@@ -327,6 +327,107 @@ if (section('giza-sees-cairo')) {
   }
 }
 
+// --- Backlit backdrop hills hold still (point 1532) -----------------------------
+// User 16.11.2026 at Giza: facing the sun, the backdrop hills were streaked and
+// trembled — the rock fractal's upper octaves aliased below a pixel and TRAA
+// shook them. Standing where the report stood and facing the sun, the hills'
+// own pixels (where the frame changes when the backdrop is hidden) must change
+// little between two consecutive still-camera frames, and clearly less than
+// with the screen-frequency fade switched off.
+if (section('backdrop-backlight')) {
+  await goToPlace('giza')
+  await page.evaluate(() => {
+    window.__game.getState().setJournalOpen(false)
+    const p = window.__placePlayer
+    const [dx, , dz] = window.__sceneSun.disc
+    // The report's spot (seed 2226741265, place-local).
+    p.x = -21.46
+    p.z = 68.12
+    p.pitch = 0
+    p.yaw = Math.atan2(-dx, -dz)
+  })
+  await nextFrames(30)
+  const backdropVisible = async (v) => {
+    await page.evaluate((shown) => {
+      const m = window.__placeScene?.getObjectByName('landscape-backdrop')
+      if (m) m.visible = shown
+    }, v)
+    await nextFrames(20)
+  }
+  const luma = async (label) => {
+    const { data, info } = await sharp(await capturePixels(page, `backdrop backlight: ${label}`)).raw().toBuffer({ resolveWithObject: true })
+    const out = new Float32Array(info.width * info.height)
+    for (let i = 0; i < out.length; i++) {
+      const j = i * info.channels
+      out[i] = 0.2126 * data[j] + 0.7152 * data[j + 1] + 0.0722 * data[j + 2]
+    }
+    return out
+  }
+  const rock = await page.evaluate(() => ({ ...window.__balance.backdropRock }))
+  const setRock = async (patch) => {
+    await page.evaluate((p) => Object.assign(window.__balance.backdropRock, p), patch)
+    await nextFrames(20)
+  }
+  await frame('1532-backdrop-backlit', { place: 'giza', label: 'the backdrop hills west of the Giza site, facing the afternoon sun' })
+  await backdropVisible(false)
+  const hidden = await luma('backdrop hidden')
+  await backdropVisible(true)
+  // Consecutive frames: one requestAnimationFrame between the two captures.
+  const tremble = async (label) => {
+    const a = await luma(`${label}, frame A`)
+    await nextFrames(1)
+    const b = await luma(`${label}, frame B`)
+    let s = 0
+    let n = 0
+    let cs = 0
+    let cn = 0
+    const lowRow = Math.floor(a.length * 0.6) // the ground disc's lower frame
+    for (let i = 0; i < a.length; i++) {
+      if (i > lowRow && i < a.length * 0.9) {
+        cn++
+        cs += Math.abs(a[i] - b[i])
+      }
+      if (Math.abs(a[i] - hidden[i]) < 8) continue // not the backdrop's own pixel
+      n++
+      s += Math.abs(a[i] - b[i])
+    }
+    return { px: n, meanDiff: +(s / Math.max(1, n)).toFixed(3), groundDiff: +(cs / Math.max(1, cn)).toFixed(3) }
+  }
+  const faded = await tremble('fade on')
+  await setRock({ fadeStartCyclesPerPx: 1e6, fadeEndCyclesPerPx: 2e6 })
+  await frame('1532-backdrop-backlit-unfaded', { place: 'giza', label: 'the same backlit hills with the rock fade switched off (the old streaks)' })
+  const unfaded = await tremble('fade off')
+  await setRock(rock)
+  // Diagnostic: the same pair with the backdrop out of the shadow map.
+  await page.evaluate(() => {
+    const m = window.__placeScene?.getObjectByName('landscape-backdrop')
+    if (m) { m.receiveShadow = false; m.material.needsUpdate = true }
+  })
+  await nextFrames(30)
+  await frame('1532-backdrop-backlit-noshadow', { place: 'giza', label: 'the same backlit hills, backdrop out of the shadow map (diagnostic)' })
+  const noShadow = await tremble('no shadow')
+  await page.evaluate(() => {
+    const m = window.__placeScene?.getObjectByName('landscape-backdrop')
+    if (m) { m.receiveShadow = true; m.material.needsUpdate = true }
+  })
+  console.log('1532 tremble', JSON.stringify({ faded, unfaded, noShadow }))
+  check(
+    'backdrop backlight: the hills cover a measurable share of the frame',
+    faded.px > 5000,
+    JSON.stringify({ faded, unfaded }),
+  )
+  check(
+    'backdrop backlight: two still-camera frames differ by < 1.5 luma on the hills, and by less than with the fade off',
+    faded.meanDiff < 1.5 && faded.meanDiff < unfaded.meanDiff,
+    JSON.stringify({ faded, unfaded }),
+  )
+  await page.evaluate(() => {
+    const p = window.__placePlayer
+    p.x = 0
+    p.z = 0
+  })
+}
+
 // --- Panorama wildlife (design.md §2) ---------------------------------------------
 if (section('panorama-wildlife')) {
   await page.evaluate(() => {

@@ -63,8 +63,9 @@ function screenFadedRock(p: typeof positionWorld) {
   const freq = vec3(...ROCK_FREQ)
   // Lowest octave's cycles per pixel; octave i spans 2^i times as many.
   const cpp0 = fwidth(p).mul(freq).length()
-  const start = float(balance.backdropRock.fadeStartCyclesPerPx)
-  const end = float(balance.backdropRock.fadeEndCyclesPerPx)
+  // Read from balance every render, so a debug edit takes effect live.
+  const start = uniform(0).onRenderUpdate(() => balance.backdropRock.fadeStartCyclesPerPx)
+  const end = uniform(1).onRenderUpdate(() => balance.backdropRock.fadeEndCyclesPerPx)
   let sum = mx_noise_float(p.mul(freq))
   for (let i = 1; i < ROCK_OCTAVES; i++) {
     const scale = 2 ** i

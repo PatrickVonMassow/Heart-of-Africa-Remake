@@ -2297,8 +2297,8 @@ export const balance: BalanceConfig = {
     skyOcclusionStrength: 0.7, // calibratable, debug-editable
   },
   backdropRock: {
-    fadeStartCyclesPerPx: 0.2, // educated guess: an octave still reads at five pixels per cycle; calibratable
-    fadeEndCyclesPerPx: 0.45, // just under Nyquist, where an octave starts to alias; calibratable
+    fadeStartCyclesPerPx: 0.2, // educated guess: an octave still reads at five pixels per cycle; calibratable, debug-editable
+    fadeEndCyclesPerPx: 0.45, // just under Nyquist, where an octave starts to alias; calibratable, debug-editable
   },
   exposure: {
     base: 1.05, // today's fixed toneMappingExposure (src/App.tsx); calibratable, debug-editable
