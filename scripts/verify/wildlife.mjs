@@ -17,7 +17,7 @@
 // parent stays beside it, and once the window heals the limp ends and the pair
 // is back with the herd — never left detached.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
-import { frameShutter } from './frameSubject.mjs'
+import { frameShutter, waitForSceneReady } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 
@@ -718,6 +718,209 @@ if (section('straggler')) {
     B.straggler.healSeconds = prev.heal
     B.parentDefense.forceOutcome = prev.force
     window.__strScene = undefined
+  })
+}
+
+// herd-walk (work-order 414, design.md §19.5): on HIGH a near bird's-eye
+// herd animal of a rigged species walks on pivoted legs. One grown zebra, staged
+// on the dry-season Serengeti at the closest zoom, is driven
+// along its facing at a fixed pace and photographed twice, a quarter stride
+// apart (half a stride would only trade the diagonal pairs, which can read as
+// the same pose): it must be drawn in the walking pool (body + four legs), its legs must
+// have swung between the frames, and the same animal held still must settle
+// to neutral legs (the stride follows distance, not the clock).
+if (section('herd-walk')) {
+  // Staging (owner picture review 17.11.2026): the first frames stood at the
+  // falls in January — spray, rain and fog, the animal a speck. So: the open
+  // Serengeti plain (the trample check's savanna), an August dry-season day
+  // with the season wetness forced dry, a near zoom that holds the whole animal,
+  // and one dedicated zebra walked through the rendered frame centre, beside
+  // the traveller. The day is pinned for both frames.
+  await page.evaluate(() => {
+    const ui = window.__ui.getState()
+    const g = window.__game.getState()
+    window.__hwPrev = { level: ui.detailLevel, zoom: ui.travelZoom, wheel: ui.wheelZoomEnabled, wet: ui.seasonWetnessOverride, day: g.day }
+    if (g.mode === 'place') g.leavePlace()
+    ui.setDetailLevel('high')
+    ui.setSeasonWetnessOverride(0) // dry: no rain, no wet haze
+    window.__game.setState({ day: 220 }) // early August, the Serengeti dry season
+    window.__game.getState().debugJumpTo(-2.2, 34.8)
+    ui.setWheelZoomEnabled(true)
+    ui.setTravelZoom(0.25) // near zoom: the closest (0.125) cut the whole animal off the frame (picture review 17.11.2026)
+  })
+  await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current && !!window.__wildlife?.gaitMeshes, null, { timeout: 60000 })
+  await page.evaluate(() => {
+    const lion = window.__lionHunt.state
+    lion.mode = 'idle'; lion.timer = 99999; lion.victim = null; lion.victimHunt = false
+  })
+  // The walk frames are shot in motion (`settle: false`), which waits only for
+  // some picture: on WebGL 2 that was the bare haze before the jumped-to terrain
+  // streamed in. The scene settles once here, before the zebra is staged.
+  const ground = await waitForSceneReady(page)
+  check('the Serengeti scene finished drawing before the walk frames (work-order 414)', !ground.timedOut, JSON.stringify(ground))
+
+  const SPEED = 1
+  const staged = await page.evaluate(async (SPEED) => {
+    const herds = window.__wildlife.herdsRef.current
+    const seed = window.__game.getState().seed
+    const ter = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
+    const land = (x, z) => { const t = ter(x, z); return t !== 'water' && t !== 'ocean' }
+    const p0 = window.__game.getState().pos
+    const cam = window.__camera
+    const gy = (x, z) => window.__wildlife.groundAt(x, z)
+    // Judged by the RENDERED projection at the ground's own height (picture
+    // review 17.11.2026): at the closest zoom the traveller stands near the top
+    // edge, so a line through the traveller's spot ran above the frame. The
+    // walk line runs through the ground point at the frame centre instead,
+    // stays inside the inner frame for its whole length, is dry land, and keeps
+    // clear of the traveller so the figures do not overlap.
+    // Feet AND back (1.4 units up) must project inside, so the whole body is in frame.
+    const inner = (x, z) => [0, 1.4].every((up) => { const n = cam.ndc(x, z, gy(x, z) + up); return n.z < 1 && Math.abs(n.x) < 0.6 && Math.abs(n.y) < 0.55 })
+    let c = null; let best = Infinity
+    for (let i = -24; i <= 24; i++) {
+      for (let j = -24; j <= 24; j++) {
+        const x = p0.x + i * 0.25; const z = p0.z + j * 0.25
+        const n = cam.ndc(x, z, gy(x, z) + 0.7)
+        const d = Math.hypot(n.x, n.y)
+        if (n.z < 1 && d < best) { best = d; c = { x, z } }
+      }
+    }
+    if (!c) return { error: 'no ground point at the frame centre' }
+    const HALF = 1
+    const at = (h, f) => ({ x: c.x + Math.sin(h) * f, z: c.z + Math.cos(h) * f })
+    // Of the valid lines the most side-on one (widest screen-x sweep): a walk
+    // seen end-on hides its legs under the body.
+    let heading = null; let sweep = -1
+    for (let k = 0; k < 16; k++) {
+      const h = (k / 16) * Math.PI * 2
+      let ok = true
+      for (let f = -HALF; f <= HALF + 1e-4; f += 0.25) {
+        const q = at(h, f)
+        if (!land(q.x, q.z) || !inner(q.x, q.z) || Math.hypot(q.x - p0.x, q.z - p0.z) < 2.2) { ok = false; break }
+      }
+      if (!ok) continue
+      const e0 = at(h, -HALF); const e1 = at(h, HALF)
+      const sx = Math.abs(cam.ndc(e1.x, e1.z, gy(e1.x, e1.z)).x - cam.ndc(e0.x, e0.z, gy(e0.x, e0.z)).x)
+      if (sx > sweep) { sweep = sx; heading = h }
+    }
+    if (heading === null) return { error: 'no dry walk line through the frame centre', centre: c }
+    const { x: x0, z: z0 } = at(heading, -HALF)
+    // A dedicated grown zebra (the point-1498 staging shape), inside the drawn capacity.
+    const a = { x: x0, z: z0, y: window.__wildlife.groundAt(x0, z0), rot: heading, heading, scale: 1, phase: 0.3, chunk: undefined, grounded: true }
+    herds.zebra.unshift(a)
+    const pin = { on: true, walk: true, x: x0, z: z0, y: a.y }
+    // The position is pinned by ACCESSORS, not by a reset in the rAF loop:
+    // R3F re-requests its frame at the start of its callback, so it always runs
+    // BEFORE `hold` — a reset there let the sim shift the animal for the frame
+    // it was drawn in, and frame-time jitter turned that shift into a drawn
+    // back-and-forth the gait counted as walking (the staged zebra "walked on
+    // the spot"). With accessors the sim cannot move it; only the pin does.
+    for (const k of ['x', 'z', 'y']) {
+      Object.defineProperty(a, k, { get: () => pin[k], set: () => {}, enumerable: true, configurable: true })
+    }
+    const hold = () => {
+      if (!pin.on) return
+      if (pin.walk) {
+        pin.x += Math.sin(heading) * SPEED / 60
+        pin.z += Math.cos(heading) * SPEED / 60
+        pin.y = window.__wildlife.groundAt(pin.x, pin.z)
+      }
+      // The drawn body follows `face` (steered toward the herd's yaw each frame), so it is pinned too.
+      a.rot = heading; a.heading = heading; a.face = heading; a.wobAmp = 0
+      requestAnimationFrame(hold)
+    }
+    hold()
+    window.__hw = { sp: 'zebra', a, pin }
+    await window.__pollSim(1, () => false)
+    return { sp: 'zebra', heading: +heading.toFixed(2), day: window.__game.getState().day }
+  }, SPEED)
+  check('a grown zebra walks through the rendered frame centre on dry land for the walk frames (work-order 414)', !staged.error, JSON.stringify(staged))
+
+  if (!staged.error) {
+    // The drawn pose: the animal's instance in its species' walking pool, and
+    // each leg's swing angle read back from (body⁻¹ · leg).
+    await page.evaluate(() => {
+      window.__hwPose = () => {
+        const { sp, a } = window.__hw
+        const g = window.__wildlife.gaitMeshes[sp]
+        const M4 = g.body.matrixWorld.constructor
+        const arr = g.body.instanceMatrix.array
+        let idx = -1
+        for (let i = 0; i < g.body.count; i++) {
+          if (Math.hypot(arr[i * 16 + 12] - a.x, arr[i * 16 + 14] - a.z) < 1.2) { idx = i; break }
+        }
+        if (idx < 0) return { inPool: false, bodyCount: g.body.count }
+        const body = new M4().fromArray(arr, idx * 16)
+        const inv = body.clone().invert()
+        const angles = g.legs.map((leg) => {
+          const local = inv.clone().multiply(new M4().fromArray(leg.instanceMatrix.array, idx * 16))
+          return +Math.atan2(local.elements[6], local.elements[5]).toFixed(4)
+        })
+        return { inPool: true, angles, gaitDist: +(a.gaitDist ?? 0).toFixed(3), x: a.x, z: a.z, y: a.y }
+      }
+    })
+    // Both frames on the SAME in-game day (the owner saw the date jump one).
+    // The day is set before each frame and READ BACK after its shutter, so the
+    // check observes what the frame showed rather than the value just assigned.
+    const pinDay = () => page.evaluate((d) => { window.__game.setState({ day: d }) }, staged.day)
+    const readDay = () => page.evaluate(() => window.__game.getState().day)
+    await pinDay()
+    const first = await page.evaluate(() => window.__hwPose())
+    await shot('414-herd-walk-a', { world: { x: first.x ?? 0, z: first.z ?? 0, y: first.y }, label: `a walking ${staged.sp} at the closest bird's-eye zoom on HIGH, dry-season Serengeti, legs at one point of the stride`, settle: false })
+    const dayA = await readDay()
+    // A quarter stride further on: a leg at neutral is now at full reach.
+    // The target is anchored to the FIRST frame's stride distance (rig units),
+    // not to whenever this call starts: the shutter above takes time, so the
+    // gap is d0 + a quarter stride plus whole strides (the same pose phase),
+    // the smallest such target still ahead of the walker.
+    const second = await page.evaluate(async (d0) => {
+      const { sp } = window.__hw
+      const g = window.__wildlife.gaitMeshes[sp]
+      const scale = window.__hw.a.scale || 1
+      const fullStride = (2 * Math.PI) / g.cadence
+      const quarter = fullStride / 4
+      const now = window.__hw.a.gaitDist ?? 0
+      const n = Math.max(0, Math.floor((now - d0 - quarter) / fullStride) + 1)
+      const target = d0 + quarter + n * fullStride
+      await window.__pollSim(((target - now) * scale) / 1.5 + 2, () => (window.__hw.a.gaitDist ?? 0) >= target)
+      return { ...window.__hwPose(), target: +target.toFixed(3) }
+    }, first.gaitDist ?? 0)
+    await pinDay()
+    await shot('414-herd-walk-b', { world: { x: second.x ?? 0, z: second.z ?? 0, y: second.y }, label: `the same ${staged.sp} a quarter stride later, same day — the legs have swung`, settle: false })
+    const dayB = await readDay()
+    check('both walk frames show the same in-game day (work-order 414 picture review)', Math.floor(dayA) === Math.floor(dayB), JSON.stringify({ dayA, dayB }))
+    const swing = first.inPool && second.inPool ? Math.max(...first.angles.map((v, k) => Math.abs(v - second.angles[k]))) : 0
+    check('the walking animal is drawn on pivoted legs and its legs moved between two frames a quarter stride apart (work-order 414)',
+      first.inPool && second.inPool && swing > 0.15 && second.gaitDist > first.gaitDist, JSON.stringify({ first, second, swing }))
+
+    // Standing still: the legs settle to neutral and the stride stops.
+    const still = await page.evaluate(async () => {
+      window.__hw.pin.walk = false
+      await window.__pollSim(1, () => false)
+      const a = window.__hwPose()
+      await window.__pollSim(1, () => false)
+      const b = window.__hwPose()
+      return { a, b }
+    })
+    check('a standing animal does not walk on the spot: its legs settle to neutral and its stride stops (work-order 414)',
+      still.a.inPool && still.b.inPool && Math.abs(still.b.gaitDist - still.a.gaitDist) < 0.05 && Math.max(...still.b.angles.map(Math.abs)) < 0.05,
+      JSON.stringify(still))
+  }
+  await page.evaluate(() => {
+    const prev = window.__hwPrev
+    if (window.__hw) {
+      window.__hw.pin.on = false
+      const list = window.__wildlife.herdsRef.current.zebra
+      const i = list.indexOf(window.__hw.a)
+      if (i >= 0) list.splice(i, 1)
+    }
+    const ui = window.__ui.getState()
+    ui.setDetailLevel(prev.level)
+    ui.setSeasonWetnessOverride(prev.wet)
+    ui.setTravelZoom(prev.zoom)
+    ui.setWheelZoomEnabled(prev.wheel)
+    window.__game.setState({ day: prev.day })
+    window.__hw = undefined
   })
 }
 

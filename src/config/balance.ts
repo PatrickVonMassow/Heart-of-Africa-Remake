@@ -3350,6 +3350,27 @@ export const VILLAGE_CATTLE = {
 } as const
 
 /**
+ * The bird's-eye herds' walk (work-order 414, design.md §19.5): the settlement
+ * gait (`src/render/fauna.ts`) carried onto the travel herds. Every value is a
+ * CALIBRATABLE educated guess until the F8 benchmark on the player's own
+ * hardware prices the bands (`src/scenes/travel/herdGait.ts`).
+ */
+export const HERD_GAIT = {
+  /** Distance from the traveller (world units) inside which a rigged animal is
+   *  drawn with pivoted, swinging legs. */
+  articulatedRadius: 60,
+  /** Distance inside which an animal beyond the articulated band still carries
+   *  the cheaper body-lift cue; beyond it the body is drawn plain. */
+  liftRadius: 140,
+  /** Ground speed (world units/s) below which an animal counts as standing:
+   *  its legs settle to neutral instead of creeping through a stride. */
+  standSpeed: 0.05,
+  /** Largest per-frame ground step (world units) still read as walking; a
+   *  longer jump (respawn, streaming re-seat) is a teleport and moves no leg. */
+  maxStep: 3,
+} as const
+
+/**
  * Micro-structure of the figures' surfaces (villagers and the traveller, design
  * line 64): the baked cloth / leather / skin maps (scripts/textureFields.mjs)
  * projected triplanar in the body's BIND-POSE space (render/materials.ts

@@ -50,6 +50,7 @@ device pixel ratio is kept (no cap).
 | `placeRiverFlotsam` | 12 | 48 | 90 |
 | `waterDetailOctaves` | 1 | 3 | 4 |
 | `faunaBodySegments` | 12 | 18 | 24 |
+| `herdGait` | off | off | on |
 | `figureBodySegments` | 0 | 16 | 24 |
 | `figureGltfBody` | off | on | on |
 | `grassFireFlames` | 16 | 28 | 40 |
@@ -169,6 +170,23 @@ added.
   the bank and the panorama's continuation of it past the ground plate's rim —
   because a level that thinned only one of them would put back the straight seam
   the two used to meet along. Climbs 1 → 3 → 4.
+- **`herdGait`** — The bird's-eye herds walk (work-order 414): elephant,
+  giraffe, zebra and antelope adults near the traveller draw from the SAME
+  body-and-pivoted-legs description the settlement and panorama animals use
+  (`buildElephantParts`, `buildGiraffeParts`, `buildZebraParts`,
+  `buildAntelopeParts`), their legs swung by the shared distance-driven phase
+  (`src/scenes/travel/herdGait.ts`): a standing animal stands still, a faster
+  one steps faster. Inside a level that carries it, the walk degrades by
+  DISTANCE from the traveller (`HERD_GAIT`, balance.ts, calibratable):
+  articulated legs within 60 world units, the body-lift cue only out to 140,
+  the plain merged body beyond. Cost: with animals in both pools, up to FIVE extra
+  instanced draws per rigged species — the split body plus four legs, beside
+  the merged draw — each with its shadow passes, and four leg matrices per
+  articulated animal. Low never carries it and high always does (user decision
+  29.07.2026); medium is OFF until the F8 benchmark on the player's own
+  hardware prices it — an open measurement, not a settled value. Species
+  without a part description (wildebeest, warthog, the predators, birds,
+  crocodile) and all calves stay unrigged.
 - **`faunaBodySegments`** — Radial segments of the swept torso, neck and head
   of the detailed ungulates — zebra, antelope (gazelle) and the settlement goat
   (work-order 1284); legs take 0.6 of it, tails, horns and manes a third. It
