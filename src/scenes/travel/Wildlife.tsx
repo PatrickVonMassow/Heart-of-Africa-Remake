@@ -6521,14 +6521,15 @@ function Herds() {
         // frames had one of the two on land.
         const crocOwnsFacing = sp === 'crocodile' && a.lunge !== undefined
         if (sp !== 'elephant' && !thrashing && !crocOwnsFacing && yaw !== idleYaw) a.rot = face
-        // The walk (work-order 414): the stride advances with the ground this
-        // drawn body covered — shuffle included, since that moves the body
-        // too — never with the clock. Calves have no rig of their own and keep
+        // The walk (work-order 414): the stride advances with the ground the
+        // LOGICAL spot covered (anchor, before the cosmetic shuffle wobble, so a
+        // grazing animal stands rather than walking on the spot) — never with
+        // the clock. Calves have no rig of their own and keep
         // the merged body; elders take the body-lift cue on the adult rig.
         let legPhase: number | undefined
         if (gaitPool) {
           const canStep = !thrashing && !a.dying && a.inWater === undefined && !isAirborne(a.air)
-          const gp = advanceHerdGait(a, px, pz, a.scale, gaitPool.cadence, dt, canStep)
+          const gp = advanceHerdGait(a, anchorX, anchorZ, a.scale, gaitPool.cadence, dt, canStep)
           const band = a.young ? 'none' : herdGaitBand(Math.hypot(px - pos.x, pz - pos.z), herdWalkOn)
           if (band !== 'none') {
             bodyY += herdBodyLift(gp, gaitPool.legLength, a.scale)
