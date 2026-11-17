@@ -1890,6 +1890,8 @@ if (section('giza-figures')) {
   await page.waitForFunction(() => window.__game.getState().placeId === 'giza' && !!window.__placeLayout && !!window.__placeScene,
     null, { timeout: 30000 })
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  // Held from arrival: the frames below are aimed at the ambient anchors.
+  await page.evaluate(() => window.__placeFreezeLife?.(true))
   const level = await page.evaluate(() => window.__ui.getState().detailLevel)
   try {
     const census = (skinnedWanted) =>
@@ -1927,7 +1929,8 @@ if (section('giza-figures')) {
         !!people && people.every((f) => f.headRise > 0.95 && f.headRise < 1.35), JSON.stringify(people))
     }
     // The wide frame: from the south over the approach, the woman tourist in
-    // front, the donkey-boy, the cameleer and his camel, the guides beyond.
+    // front, the donkey-boy, the cameleer and his camel, the guides beyond —
+    // held since arrival, near their anchors (they walk, work-order 1529).
     await page.evaluate(() => {
       const p = window.__placePlayer
       p.x = 3
@@ -1938,8 +1941,7 @@ if (section('giza-figures')) {
     await waitForStable(page)
     await frame(shot('1378-giza-ambient'), { place: 'giza', label: "the plateau's ambient life on the villagers' dressed body" })
     // Closer: the tourist man in his sun helmet beside a guide in galabiya and
-    // turban — where they stand NOW (they walk, work-order 1529), held still.
-    await page.evaluate(() => window.__placeFreezeLife?.(true))
+    // turban — where they stand NOW, still held.
     const near = await page.evaluate(() => {
       const live = window.__gizaActivity()
       const [gx, gz] = [live[0].x, live[0].z]
