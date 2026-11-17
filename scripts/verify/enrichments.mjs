@@ -12464,7 +12464,9 @@ if (section('horizon-maps')) {
   // with the close fade switched off — the old picture — against with it on;
   // the fade must remove most of it. Cloud shadows, birds and LOD swaps change
   // pixels in both pairs alike. At an overview zoom the land still shades.
-  const LUXOR = { lat: 25.72, lon: 32.5 } // Theban hills on the west bank, over the Nile valley
+  // Dry desert west of the Theban hills: at 32.5 E the traveller landed in the
+  // rendered Nile and the current carried him out of frame between captures.
+  const LUXOR = { lat: 25.72, lon: 32.3 }
   const DEC_21 = 354
   const zoomWas = await page.evaluate(() => ({ z: window.__ui.getState().travelZoom, wheel: window.__ui.getState().wheelZoomEnabled }))
   await page.evaluate(([d, la, lo]) => {
