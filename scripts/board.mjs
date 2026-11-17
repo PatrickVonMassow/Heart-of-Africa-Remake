@@ -77,7 +77,6 @@ import {
   setCardDescription,
   parseClosingArgs,
   parseDoneArgs,
-  DONE_USAGE,
   requireMeasuresText,
   pointSubject,
   promoteToNow,
@@ -470,7 +469,7 @@ try {
     // ONE edit, one write (point 416): archiving and the successor go into the
     // same document, so the board is never observed without current work.
     const { point, words, next, nextWords, noneWords, hasNone, checked } = parseDoneArgs(rest)
-    if (!point) throw new Error(`usage: ${DONE_USAGE}`)
+    if (!point) throw new Error(`usage: board.mjs done <point> "<measures>" [--checked "<backends>"] [--next <m> "<status>" | --none "<reason>"]`)
     // Read once: stdin can be consumed only once, and the measures text is
     // required before anything else is touched (point 1535).
     const measures = textOf(words)

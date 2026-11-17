@@ -2497,7 +2497,7 @@ export const DONE_USAGE =
  */
 export function requireMeasuresText(text, point) {
   if (String(text ?? '').trim()) return
-  throw new Error(`board: done ${point ?? '<point>'} needs the measures text (what was changed). Usage: ${DONE_USAGE}`)
+  throw new Error(`board: done ${point ?? '<point>'} needs the measures text (what was changed). Accepted syntax: ${DONE_USAGE}`)
 }
 
 /**
