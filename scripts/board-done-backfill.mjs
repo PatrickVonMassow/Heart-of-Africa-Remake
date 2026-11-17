@@ -20,7 +20,7 @@ const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
 const ARCHIVE = resolve(REPO_ROOT, '.batch-dashboard-archive.html')
 const TEXTS = resolve(REPO_ROOT, 'scripts', 'board-done-measures.json')
 
-const git = (...args) => execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+const git = (...args) => execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, windowsHide: true })
 // The owner's local main; a clone without one (a cloud checkout) reads origin/main.
 const mainRef = () => {
   try {

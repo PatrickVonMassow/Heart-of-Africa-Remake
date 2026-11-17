@@ -14,6 +14,7 @@ import {
   renderCardSections,
   renderStatusSection,
 } from './board-core.mjs'
+import { pointOwnershipFromTitle } from './dashboard-point-reader-core.mjs'
 
 const CARD_RE = /<details>\s*<summary>[\s\S]*?<\/details>/g
 const BODY_RE = /(<div class="body">)([\s\S]*?)(\s*<\/div>\s*<\/details>)$/
@@ -22,8 +23,9 @@ const BODY_RE = /(<div class="body">)([\s\S]*?)(\s*<\/div>\s*<\/details>)$/
 export function cardPoint(card) {
   const chip = String(card).match(/<span class="num">(\d+)<\/span>/)
   if (chip) return Number(chip[1])
-  const legacy = String(card).match(/<span class="t">\s*(\d+)\s*[—–-]/)
-  return legacy ? Number(legacy[1]) : null
+  const title = (String(card).match(/<span class="t">([^<]*)<\/span>/) ?? [])[1]
+  const points = title == null ? [] : pointOwnershipFromTitle(title, { allowUnseparatedSingle: true }).points
+  return points.length === 1 ? Number(points[0]) : null
 }
 
 /** Whether a card already shows the measures heading — the backfill is idempotent. */
