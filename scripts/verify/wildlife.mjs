@@ -17,7 +17,7 @@
 // parent stays beside it, and once the window heals the limp ends and the pair
 // is back with the herd — never left detached.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
-import { frameShutter } from './frameSubject.mjs'
+import { frameShutter, waitForSceneReady } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 
@@ -753,6 +753,11 @@ if (section('herd-walk')) {
     const lion = window.__lionHunt.state
     lion.mode = 'idle'; lion.timer = 99999; lion.victim = null; lion.victimHunt = false
   })
+  // The walk frames are shot in motion (`settle: false`), which waits only for
+  // some picture: on WebGL 2 that was the bare haze before the jumped-to terrain
+  // streamed in. The scene settles once here, before the zebra is staged.
+  const ground = await waitForSceneReady(page)
+  check('the Serengeti scene finished drawing before the walk frames (work-order 414)', !ground.timedOut, JSON.stringify(ground))
 
   const SPEED = 1
   const staged = await page.evaluate(async (SPEED) => {
