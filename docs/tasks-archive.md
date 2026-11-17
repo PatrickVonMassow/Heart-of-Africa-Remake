@@ -37435,3 +37435,13 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Test: Vitest for routing and role behaviour (positions change over time, stay off monuments); a Playwright polish frame of the Giza site showing figures in activity, both backends.
   Source: user request 16.11.2026 16:16 (eb44b158).
   Bundle: Monumente.
+
+- [x] 1530. Replace the Giza camel's box primitives with a proper camel model
+  User 16.11.2026: "dem für das Kamel fehlt noch das Modell"; queued at the front ("ja, beide vorne einreihen").
+  Measured: `Camel()` in src/scenes/place/PlaceScene.tsx ~2319 is a box body, a sphere hump, a cylinder neck, a box head and four straight stick legs; in verification/1378-giza-ambient.png it reads as a crate on stilts.
+  Player impact: the camel is visibly a box primitive beside shaped villager bodies.
+  Final state: a dromedary (one hump, Egypt 1890) with a rounded body, a hump growing out of the back, an S-curved neck, a head with muzzle and ears, jointed legs with knees and wide pads, and a tail; detail level and low-preset fallback like the villager figures; a simple head/neck/tail idle; used everywhere `Camel()` is used now (check panoramaWildlife for a shared camel). The donkey is not part of this point. Colours and proportions calibratable in src/config/balance.ts.
+  Also owed (finding 17.11.2026): the full polish-panorama run on both backends that 1529 landed without (it covered only the giza-figures and giza-activity sections); the covering run of this point pays it.
+  Test: Vitest for the model builder (parts present, height fits the existing label height 2.4); a Playwright close-up frame of the Giza camel, both backends, picture-checked.
+  Source: user request 16.11.2026 16:16 (eb44b158).
+  Bundle: Monumente.
