@@ -8,6 +8,7 @@ import {
   HORIZON_BOUNDS,
   HORIZON_MAP_SIZE,
   horizonCloseFade,
+  horizonPixelsPerTexel,
   horizonShadowSoftnessDeg,
   horizonUniformValues,
   setHorizonMapsWanted,
@@ -71,6 +72,18 @@ describe('horizon shadow smoothing', () => {
       expect(w).toBeLessThanOrEqual(last)
       last = w
     }
+  })
+
+  it('measure a foreshortened texel along its longer side, so it still fades', () => {
+    const W = 1000
+    const H = 1000
+    // 80 px across, 20 px deep: per pixel the UV moves 1/80 and 1/20 of a texel.
+    const ppt = horizonPixelsPerTexel(1 / 80 / W, 1 / 20 / H, W, H)
+    expect(ppt).toBeCloseTo(80, 9)
+    expect(horizonPixelsPerTexel(1 / 20 / W, 1 / 80 / H, W, H)).toBeCloseTo(80, 9)
+    expect(horizonCloseFade(ppt, h.closeFadeStartPx, h.closeFadeEndPx)).toBe(0)
+    // A square texel reads its side either way.
+    expect(horizonPixelsPerTexel(1 / 30 / W, 1 / 30 / H, W, H)).toBeCloseTo(30, 9)
   })
 })
 

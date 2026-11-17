@@ -12,7 +12,7 @@
 // Settlements have their own scene and ground and never read these.
 
 import * as THREE from 'three/webgpu'
-import { atan, float, fwidth, max, mix, positionWorld, smoothstep, texture, uniform, vec2, vec4 } from 'three/tsl'
+import { atan, float, fwidth, max, min, mix, positionWorld, smoothstep, texture, uniform, vec2, vec4 } from 'three/tsl'
 import { balance } from '../config/balance'
 import { UNITS_PER_DEGREE } from '../world/geo'
 import { createHorizonMapGate } from './horizonMapGate'
@@ -71,6 +71,14 @@ function smoothstepCpu(e0: number, e1: number, x: number): number {
   return t * t * (3 - 2 * t)
 }
 
+/** Screen pixels one texel spans along its LONGER projected side, from the
+ *  map UV's per-pixel change (fwidth) and the map size. The shorter side must
+ *  not decide: a foreshortened texel 80 px wide and 20 px deep shows its
+ *  blocks across the 80. The shader node mirrors this per fragment. */
+export function horizonPixelsPerTexel(fwidthU: number, fwidthV: number, width: number, height: number): number {
+  return 1 / Math.max(Math.min(fwidthU * width, fwidthV * height), 1e-6)
+}
+
 /** Weight of the horizon terms by magnification (1 = full, 0 = faded out):
  *  a texel covering more than `startPx` screen pixels starts to fade, at
  *  `endPx` it is gone. The shader node mirrors this per fragment. */
@@ -115,7 +123,7 @@ const mapB = texture(placeholder(), horizonUV)
 // The horizon terms' weight at this fragment: enabled, and faded out where one
 // texel covers so many screen pixels that its blocks would show.
 function createWeightNode() {
-  const texelsPerPixel = max(fwidth(horizonUV.x).mul(mapSizeU.x), fwidth(horizonUV.y).mul(mapSizeU.y))
+  const texelsPerPixel = min(fwidth(horizonUV.x).mul(mapSizeU.x), fwidth(horizonUV.y).mul(mapSizeU.y))
   const pixelsPerTexel = float(1).div(max(texelsPerPixel, 1e-6))
   return enabledU.mul(float(1).sub(smoothstep(fadeStartU, fadeEndU, pixelsPerTexel)))
 }
