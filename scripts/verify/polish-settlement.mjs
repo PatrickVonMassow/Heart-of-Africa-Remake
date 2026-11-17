@@ -802,6 +802,8 @@ if (section('rain-depth')) {
       PLACE,
       { timeout: 40000 },
     )
+    // Entering writes the arrival entry and opens the journal over the frame.
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
     await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
     const heavy = await page
       .waitForFunction(() => window.__placeSeason().rain > 0.5, null, { timeout: 15000 })
