@@ -37445,3 +37445,12 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Test: Vitest for the model builder (parts present, height fits the existing label height 2.4); a Playwright close-up frame of the Giza camel, both backends, picture-checked.
   Source: user request 16.11.2026 16:16 (eb44b158).
   Bundle: Monumente.
+
+- [x] 1531. Smooth the bird's-eye horizon shadow so its 5.6 km texels no longer show as stair-step blocks
+  User 16.11.2026 with screenshot: "Warum sieht das so klötzchenhaft aus?"; recommendation (options 1 + 3) approved and queued at the front.
+  Measured from code and data, not yet in the running game: the horizon maps (src/render/horizonMaps.ts) have a ~5.6 km texel (public/geodata/horizon.json, cellMeters 5566); the linearly filtered slope is thresholded by smoothstep over only ±1.5° (balance.horizonMaps.shadowSoftnessDeg) after a ×15 reliefScale, so the shadow flips texel by texel along dune ridges at close zoom over Nile-valley sand under a low sun.
+  Player impact: the bird's-eye ground shows blocky stair-step shadows at close zoom.
+  Final state: (1) the shadow transition is widened (softness scaling with reliefScale) and/or the shadow term blurred across neighbouring texels, so no texel edge shows as a step at any zoom; (2) when one horizon texel covers more than a calibratable number of screen pixels, the shadow and sky-occlusion terms fade toward 1, far and overview zooms unchanged. No re-bake at higher resolution. New constants calibratable in src/config/balance.ts.
+  Test: Vitest for the fade factor (texel-to-pixel ratio to weight) and the softened curve; Playwright frames of the bird's-eye view at close zoom over Egyptian ground under a low sun (no stair steps) and at an overview zoom (land shading still present), both backends, picture-checked.
+  Source: user request 16.11.2026 16:21 (eb44b158).
+  Bundle: Sonne & Himmel.

@@ -77,15 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1531. Smooth the bird's-eye horizon shadow so its 5.6 km texels no longer show as stair-step blocks
-  User 16.11.2026 with screenshot: "Warum sieht das so klötzchenhaft aus?"; recommendation (options 1 + 3) approved and queued at the front.
-  Measured from code and data, not yet in the running game: the horizon maps (src/render/horizonMaps.ts) have a ~5.6 km texel (public/geodata/horizon.json, cellMeters 5566); the linearly filtered slope is thresholded by smoothstep over only ±1.5° (balance.horizonMaps.shadowSoftnessDeg) after a ×15 reliefScale, so the shadow flips texel by texel along dune ridges at close zoom over Nile-valley sand under a low sun.
-  Player impact: the bird's-eye ground shows blocky stair-step shadows at close zoom.
-  Final state: (1) the shadow transition is widened (softness scaling with reliefScale) and/or the shadow term blurred across neighbouring texels, so no texel edge shows as a step at any zoom; (2) when one horizon texel covers more than a calibratable number of screen pixels, the shadow and sky-occlusion terms fade toward 1, far and overview zooms unchanged. No re-bake at higher resolution. New constants calibratable in src/config/balance.ts.
-  Test: Vitest for the fade factor (texel-to-pixel ratio to weight) and the softened curve; Playwright frames of the bird's-eye view at close zoom over Egyptian ground under a low sun (no stair steps) and at an overview zoom (land shading still present), both backends, picture-checked.
-  Source: user request 16.11.2026 16:21 (eb44b158).
-  Bundle: Sonne & Himmel.
-
 - [ ] 1532. Fade the backdrop hills' rock noise with distance so backlit ridges stop aliasing and trembling
   User 16.11.2026: "Bei Gegenlicht sehen die Berge nicht gut aus und außerdem zittern sie." (report /backup/hoa/local/hoa-state-2026-11-16-2226741265.zip: seed 2226741265, giza, 15.01.1890 14:00, high, WebGPU); queued at the front ("ja").
   Measured from code, not yet in the running game: in src/scenes/place/backdropMaterial.ts ~73-83 the `fine` octave is distance-faded (detailFade(70, 200)) but the 4-octave `rock` fractal (freq 0.16/0.28/0.16) is not; it drives colour and bump normal, so its upper octaves alias far below a pixel and TRAA turns them into frame-to-frame trembling on the dark backlit flanks. Side finding in the same picture: a bright yellow sand band at left with stair-stepped edges (likely the backdrop heightfield's coarse biome vertex colour).
