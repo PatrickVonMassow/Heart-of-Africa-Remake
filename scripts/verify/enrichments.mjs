@@ -12513,35 +12513,40 @@ if (section('horizon-maps')) {
   }
   const ZERO = { shadowStrength: 0, skyOcclusionStrength: 0 }
   const NO_FADE = { closeFadeStartPx: 1e6, closeFadeEndPx: 2e6 }
+  // Animation (water edge, cloud shadows, the traveller idling) adds positive
+  // error to every difference and does not cancel between pairs (cross-review):
+  // the zeroed frame is taken twice, and the difference of those two — the
+  // matched control residual — is subtracted from the horizon effect.
+  const horizonEffect = async (label, patch) => {
+    const on = await lumaOf(label)
+    await setHz({ ...patch, ...ZERO })
+    const zeroA = await lumaOf(`${label}, zeroed`)
+    const zeroB = await lumaOf(`${label}, zeroed again`)
+    await setHz(hz)
+    const raw = effect(on, zeroA)
+    const noise = effect(zeroA, zeroB)
+    return { raw, noise, net: +(raw - noise).toFixed(3) }
+  }
   const smoothing = {}
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.125))
   await setHz(NO_FADE)
   await shot(backend('1531-horizon-close-unfaded'), { world: LUXOR, label: 'Theban hills on 21 December at 16:00, closest zoom, close fade switched off (the old blocks)' })
-  const unfaded = await lumaOf('close, fade off')
-  await setHz({ ...NO_FADE, ...ZERO })
-  smoothing.closeUnfaded = effect(unfaded, await lumaOf('close, fade off, zeroed'))
-  await setHz(hz)
+  smoothing.closeUnfaded = await horizonEffect('close, fade off', NO_FADE)
   await shot(backend('1531-horizon-close'), { world: LUXOR, label: 'Theban hills on 21 December at 16:00, closest zoom, horizon maps on (medium)' })
-  const faded = await lumaOf('close, fade on')
-  await setHz(ZERO)
-  smoothing.closeFaded = effect(faded, await lumaOf('close, zeroed'))
-  await setHz(hz)
+  smoothing.closeFaded = await horizonEffect('close, fade on', {})
   await page.evaluate(() => window.__ui.getState().setTravelZoom(4))
   await shot(backend('1531-horizon-overview'), { world: LUXOR, label: 'Upper Egypt round Luxor on 21 December at 16:00, overview zoom, horizon maps on (medium)' })
-  const over = await lumaOf('overview')
-  await setHz(ZERO)
-  smoothing.overview = effect(over, await lumaOf('overview, zeroed'))
-  await setHz(hz)
+  smoothing.overview = await horizonEffect('overview', {})
   await page.evaluate((was) => {
     window.__ui.getState().setTravelZoom(was.z)
     window.__ui.getState().setWheelZoomEnabled(was.wheel)
   }, zoomWas)
   check(
     'horizon smoothing: the close fade removes most of the horizon terms at the closest zoom',
-    smoothing.closeUnfaded > 0.5 && smoothing.closeFaded < 0.5 * smoothing.closeUnfaded,
+    smoothing.closeUnfaded.net > 0.5 && smoothing.closeFaded.net < 0.5 * smoothing.closeUnfaded.net,
     JSON.stringify(smoothing),
   )
-  check('horizon smoothing: the overview zoom still shades the land', smoothing.overview > 0.3, JSON.stringify(smoothing))
+  check('horizon smoothing: the overview zoom still shades the land beyond the animation residual', smoothing.overview.net > 0.3, JSON.stringify(smoothing))
   check('horizon maps: no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
 }
 
