@@ -3304,6 +3304,39 @@ export const GIZA_CAST = {
 } as const
 
 /**
+ * The Giza dromedary (src/scenes/place/camelModel.ts): coat colours, the
+ * proportions of the swept body (m, model faces +z, ground at y = 0) and the
+ * standing idle. Every value is a CALIBRATABLE guess from a riding dromedary's
+ * build (shoulder ~1.9 m, hump top ~2.1 m); the topmost point must stay under
+ * the Ctrl label height 2.4 the plateau gives the camel.
+ */
+export const CAMEL_MODEL = {
+  colour: {
+    coat: '#b89468',
+    hump: '#bf9c70',
+    muzzle: '#8a6a4a',
+    ear: '#a5845b',
+    pad: '#5e4c3a',
+    tailTuft: '#5a4632',
+  },
+  /** Barrel: centre height, half length, half width, half depth. */
+  body: { y: 1.46, halfLen: 0.72, rx: 0.3, ry: 0.32, z: -0.05 },
+  /** The single hump: top height, half length along the back, half width. */
+  hump: { top: 2.1, halfLen: 0.42, rx: 0.27 },
+  /** S-curved neck: springs from the breast, dips forward, rises to the poll. */
+  neck: { baseY: 1.6, dipY: 1.4, dipReach: 0.32, pollY: 1.98, pollReach: 0.58, rBase: 0.21, rPoll: 0.1 },
+  /** Head: length forward from the poll, drop of the muzzle, half sizes. */
+  head: { len: 0.42, drop: 0.07, rx: 0.1, ry: 0.12, muzzleR: 0.075 },
+  ear: { len: 0.1, r: 0.03 },
+  /** Legs: half track, fore/hind station along z, knee/hock height, the
+   *  thigh/forearm and cannon radii, and the wide soft pad. */
+  leg: { x: 0.19, foreZ: 0.48, hindZ: -0.6, kneeY: 0.74, rUpper: 0.12, rLower: 0.055, padRx: 0.1, padRz: 0.13, padRy: 0.055 },
+  tail: { len: 0.55, r: 0.035 },
+  /** Standing idle: a slow neck nod, a head turn and a tail swish (rad, s). */
+  idle: { neckPitch: 0.05, neckPeriod: 6.5, headYaw: 0.14, headPeriod: 4.7, tailSwing: 0.22, tailPeriod: 2.3 },
+} as const
+
+/**
  * What the Giza plateau's people do (src/scenes/place/gizaActivity.ts): the
  * guides walk their tourists between monument viewpoints, the cameleer leads
  * and tends his camel, the donkey-boy walks his donkey. Paces in m/s, pauses
