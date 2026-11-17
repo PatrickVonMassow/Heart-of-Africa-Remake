@@ -84,6 +84,7 @@ put it is the mistake this line exists to stop.
   Final state: the rock noise's upper octaves fade with distance or screen frequency like `fine`, the low-frequency banding stays; no sub-pixel noise reaches colour or bump. The yellow band's edge reads smooth or its cause is named and fixed. Constants calibratable in src/config/balance.ts.
   Test: Vitest for the fade weights; a Playwright backlit frame at the report's spot on both backends, picture-checked, plus two consecutive still-camera frames whose backdrop difference stays below a stated threshold.
   Source: user request 16.11.2026 16:26 (eb44b158).
+  Split 17.11.2026 (owner decision under the standing split rule): the yellow band side finding moved to point 1534; this point owes the rock fade and the tremble measurement.
   Bundle: Siedlungsgeometrie.
 
 - [ ] 385. Rain with depth and weather — layers, streak shape, dimmed sun (user
@@ -14584,3 +14585,11 @@ to land than a mechanism that needs a review.
   Test: the full polish-settlement pass green on both backends; if a wait is the cause, a bounded wait that fails loud instead of hanging.
   Source: finding of the 1529 session, 17.11.2026 00:53.
   Bundle: Testinfrastruktur.
+
+- [ ] 1534. Smooth the stair-stepped yellow sand band in the Giza backdrop foreland
+  Split from point 1532 on 17.11.2026. In the user's backlit Giza report picture (seed 2226741265, giza, 15.01.1890 14:00, high, WebGPU) a bright yellow sand band at left and the foreland just above the ground disc carry dark/light horizontal streaks with stair-stepped edges (crop: local/1532-band.png, frame verification/1532-backdrop-backlit.png on feat/1532). Not yet measured which input carries it: the backdrop heightfield's per-vertex biome colour (48x320 polar grid, so a biome edge steps along the segments), ring-to-ring height alternation lit by the backlight, or the steepness mix on near-flat facets.
+  Player impact: a hard-edged striped band sits between the walkable ground and the panorama hills.
+  Final state: the band's cause is named by measurement (switching colour, steepness and normal terms off at the report spot) and fixed; the band's edges read smooth at the report spot.
+  Test: Vitest for any changed colour or height blending; a Playwright frame at the report's spot on both backends, picture-checked.
+  Source: point 1532 side finding, user report 16.11.2026.
+  Bundle: Siedlungsgeometrie.
