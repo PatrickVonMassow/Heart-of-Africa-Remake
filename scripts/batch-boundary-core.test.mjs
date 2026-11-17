@@ -813,7 +813,7 @@ describe('the boundary card names where the batch actually goes', () => {
 
   it('names the command that fits the board it is printed for', () => {
     expect(boundaryCardCommand({ point: 434, pointCardStanding: true })).toBe(
-      'node scripts/board.mjs done 434 --none --text-stdin',
+      'node scripts/board.mjs done 434 "<Umgesetzte Maßnahmen>" --none --text-stdin',
     )
     expect(boundaryCardCommand({ point: 434, pointCardStanding: false })).toBe(
       'node scripts/board.mjs none --text-stdin',

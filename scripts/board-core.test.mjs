@@ -41,6 +41,11 @@ import {
   hasCurrentWork,
   normaliseLineEndings,
   parseDoneArgs,
+  requireMeasuresText,
+  DONE_USAGE,
+  MEASURES_SECTION_TITLE,
+  STATUS_SECTION_TITLE,
+  renderStatusSection,
   promotionEstimateWarning,
   queueEstimateHours,
   renderCardBody,
@@ -1414,7 +1419,14 @@ describe('parseDoneArgs — the flags behind one closing call', () => {
       nextWords: ['Angefangen.'],
       noneWords: [],
       hasNone: false,
+      checked: '',
     })
+  })
+
+  it('takes --checked with its one value, wherever it stands (point 1535)', () => {
+    const out = parseDoneArgs(['300', 'Maßnahme.', '--checked', 'beide Backends', '--none', 'Leer.'])
+    expect(out).toMatchObject({ words: ['Maßnahme.'], checked: 'beide Backends', noneWords: ['Leer.'], hasNone: true })
+    expect(parseDoneArgs(['300', '--none', 'Leer.', '--checked', 'WebGPU'])).toMatchObject({ noneWords: ['Leer.'], checked: 'WebGPU' })
   })
 
   it('reads --none as its own bucket, and remembers a bare one', () => {
@@ -2997,5 +3009,61 @@ describe('board cards keep the German description and drop the title from the st
     const cleaned = cleanDoneTitles(leaked)
     expect(titleIn(doneCard(cleaned, POINT))).toBe(SUBJECT)
     expect(cleanDoneTitles(cleaned)).toBe(cleaned)
+  })
+})
+
+// Point 1535 (user 17.11.2026): a done card says what was done.
+describe('done cards show the measures, not the status (point 1535)', () => {
+  const board = () => fullBoard({ now: nowEntry(1535, 'Erledigt-Karten zeigen Maßnahmen', '10:00 · ~12:00') })
+  const MEASURES = 'Erledigte Karten nennen jetzt, was sich geändert hat.'
+
+  it('swaps the heading on the done card only', () => {
+    const out = toDone(board(), 1535, { text: MEASURES, end: '12:00' })
+    const card = doneCard(out, 1535)
+    expect(card).toContain(`<p class="status-head">${MEASURES_SECTION_TITLE}</p>`)
+    expect(card).not.toContain(STATUS_SECTION_TITLE)
+    expect(card).toContain(`<p>${MEASURES}</p>`)
+    // Open and current cards keep their heading.
+    expect(renderStatusSection({ status: 'x' })).toContain(`<p class="status-head">${STATUS_SECTION_TITLE}</p>`)
+  })
+
+  it('writes the picture check as one trailing note, and none when none is recorded', () => {
+    const checked = doneCard(toDone(board(), 1535, { text: MEASURES, end: '12:00', checked: 'beide Backends' }), 1535)
+    expect(checked).toMatch(new RegExp(`<p>${MEASURES}</p>\\n\\s*<p class="check-note">✓ geprüft: beide Backends</p>\\n\\s*</div>`))
+    expect(doneCard(toDone(board(), 1535, { text: MEASURES, end: '12:00' }), 1535)).not.toContain('check-note')
+  })
+
+  it('closeCard carries the note through to the archived card', () => {
+    const out = closeCard(board(), 1535, { text: MEASURES, end: '12:00', checked: 'WebGPU', none: 'Übergabe — der Nachfolger nimmt Punkt 1536.' })
+    expect(doneCard(out, 1535)).toContain('✓ geprüft: WebGPU')
+  })
+
+  it('refuses a missing measures text once, printing the exact syntax — and nothing else', () => {
+    for (const missing of [undefined, '', '   ']) {
+      expect(() => requireMeasuresText(missing, 1535)).toThrow(DONE_USAGE)
+    }
+    expect(DONE_USAGE).toMatch(/^node scripts\/board\.mjs done <point> "<Umgesetzte Maßnahmen/)
+    // No content heuristic: any non-empty text passes, process words included.
+    for (const text of ['x', 'Zusammengeführt und gepusht.', 'feat/1535 abc1234']) {
+      expect(() => requireMeasuresText(text, 1535)).not.toThrow()
+    }
+  })
+
+  it('every reader of the status paragraph reads the measures and skips the note', () => {
+    const out = toDone(board(), 1535, { text: MEASURES, end: '12:00', checked: 'beide Backends' })
+    // Re-archiving after a reopen keeps the description and folds to one card.
+    const reopened = fullBoard({ now: nowEntry(1535, 'Erledigt-Karten zeigen Maßnahmen', '13:00 · ~14:00'), done: doneCard(out, 1535) })
+    const again = toDone(reopened, 1535, { text: 'Zweite Maßnahme.', end: '14:00' })
+    expect(doneCards(again, 1535)).toHaveLength(1)
+    expect(doneCard(again, 1535)).toContain('<p>Zweite Maßnahme.</p>')
+    expect(mergeDoneDuplicates(out).merged).toEqual([])
+  })
+
+  it('a board with the new done card stays clean under the board guard', () => {
+    const source = board()
+    const out = closeCard(source, 1535, { text: MEASURES, end: '12:00', checked: 'beide Backends', none: 'Übergabe — der Nachfolger nimmt Punkt 1536.' })
+    const before = new Set(structureViolations(source).map((v) => v.code))
+    expect(structureViolations(out).map((v) => v.code).filter((code) => !before.has(code))).toEqual([])
+    expect(concisenessOffenders(out)).toEqual([])
   })
 })
