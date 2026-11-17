@@ -811,12 +811,19 @@ if (section('rain-depth')) {
     // it the section would photograph dry weather as rain evidence.
     check(`${level}: heavy rain is staged before any frame (rain > 0.5)`, heavy && rainNow > 0.5, `rain ${rainNow}`)
     if (!(heavy && rainNow > 0.5)) continue
-    const s = await waitForReadingStable(
-      page,
-      () => { const v = window.__placeSeason(); return { sun: v.sunBase, hemi: v.hemiBase, fogFar: v.fogFar, sky: v.sky } },
-      { settleMs: 400, samples: 3, timeout: 60000 },
-    )
-    check(`${level}: the rained-in light settles before the frames`, s.settled, `after ${s.waitedMs} ms — ${JSON.stringify(s.value)}`)
+    // Settle by DRAWN frames, not wall clock: the loop stalls for seconds after
+    // the wetness switch, and a wall-clock quiet read the sun two frames into
+    // its ease as settled (measured: 0.1536 of the way, every level).
+    const readLight = () => page.evaluate(() => { const v = window.__placeSeason(); return [v.sunBase, v.hemiBase, v.fogFar ?? 0] })
+    const s = { settled: false, frames: 0, value: await readLight() }
+    for (let i = 1; i <= 120 && !s.settled; i++) {
+      await nextFrames(30)
+      const next = await readLight()
+      s.settled = next.every((n, j) => Math.abs(n - s.value[j]) <= 1e-3)
+      s.value = next
+      s.frames = i * 30
+    }
+    check(`${level}: the rained-in light settles before the frames`, s.settled, `after ${s.frames} frames — ${JSON.stringify(s.value)}`)
     const v = await page.evaluate(() => window.__placeSeason())
     skies[level] = v.sky
     lights[level] = { sun: v.sunBase, hemi: v.hemiBase, damp: v.rainLight }
