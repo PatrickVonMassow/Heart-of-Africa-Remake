@@ -9,9 +9,10 @@
 //   node scripts/board.mjs status <point> "<text>"    # restate a now-card's status
 //   node scripts/board.mjs title  <point> "<text>"    # retitle a now- OR queue card
 //   node scripts/board.mjs queue  <point> ["<text>"]  # current work → back to queue
-//   node scripts/board.mjs done   <point> ["<text>"] --next <m> "<status>"
-//                                                     # archive + promote in ONE write
-//   node scripts/board.mjs done   <point> --none "<reason>"   # …or name the gap
+//   node scripts/board.mjs done   <point> "<measures>" [--checked "<backends>"] --next <m> "<status>"
+//                                                     # archive + promote in ONE write;
+//                                                     # <measures> is REQUIRED (point 1535)
+//   node scripts/board.mjs done   <point> "<measures>" --none "<reason>"   # …or name the gap
 //   node scripts/board.mjs none   "<reason>"           # the gap card, no point to close
 //   node scripts/board.mjs closing <point> [--title "<Betreff>"] "<reason>"
 //                                                     # …still owed: its closing duties
@@ -48,7 +49,7 @@
 // `--none` takes it too — that gap card is written at every session boundary, so
 // it was the last place a German text still reached the board as an argument:
 //
-//   node scripts/board.mjs done 434 --none --text-stdin <<'EOF'
+//   node scripts/board.mjs done 434 "Die Karte zeigt jetzt …" --none --text-stdin <<'EOF'
 //   Der Punkt ist abgeschlossen. Ich übergebe an eine frische Sitzung …
 //   EOF
 //
@@ -76,6 +77,8 @@ import {
   setCardDescription,
   parseClosingArgs,
   parseDoneArgs,
+  DONE_USAGE,
+  requireMeasuresText,
   pointSubject,
   promoteToNow,
   promotionEstimateWarning,
@@ -466,13 +469,12 @@ try {
   } else if (cmd === 'done') {
     // ONE edit, one write (point 416): archiving and the successor go into the
     // same document, so the board is never observed without current work.
-    const { point, words, next, nextWords, noneWords, hasNone } = parseDoneArgs(rest)
-    if (!point) {
-      throw new Error(
-        'usage: board.mjs done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] ' +
-          `(any "<text>" may be ${TEXT_STDIN_FLAG} — including --none's reason)`,
-      )
-    }
+    const { point, words, next, nextWords, noneWords, hasNone, checked } = parseDoneArgs(rest)
+    if (!point) throw new Error(`usage: ${DONE_USAGE}`)
+    // Read once: stdin can be consumed only once, and the measures text is
+    // required before anything else is touched (point 1535).
+    const measures = textOf(words)
+    requireMeasuresText(measures, point)
     if (next != null) refuseStartWhileRequestsPending(next)
     const at = berlinStamp()
     const noEstimate = next == null ? null : promotionEstimateWarning(readFileSync(BOARD, 'utf8'), next)
@@ -486,7 +488,8 @@ try {
         return closeCard(html, point, {
           span,
           nextSpan,
-          text: textOf(words),
+          text: measures,
+          checked,
           end: at,
           next,
           nextStatus: next == null ? '' : textOf(nextWords),
@@ -753,7 +756,7 @@ try {
   } else {
     console.error(
       'usage: board.mjs now|status|title <point> "<text>" | queue <point> ["<text>"] | eta <point> "<HH:MM>" | ' +
-        'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
+        'done <point> "<measures>" [--checked "<backends>"] [--next <m> "<status>" | --none "<reason>"] | ' +
         'none "<reason>" | closing <point> ["--title <Betreff>"] "<reason>" | ' +
         'vdzk-add [--automated] "<title>" "<question>" | vdzk-remove "<title>" | ' +
         'log-add "Entscheidungsprotokoll: <title>" "<record>" | log-remove "<title>" | ' +

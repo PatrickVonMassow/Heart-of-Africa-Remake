@@ -1136,7 +1136,7 @@ export function boundaryDestination({ claimHonoured = false, claimantSid = null 
  */
 export function boundaryCardCommand({ point, pointCardStanding = false } = {}) {
   return pointCardStanding === true
-    ? `${EDIT_CMD} done ${point} --none --text-stdin`
+    ? `${EDIT_CMD} done ${point} "<Umgesetzte Maßnahmen>" --none --text-stdin`
     : `${NONE_CARD_CMD} --text-stdin`
 }
 

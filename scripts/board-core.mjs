@@ -99,6 +99,15 @@ export function renderCardBody(text, { stamp = null, indent = '    ', escape = n
 // stub carry-over) keeps reading the status alone.
 export const DESCRIPTION_MISSING_TEXT = 'Beschreibung fehlt'
 export const STATUS_SECTION_TITLE = 'Stand der Umsetzung'
+// A DONE CARD SAYS WHAT WAS DONE (point 1535, user 17.11.2026): the same
+// section under its own heading, with the measures in plain `<p>` (so statusOf
+// and cardBodyText read them unchanged) and the picture check as one small
+// classed note after them, which those readers skip.
+export const MEASURES_SECTION_TITLE = 'Umgesetzte Maßnahmen'
+/** The backfill text of a done card whose work cannot be attributed. */
+export const MEASURES_UNKNOWN_TEXT = 'Maßnahmen nicht mehr nachvollziehbar.'
+/** The trailing picture-check note of a done card ('' when none is recorded). */
+export const checkNoteText = (checked) => (String(checked ?? '').trim() ? `✓ geprüft: ${String(checked).trim()}` : '')
 /** The status a queue card shows: no work has started on it. */
 export const QUEUE_STATUS_TEXT = 'Noch nicht begonnen.'
 /** A description longer than this is a status or a spec, not 1-3 sentences. */
@@ -123,21 +132,23 @@ export function descriptionOf(card) {
  * A card body with both sections: the description (or the visible
  * placeholder), the divider, the status heading, the stamped status.
  */
-export function renderCardSections({ description = '', status = '', stamp = null, indent = '    ', escape = null } = {}) {
+export function renderCardSections({ description = '', status = '', stamp = null, indent = '    ', escape = null, title = STATUS_SECTION_TITLE, checked = '' } = {}) {
   const desc = cardParagraphs(description).map((p) => (escape ? escape(p) : p))
   const head = desc.length
     ? desc.map((p) => `${indent}<p class="desc">${p}</p>`)
     : [`${indent}<p class="desc-missing">${DESCRIPTION_MISSING_TEXT}</p>`]
-  return [...head, renderStatusSection({ status, stamp, indent, escape })].join('\n')
+  return [...head, renderStatusSection({ status, stamp, indent, escape, title, checked })].join('\n')
 }
 
 /** The divider, the status heading and the stamped status — the part a progress update replaces. */
-export function renderStatusSection({ status = '', stamp = null, indent = '    ', escape = null } = {}) {
+export function renderStatusSection({ status = '', stamp = null, indent = '    ', escape = null, title = STATUS_SECTION_TITLE, checked = '' } = {}) {
   const statusLines = renderCardBody(status, { stamp, indent, escape })
+  const note = checkNoteText(checked)
   return [
     `${indent}<hr class="split">`,
-    `${indent}<p class="status-head">${STATUS_SECTION_TITLE}</p>`,
+    `${indent}<p class="status-head">${title}</p>`,
     ...(statusLines ? [statusLines] : []),
+    ...(note ? [`${indent}<p class="check-note">${note}</p>`] : []),
   ].join('\n')
 }
 
@@ -346,6 +357,7 @@ details:not(.sect)[open]>summary::after{content:"▾"}
 .body hr.split{border:0;border-top:1px solid var(--rule,#cdbf9c);margin:10px 0 6px}
 .body .status-head{font-weight:700;font-size:.8em;letter-spacing:.03em;color:var(--soft,#7c6c4d);margin-bottom:2px}
 .body .desc-missing{font-style:italic;color:var(--warn,#a85f28)}
+.body .check-note{font-size:.78em;color:var(--soft,#7c6c4d);margin-top:4px}
 .body .dist-head{font-weight:700;font-size:.8em;letter-spacing:.03em;color:var(--soft,#7c6c4d);margin:8px 0 2px}
 .body .dist{font-size:.85em;color:var(--soft,#7c6c4d)}
 details.sect>summary>.slots{display:block;margin:0 0 8px;font-size:.8em;font-weight:400;color:var(--soft,#7c6c4d);overflow-wrap:anywhere}
@@ -1512,7 +1524,7 @@ export function toQueue(html, point, { text, estimate, recorded = null, now = ne
  * shape the Erledigt section fixes. The body carries the card's status text,
  * every paragraph, over unless the caller writes a closing one.
  */
-export function toDone(html, point, { text, end = berlinStamp(), span = null, queueData = null } = {}) {
+export function toDone(html, point, { text, end = berlinStamp(), span = null, queueData = null, checked = '' } = {}) {
   const card = nowCard(html, point)
   if (!card) throw new Error(`board: no current-work card for point ${point}`)
   const body = text?.trim() || statusOf(card)
@@ -1539,18 +1551,18 @@ export function toDone(html, point, { text, end = berlinStamp(), span = null, qu
   const description =
     descriptionOf(card) || existing.map(descriptionOf).find(Boolean) || queuedDescription(queueData, point)
   const meta = span ? cardTimeLine(span) : `${earliest} · ${end}`
-  const entry = renderDoneEntry({ point, title, meta, body, description })
+  const entry = renderDoneEntry({ point, title, meta, body, description, checked })
   const cleaned = dropDoneCards(out, point)
   const { from } = sectionBounds(cleaned, 'done')
   return `${cleaned.slice(0, from)}\n${entry}${cleaned.slice(from).replace(/^\n/, '')}`
 }
 
 /** One Erledigt entry, the single writer of that markup. */
-function renderDoneEntry({ point, title, meta, body, description = '' }) {
+function renderDoneEntry({ point, title, meta, body, description = '', checked = '' }) {
   return (
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
     `<span class="right"><span class="meta">${meta}</span></span></summary>\n` +
-    `  <div class="body">\n${renderCardSections({ description, status: body })}\n  </div>\n</details>\n`
+    `  <div class="body">\n${renderCardSections({ description, status: body, title: MEASURES_SECTION_TITLE, checked })}\n  </div>\n</details>\n`
   )
 }
 
@@ -2411,10 +2423,10 @@ function writeStateCard(html, { kind, point = null, title, text: reason, descrip
  * another card on its own. Anything else is REFUSED: leaving the section empty
  * is the defect, and forgetting must not be able to reach it.
  */
-export function closeCard(html, point, { text, end = berlinStamp(), next = null, nextStatus, none, stamp, queueData = null, span = null, nextSpan = null } = {}) {
+export function closeCard(html, point, { text, end = berlinStamp(), next = null, nextStatus, none, stamp, queueData = null, span = null, nextSpan = null, checked = '' } = {}) {
   if (next != null && none) throw new Error('board: done takes EITHER --next or --none, never both')
   const at = stamp ?? end
-  const archived = toDone(html, point, { text, end, span, queueData })
+  const archived = toDone(html, point, { text, end, span, queueData, checked })
   if (next != null) {
     const status = String(nextStatus ?? '').trim()
     if (!status) throw new Error(`board: --next ${next} needs the new card's status text`)
@@ -2439,9 +2451,18 @@ export function closeCard(html, point, { text, end = berlinStamp(), next = null,
  */
 export function parseDoneArgs(rest) {
   const args = (Array.isArray(rest) ? rest : []).map((a) => String(a))
-  const out = { point: args[0], words: [], next: null, nextWords: [], noneWords: [], hasNone: false }
+  const out = { point: args[0], words: [], next: null, nextWords: [], noneWords: [], hasNone: false, checked: '' }
   let bucket = 'words'
-  for (const a of args.slice(1)) {
+  const tail = args.slice(1)
+  for (let i = 0; i < tail.length; i += 1) {
+    const a = tail[i]
+    // `--checked "<backends>"` takes exactly its one value and leaves the bucket
+    // as it was, so it may stand anywhere on the line (point 1535).
+    if (a === '--checked') {
+      out.checked = String(tail[i + 1] ?? '').trim()
+      i += 1
+      continue
+    }
     if (a === '--next') {
       if (out.next != null) throw new Error('board: --next given twice')
       bucket = 'next-point'
@@ -2462,6 +2483,21 @@ export function parseDoneArgs(rest) {
   }
   if (bucket === 'next-point') throw new Error('board: --next needs a point number')
   return out
+}
+
+/** The exact accepted `done` syntax, printed by the one measures refusal. */
+export const DONE_USAGE =
+  'node scripts/board.mjs done <point> "<Umgesetzte Maßnahmen: 1-3 Sätze, was sich für den Spieler geändert hat>" ' +
+  '[--checked "<beide Backends|WebGPU|WebGL 2>"] [--next <m> "<status>" | --none "<reason>"] ' +
+  `(any "<text>" may be ${TEXT_STDIN_FLAG}, but stdin feeds only one of them)`
+
+/**
+ * The single refusal `done` owns (point 1535): the measures text is required.
+ * Only PRESENCE is judged — no content heuristic, by user order 17.11.2026.
+ */
+export function requireMeasuresText(text, point) {
+  if (String(text ?? '').trim()) return
+  throw new Error(`board: done ${point ?? '<point>'} needs the measures text (what was changed). Usage: ${DONE_USAGE}`)
 }
 
 /**
