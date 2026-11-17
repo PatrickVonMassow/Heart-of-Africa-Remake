@@ -9,9 +9,11 @@ import {
   cameraViewMatrix,
   color,
   float,
+  fwidth,
   max,
   mix,
   mx_fractal_noise_float,
+  mx_noise_float,
   normalWorldGeometry,
   positionLocal,
   positionWorld,
@@ -20,6 +22,7 @@ import {
   vec3,
   vec4,
 } from 'three/tsl'
+import { balance } from '../../config/balance'
 import { detailFade, proceduralBump } from '../../render/materials'
 import { WATER_METALNESS, riverWaterSurface } from '../../render/waterAppearance'
 import { BACKDROP_RIVER_Y } from './backdropRiver'
@@ -27,6 +30,50 @@ import { BACKDROP_RIVER_Y } from './backdropRiver'
 /** How far (place units) the heightfield may leave the river plane before the
  *  water's fine octave is gone from it. */
 const FINE_OFF_PLANE = 0.08
+
+/** Base frequency (cycles per place unit, per axis) of the rock fractal's
+ *  lowest octave; each further octave doubles it. */
+const ROCK_FREQ = [0.16, 0.28, 0.16] as const
+/** Octaves of the rock fractal; the first one is the banding and never fades. */
+const ROCK_OCTAVES = 4
+
+/**
+ * Weight of one rock octave by how many of its cycles one screen pixel spans:
+ * 1 while it resolves, 0 once it would alias (point 1532). The shader computes
+ * the same smoothstep; this mirror is what the unit test reads.
+ */
+export function rockOctaveWeight(
+  octave: number,
+  cyclesPerPx: number,
+  start = balance.backdropRock.fadeStartCyclesPerPx,
+  end = balance.backdropRock.fadeEndCyclesPerPx,
+): number {
+  if (octave === 0) return 1
+  const t = Math.min(1, Math.max(0, (cyclesPerPx - start) / (end - start)))
+  return 1 - t * t * (3 - 2 * t)
+}
+
+/**
+ * The rock fractal with its upper octaves faded by screen frequency. At full
+ * weight it is the 4-octave fBm it replaces, mapped to 0..1; a faded octave
+ * drops out of colour and bump alike, so the dark backlit far flanks keep only
+ * the banding they can resolve instead of streaks TRAA trembles with.
+ */
+function screenFadedRock(p: typeof positionWorld) {
+  const freq = vec3(...ROCK_FREQ)
+  // Lowest octave's cycles per pixel; octave i spans 2^i times as many.
+  const cpp0 = fwidth(p).mul(freq).length()
+  const start = float(balance.backdropRock.fadeStartCyclesPerPx)
+  const end = float(balance.backdropRock.fadeEndCyclesPerPx)
+  let sum = mx_noise_float(p.mul(freq))
+  for (let i = 1; i < ROCK_OCTAVES; i++) {
+    const scale = 2 ** i
+    // Ordered smoothstep edges (GLSL ES leaves reversed ones undefined).
+    const weight = smoothstep(start, end, cpp0.mul(scale)).oneMinus()
+    sum = sum.add(mx_noise_float(p.mul(freq).mul(scale)).mul(weight.mul(0.5 ** i)))
+  }
+  return sum.mul(0.5).add(0.5)
+}
 
 /** The backdrop material and the handles the scene keeps writing to. */
 interface BackdropMaterialHandle {
@@ -70,7 +117,7 @@ export function createBackdropMaterial(waterOctaves: number): BackdropMaterialHa
   // normalView, so flatShading must stay off for the ridge to read smooth.
   m.flatShading = false
   const p = positionWorld
-  const rock = mx_fractal_noise_float(p.mul(vec3(0.16, 0.28, 0.16)), 4).mul(0.5).add(0.5)
+  const rock = screenFadedRock(p)
   const fine = mx_fractal_noise_float(p.mul(0.65), 3).mul(0.5).add(0.5)
   // Steepness from the mesh normal: flat ground keeps its biome color,
   // steeper faces mix toward a bare rock tone with banded structure.
@@ -79,7 +126,8 @@ export function createBackdropMaterial(waterOctaves: number): BackdropMaterialHa
   let col = mix(biome, color('#8d7f6a').mul(rock.mul(0.5).add(0.7)), steep.mul(0.75)) as typeof biome
   // The fine octave and the bump are distance-faded: past ~200 units they
   // are sub-pixel and only fed the TRAA trembling (the low-frequency rock
-  // banding carries the far silhouette structure on its own).
+  // banding carries the far silhouette structure on its own). The rock's own
+  // upper octaves fade by screen frequency inside screenFadedRock.
   const fade = detailFade(70, 200)
   const land = col.mul(rock.mul(0.22).add(0.89)).mul(fine.sub(0.5).mul(0.12).mul(fade).add(1.0))
 

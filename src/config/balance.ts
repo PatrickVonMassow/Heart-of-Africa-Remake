@@ -957,6 +957,16 @@ interface BalanceConfig {
      *  round; real hollows lose this times sin^2 of their mean horizon. */
     skyOcclusionStrength: number
   }
+  /** Rock noise of the settlement's backdrop hills (src/scenes/place/
+   *  backdropMaterial.ts): its upper octaves fade by how many noise cycles one
+   *  screen pixel spans, so no sub-pixel grain reaches colour or bump and TRAA
+   *  has nothing to tremble with. The lowest octave (the banding) always stays. */
+  backdropRock: {
+    /** Cycles per pixel at which an upper octave starts fading out. */
+    fadeStartCyclesPerPx: number
+    /** Cycles per pixel at which it is gone (0.5 = the Nyquist limit). */
+    fadeEndCyclesPerPx: number
+  }
   /** First-person eye adaptation (design.md §2.7, render/exposureControl.ts):
    *  the exposure follows the frame's mean luminance inside a bounded range.
    *  Highest quality level, settlement scenes only; the bird's-eye view keeps
@@ -2285,6 +2295,10 @@ export const balance: BalanceConfig = {
     closeFadeStartPx: 24, // educated guess: about one texel's size at the default zoom; calibratable, debug-editable
     closeFadeEndPx: 64, // educated guess: gone well before the closest zoom (~80 px per texel); calibratable, debug-editable
     skyOcclusionStrength: 0.7, // calibratable, debug-editable
+  },
+  backdropRock: {
+    fadeStartCyclesPerPx: 0.2, // educated guess: an octave still reads at five pixels per cycle; calibratable
+    fadeEndCyclesPerPx: 0.45, // just under Nyquist, where an octave starts to alias; calibratable
   },
   exposure: {
     base: 1.05, // today's fixed toneMappingExposure (src/App.tsx); calibratable, debug-editable
