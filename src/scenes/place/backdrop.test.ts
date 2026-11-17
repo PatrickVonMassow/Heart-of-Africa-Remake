@@ -659,6 +659,11 @@ describe('backdrop rock footprint estimate (point 1532)', () => {
     expect(rockCyclesPerPx(300, -0.5, projY, 984)).toBeCloseTo(2 * head, 9)
     expect(Number.isFinite(rockCyclesPerPx(300, 0, projY, 984))).toBe(true)
   })
+  it('fades the banding on a grazing foreland at cosine 0.015 (review of 1532)', () => {
+    const cpp = rockCyclesPerPx(100, 0.015, projY, 984)
+    expect(cpp).toBeGreaterThan(2)
+    expect(rockOctaveWeight(0, cpp)).toBe(0)
+  })
   it('matches the head-on footprint the fade test assumes', () => {
     const footprint = (2 * 300 * Math.tan((25 * Math.PI) / 180)) / 984
     expect(rockCyclesPerPx(300, 1, projY, 984)).toBeCloseTo(footprint * Math.hypot(0.16, 0.28, 0.16), 9)

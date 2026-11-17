@@ -56,8 +56,9 @@ export function rockOctaveWeight(
   return 1 - t * t * (3 - 2 * t)
 }
 
-/** Steepest view angle the footprint estimate follows; flatter grazes clamp here. */
-const MIN_VIEW_COS = 0.1
+/** Flattest view cosine the footprint estimate follows; it only guards the
+ *  division, so a grazing foreland still fades its banding (review of 1532). */
+const MIN_VIEW_COS = 0.005
 /** Base frequency (cycles per place unit) of the fine grain's lowest octave. */
 const FINE_FREQ = 0.65
 /** Octaves of the fine grain; all of them fade, the first one included. */
