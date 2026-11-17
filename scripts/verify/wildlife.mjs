@@ -722,62 +722,75 @@ if (section('straggler')) {
 }
 
 // herd-walk (work-order 414, design.md §19.5): on HIGH a near bird's-eye
-// herd animal of a rigged species walks on pivoted legs. One adult is driven
+// herd animal of a rigged species walks on pivoted legs. One grown zebra, staged
+// on the dry-season Serengeti at the closest zoom, is driven
 // along its facing at a fixed pace and photographed twice, a quarter stride
 // apart (half a stride would only trade the diagonal pairs, which can read as
 // the same pose): it must be drawn in the walking pool (body + four legs), its legs must
 // have swung between the frames, and the same animal held still must settle
 // to neutral legs (the stride follows distance, not the clock).
 if (section('herd-walk')) {
+  // Staging (owner picture review 17.11.2026): the first frames stood at the
+  // falls in January — spray, rain and fog, the animal a speck. So: the open
+  // Serengeti plain (the trample check's savanna), an August dry-season day
+  // with the season wetness forced dry, the closest zoom a player can reach,
+  // and one dedicated zebra walked past the traveller's spot so it crosses
+  // the frame centre. The day is pinned for both frames.
   await page.evaluate(() => {
-    window.__hwPrev = { level: window.__ui.getState().detailLevel }
-    window.__ui.getState().setDetailLevel('high')
-    window.__game.getState().debugJumpTo(-17.9, 25.9)
-    window.__ui.getState().setWheelZoomEnabled(true)
-    window.__ui.getState().setTravelZoom(0.5) // DEFAULT_TRAVEL_ZOOM: the game's own bird's-eye distance
+    const ui = window.__ui.getState()
+    const g = window.__game.getState()
+    window.__hwPrev = { level: ui.detailLevel, zoom: ui.travelZoom, wheel: ui.wheelZoomEnabled, wet: ui.seasonWetnessOverride, day: g.day }
+    if (g.mode === 'place') g.leavePlace()
+    ui.setDetailLevel('high')
+    ui.setSeasonWetnessOverride(0) // dry: no rain, no wet haze
+    window.__game.setState({ day: 220 }) // early August, the Serengeti dry season
+    window.__game.getState().debugJumpTo(-2.2, 34.8)
+    ui.setWheelZoomEnabled(true)
+    ui.setTravelZoom(0.125) // the closest bird's-eye zoom (setTravelZoom's floor; zooming in needs no unlock)
   })
-  await page.waitForFunction(() => !!window.__wildlife?.restock && !!window.__wildlife?.gaitMeshes, null, { timeout: 60000 })
+  await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current && !!window.__wildlife?.gaitMeshes, null, { timeout: 60000 })
   await page.evaluate(() => {
     const lion = window.__lionHunt.state
     lion.mode = 'idle'; lion.timer = 99999; lion.victim = null; lion.victimHunt = false
-    window.__wildlife.restock()
   })
-  await page.waitForFunction(() => {
-    const h = window.__wildlife?.herdsRef?.current
-    return !!h && ['zebra', 'antelope', 'giraffe'].some((sp) => (h[sp] ?? []).some((a) => a.chunk && !a.dead && !a.young))
-  }, null, { timeout: 60000 }).catch(() => {})
 
-  const SPEED = 1.5
+  const SPEED = 1
   const staged = await page.evaluate(async (SPEED) => {
     const herds = window.__wildlife.herdsRef.current
     const seed = window.__game.getState().seed
     const ter = (x, z) => window.__terrainType(-z / 10, x / 10, seed)
     const land = (x, z) => { const t = ter(x, z); return t !== 'water' && t !== 'ocean' }
     const p0 = window.__game.getState().pos
-    let pick = null
-    for (const sp of ['zebra', 'antelope', 'giraffe']) {
-      for (const a of herds[sp] ?? []) {
-        if (a.dead || a.young || a.elderly || a.inWater !== undefined || !land(a.x, a.z)) continue
-        const dp = Math.hypot(a.x - p0.x, a.z - p0.z)
-        if (dp > 6 && dp < 25 && (!pick || dp < pick.dp)) pick = { sp, a, dp }
-      }
+    // A heading whose whole walk line — 3 units either side of the frame
+    // centre, passing 1.5 units beside the traveller so the figures do not
+    // overlap — is dry land.
+    const SIDE = 1.5
+    const at = (h, f) => ({ x: p0.x + Math.sin(h) * f + Math.cos(h) * SIDE, z: p0.z + Math.cos(h) * f - Math.sin(h) * SIDE })
+    let heading = null
+    for (let k = 0; k < 16 && heading === null; k++) {
+      const h = (k / 16) * Math.PI * 2
+      let ok = true
+      for (let f = -3; f <= 3.0001; f += 0.5) { const q = at(h, f); if (!land(q.x, q.z)) { ok = false; break } }
+      if (ok) heading = h
     }
-    if (!pick) return { error: 'no grown rigged animal on land near the traveller' }
-    const { a } = pick
-    const heading = a.rot
-    const pin = { on: true, walk: true, x: a.x, z: a.z }
+    if (heading === null) return { error: 'no dry walk line beside the traveller' }
+    const { x: x0, z: z0 } = at(heading, -3)
+    // A dedicated grown zebra (the point-1498 staging shape), inside the drawn capacity.
+    const a = { x: x0, z: z0, y: window.__wildlife.groundAt(x0, z0), rot: heading, heading, scale: 1, phase: 0.3, chunk: undefined, grounded: true }
+    herds.zebra.unshift(a)
+    const pin = { on: true, walk: true, x: x0, z: z0 }
     const hold = () => {
       if (!pin.on) return
       if (pin.walk) { pin.x += Math.sin(heading) * SPEED / 60; pin.z += Math.cos(heading) * SPEED / 60 }
-      a.x = pin.x; a.z = pin.z; a.rot = heading; a.heading = heading; a.wobAmp = 0
+      a.x = pin.x; a.z = pin.z; a.y = window.__wildlife.groundAt(pin.x, pin.z); a.rot = heading; a.heading = heading; a.wobAmp = 0
       requestAnimationFrame(hold)
     }
     hold()
-    window.__hw = { sp: pick.sp, a, pin }
+    window.__hw = { sp: 'zebra', a, pin }
     await window.__pollSim(1, () => false)
-    return { sp: pick.sp, dp: +pick.dp.toFixed(1) }
+    return { sp: 'zebra', heading: +heading.toFixed(2), day: window.__game.getState().day }
   }, SPEED)
-  check('a grown zebra, antelope or giraffe stands near the traveller for the walk frames (work-order 414)', !staged.error, JSON.stringify(staged))
+  check('a grown zebra walks past the traveller\'s spot on dry land for the walk frames (work-order 414)', !staged.error, JSON.stringify(staged))
 
   if (!staged.error) {
     // The drawn pose: the animal's instance in its species' walking pool, and
@@ -802,8 +815,11 @@ if (section('herd-walk')) {
         return { inPool: true, angles, gaitDist: +(a.gaitDist ?? 0).toFixed(3), x: a.x, z: a.z }
       }
     })
+    // Both frames on the SAME in-game day (the owner saw the date jump one).
+    const pinDay = () => page.evaluate((d) => { window.__game.setState({ day: d }); return window.__game.getState().day }, staged.day)
+    const dayA = await pinDay()
     const first = await page.evaluate(() => window.__hwPose())
-    await shot('414-herd-walk-a', { world: { x: first.x ?? 0, z: first.z ?? 0 }, label: `a walking ${staged.sp} at bird's-eye zoom on HIGH, legs at one point of the stride`, settle: false })
+    await shot('414-herd-walk-a', { world: { x: first.x ?? 0, z: first.z ?? 0 }, label: `a walking ${staged.sp} at the closest bird's-eye zoom on HIGH, dry-season Serengeti, legs at one point of the stride`, settle: false })
     // A quarter stride further on: a leg at neutral is now at full reach.
     // The target is anchored to the FIRST frame's stride distance (rig units),
     // not to whenever this call starts: the shutter above takes time, so the
@@ -821,7 +837,9 @@ if (section('herd-walk')) {
       await window.__pollSim(((target - now) * scale) / 1.5 + 2, () => (window.__hw.a.gaitDist ?? 0) >= target)
       return { ...window.__hwPose(), target: +target.toFixed(3) }
     }, first.gaitDist ?? 0)
-    await shot('414-herd-walk-b', { world: { x: second.x ?? 0, z: second.z ?? 0 }, label: `the same ${staged.sp} a quarter stride later — the legs have swung`, settle: false })
+    const dayB = await pinDay()
+    await shot('414-herd-walk-b', { world: { x: second.x ?? 0, z: second.z ?? 0 }, label: `the same ${staged.sp} a quarter stride later, same day — the legs have swung`, settle: false })
+    check('both walk frames show the same in-game day (work-order 414 picture review)', Math.floor(dayA) === Math.floor(dayB), JSON.stringify({ dayA, dayB }))
     const swing = first.inPool && second.inPool ? Math.max(...first.angles.map((v, k) => Math.abs(v - second.angles[k]))) : 0
     check('the walking animal is drawn on pivoted legs and its legs moved between two frames a quarter stride apart (work-order 414)',
       first.inPool && second.inPool && swing > 0.15 && second.gaitDist > first.gaitDist, JSON.stringify({ first, second, swing }))
@@ -840,8 +858,19 @@ if (section('herd-walk')) {
       JSON.stringify(still))
   }
   await page.evaluate(() => {
-    if (window.__hw) window.__hw.pin.on = false
-    window.__ui.getState().setDetailLevel(window.__hwPrev.level)
+    const prev = window.__hwPrev
+    if (window.__hw) {
+      window.__hw.pin.on = false
+      const list = window.__wildlife.herdsRef.current.zebra
+      const i = list.indexOf(window.__hw.a)
+      if (i >= 0) list.splice(i, 1)
+    }
+    const ui = window.__ui.getState()
+    ui.setDetailLevel(prev.level)
+    ui.setSeasonWetnessOverride(prev.wet)
+    ui.setTravelZoom(prev.zoom)
+    ui.setWheelZoomEnabled(prev.wheel)
+    window.__game.setState({ day: prev.day })
     window.__hw = undefined
   })
 }
