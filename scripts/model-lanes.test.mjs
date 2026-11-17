@@ -80,6 +80,20 @@ describe('resolving designations', () => {
     }
   })
 
+  it('keeps every former cross-lane spelling resolving, ids included', () => {
+    // Landed trailers and ledger rows carry these; a dropped alias would orphan them.
+    for (const s of ['GPT-6.1 Sol', 'gpt-6.1-sol', 'GPT-5.6 Sol', 'gpt-5.6-sol', 'GPT-6 Astra', 'gpt-6-astra']) {
+      expect(resolveModel(s)?.lane.role, s).toBe('cross')
+    }
+  })
+
+  it('holds the cross aliases that historic fixtures read by position at their index', () => {
+    // cross-review-core and four-eyes-artefacts tests read GPT-5.6 Sol by position;
+    // new retired spellings are appended, never prepended.
+    expect(CROSS.retired[2]).toBe('GPT-5.6 Sol')
+    expect(CROSS.retired.filter((name) => /\s/.test(name))[1]).toBe('GPT-5.6 Sol')
+  })
+
   it('reads the context suffix the harness writes as the same model', () => {
     expect(identityKey(`${MAIN.trailerName} (1M context)`)).toBe('main')
   })
@@ -218,10 +232,10 @@ describe('identities a designation mentions', () => {
   })
 })
 
-describe('the cross lane runs at high reasoning effort (user order 21.10.2026)', () => {
-  it('carries effort high in its record and in its execution target', () => {
-    expect(CROSS.reasoningEffort).toBe('high')
-    expect(executionTarget('cross').effort).toBe('high')
+describe('the cross lane runs at medium reasoning effort (user order 17.11.2026)', () => {
+  it('carries effort medium in its record and in its execution target', () => {
+    expect(CROSS.reasoningEffort).toBe('medium')
+    expect(executionTarget('cross').effort).toBe('medium')
   })
 })
 
