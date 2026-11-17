@@ -23,7 +23,14 @@ import {
   vec4,
 } from 'three/tsl'
 import { balance } from '../../config/balance'
-import { detailFade, proceduralBump } from '../../render/materials'
+import {
+  detailFade,
+  groundOpenColor,
+  groundOpenNormal,
+  groundOpenRoughness,
+  proceduralBump,
+  type GroundSurface,
+} from '../../render/materials'
 import { WATER_METALNESS, riverWaterSurface } from '../../render/waterAppearance'
 import { BACKDROP_RIVER_Y } from './backdropRiver'
 
@@ -113,6 +120,26 @@ function screenFadedFbm(p: typeof positionWorld, freq: readonly [number, number,
   return sum.mul(0.5).add(0.5)
 }
 
+/**
+ * Smooth vertex normals for the backdrop annulus (ring-major, `segs` per ring),
+ * computed as if ring 0 lay level with ring 1 (point 428). The tucked rim drops
+ * BACKDROP_RIM_DROP over the disc overhang — a 45° strip hidden under the plate
+ * — and averaged into the disc-edge ring it tilted that ring's normal toward
+ * the centre, so the backdrop's first visible strip took the sun at another
+ * angle than the flat disc beside it. Positions are restored unchanged.
+ */
+export function computeBackdropNormals(geo: THREE.BufferGeometry, segs: number): void {
+  const pos = geo.attributes.position as THREE.BufferAttribute
+  const tucked = new Float32Array(segs)
+  for (let si = 0; si < segs; si++) {
+    tucked[si] = pos.getY(si)
+    pos.setY(si, pos.getY(segs + si))
+  }
+  geo.computeVertexNormals()
+  for (let si = 0; si < segs; si++) pos.setY(si, tucked[si])
+  pos.needsUpdate = true
+}
+
 /** The backdrop material and the handles the scene keeps writing to. */
 interface BackdropMaterialHandle {
   material: THREE.MeshStandardNodeMaterial
@@ -144,9 +171,12 @@ interface BackdropMaterialHandle {
  * @param waterOctaves fractal octaves of the shared water detail field (the
  *   `waterDetailOctaves` quality lever).
  */
-export function createBackdropMaterial(waterOctaves: number): BackdropMaterialHandle {
+export function createBackdropMaterial(waterOctaves: number, ground: GroundSurface): BackdropMaterialHandle {
   const m = new THREE.MeshStandardNodeMaterial()
-  m.vertexColors = true
+  // Biome vertex colours, multiplied in BELOW rather than by three's automatic
+  // vertex-colour factor, so the water and the seam can carry exact colours of
+  // their own (they used to divide that factor back out, clamped).
+  m.vertexColors = false
   m.roughness = 0.95
   m.metalness = 0
   m.side = THREE.DoubleSide
@@ -159,15 +189,22 @@ export function createBackdropMaterial(waterOctaves: number): BackdropMaterialHa
   const fine = screenFadedFbm(p, [FINE_FREQ, FINE_FREQ, FINE_FREQ], FINE_OCTAVES, false)
   // Steepness from the mesh normal: flat ground keeps its biome color,
   // steeper faces mix toward a bare rock tone with banded structure.
-  const steep = smoothstep(float(0.95), float(0.55), normalWorldGeometry.y)
+  // The walkable ground's own share (point 428): 1 on the disc edge, easing to
+  // 0 across `balance.backdropSeam.blendWidth` (backdropSeamWeight). There the
+  // backdrop takes the disc's albedo, normal and roughness — the SAME nodes —
+  // and none of its own rock terms, so the two read as one ground.
+  const seam = float(attribute('seam', 'float') as never).clamp(0, 1)
+  const steep = smoothstep(float(0.95), float(0.55), normalWorldGeometry.y).mul(seam.oneMinus())
   const biome = attribute('color', 'vec3') as unknown as ReturnType<typeof vec3>
-  let col = mix(biome, color('#8d7f6a').mul(rock.mul(0.5).add(0.7)), steep.mul(0.75)) as typeof biome
+  const col = mix(biome, color('#8d7f6a').mul(rock.mul(0.5).add(0.7)), steep.mul(0.75)) as typeof biome
   // The fine octave and the bump are distance-faded: past ~200 units they
   // are sub-pixel and only fed the TRAA trembling (the low-frequency rock
   // banding carries the far silhouette structure on its own). Both noises also
   // fade their octaves by screen frequency inside screenFadedFbm.
   const fade = detailFade(70, 200)
-  const land = col.mul(rock.mul(0.22).add(0.89)).mul(fine.sub(0.5).mul(0.12).mul(fade).add(1.0))
+  // The biome factor three used to apply through `vertexColors` (see above).
+  const relief = col.mul(rock.mul(0.22).add(0.89)).mul(fine.sub(0.5).mul(0.12).mul(fade).add(1.0)).mul(biome)
+  const land = mix(relief, groundOpenColor(ground) as unknown as typeof relief, seam)
 
   // The river the settlement stands on, carried on out to the horizon.
   const flow = uniform(new THREE.Vector4(0, 1, 1, 0))
@@ -185,19 +222,17 @@ export function createBackdropMaterial(waterOctaves: number): BackdropMaterialHa
     fineWeight: smoothstep(float(0), float(FINE_OFF_PLANE), positionLocal.y.sub(BACKDROP_RIVER_Y).abs()).oneMinus(),
   })
 
-  // three multiplies the geometry's vertex colour into every colorNode while
-  // `vertexColors` is on (NodeMaterial.setupDiffuseColor), and the relief above
-  // is built on that. The water must NOT be tinted by the biome tone under it —
-  // it is the same water as the surface drawn at the bank — so its branch
-  // divides that automatic factor back out. The floor only guards the division;
-  // no water vertex of the terrain comes near it.
-  const untinted = water.color.div(max(biome, vec3(0.06)))
-  m.colorNode = mix(land, untinted, mask)
-  m.roughnessNode = mix(float(0.95), water.roughness, mask)
+  // The water is NOT tinted by the biome tone under it — it is the same water
+  // as the surface drawn at the bank.
+  m.colorNode = mix(land, water.color, mask)
+  m.roughnessNode = mix(mix(float(0.95), groundOpenRoughness(), seam), water.roughness, mask)
   m.metalnessNode = mask.mul(WATER_METALNESS)
   // World up in view space, which is the space proceduralBump returns.
   const flat = cameraViewMatrix.mul(vec4(0, 1, 0, 0)).xyz.normalize()
-  m.normalNode = mix(proceduralBump(rock.mul(0.7).add(fine.mul(0.3)), float(2.6).mul(fade)), flat, mask).normalize()
+  const rockNormal = proceduralBump(rock.mul(0.7).add(fine.mul(0.3)), float(2.6).mul(fade))
+  m.normalNode = mix(mix(rockNormal, groundOpenNormal(ground), seam), flat, mask).normalize()
+  // The shared terms, for the seam test (backdrop.test.ts).
+  m.userData.seamGround = ground
   return {
     material: m,
     flow: flow as unknown as { value: THREE.Vector4 },

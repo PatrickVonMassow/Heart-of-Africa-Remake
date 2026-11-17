@@ -9,6 +9,7 @@ import * as THREE from 'three/webgpu'
 import {
   backdropBase,
   backdropHeightAt,
+  backdropSeamWeight,
   backdropRingRadius,
   backdropSurfaceY,
   backdropTaper,
@@ -27,7 +28,10 @@ import {
 import { bandHeightAt } from '../travel/panoramaMath'
 import { balance } from '../../config/balance'
 import { pitchLimit } from '../../systems/lookPitch'
-import { createBackdropMaterial, rockCyclesPerPx, rockOctaveWeight } from './backdropMaterial'
+import { computeBackdropNormals, createBackdropMaterial, rockCyclesPerPx, rockOctaveWeight } from './backdropMaterial'
+import { createGroundMaterial, groundSurface } from '../../render/materials'
+import { GROUND_WET_U, SEASON_TINT_U } from '../../render/seasonTint'
+import { MONUMENT_GROUND, PORT_GROUND } from './regionStyles'
 import { GIZA_SITE_RADIUS } from './gizaSite'
 import { PLACE_RADIUS } from './layout'
 import { PLACES, placeById } from '../../world/geo'
@@ -316,20 +320,21 @@ describe('backdrop heightfield (design.md §2.5)', () => {
 
 describe('backdrop material (design.md §2.5 smooth shading)', () => {
   it('shades smooth — never flat per-face facets — and keeps the §2.5 draw state', () => {
-    const { material: m } = createBackdropMaterial(3)
+    const { material: m } = createBackdropMaterial(3, groundSurface(...PORT_GROUND))
     // The Cairo facet report: flatShading would replace the heightfield's
     // interpolated vertex normals with per-face normals.
     expect(m.flatShading).toBe(false)
     // Double-sided so steep far slopes never show as black backface overhangs.
     expect(m.side).toBe(THREE.DoubleSide)
-    // Biome vertex colors under the rock shading, with a real normal node.
-    expect(m.vertexColors).toBe(true)
+    // Biome vertex colors under the rock shading (multiplied in by the colour
+    // node itself, point 428), with a real normal node.
+    expect(m.vertexColors).toBe(false)
     expect(m.colorNode).toBeTruthy()
     expect(m.normalNode).toBeTruthy()
   })
 
   it('carries the bank frame the panorama measures its water in (work-order 525)', () => {
-    const handle = createBackdropMaterial(3)
+    const handle = createBackdropMaterial(3, groundSurface(...PORT_GROUND))
     // The frame is a UNIFORM, so walking into another settlement moves the
     // panorama's water field without re-linking the shader.
     expect(handle.flow.value).toBeInstanceOf(THREE.Vector4)
@@ -342,6 +347,124 @@ describe('backdrop material (design.md §2.5 smooth shading)', () => {
     // so a river in the panorama can never read as a rough rock face.
     expect(handle.material.roughnessNode).toBeTruthy()
     expect(handle.material.metalnessNode).toBeTruthy()
+  })
+})
+
+/** Every TSL node reachable from `root` through its own properties. */
+function reachableNodes(root: unknown): Set<unknown> {
+  const seen = new Set<unknown>()
+  const stack: unknown[] = [root]
+  while (stack.length) {
+    const n = stack.pop()
+    if (!n || typeof n !== 'object' || seen.has(n)) continue
+    if (!Array.isArray(n) && !(n as { isNode?: boolean }).isNode) continue
+    seen.add(n)
+    for (const v of Object.values(n)) if (v && typeof v === 'object') stack.push(v)
+  }
+  return seen
+}
+
+/** Whether a node graph reads the named geometry attribute. */
+function readsAttribute(root: unknown, name: string): boolean {
+  return [...reachableNodes(root)].some((n) => (n as { _attributeName?: string })._attributeName === name)
+}
+
+describe('disc-to-backdrop seam reads as one ground (point 428)', () => {
+  it('hands the walkable ground\'s shading over across a band past the disc edge', () => {
+    const width = balance.backdropSeam.blendWidth
+    expect(width).toBeGreaterThan(0)
+    for (const r0 of [40, 72, GIZA_DISC_EDGE - BACKDROP_DISC_OVERLAP]) {
+      const edge = r0 + BACKDROP_DISC_OVERLAP
+      // Under the plate and ON the seam: the disc's own inputs, whole.
+      expect(backdropSeamWeight(r0, r0)).toBe(1)
+      expect(backdropSeamWeight(backdropRingRadius(1, r0), r0)).toBe(1)
+      // Past the band: the biome relief alone.
+      expect(backdropSeamWeight(edge + width, r0)).toBe(0)
+      expect(backdropSeamWeight(BACKDROP_OUTER, r0)).toBe(0)
+      // A gradient, never a step: monotone with a bounded per-unit change.
+      let prev = 1
+      for (let i = 0; i <= 200; i++) {
+        const w = backdropSeamWeight(edge + (i / 200) * width, r0)
+        expect(w).toBeLessThanOrEqual(prev)
+        expect(prev - w).toBeLessThan(0.02)
+        prev = w
+      }
+    }
+  })
+
+  it('resolves the SAME albedo, wetness, season and roughness inputs as the disc at the seam', () => {
+    for (const [palette, sand] of [[PORT_GROUND, false], [MONUMENT_GROUND, true]] as const) {
+      const ground = groundSurface(...palette, sand)
+      const disc = createGroundMaterial(...palette, undefined, { sand })
+      const { material: backdrop } = createBackdropMaterial(3, ground)
+      // One memoized set of terms, the one the disc is built on.
+      expect(disc.userData.groundSurface).toBe(ground)
+      expect(backdrop.userData.seamGround).toBe(ground)
+      // Same lighting model (sun, IBL/hemisphere, tone mapping, fog).
+      expect(backdrop).toBeInstanceOf(THREE.MeshStandardNodeMaterial)
+      expect(disc).toBeInstanceOf(THREE.MeshStandardNodeMaterial)
+      for (const m of [disc, backdrop]) {
+        expect(m.toneMapped).toBe(true)
+        expect(m.fog).toBe(true)
+        expect(m.metalness).toBe(0)
+      }
+      const discColor = reachableNodes(disc.colorNode)
+      const backColor = reachableNodes(backdrop.colorNode)
+      for (const shared of [ground.mottle, ground.structure, GROUND_WET_U, SEASON_TINT_U]) {
+        expect(discColor.has(shared)).toBe(true)
+        expect(backColor.has(shared)).toBe(true)
+      }
+      expect(reachableNodes(disc.roughnessNode).has(GROUND_WET_U)).toBe(true)
+      expect(reachableNodes(backdrop.roughnessNode).has(GROUND_WET_U)).toBe(true)
+      // The seam weight drives every shading term of the backdrop, so none of
+      // them can keep a backdrop-only value on the seam.
+      for (const node of [backdrop.colorNode, backdrop.normalNode, backdrop.roughnessNode]) {
+        expect(readsAttribute(node, 'seam')).toBe(true)
+      }
+      // The disc reads no vertex colour; the backdrop multiplies its biome in
+      // itself, so three adds no factor the disc does not have.
+      expect(disc.vertexColors).toBe(false)
+      expect(backdrop.vertexColors).toBe(false)
+    }
+  })
+
+  it('keeps the tucked rim out of the disc-edge ring\'s normal', () => {
+    // A level annulus with the point-381 tuck: ring 0 two units under the plate.
+    const segs = 32
+    const radii = [10, 12, 15, 19]
+    const pos: number[] = []
+    for (const [ri, r] of radii.entries()) {
+      for (let si = 0; si < segs; si++) {
+        const a = (si / segs) * Math.PI * 2
+        pos.push(Math.cos(a) * r, ri === 0 ? -2 : 0, Math.sin(a) * r)
+      }
+    }
+    const idx: number[] = []
+    for (let ri = 0; ri < radii.length - 1; ri++) {
+      for (let si = 0; si < segs; si++) {
+        const a = ri * segs + si
+        const b = ri * segs + ((si + 1) % segs)
+        idx.push(a, a + segs, b, b, a + segs, b + segs)
+      }
+    }
+    const build = () => {
+      const g = new THREE.BufferGeometry()
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3))
+      g.setIndex(idx)
+      return g
+    }
+    // The cause: plain smoothing tilts the edge ring toward the centre.
+    const plain = build()
+    plain.computeVertexNormals()
+    expect(Math.abs(plain.attributes.normal.getY(segs))).toBeLessThan(0.97)
+    const fixed = build()
+    computeBackdropNormals(fixed, segs)
+    for (let si = 0; si < segs; si++) {
+      // Flat ground beside a flat disc: straight up, like the disc's own normal.
+      expect(Math.abs(fixed.attributes.normal.getY(segs + si))).toBeCloseTo(1, 6)
+      // The tuck itself is untouched.
+      expect(fixed.attributes.position.getY(si)).toBe(-2)
+    }
   })
 })
 

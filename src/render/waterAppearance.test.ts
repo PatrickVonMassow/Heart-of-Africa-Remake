@@ -25,6 +25,7 @@ const { RIVER_WATER_TONES, WATER_FOAM_ROUGHNESS, WATER_METALNESS, WATER_ROUGHNES
 const { FOAM_PATCH_OPACITY, FOAM_PATCH_SEGMENTS, foamPatchOpacity, buildFoamPatchGeometry, createPlaceRiverMaterial, createRiverFoamMaterial } =
   await import('./placeRiver')
 const { createBackdropMaterial } = await import('../scenes/place/backdropMaterial')
+const { groundSurface } = await import('./materials')
 
 const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
@@ -40,7 +41,7 @@ describe('both halves of a settlement river read ONE water description', () => {
 
   it('and so does the panorama that continues the same river past the rim', () => {
     vi.mocked(riverWaterSurface).mockClear()
-    const { material } = createBackdropMaterial(3)
+    const { material } = createBackdropMaterial(3, groundSurface('#dcc99c', '#c4ad7c', '#b59a6b'))
     expect(riverWaterSurface).toHaveBeenCalledTimes(1)
     expect(material.colorNode).toBeTruthy()
   })
