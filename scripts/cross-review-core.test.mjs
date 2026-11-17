@@ -976,14 +976,14 @@ describe('the codex command line is the rule, not a preference of the caller', (
 
 describe('the reviewer is chosen by lane vendor, read from the registry', () => {
   it('takes the reasoning effort of every codex review from the cross lane record', () => {
-    expect(CROSS.reasoningEffort).toBe('high')
+    expect(CROSS.reasoningEffort).toBe('medium')
     const args = codexArgs({ cwd: '/repo', outputFile: '/tmp/out.txt', prompt: 'judge this' })
-    expect(args[args.indexOf('-c') + 1]).toBe('model_reasoning_effort=high')
+    expect(args[args.indexOf('-c') + 1]).toBe('model_reasoning_effort=medium')
     expect(args[args.indexOf('-m') + 1]).toBe(lane('cross').modelId)
   })
 
-  it('treats the three cross-lane names pairwise as ONE lane — none may review another', () => {
-    expect(CROSS_NAMES).toHaveLength(3)
+  it('treats the four cross-lane names pairwise as ONE lane — none may review another', () => {
+    expect(CROSS_NAMES).toHaveLength(4)
     for (const reviewer of CROSS_NAMES) {
       expect(reviewerDescriptor(reviewer), reviewer).toMatchObject({ key: 'cross', runtime: 'codex' })
       for (const author of CROSS_NAMES) {

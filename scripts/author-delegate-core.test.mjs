@@ -98,10 +98,10 @@ describe('authoringCodexArgs', () => {
     expect(args[args.length - 1]).toBe('p')
   })
 
-  it('carries the cross lane record\'s high reasoning effort on the authoring command line', () => {
-    expect(CROSS.reasoningEffort).toBe('high')
+  it('carries the cross lane record\'s medium reasoning effort on the authoring command line', () => {
+    expect(CROSS.reasoningEffort).toBe('medium')
     const args = authoringCodexArgs({ prompt: 'p' })
-    expect(args.slice(args.indexOf('-c'), args.indexOf('-c') + 2)).toEqual(['-c', 'model_reasoning_effort=high'])
+    expect(args.slice(args.indexOf('-c'), args.indexOf('-c') + 2)).toEqual(['-c', 'model_reasoning_effort=medium'])
     // The runtime dispatch builds the same line for the cross lane.
     expect(authoringRuntime('cross').args({ prompt: 'p' })).toEqual(args)
   })

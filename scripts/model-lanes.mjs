@@ -58,15 +58,15 @@ const RAW_LANES = [
   {
     role: 'cross',
     vendor: 'openai',
-    // Display name assumed from the user order of 19.10.2026; the user may correct it.
-    displayName: 'GPT-6.1 Sol',
-    trailerName: 'GPT-6.1 Sol',
-    // Needs the Codex CLI >= 0.163.0 (probe of 20.10.2026); 0.153.0 answers 400 "not supported".
-    modelId: 'gpt-6.1-sol',
+    // Display name follows the user order of 17.11.2026; the user may correct it.
+    displayName: 'GPT-6.2 Sol',
+    trailerName: 'GPT-6.2 Sol',
+    // Needs the Codex CLI >= 0.169.1 (probe of 18.11.2026); 0.163.0 served only gpt-6.1-sol.
+    modelId: 'gpt-6.2-sol',
     familyWords: ['sol', 'astra'],
-    retired: ['GPT-6 Astra', 'gpt-6-astra', 'GPT-5.6 Sol', 'gpt-5.6-sol'],
+    retired: ['GPT-6 Astra', 'gpt-6-astra', 'GPT-5.6 Sol', 'gpt-5.6-sol', 'GPT-6.1 Sol', 'gpt-6.1-sol'],
     runtime: 'codex',
-    reasoningEffort: 'high',
+    reasoningEffort: 'medium',
     scarce: false,
   },
   {

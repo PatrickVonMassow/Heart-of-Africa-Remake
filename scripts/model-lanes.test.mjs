@@ -218,10 +218,10 @@ describe('identities a designation mentions', () => {
   })
 })
 
-describe('the cross lane runs at high reasoning effort (user order 21.10.2026)', () => {
-  it('carries effort high in its record and in its execution target', () => {
-    expect(CROSS.reasoningEffort).toBe('high')
-    expect(executionTarget('cross').effort).toBe('high')
+describe('the cross lane runs at medium reasoning effort (user order 17.11.2026)', () => {
+  it('carries effort medium in its record and in its execution target', () => {
+    expect(CROSS.reasoningEffort).toBe('medium')
+    expect(executionTarget('cross').effort).toBe('medium')
   })
 })
 
