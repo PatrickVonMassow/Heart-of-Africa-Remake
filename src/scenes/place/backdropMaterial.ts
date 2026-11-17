@@ -6,20 +6,24 @@
 import * as THREE from 'three/webgpu'
 import {
   attribute,
+  cameraPosition,
+  cameraProjectionMatrix,
   cameraViewMatrix,
   color,
   float,
   max,
   mix,
-  mx_fractal_noise_float,
+  mx_noise_float,
   normalWorldGeometry,
   positionLocal,
   positionWorld,
+  screenSize,
   smoothstep,
   uniform,
   vec3,
   vec4,
 } from 'three/tsl'
+import { balance } from '../../config/balance'
 import { detailFade, proceduralBump } from '../../render/materials'
 import { WATER_METALNESS, riverWaterSurface } from '../../render/waterAppearance'
 import { BACKDROP_RIVER_Y } from './backdropRiver'
@@ -27,6 +31,86 @@ import { BACKDROP_RIVER_Y } from './backdropRiver'
 /** How far (place units) the heightfield may leave the river plane before the
  *  water's fine octave is gone from it. */
 const FINE_OFF_PLANE = 0.08
+
+/** Base frequency (cycles per place unit, per axis) of the rock fractal's
+ *  lowest octave; each further octave doubles it. */
+const ROCK_FREQ = [0.16, 0.28, 0.16] as const
+/** Octaves of the rock fractal; the first one is the banding and fades last. */
+const ROCK_OCTAVES = 4
+
+/**
+ * Weight of one rock octave by how many of its cycles one screen pixel spans:
+ * 1 while it resolves, 0 once it would alias (point 1532). The shader computes
+ * the same smoothstep; this mirror is what the unit test reads.
+ */
+export function rockOctaveWeight(
+  octave: number,
+  cyclesPerPx: number,
+  start = balance.backdropRock.fadeStartCyclesPerPx,
+  end = balance.backdropRock.fadeEndCyclesPerPx,
+): number {
+  // The banding octave stays wherever a pixel resolves it and only goes
+  // past Nyquist, as on the grazing flat foreland.
+  const [a, b] = octave === 0 ? [end, 2 * end] : [start, end]
+  const t = Math.min(1, Math.max(0, (cyclesPerPx - a) / (b - a)))
+  return 1 - t * t * (3 - 2 * t)
+}
+
+/** Flattest view cosine the footprint estimate follows; it only guards the
+ *  division, so a grazing foreland still fades its banding (review of 1532). */
+const MIN_VIEW_COS = 0.005
+/** Base frequency (cycles per place unit) of the fine grain's lowest octave. */
+const FINE_FREQ = 0.65
+/** Octaves of the fine grain; all of them fade, the first one included. */
+const FINE_OCTAVES = 3
+
+/**
+ * Cycles of a noise octave one pixel spans: the pixel's footprint (distance
+ * times pixel angle, stretched by the grazing angle) times the octave's
+ * frequency vector length. Derivative-free on purpose: fwidth is constant per
+ * triangle and moves with the TRAA jitter, so weights built on it stepped at
+ * facet edges and flickered (point 1532). The shader mirrors it.
+ */
+export function noiseCyclesPerPx(freqLength: number, distance: number, viewCos: number, projY: number, heightPx: number): number {
+  const pixelAngle = 2 / (projY * heightPx)
+  return (freqLength * distance * pixelAngle) / Math.max(Math.abs(viewCos), MIN_VIEW_COS)
+}
+
+/** {@link noiseCyclesPerPx} for the rock fractal's lowest octave. */
+export function rockCyclesPerPx(distance: number, viewCos: number, projY: number, heightPx: number): number {
+  return noiseCyclesPerPx(Math.hypot(...ROCK_FREQ), distance, viewCos, projY, heightPx)
+}
+
+/**
+ * A fractal noise with its octaves faded by screen frequency, mapped to 0..1
+ * (0.5 where every octave has faded). At full weight it is the fBm it
+ * replaces; a faded octave drops out of colour and bump alike. The backlit
+ * terminator turns every sub-pixel bump slope into a light/dark flip, so the
+ * bump height may carry nothing a pixel cannot resolve (point 1532).
+ */
+function screenFadedFbm(p: typeof positionWorld, freq: readonly [number, number, number], octaves: number, keepFirst: boolean) {
+  // Lowest octave's cycles per pixel; octave i spans 2^i times as many.
+  // Geometry normal, not normalView: the bump normal is itself built on this.
+  const toEye = cameraPosition.sub(p)
+  const viewCos = max(normalWorldGeometry.dot(toEye.normalize()).abs(), float(MIN_VIEW_COS))
+  const pixelAngle = float(2).div(cameraProjectionMatrix.element(1).element(1).mul(screenSize.y))
+  const cpp0 = float(Math.hypot(...freq)).mul(toEye.length()).mul(pixelAngle).div(viewCos)
+  // Read from balance every render, so a debug edit takes effect live.
+  const start = uniform(0).onRenderUpdate(() => balance.backdropRock.fadeStartCyclesPerPx)
+  const end = uniform(1).onRenderUpdate(() => balance.backdropRock.fadeEndCyclesPerPx)
+  const pf = p.mul(vec3(...freq))
+  let sum = float(0)
+  for (let i = 0; i < octaves; i++) {
+    const scale = 2 ** i
+    const noise = mx_noise_float(pf.mul(scale)).mul(0.5 ** i)
+    // A kept first octave (the banding) fades one octave later, past Nyquist.
+    const [a, b] = i === 0 && keepFirst ? [end, end.mul(2)] : [start, end]
+    // Ordered smoothstep edges (GLSL ES leaves reversed ones undefined).
+    const weight = smoothstep(a, b, cpp0.mul(scale)).oneMinus()
+    sum = sum.add(noise.mul(weight))
+  }
+  return sum.mul(0.5).add(0.5)
+}
 
 /** The backdrop material and the handles the scene keeps writing to. */
 interface BackdropMaterialHandle {
@@ -70,8 +154,8 @@ export function createBackdropMaterial(waterOctaves: number): BackdropMaterialHa
   // normalView, so flatShading must stay off for the ridge to read smooth.
   m.flatShading = false
   const p = positionWorld
-  const rock = mx_fractal_noise_float(p.mul(vec3(0.16, 0.28, 0.16)), 4).mul(0.5).add(0.5)
-  const fine = mx_fractal_noise_float(p.mul(0.65), 3).mul(0.5).add(0.5)
+  const rock = screenFadedFbm(p, ROCK_FREQ, ROCK_OCTAVES, true)
+  const fine = screenFadedFbm(p, [FINE_FREQ, FINE_FREQ, FINE_FREQ], FINE_OCTAVES, false)
   // Steepness from the mesh normal: flat ground keeps its biome color,
   // steeper faces mix toward a bare rock tone with banded structure.
   const steep = smoothstep(float(0.95), float(0.55), normalWorldGeometry.y)
@@ -79,7 +163,8 @@ export function createBackdropMaterial(waterOctaves: number): BackdropMaterialHa
   let col = mix(biome, color('#8d7f6a').mul(rock.mul(0.5).add(0.7)), steep.mul(0.75)) as typeof biome
   // The fine octave and the bump are distance-faded: past ~200 units they
   // are sub-pixel and only fed the TRAA trembling (the low-frequency rock
-  // banding carries the far silhouette structure on its own).
+  // banding carries the far silhouette structure on its own). Both noises also
+  // fade their octaves by screen frequency inside screenFadedFbm.
   const fade = detailFade(70, 200)
   const land = col.mul(rock.mul(0.22).add(0.89)).mul(fine.sub(0.5).mul(0.12).mul(fade).add(1.0))
 

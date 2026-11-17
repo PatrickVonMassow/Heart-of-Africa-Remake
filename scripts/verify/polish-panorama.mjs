@@ -327,6 +327,133 @@ if (section('giza-sees-cairo')) {
   }
 }
 
+// --- Backlit backdrop hills hold still (point 1532) -----------------------------
+// User 16.11.2026 at Giza: facing the sun, the backdrop hills were streaked and
+// trembled — the rock fractal's upper octaves aliased below a pixel and TRAA
+// shook them. Standing where the report stood and facing the sun, the hills'
+// own pixels (where the frame changes when the backdrop is hidden) must change
+// little between two consecutive still-camera frames, and clearly less than
+// with the screen-frequency fade switched off.
+if (section('backdrop-backlight')) {
+  await goToPlace('giza')
+  await page.evaluate(() => {
+    window.__game.getState().setJournalOpen(false)
+    const p = window.__placePlayer
+    const [dx, , dz] = window.__sceneSun.disc
+    // The report's spot (seed 2226741265, place-local).
+    p.x = -21.46
+    p.z = 68.12
+    p.pitch = 0
+    p.yaw = Math.atan2(-dx, -dz)
+  })
+  await nextFrames(30)
+  const backdropVisible = async (v) => {
+    await page.evaluate((shown) => {
+      const m = window.__placeScene?.getObjectByName('landscape-backdrop')
+      if (m) m.visible = shown
+    }, v)
+    await nextFrames(20)
+  }
+  const shot = (label) => capturePixels(page, `backdrop backlight: ${label}`)
+  const toLuma = async (png) => {
+    const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true })
+    const out = new Float32Array(info.width * info.height)
+    for (let i = 0; i < out.length; i++) {
+      const j = i * info.channels
+      out[i] = 0.2126 * data[j] + 0.7152 * data[j + 1] + 0.0722 * data[j + 2]
+    }
+    return out
+  }
+  const luma = async (label) => toLuma(await shot(label))
+  // Counts animation frames so a pair reports how many frames really lay between
+  // its two captures instead of assuming one.
+  await page.evaluate(() => {
+    window.__backlightFrames = 0
+    const tick = () => {
+      window.__backlightFrames++
+      requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  })
+  const frameCount = () => page.evaluate(() => window.__backlightFrames)
+  const rock = await page.evaluate(() => ({ ...window.__balance.backdropRock }))
+  const setRock = async (patch) => {
+    await page.evaluate((p) => Object.assign(window.__balance.backdropRock, p), patch)
+    await nextFrames(20)
+  }
+  await frame('1532-backdrop-backlit', { place: 'giza', label: 'the backdrop hills west of the Giza site, facing the afternoon sun' })
+  await backdropVisible(false)
+  const hidden = await luma('backdrop hidden')
+  await nextFrames(20)
+  const hiddenAgain = await luma('backdrop hidden, second look')
+  await backdropVisible(true)
+  // TRAA needs its history back after every switch before a pair means anything.
+  await nextFrames(60)
+  // ONE backdrop mask for every comparison: pixels the hills change, minus any
+  // the scene moves or re-exposes on its own between two hidden looks. Built
+  // once with the fade on, so switching the fade cannot change who is counted.
+  const shown = await luma('backdrop shown, mask')
+  const mask = new Uint8Array(shown.length)
+  let maskPx = 0
+  for (let i = 0; i < shown.length; i++) {
+    if (Math.abs(shown[i] - hidden[i]) >= 8 && Math.abs(hiddenAgain[i] - hidden[i]) < 2) {
+      mask[i] = 1
+      maskPx++
+    }
+  }
+  // Still-camera pairs: both PNGs are taken before either is decoded, and the
+  // frames that passed between them are counted and reported, not assumed.
+  // Averaged over three pairs so one unlucky jitter phase cannot decide.
+  const tremble = async (label) => {
+    let s = 0
+    let n = 0
+    let maxGap = 0
+    for (let pair = 0; pair < 3; pair++) {
+      const before = await frameCount()
+      const pa = await shot(`${label}, pair ${pair} frame A`)
+      await nextFrames(1)
+      const pb = await shot(`${label}, pair ${pair} frame B`)
+      maxGap = Math.max(maxGap, (await frameCount()) - before)
+      const a = await toLuma(pa)
+      const b = await toLuma(pb)
+      for (let i = 0; i < a.length; i++) {
+        if (!mask[i]) continue
+        n++
+        s += Math.abs(a[i] - b[i])
+      }
+    }
+    return { meanDiff: +(s / Math.max(1, n)).toFixed(3), maxFrameGap: maxGap }
+  }
+  const fadedFirst = await tremble('fade on')
+  await setRock({ fadeStartCyclesPerPx: 1e6, fadeEndCyclesPerPx: 2e6 })
+  await nextFrames(60)
+  await frame('1532-backdrop-backlit-unfaded', { place: 'giza', label: 'the same backlit hills with the rock fade switched off (the old streaks)' })
+  const unfaded = await tremble('fade off')
+  await setRock(rock)
+  await nextFrames(60)
+  // Measured again after the comparison, so frame order cannot favour either.
+  const fadedAgain = await tremble('fade on again')
+  const faded = {
+    meanDiff: +((fadedFirst.meanDiff + fadedAgain.meanDiff) / 2).toFixed(3),
+    maxFrameGap: Math.max(fadedFirst.maxFrameGap, fadedAgain.maxFrameGap),
+  }
+  check(
+    'backdrop backlight: the hills cover a measurable share of the frame',
+    maskPx > 5000,
+    JSON.stringify({ maskPx, faded, unfaded }),
+  )
+  check(
+    'backdrop backlight: still-camera frames a few frames apart differ by < 1.5 luma on the hills, and by less than with the fade off',
+    faded.meanDiff < 1.5 && faded.meanDiff < unfaded.meanDiff,
+    JSON.stringify({ maskPx, fadedFirst, fadedAgain, unfaded }),
+  )
+  await page.evaluate(() => {
+    const p = window.__placePlayer
+    p.x = 0
+    p.z = 0
+  })
+}
+
 // --- Panorama wildlife (design.md §2) ---------------------------------------------
 if (section('panorama-wildlife')) {
   await page.evaluate(() => {

@@ -27,7 +27,7 @@ import {
 import { bandHeightAt } from '../travel/panoramaMath'
 import { balance } from '../../config/balance'
 import { pitchLimit } from '../../systems/lookPitch'
-import { createBackdropMaterial } from './backdropMaterial'
+import { createBackdropMaterial, rockCyclesPerPx, rockOctaveWeight } from './backdropMaterial'
 import { GIZA_SITE_RADIUS } from './gizaSite'
 import { PLACE_RADIUS } from './layout'
 import { PLACES, placeById } from '../../world/geo'
@@ -608,5 +608,64 @@ describe('vertical look over the settlement horizon (design.md §17.5, point 392
       }
       expect({ place: place.id, holes }).toEqual({ place: place.id, holes: 0 })
     }
+  })
+})
+
+describe('backdrop rock noise fades with screen frequency (point 1532)', () => {
+  it('keeps the banding octave wherever a pixel resolves it, and resolvable octaves whole', () => {
+    const { fadeEndCyclesPerPx: end } = balance.backdropRock
+    for (const cpp of [0, 0.1, end]) expect(rockOctaveWeight(0, cpp)).toBe(1)
+    // Past Nyquist (the grazing foreland) even the banding goes.
+    for (const cpp of [2 * end, 10]) expect(rockOctaveWeight(0, cpp)).toBe(0)
+    for (const o of [1, 2, 3]) expect(rockOctaveWeight(o, 0.05)).toBe(1)
+  })
+
+  it('drops an upper octave entirely once it would alias', () => {
+    const { fadeStartCyclesPerPx: start, fadeEndCyclesPerPx: end } = balance.backdropRock
+    expect(start).toBeLessThan(end)
+    expect(end).toBeLessThanOrEqual(0.5) // Nyquist
+    for (const o of [1, 2, 3]) {
+      expect(rockOctaveWeight(o, end)).toBe(0)
+      expect(rockOctaveWeight(o, 2)).toBe(0)
+      expect(rockOctaveWeight(o, start)).toBe(1)
+    }
+    // Monotone in between: more cycles per pixel never weighs more.
+    let last = 1
+    for (let c = start; c <= end; c += (end - start) / 16) {
+      const w = rockOctaveWeight(2, c)
+      expect(w).toBeLessThanOrEqual(last)
+      last = w
+    }
+  })
+
+  it('at the reported backlit hills (~300 units, 984 px tall, fov 50) the finest octaves are gone', () => {
+    // One pixel's footprint facing the hill head-on; a grazing flank spans more.
+    const footprint = (2 * 300 * Math.tan((25 * Math.PI) / 180)) / 984
+    const cpp0 = footprint * Math.hypot(0.16, 0.28, 0.16)
+    // Octave i spans 2^i times the lowest octave's cycles per pixel.
+    const w = [0, 1, 2, 3].map((i) => rockOctaveWeight(i, cpp0 * 2 ** i))
+    expect(w[0]).toBe(1)
+    expect(w[3]).toBe(0)
+    expect(w[2]).toBeLessThan(0.5)
+  })
+})
+
+describe('backdrop rock footprint estimate (point 1532)', () => {
+  const projY = 1 / Math.tan((25 * Math.PI) / 180)
+  it('grows with distance and with a grazing view, and stays finite edge-on', () => {
+    const head = rockCyclesPerPx(300, 1, projY, 984)
+    expect(rockCyclesPerPx(600, 1, projY, 984)).toBeCloseTo(2 * head, 9)
+    expect(rockCyclesPerPx(300, 0.5, projY, 984)).toBeCloseTo(2 * head, 9)
+    expect(rockCyclesPerPx(300, -0.5, projY, 984)).toBeCloseTo(2 * head, 9)
+    expect(Number.isFinite(rockCyclesPerPx(300, 0, projY, 984))).toBe(true)
+  })
+  it('fades the banding on a grazing foreland at cosine 0.015 (review of 1532)', () => {
+    const cpp = rockCyclesPerPx(100, 0.015, projY, 984)
+    expect(cpp).toBeGreaterThan(2)
+    expect(rockOctaveWeight(0, cpp)).toBe(0)
+  })
+  it('matches the head-on footprint the fade test assumes', () => {
+    const footprint = (2 * 300 * Math.tan((25 * Math.PI) / 180)) / 984
+    expect(rockCyclesPerPx(300, 1, projY, 984)).toBeCloseTo(footprint * Math.hypot(0.16, 0.28, 0.16), 9)
   })
 })
