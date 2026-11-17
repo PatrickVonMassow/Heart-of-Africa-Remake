@@ -1997,27 +1997,30 @@ if (section('giza-activity')) {
     // Gap bounds: over the two bodies' radii (0.85 m for the donkey and its
     // boy), under lag + side + 1 m (GIZA_ACTIVITY: 2.4 + 0.7 + 1).
     const pairs = [[2, 0], [4, 3], [6, 5]]
-    const start = await page.evaluate(() => window.__gizaActivity())
-    const far = (now, i) => Math.hypot(now[i].x - start[i].x, now[i].z - start[i].z)
-    const walked = pairs.map(() => ({ mount: 0, handler: 0, minGap: Infinity, maxGap: 0, samples: 0 }))
-    const deadline = Date.now() + 90000
-    for (;;) {
-      const now = await page.evaluate(() => window.__gizaActivity())
-      pairs.forEach(([m, h], k) => {
-        const w = walked[k]
-        const gap = Math.hypot(now[m].x - now[h].x, now[m].z - now[h].z)
-        w.minGap = Math.min(w.minGap, gap)
-        w.maxGap = Math.max(w.maxGap, gap)
-        w.mount = Math.max(w.mount, far(now, m))
-        w.handler = Math.max(w.handler, far(now, h))
-        w.samples++
-      })
-      if (walked.every((w) => w.mount > 2 && w.handler > 2) || Date.now() > deadline) break
-      await page.waitForTimeout(250)
-    }
+    // Sampled in the page by the poll itself (no wall-clock pause): each poll
+    // records the pairs' gaps and how far each body has walked from the start.
+    const walked = await page
+      .waitForFunction((pairs) => {
+        const now = window.__gizaActivity()
+        const rec = (window.__gizaMountWalk ??= { start: now, walked: pairs.map(() => ({ mount: 0, handler: 0, minGap: Infinity, maxGap: 0, samples: 0 })) })
+        const far = (i) => Math.hypot(now[i].x - rec.start[i].x, now[i].z - rec.start[i].z)
+        pairs.forEach(([m, h], k) => {
+          const w = rec.walked[k]
+          const gap = Math.hypot(now[m].x - now[h].x, now[m].z - now[h].z)
+          w.minGap = Math.min(w.minGap, gap)
+          w.maxGap = Math.max(w.maxGap, gap)
+          w.mount = Math.max(w.mount, far(m))
+          w.handler = Math.max(w.handler, far(h))
+          w.samples++
+        })
+        return rec.walked.every((w) => w.mount > 2 && w.handler > 2) ? rec.walked : null
+      }, pairs, { timeout: 90000, polling: 250 })
+      .then((h) => h.jsonValue())
+      .catch(() => page.evaluate(() => window.__gizaMountWalk?.walked ?? []))
+    await page.evaluate(() => delete window.__gizaMountWalk)
     const report = JSON.stringify(walked.map((w, k) => ({ pair: pairs[k], ...w, minGap: +w.minGap.toFixed(2), maxGap: +w.maxGap.toFixed(2), mount: +w.mount.toFixed(2), handler: +w.handler.toFixed(2) })))
-    check('Giza activity: every mount itself walks off its place with its handler', walked.every((w) => w.mount > 2 && w.handler > 2), report)
-    check('Giza activity: every mount stays beside its handler throughout the walk', walked.every((w) => w.samples > 1 && w.minGap > 0.85 && w.maxGap < 4.1), report)
+    check('Giza activity: every mount itself walks off its place with its handler', walked.length === pairs.length && walked.every((w) => w.mount > 2 && w.handler > 2), report)
+    check('Giza activity: every mount stays beside its handler throughout the walk', walked.length === pairs.length && walked.every((w) => w.samples > 1 && w.minGap > 0.85 && w.maxGap < 4.1), report)
     // Mid-walk: wait for the guide's party to be under way, then hold it.
     const walking = await page
       .waitForFunction(() => {
