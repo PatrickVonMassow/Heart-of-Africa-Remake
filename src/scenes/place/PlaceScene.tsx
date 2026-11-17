@@ -178,6 +178,7 @@ import { clearShelterMask, setShelterLook, setShelterMask, SHELTER_MASK_SIZE } f
 import { bakeShelterMask, placeShelters } from './shelterMask'
 import { FireSmoke, WalkerDust } from './SmokeDust'
 import { isLifeFrozen } from './lifeFreeze'
+import { Camel } from './Camel'
 import { devAssert } from '../../systems/devAssert'
 import {
   GUESS_KEY_CODE,
@@ -2316,44 +2317,6 @@ function GizaSphinx() {
   return <mesh geometry={geometry} material={material} castShadow receiveShadow />
 }
 
-/** A standing camel (Bedouin mount): humped body, long neck, four legs. */
-function Camel() {
-  const tan = '#b89468'
-  return (
-    <group>
-      <mesh position={[0, 1.15, 0]} castShadow>
-        <boxGeometry args={[1.4, 0.6, 0.55]} />
-        <meshStandardMaterial color={tan} roughness={0.95} />
-      </mesh>
-      <mesh position={[0.05, 1.55, 0]} castShadow>
-        <sphereGeometry args={[0.34, 10, 8]} />
-        <meshStandardMaterial color={tan} roughness={0.95} />
-      </mesh>
-      <mesh position={[0.75, 1.55, 0]} rotation={[0, 0, -0.7]} castShadow>
-        <cylinderGeometry args={[0.12, 0.17, 1.0, 8]} />
-        <meshStandardMaterial color={tan} roughness={0.95} />
-      </mesh>
-      <mesh position={[1.02, 2.0, 0]} castShadow>
-        <boxGeometry args={[0.38, 0.26, 0.22]} />
-        <meshStandardMaterial color={tan} roughness={0.95} />
-      </mesh>
-      {(
-        [
-          [0.55, 0.3],
-          [0.55, -0.3],
-          [-0.55, 0.3],
-          [-0.55, -0.3],
-        ] as const
-      ).map(([lx, lz], i) => (
-        <mesh key={i} position={[lx, 0.5, lz]} castShadow>
-          <cylinderGeometry args={[0.08, 0.07, 1.05, 6]} />
-          <meshStandardMaterial color={tan} roughness={0.95} />
-        </mesh>
-      ))}
-    </group>
-  )
-}
-
 /** A standing donkey (the donkey-boys' mounts): smaller, grey, long ears. */
 function Donkey() {
   const grey = '#9c968c'
@@ -2446,8 +2409,9 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
       g.rotation.y = isGizaPerson(a.role) ? p.yaw : p.yaw - Math.PI / 2
     })
   })
-  const figureFor = (a: { role: GizaAmbientRole; sex?: 'female' | 'male'; dragoman?: boolean }) => {
-    if (a.role === 'camel') return <Camel />
+  const figureFor = (a: { role: GizaAmbientRole; sex?: 'female' | 'male'; dragoman?: boolean }, i: number) => {
+    // The swept dromedary (Camel.tsx); the index staggers each camel's idle.
+    if (a.role === 'camel') return <Camel phase={i * 1.7} />
     if (a.role === 'donkey') return <Donkey />
     if (!isGizaPerson(a.role)) return null
     const spec = gizaFigure(a.role, a.sex, a.dragoman)
@@ -2477,7 +2441,7 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
           // (design.md §17.8); a person's Figure carries its own mark.
           userData={isGizaPerson(a.role) ? undefined : markActor({ kind: a.role, height: a.role === 'camel' ? 2.4 : 2.0 })}
         >
-          {figureFor(a)}
+          {figureFor(a, i)}
         </group>
       ))}
     </LimbDetailContext.Provider>

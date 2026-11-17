@@ -2128,6 +2128,96 @@ if (section('giza-activity')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
+// --- The Giza camel's model (swept dromedary) ----------------------------------
+// The camel is the swept dromedary (Camel.tsx) on medium and high, the primitive
+// on low. One close-up per backend from the camel's side, life held, so the
+// hump, the S-neck, the head and the jointed legs on their pads can be judged.
+if (section('giza-camel')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await goToPlace('giza')
+  await page.waitForFunction(() => window.__game.getState().placeId === 'giza' && !!window.__placeLayout && !!window.__placeScene && !!window.__gizaActivity,
+    null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.evaluate(() => window.__placeFreezeLife?.(true))
+  const level = await page.evaluate(() => window.__ui.getState().detailLevel)
+  try {
+    // Per level: the camel's marked group holds the swept model (a 'camel'
+    // group with four meshes on medium) or the primitive (no __camelModel).
+    for (const lvl of ['low', 'medium']) {
+      await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), lvl)
+      const swept = lvl !== 'low'
+      const ok = await page
+        .waitForFunction((swept) => (swept ? (window.__camelModel?.radial ?? 0) > 0 : !window.__camelModel), swept, { timeout: 15000 })
+        .then(() => true)
+        .catch(() => false)
+      // A missing camel must not pass for the primitive: count the visible
+      // meshes under the 'camel' groups at this level.
+      const meshes = await page.evaluate(() => {
+        let n = 0
+        window.__placeScene.traverseVisible((o) => {
+          if (o.name !== 'camel') return
+          o.traverseVisible((m) => {
+            if (m.isMesh) n++
+          })
+        })
+        return n
+      })
+      check(`Giza camel (${lvl}): ${swept ? 'the swept dromedary' : 'the primitive camel'} is drawn`, ok && meshes > 0,
+        JSON.stringify({ model: await page.evaluate(() => window.__camelModel ?? null), meshes }))
+    }
+    // The cameleer's camel (GIZA_AMBIENT index 4), seen in profile from 4.5 m:
+    // the stand is off its flank, perpendicular to its heading.
+    const camel = await page.evaluate(() => {
+      const live = window.__gizaActivity()
+      const c = live.find((q, i) => i === 4 && q.role === 'camel') ?? live.find((q) => q.role === 'camel')
+      if (!c) return null
+      const side = c.yaw + Math.PI / 2
+      const p = window.__placePlayer
+      p.x = c.x + Math.sin(side) * 4.5
+      p.z = c.z + Math.cos(side) * 4.5
+      p.yaw = Math.atan2(c.x - p.x, c.z - p.z) + Math.PI
+      p.pitch = -0.05
+      return { x: c.x, z: c.z }
+    })
+    check('Giza camel: a live camel to frame', !!camel, JSON.stringify(camel))
+    await waitForStable(page)
+    // The frame must show it: the camel's marked group, 1.2 m above its feet,
+    // projects inside the frame and in front of the camera.
+    const seen = await page.evaluate((camel) => {
+      const cam = window.__placeCamera
+      cam.updateMatrixWorld(true)
+      let best = null
+      let bestD = Infinity
+      const v = cam.position.clone()
+      window.__placeScene.traverseVisible((o) => {
+        if (o.userData?.actor?.kind !== 'camel') return
+        o.getWorldPosition(v)
+        const d = Math.hypot(v.x - camel.x, v.z - camel.z)
+        if (d < bestD) {
+          bestD = d
+          best = o
+        }
+      })
+      if (!best || bestD > 0.5) return { drawn: false }
+      best.getWorldPosition(v)
+      v.y += 1.2
+      const ahead = v.clone().sub(cam.position).dot(cam.getWorldDirection(cam.position.clone())) > 0
+      v.project(cam)
+      return { drawn: true, ahead, ndc: [+v.x.toFixed(2), +v.y.toFixed(2)], inside: ahead && Math.abs(v.x) <= 0.8 && Math.abs(v.y) <= 0.8 }
+    }, camel)
+    check('Giza camel: the close-up shows the camel (projected inside the frame)', !!seen?.inside, JSON.stringify(seen))
+    await frame(shot('1530-giza-camel'), {
+      local: { x: camel?.x ?? 0, y: 1.2, z: camel?.z ?? 0 },
+      label: 'the Giza dromedary in profile: one hump, S-neck, muzzle and ears, jointed legs on pads',
+    })
+  } finally {
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
+    await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
 // --- Detailed animal models (work-order 1284) ----------------------------------
 // The zebra, the antelope and the settlement goat are shaped models with face,
 // horns/mane and jointed legs; the zebra and the gazelle carry their pelt
