@@ -76,6 +76,8 @@ describe('settlement rain layers (design.md §19.13)', () => {
     // Clamped either way.
     expect(streakVector(20, [0, 500, 0], D.exposureS, D.streakMinM, D.streakMaxM).length).toBe(D.streakMaxM)
     expect(streakVector(20, [0, -20, 0], D.exposureS, D.streakMinM, D.streakMaxM).length).toBe(D.streakMinM)
+    // Cancelled relative speed: the shortest streak stands upright (the shader's fallback).
+    expect(streakVector(20, [0, -20, 0], D.exposureS, D.streakMinM, D.streakMaxM).dir).toEqual([0, 1, 0])
   })
 
   it('a stalled camera does not stretch a drop', () => {

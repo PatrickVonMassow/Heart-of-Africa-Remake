@@ -141,7 +141,8 @@ export function buildRainMaterials(
   const rel = vec3(uniforms.camVel.x.negate(), speed.negate().sub(uniforms.camVel.y), uniforms.camVel.z.negate())
   const relSpeed = rel.length()
   const len = relSpeed.mul(D.exposureS).clamp(D.streakMinM, D.streakMaxM)
-  const dir = rel.negate().div(max(relSpeed, float(1e-6)))
+  // At zero relative speed the streak stands upright, as streakVector's mirror.
+  const dir = relSpeed.greaterThan(1e-6).select(rel.negate().div(max(relSpeed, float(1e-6))), vec3(0, 1, 0))
   const base = vec3(spot.x, spot.y.add(fall), spot.z)
   const centreDist = base.add(dir.mul(len.mul(0.5))).sub(cameraPosition).length()
   const fit = len.div(uniforms.tanHalfFov.mul(2 * balance.rain.dropMaxFrameFraction))
