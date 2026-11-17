@@ -963,6 +963,12 @@ interface BalanceConfig {
    *  has nothing to tremble with. The lowest octave (the banding) stays until
    *  twice the end, i.e. wherever a pixel still resolves it; the fine grain
    *  fades all its octaves on the same thresholds. */
+  /** Where the walkable disc meets the panorama backdrop (point 428). */
+  backdropSeam: {
+    /** Place units past the disc edge over which the backdrop hands the
+     *  ground's own albedo, normal and roughness over to its biome relief. */
+    blendWidth: number
+  }
   backdropRock: {
     /** Cycles per pixel at which an upper octave starts fading out. */
     fadeStartCyclesPerPx: number
@@ -2335,6 +2341,9 @@ export const balance: BalanceConfig = {
     closeFadeStartPx: 24, // educated guess: about one texel's size at the default zoom; calibratable, debug-editable
     closeFadeEndPx: 64, // educated guess: gone well before the closest zoom (~80 px per texel); calibratable, debug-editable
     skyOcclusionStrength: 0.7, // calibratable, debug-editable
+  },
+  backdropSeam: {
+    blendWidth: 24, // educated guess: a gradient over ~24 m reads as terrain, not as an edge; calibratable
   },
   backdropRock: {
     fadeStartCyclesPerPx: 0.2, // educated guess: an octave still reads at five pixels per cycle; calibratable, debug-editable

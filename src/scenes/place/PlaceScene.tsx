@@ -58,11 +58,12 @@ import {
   PANORAMA_RING_CLEARANCE,
   backdropRingRadius,
   backdropSurfaceY,
+  backdropSeamWeight,
   groundDiscSegments,
   panoramaStandY,
 } from './backdrop'
 import { BACKDROP_RIVER_Y, backdropRiverFill, barycentricValue, mapWaterAt } from './backdropRiver'
-import { createBackdropMaterial } from './backdropMaterial'
+import { computeBackdropNormals, createBackdropMaterial } from './backdropMaterial'
 import { mulberry32 } from '../../world/noise'
 import {
   consumeTouchLook,
@@ -80,7 +81,13 @@ import { rainLightDamping, rainSunDampNow } from './rainLight'
 import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { floraSlotScale, floraSlotSpecies, type FloraSpecies } from './floraSpecies'
-import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial } from '../../render/materials'
+import {
+  createGroundMaterial,
+  createNoisyMaterial,
+  createSurfaceMaterial,
+  groundSurface,
+  type GroundSurface,
+} from '../../render/materials'
 import { TESSELLATION } from '../../render/figures'
 import { FIGURE_STATURE } from '../../render/figureBody'
 import { Figure } from './placeFigure'
@@ -329,21 +336,18 @@ function usePlaceMaterials(
     const pathOpts = pathTex
       ? { mask: pathTex, color: isPort ? '#bfa070' : style.pathColor, extent: PATH_MASK_EXTENT }
       : undefined
+    // The walkable Giza plateau: warm, granular DESERT SAND (matched to the
+    // travel desert biome), not the port's pebbled sandy earth (point 273) —
+    // the `sand` mode mutes the earth mottling.
+    const palette = isMonument ? MONUMENT_GROUND : isPort ? PORT_GROUND : style.ground
+    const sand = isMonument
     const ground = flatGround
-      ? new THREE.MeshStandardMaterial({
-          color: isMonument ? MONUMENT_GROUND[0] : isPort ? PORT_GROUND[0] : style.ground[0],
-          roughness: 1,
-          metalness: 0,
-        })
-      : isMonument
-        ? // The walkable Giza plateau: warm, granular DESERT SAND (matched to
-          // the travel desert biome), not the port's pebbled sandy earth
-          // (point 273) — the `sand` mode mutes the earth mottling.
-          createGroundMaterial(...MONUMENT_GROUND, pathOpts, { sand: true })
-        : isPort
-          ? createGroundMaterial(...PORT_GROUND, pathOpts)
-          : createGroundMaterial(style.ground[0], style.ground[1], style.ground[2], pathOpts)
-    return { plaster, plasterDark, mud, thatch, wood, cloth, ground }
+      ? new THREE.MeshStandardMaterial({ color: palette[0], roughness: 1, metalness: 0 })
+      : createGroundMaterial(...palette, pathOpts, { sand })
+    // The disc's open-land terms, which the backdrop takes on at the seam
+    // (point 428) — the same memoized nodes the ground material is built on.
+    const groundOpen = groundSurface(...palette, sand)
+    return { plaster, plasterDark, mud, thatch, wood, cloth, ground, groundOpen }
   }, [isPort, isMonument, style, pathTex, flatGround])
 }
 
@@ -1985,6 +1989,7 @@ function LandscapeBackdrop({
   innerRadius,
   bank,
   bounds,
+  ground,
 }: {
   lat: number
   lon: number
@@ -1994,12 +1999,15 @@ function LandscapeBackdrop({
   /** The walkable bounds: where the drawn disc is pushed out (downstream of a
    *  bank, work-order 1237) the rim moves out with it. */
   bounds: PlaceBounds
+  /** The walkable disc's open-land terms, taken on at the seam (point 428). */
+  ground: GroundSurface
 }) {
   const geometry = useMemo(() => {
     const centerH = sampleTerrain(lat, lon, seed).height
     const positions: number[] = []
     const colors: number[] = []
     const water: number[] = []
+    const seam: number[] = []
     const indices: number[] = []
     // Each column's rim follows the drawn disc at its own bearing: tucked under
     // the plate and feathered up to it at the plate's edge, wherever that is.
@@ -2032,6 +2040,8 @@ function LandscapeBackdrop({
         // rock shading (work-order 525) — the same source the drawn surface at
         // the bank reads, so the two meet with no seam at the plate's rim.
         water.push(smp.type === 'water' || river ? 1 : 0)
+        // The walkable ground's own shading at the disc edge (point 428).
+        seam.push(backdropSeamWeight(r, r0))
       }
     }
     for (let ri = 0; ri < BACKDROP_RINGS - 1; ri++) {
@@ -2047,14 +2057,16 @@ function LandscapeBackdrop({
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3))
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3))
     geo.setAttribute('waterMask', new THREE.BufferAttribute(new Float32Array(water), 1))
+    geo.setAttribute('seam', new THREE.BufferAttribute(new Float32Array(seam), 1))
     geo.setIndex(indices)
     // Smooth interpolated vertex normals — the backdrop ridge must never
-    // shade as hard flat facets (createBackdropMaterial keeps flat shading off).
-    geo.computeVertexNormals()
+    // shade as hard flat facets (createBackdropMaterial keeps flat shading off)
+    // — and the tucked rim kept out of the edge ring's normal (point 428).
+    computeBackdropNormals(geo, BACKDROP_SEGS)
     return geo
   }, [lat, lon, seed, innerRadius, bounds, bank])
   const waterOctaves = useUi(effectiveWaterDetailOctaves)
-  const backdrop = useMemo(() => createBackdropMaterial(waterOctaves), [waterOctaves])
+  const backdrop = useMemo(() => createBackdropMaterial(waterOctaves, ground), [waterOctaves, ground])
   const material = backdrop.material
   // The bank frame the panorama measures its water in — a uniform, not a build
   // constant, so walking into another settlement never re-links the shader.
@@ -3442,7 +3454,7 @@ export function PlaceScene() {
       />
 
       {/* Real-surroundings panorama behind the settlement (design.md §2) */}
-      <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} bank={layout.bank ?? null} bounds={layout} />
+      <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} bank={layout.bank ?? null} bounds={layout} ground={mats.groundOpen} />
       <TravelPanorama placeId={place.id} />
       <TableMountainSkyline placeId={place.id} />
       <HorizonNeighbours items={horizonNeighbours} place={place} seed={seed} layout={layout} />

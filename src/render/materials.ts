@@ -473,6 +473,59 @@ export interface GroundPathOptions {
   extent: number
 }
 
+/** The settlement ground's open-land terms, shared by the walkable disc and the
+ *  backdrop's seam band (point 428) — the SAME node instances, so the two
+ *  surfaces cannot resolve different albedo where they meet. */
+export interface GroundSurface {
+  /** Mottled region albedo before season tint (no path, no swept term). */
+  mottle: ReturnType<typeof vec3>
+  /** Baked earth structure factor (~1 mean). */
+  structure: ReturnType<typeof vec3>
+  /** Normal-relief strength of open (unswept, unpathed) ground. */
+  openRelief: number
+}
+
+const groundSurfaces = new Map<string, GroundSurface>()
+
+/** The open-land ground terms for one palette, memoized per palette. */
+export function groundSurface(base: string, alt: string, patch: string, sand = false): GroundSurface {
+  const key = `${base}|${alt}|${patch}|${sand}`
+  const cached = groundSurfaces.get(key)
+  if (cached) return cached
+  const p = positionWorld.xz
+  const large = mx_fractal_noise_float(vec3(p.mul(0.08), 2.0), 4).mul(0.5).add(0.5)
+  // Worley noise returns a cell DISTANCE that can exceed 1, so clamp it before
+  // `oneMinus().pow(3)`: without the clamp a value > 1 makes the base negative,
+  // and pow(negative, 3) is NaN on WGSL/WebGPU (pow = exp(y·log(x)), log of a
+  // negative = NaN) — the NaN propagated to a flat-black ground patch that the
+  // WebGL 2 path never showed (point 111).
+  const cells = mx_worley_noise_float(vec3(p.mul(0.22), 9.0)).clamp(0, 1)
+  const even = mix(color(base), color(alt), large.clamp(0, 1))
+  const patchWeight = sand ? GROUND_PATCH_WEIGHT.sand : GROUND_PATCH_WEIGHT.earth
+  const surface: GroundSurface = {
+    mottle: mix(even, color(patch), cells.oneMinus().pow(3).mul(patchWeight)) as unknown as ReturnType<typeof vec3>,
+    structure: surfaceStructure('ground') as unknown as ReturnType<typeof vec3>,
+    openRelief: (sand ? 0.4 : 0.85) + 0.15,
+  }
+  groundSurfaces.set(key, surface)
+  return surface
+}
+
+/** Open-land ground albedo: season tint, structure and the unsheltered wetness. */
+export function groundOpenColor(s: GroundSurface) {
+  return wetGroundColor(seasonTintNode(s.mottle as never).mul(s.structure))
+}
+
+/** Open-land ground normal (view space). */
+export function groundOpenNormal(s: GroundSurface) {
+  return surfaceNormal('ground', float(s.openRelief))
+}
+
+/** Ground roughness under the unsheltered wetness. */
+export function groundOpenRoughness() {
+  return wetGroundRoughness(float(1))
+}
+
 /**
  * Ground material: region tint and large Worley patch mottling over the baked
  * earth structure (grain, pebbles — relief from the baked normal map, so it
@@ -497,14 +550,8 @@ export function createGroundMaterial(
   m.roughness = 1
   m.metalness = 0
   const p = positionWorld.xz
-  const large = mx_fractal_noise_float(vec3(p.mul(0.08), 2.0), 4).mul(0.5).add(0.5)
-  // Worley noise returns a cell DISTANCE that can exceed 1, so clamp it before
-  // `oneMinus().pow(3)`: without the clamp a value > 1 makes the base negative,
-  // and pow(negative, 3) is NaN on WGSL/WebGPU (pow = exp(y·log(x)), log of a
-  // negative = NaN) — the NaN propagated to a flat-black ground patch that the
-  // WebGL 2 path never showed (point 111).
-  const cells = mx_worley_noise_float(vec3(p.mul(0.22), 9.0)).clamp(0, 1)
-  const even = mix(color(base), color(alt), large.clamp(0, 1))
+  const surface = groundSurface(base, alt, patch, sand)
+  const even = mix(color(base), color(alt), mx_fractal_noise_float(vec3(p.mul(0.08), 2.0), 4).mul(0.5).add(0.5).clamp(0, 1))
   // The settlement edge (design.md §2.6, point 352/488): 1 on the swept ground
   // inside, 0 on the open land outside, ramping across a soft band at the
   // boundary the leave check reads. Three terms of THIS material carry it —
@@ -516,7 +563,7 @@ export function createGroundMaterial(
   // does not bleach it, and mixing to the bright colour used to give the swept
   // side back most of the darkening the tone step had just applied.
   const patchWeight = sand ? GROUND_PATCH_WEIGHT.sand : GROUND_PATCH_WEIGHT.earth
-  let col = mix(even, color(patch), cells.oneMinus().pow(3).mul(patchWeight))
+  let col = surface.mottle as unknown as typeof even
   const levelled = mix(even, color(patch), float(patchWeight * SWEPT_PATCH_MEAN))
   col = mix(col, levelled, swept.mul(edgeBandUniforms.mottle))
   const pathMask = (() => {
@@ -557,7 +604,7 @@ export function createGroundMaterial(
   // SPATIALLY: ground under a roof or a crown stays less wet, and a drip band
   // just outside the eaves wetter (shelterWetness.ts). Dry weather is 0 · mask = 0.
   const wet = shelteredWetNode()
-  m.colorNode = wetGroundColor(dusted.mul(sweptTone).mul(surfaceStructure('ground')), wet)
+  m.colorNode = wetGroundColor(dusted.mul(sweptTone).mul(surface.structure), wet)
   // Baked micro-relief; trodden paths are worn flat (the tangent deflection
   // fades where the mask is strong). Sand keeps a softer grain (weaker relief,
   // same tile) so the open plateau reads as smooth desert sand rather than a
@@ -567,8 +614,9 @@ export function createGroundMaterial(
   const sweptRelief = float(1).sub(swept.mul(edgeBandUniforms.relief))
   m.normalNode = surfaceNormal(
     'ground',
-    pathMask.oneMinus().mul(sand ? 0.4 : 0.85).add(0.15).mul(sweptRelief),
+    pathMask.oneMinus().mul(surface.openRelief - 0.15).add(0.15).mul(sweptRelief),
   )
+  m.userData.groundSurface = surface
   // Wet gloss: the base roughness (1) pulls down toward a sheen with the wet
   // factor, so the micro-relief normals catch a highlight. `m.roughness` stays
   // its scalar default — the node overrides it.

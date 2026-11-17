@@ -2,6 +2,7 @@
 // the annulus heightfield formula shared by the backdrop mesh and the
 // panorama wildlife, kept three-free so the shape rules are unit-testable.
 
+import { balance } from '../../config/balance'
 import { sampleTerrain } from '../../world/terrain'
 
 export const BACKDROP_SCALE = 0.005 // degrees of map per place-unit of distance
@@ -150,6 +151,20 @@ export function backdropSurfaceY(r: number, r0: number, relief: number): number 
   if (r < r0 + BACKDROP_DISC_OVERLAP) return base
   const capped = Math.min(r * BACKDROP_MAX_SLOPE, Math.max(0, relief))
   return capped * backdropTaper(r, r0) + base
+}
+
+/**
+ * How much of the walkable ground's own shading the backdrop takes at radius
+ * `r` (point 428): 1 up to the disc edge (r0 + BACKDROP_DISC_OVERLAP), easing to
+ * 0 over `width` past it. The disc and the backdrop were two surfaces with two
+ * albedos (region palette vs. map biome) and the backdrop's own rock term, which
+ * the vertical look showed as a straight brightness step along the seam. With
+ * the weight at 1 on the seam both resolve the same inputs there; the biome
+ * relief then takes over as a gradient the eye reads as terrain.
+ */
+export function backdropSeamWeight(r: number, r0: number, width: number = balance.backdropSeam.blendWidth): number {
+  const t = Math.min(1, Math.max(0, (r - r0 - BACKDROP_DISC_OVERLAP) / width))
+  return 1 - t * t * (3 - 2 * t)
 }
 
 /**
