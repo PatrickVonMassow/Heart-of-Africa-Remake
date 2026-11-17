@@ -960,7 +960,9 @@ interface BalanceConfig {
   /** Rock noise of the settlement's backdrop hills (src/scenes/place/
    *  backdropMaterial.ts): its upper octaves fade by how many noise cycles one
    *  screen pixel spans, so no sub-pixel grain reaches colour or bump and TRAA
-   *  has nothing to tremble with. The lowest octave (the banding) always stays. */
+   *  has nothing to tremble with. The lowest octave (the banding) stays until
+   *  twice the end, i.e. wherever a pixel still resolves it; the fine grain
+   *  fades all its octaves on the same thresholds. */
   backdropRock: {
     /** Cycles per pixel at which an upper octave starts fading out. */
     fadeStartCyclesPerPx: number

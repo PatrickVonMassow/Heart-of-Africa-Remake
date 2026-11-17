@@ -612,8 +612,11 @@ describe('vertical look over the settlement horizon (design.md §17.5, point 392
 })
 
 describe('backdrop rock noise fades with screen frequency (point 1532)', () => {
-  it('keeps the banding octave and resolvable octaves whole', () => {
-    for (const cpp of [0, 0.1, 1, 10]) expect(rockOctaveWeight(0, cpp)).toBe(1)
+  it('keeps the banding octave wherever a pixel resolves it, and resolvable octaves whole', () => {
+    const { fadeEndCyclesPerPx: end } = balance.backdropRock
+    for (const cpp of [0, 0.1, end]) expect(rockOctaveWeight(0, cpp)).toBe(1)
+    // Past Nyquist (the grazing foreland) even the banding goes.
+    for (const cpp of [2 * end, 10]) expect(rockOctaveWeight(0, cpp)).toBe(0)
     for (const o of [1, 2, 3]) expect(rockOctaveWeight(o, 0.05)).toBe(1)
   })
 

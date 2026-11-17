@@ -412,7 +412,6 @@ if (section('backdrop-backlight')) {
     meanDiff: +((fadedFirst.meanDiff + fadedAgain.meanDiff) / 2).toFixed(3),
     groundDiff: +((fadedFirst.groundDiff + fadedAgain.groundDiff) / 2).toFixed(3),
   }
-  console.log('1532 tremble', JSON.stringify({ fadedFirst, fadedAgain, unfaded }))
   check(
     'backdrop backlight: the hills cover a measurable share of the frame',
     faded.px > 5000,
@@ -421,7 +420,7 @@ if (section('backdrop-backlight')) {
   check(
     'backdrop backlight: two still-camera frames differ by < 1.5 luma on the hills, and by less than with the fade off',
     faded.meanDiff < 1.5 && faded.meanDiff < unfaded.meanDiff,
-    JSON.stringify({ faded, unfaded }),
+    JSON.stringify({ fadedFirst, fadedAgain, unfaded }),
   )
   await page.evaluate(() => {
     const p = window.__placePlayer
