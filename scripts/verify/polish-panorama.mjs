@@ -1890,6 +1890,8 @@ if (section('giza-figures')) {
   await page.waitForFunction(() => window.__game.getState().placeId === 'giza' && !!window.__placeLayout && !!window.__placeScene,
     null, { timeout: 30000 })
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  // Held from arrival: the frames below are aimed at the ambient anchors.
+  await page.evaluate(() => window.__placeFreezeLife?.(true))
   const level = await page.evaluate(() => window.__ui.getState().detailLevel)
   try {
     const census = (skinnedWanted) =>
@@ -1926,21 +1928,89 @@ if (section('giza-figures')) {
       check(`Giza figures (${lvl}): every head stands at villager height`,
         !!people && people.every((f) => f.headRise > 0.95 && f.headRise < 1.35), JSON.stringify(people))
     }
-    // The wide frame: from the south over the approach, the woman tourist in
-    // front, the donkey-boy, the cameleer and his camel, the guides beyond.
-    await page.evaluate(() => {
-      const p = window.__placePlayer
-      p.x = 3
-      p.z = 40
-      p.yaw = 0.08
-      p.pitch = -0.06
+    // The wide frame: from the south over the approach (the spawn side, +z),
+    // looking north past the plateau's people toward the pyramids. Aimed at
+    // where the held figures stand NOW (they walk, work-order 1529), not at a
+    // fixed spot: a fixed (3, 40) went stale when the site rescale moved the
+    // anchors ~40 m south and stood the camera north of every figure. The
+    // stand backs off along the view until every figure fits the inner 85 %
+    // of the frame width.
+    const wide = await page.evaluate(() => {
+      const live = window.__gizaActivity()
+      const cam = window.__placeCamera
+      const tanH = Math.tan((cam.fov * Math.PI) / 360) * cam.aspect
+      const cx = live.reduce((s, q) => s + q.x, 0) / live.length
+      const cz = live.reduce((s, q) => s + q.z, 0) / live.length
+      const yaw = 0.08
+      const fwd = [-Math.sin(yaw), -Math.cos(yaw)]
+      const right = [Math.cos(yaw), -Math.sin(yaw)]
+      for (let d = 8; d <= 45; d += 0.5) {
+        const x = cx - fwd[0] * d
+        const z = cz - fwd[1] * d
+        const fits = live.every((q) => {
+          const dx = q.x - x
+          const dz = q.z - z
+          const depth = dx * fwd[0] + dz * fwd[1]
+          return depth > 3 && Math.abs((dx * right[0] + dz * right[1]) / depth) < 0.85 * tanH
+        })
+        if (!fits) continue
+        const p = window.__placePlayer
+        p.x = x
+        p.z = z
+        p.yaw = yaw
+        p.pitch = -0.06
+        return { x: +x.toFixed(2), z: +z.toFixed(2), back: d }
+      }
+      return null
     })
+    check('Giza figures: a south stand frames every held figure', !!wide, JSON.stringify(wide))
     await waitForStable(page)
     await frame(shot('1378-giza-ambient'), { place: 'giza', label: "the plateau's ambient life on the villagers' dressed body" })
-    // Closer: the tourist man in his sun helmet beside a guide in galabiya and turban.
+    // The frame must actually show them: each live pose's drawn body (the
+    // person's Figure or the mount's marked group, matched within 0.5 m) is
+    // projected through the frame's own camera, 1 m above its feet, and must
+    // fall inside the frame and in front of the camera. A mis-aimed frame
+    // (figures behind or beside the view) turns the section red.
+    const inFrame = await page.evaluate(() => {
+      const live = window.__gizaActivity()
+      const cam = window.__placeCamera
+      cam.updateMatrixWorld(true)
+      const bodies = []
+      // traverseVisible: a hidden body (or one under a hidden ancestor) is not
+      // in the picture, so it must not satisfy the match.
+      window.__placeScene.traverseVisible((o) => {
+        const kind = o.userData?.actor?.kind
+        if (o.name === 'inhabitant' || kind === 'camel' || kind === 'donkey') bodies.push(o)
+      })
+      const v = cam.position.clone()
+      return live.map((q) => {
+        let best = null
+        let bestD = Infinity
+        for (const o of bodies) {
+          o.getWorldPosition(v)
+          const d = Math.hypot(v.x - q.x, v.z - q.z)
+          if (d < bestD) {
+            bestD = d
+            best = o
+          }
+        }
+        if (!best || bestD > 0.5) return { role: q.role, drawn: false }
+        best.getWorldPosition(v)
+        v.y += 1
+        const ahead = v.clone().sub(cam.position).dot(cam.getWorldDirection(cam.position.clone())) > 0
+        v.project(cam)
+        const inside = ahead && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1
+        return { role: q.role, drawn: true, ndc: [+v.x.toFixed(2), +v.y.toFixed(2)], ahead, inside }
+      })
+    })
+    check('Giza figures: the ambient frame shows every plateau figure (projected inside the frame)',
+      inFrame.length === 9 && inFrame.every((f) => f.inside), JSON.stringify({ stand: wide, figures: inFrame }))
+    // Closer: the tourist man in his sun helmet beside a guide in galabiya and
+    // turban — where they stand NOW, still held.
     const near = await page.evaluate(() => {
-      const [gx, gz] = window.__placeLayout.errands[0]
-      const [tx, tz] = window.__placeLayout.errands[1]
+      const live = window.__gizaActivity()
+      const [gx, gz] = [live[0].x, live[0].z]
+      const [tx, tz] = [live[1].x, live[1].z]
       const cx = (gx + tx) / 2
       const cz = (gz + tz) / 2
       const p = window.__placePlayer
@@ -1956,7 +2026,99 @@ if (section('giza-figures')) {
       label: 'the tourist in suit and sun helmet beside a guide in galabiya and turban',
     })
   } finally {
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
     await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
+// --- The plateau's people at work (work-order 1529) -----------------------------
+// The guides walk their tourists between monument viewpoints, the cameleer
+// leads his camel, the donkey-boy walks his donkey (gizaActivity.ts). The live
+// poses must change over a few seconds and every mount must stay beside its
+// handler; one frame catches the guide's party mid-walk, held by the life freeze.
+if (section('giza-activity')) {
+  const shot = (n) => (VERIFY_GL === 'webgl' ? `${n}-webgl2` : n)
+  await goToPlace('giza')
+  await page.waitForFunction(() => window.__game.getState().placeId === 'giza' && !!window.__placeLayout && !!window.__placeScene && !!window.__gizaActivity,
+    null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  try {
+    const before = await page.evaluate(() => window.__gizaActivity())
+    // Polled, not a fixed wait: done as soon as four figures have walked off.
+    const after = await page
+      .waitForFunction((before) => {
+        const live = window.__gizaActivity()
+        const moved = live.filter((p, i) => Math.hypot(p.x - before[i].x, p.z - before[i].z) > 0.5).length
+        return moved >= 4 ? live : null
+      }, before, { timeout: 30000, polling: 250 })
+      .then((h) => h.jsonValue())
+      .catch(() => null)
+    check('Giza activity: the plateau\'s figures walk off their places (not statues)', !!after, JSON.stringify({ before }))
+    // Mounts move WITH their handlers (gizaActivity.ts GIZA_PARTIES: camel 2
+    // with guide 0, camel 4 with the cameleer 3, donkey 6 with the donkey-boy
+    // 5): sampled every 250 ms until every mount AND its handler have each
+    // walked over 2 m from where they stood, the gap between them checked at
+    // every sample — not one instant, which stationary mounts could pass.
+    // Gap bounds: over the two bodies' radii (0.85 m for the donkey and its
+    // boy), under lag + side + 1 m (GIZA_ACTIVITY: 2.4 + 0.7 + 1).
+    const pairs = [[2, 0], [4, 3], [6, 5]]
+    // Sampled in the page by the poll itself (no wall-clock pause): each poll
+    // records the pairs' gaps and how far each body has walked from the start.
+    const walked = await page
+      .waitForFunction((pairs) => {
+        const now = window.__gizaActivity()
+        const rec = (window.__gizaMountWalk ??= { start: now, walked: pairs.map(() => ({ mount: 0, handler: 0, minGap: Infinity, maxGap: 0, samples: 0 })) })
+        const far = (i) => Math.hypot(now[i].x - rec.start[i].x, now[i].z - rec.start[i].z)
+        pairs.forEach(([m, h], k) => {
+          const w = rec.walked[k]
+          const gap = Math.hypot(now[m].x - now[h].x, now[m].z - now[h].z)
+          w.minGap = Math.min(w.minGap, gap)
+          w.maxGap = Math.max(w.maxGap, gap)
+          w.mount = Math.max(w.mount, far(m))
+          w.handler = Math.max(w.handler, far(h))
+          w.samples++
+        })
+        return rec.walked.every((w) => w.mount > 2 && w.handler > 2) ? rec.walked : null
+      }, pairs, { timeout: 90000, polling: 250 })
+      .then((h) => h.jsonValue())
+      .catch(() => page.evaluate(() => window.__gizaMountWalk?.walked ?? []))
+    await page.evaluate(() => delete window.__gizaMountWalk)
+    const report = JSON.stringify(walked.map((w, k) => ({ pair: pairs[k], ...w, minGap: +w.minGap.toFixed(2), maxGap: +w.maxGap.toFixed(2), mount: +w.mount.toFixed(2), handler: +w.handler.toFixed(2) })))
+    check('Giza activity: every mount itself walks off its place with its handler', walked.length === pairs.length && walked.every((w) => w.mount > 2 && w.handler > 2), report)
+    check('Giza activity: every mount stays beside its handler throughout the walk', walked.length === pairs.length && walked.every((w) => w.samples > 1 && w.minGap > 0.85 && w.maxGap < 4.1), report)
+    // Mid-walk: wait for the guide's party to be under way, then hold it.
+    const walking = await page
+      .waitForFunction(() => {
+        const live = window.__gizaActivity()
+        return live[0].moving && live[1].moving ? live : null
+      }, null, { timeout: 60000, polling: 250 })
+      .then((h) => h.jsonValue())
+      .catch(() => null)
+    check('Giza activity: the guide\'s party is caught walking', !!walking, 'no walking moment within 60 s')
+    await page.evaluate(() => window.__placeFreezeLife?.(true))
+    const party = await page.evaluate(() => {
+      const live = window.__gizaActivity()
+      const [g, t, c] = [live[0], live[1], live[2]]
+      const cx = (g.x + t.x + c.x) / 3
+      const cz = (g.z + t.z + c.z) / 3
+      // Stand off to the party's side, a few metres out, looking at it.
+      const side = g.yaw + Math.PI / 2
+      const p = window.__placePlayer
+      p.x = cx + Math.sin(side) * 7
+      p.z = cz + Math.cos(side) * 7
+      p.yaw = Math.atan2(cx - p.x, cz - p.z) + Math.PI
+      p.pitch = -0.1
+      return { x: cx, z: cz }
+    })
+    await waitForStable(page)
+    await frame(shot('1529-giza-activity'), {
+      local: { x: party.x, y: 1.0, z: party.z },
+      label: "the guide walking the tourist and his camel between the monuments, mid-stride",
+    })
+  } finally {
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })

@@ -34,7 +34,7 @@ import {
   effectiveFigureLimbSegments,
   effectiveSphinxSiteDetail,
 } from '../../state/ui'
-import { balance, GIZA_CAST, START_YEAR, VILLAGER_ASSET } from '../../config/balance'
+import { balance, GIZA_ACTIVITY, GIZA_CAST, START_YEAR, VILLAGER_ASSET } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { marketPlentyAt } from '../../systems/seasonalLife'
 import { fireHasCookShelter, fireShelterResponse, shelteredFireRainFactor, yardFireOut } from '../../systems/cookShelter'
@@ -91,6 +91,7 @@ import { useHorizonNeighbours } from './useHorizonNeighbours'
 import { neighbourExclusionSpans } from './horizonNeighbours'
 import { createSphinxSiteMaterial } from '../../render/sphinxMaterial'
 import { GIZA_AMBIENT, GIZA_PYRAMIDS, GIZA_SPHINX, gizaFigure, isGizaPerson, pyramidMassFootprint, type GizaAmbientRole } from './gizaSite'
+import { startGizaActivity, stepGizaActivity, type GizaActivity } from './gizaActivity'
 import { LadyHat, SunHelmet } from './castHats'
 import {
   buildAntelopeParts,
@@ -2397,14 +2398,26 @@ function Donkey() {
  * The sparse Thomas-Cook-era ambient life at the Giza plateau (docs/
  * giza-1890.md §4): a handful of robed guides/dragomen, a Bedouin cameleer,
  * a donkey-boy, a few 1890s tourists, and their camels and donkeys — no throng.
- * Positions come from the layout's validated ambient anchors (free of the
- * monuments), paired with GIZA_AMBIENT's roles; each figure idles and looks
- * slowly around (no mechanics).
+ * They start on the layout's validated ambient anchors (free of the
+ * monuments), paired with GIZA_AMBIENT's roles, and go about their business
+ * (gizaActivity.ts): guides walk their tourists between monument viewpoints,
+ * the cameleer leads and tends his camel, the donkey-boy walks his donkey. The
+ * villagers' Figure strides from its own movement (figureWalk); no mechanics.
  */
 function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role: GizaAmbientRole; sex?: 'female' | 'male'; dragoman?: boolean }> }) {
   const groundHeight = usePlaceGround()
   const refs = useRef<Array<THREE.Group | null>>([])
-  const phases = useMemo(() => anchors.map((_, i) => i * 1.7 + 0.3), [anchors])
+  const activity = useRef<GizaActivity | null>(null)
+  activity.current ??= startGizaActivity()
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    // Dev: the live poses, for the proof frames that stage the figures.
+    const w = window as unknown as Record<string, unknown>
+    w.__gizaActivity = () => activity.current?.poses.map((p, i) => ({ ...p, role: GIZA_AMBIENT[i]?.role }))
+    return () => {
+      delete w.__gizaActivity
+    }
+  }, [])
   // The plateau's people wear their cast's dress on the villagers' body
   // (docs/giza-1890.md §4.1); null on the low preset, which keeps the
   // primitive figure. One look per cast, read once per visit.
@@ -2417,14 +2430,20 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
     expedition: null,
   }
   const limbSegments = useUi(effectiveFigureLimbSegments)
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime
+  useFrame((_, delta) => {
+    const state = activity.current
+    if (!state) return
+    // The dev life freeze holds them like every inhabitant (lifeFreeze.ts).
+    // The routine consumes the elapsed time in fixed substeps, bounded like
+    // the figure's own stride measure (maxFrame), so a hitch is no sprint.
+    if (!isLifeFrozen()) stepGizaActivity(state, Math.min(delta, GIZA_ACTIVITY.maxFrame))
     anchors.forEach((a, i) => {
       const g = refs.current[i]
-      if (!g) return
-      // Each stands on the spot and looks slowly around.
-      g.rotation.y = phases[i] + Math.sin(t * 0.3 + phases[i]) * 0.5
-      g.position.y = groundHeight(a.x, a.z)
+      const p = state.poses[i]
+      if (!g || !p) return
+      g.position.set(p.x, groundHeight(p.x, p.z), p.z)
+      // A person faces +z at yaw 0; the camel and donkey models face +x.
+      g.rotation.y = isGizaPerson(a.role) ? p.yaw : p.yaw - Math.PI / 2
     })
   })
   const figureFor = (a: { role: GizaAmbientRole; sex?: 'female' | 'male'; dragoman?: boolean }) => {
