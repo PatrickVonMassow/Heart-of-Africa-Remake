@@ -1797,6 +1797,9 @@ if (section('sphinx')) {
       return { dp, da: Math.acos(Math.min(1, Math.max(-1, dot))) }
     }
     const still = (m) => m.dp <= SETTLE_SHARE * stepLen && m.da <= SETTLE_SHARE * STEP
+    // The plateau's walkers are held: a figure crossing the Sphinx is true
+    // motion, but its swinging limbs read as A → B → A flips to the judge.
+    await page.evaluate(() => window.__placeFreezeLife?.(true))
     for (let arc = 0; arc < 4; arc++) {
       const a0 = (arc / 4) * Math.PI * 2 - (ARC_FRAMES / 2) * STEP
       const series = []
@@ -1835,6 +1838,7 @@ if (section('sphinx')) {
         `worst flip share ${(flicker.worst * 100).toFixed(3)}% > ${(flicker.limit * 100).toFixed(3)}% at frame ${flicker.worstAt + 1}`)
       await frame(shot(`315-sphinx-orbit-${arc}`), { local: { x: sx.x, y: 0.15 * L, z: sx.z }, label: `the end of moving-camera arc ${arc + 1} of 4 round the Sphinx` })
     }
+    await page.evaluate(() => window.__placeFreezeLife?.(false))
     // The frame cost at the site, LOW and MEDIUM, standing in profile.
     await standAt(sx.x + 0.05 * L, sx.z + 0.85 * L, sx.x, sx.z, 0)
     for (const lvl of ['low', 'medium']) {
