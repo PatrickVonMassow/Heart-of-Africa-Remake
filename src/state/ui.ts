@@ -464,6 +464,8 @@ export const effectiveSpringBubbles = (s: UiState): number => currentQuality(s).
 export const effectiveWaterDetailOctaves = (s: UiState): number => currentQuality(s).waterDetailOctaves
 /** Radial segments of the detailed ungulates' swept bodies (work-order 1284). */
 export const effectiveFaunaBodySegments = (s: UiState): number => currentQuality(s).faunaBodySegments
+/** Whether the bird's-eye herds walk on pivoted legs (work-order 414). */
+export const effectiveHerdGait = (s: UiState): boolean => currentQuality(s).herdGait
 /** The Great Sphinx's site mesh level for the current preset. */
 export const effectiveSphinxSiteDetail = (s: UiState) => currentQuality(s).sphinxSiteDetail
 /** The villagers' skinned-body resolution; 0 = the primitive figure (work-order "villager dress"). */

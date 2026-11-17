@@ -102,6 +102,12 @@ export interface QualityPreset {
    *  close animal's outline reads round or faceted; a herd draws one instanced
    *  mesh per species, so the cost is vertices per instance. */
   faunaBodySegments: number
+  /** The bird's-eye herds walk (work-order 414): rigged species near the
+   *  traveller draw pivoted legs driven by the distance they cover, a middle
+   *  band only the body-lift cue (bands in `HERD_GAIT`, balance.ts). Off draws
+   *  every herd animal as one merged body, as before. Prices up to four extra
+   *  instanced leg draws per rigged species plus their matrices. */
+  herdGait: boolean
   /** Ring resolution of the villagers' code-built skinned body and its dress
    *  (work-order "villager dress"); 0 keeps the primitive cone-and-sphere
    *  figure (user decision 04.10.2026: low keeps it). A settlement draws one
@@ -211,6 +217,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     placeRiverFlotsam: 12, // x2 only, to spare the weakest tier (frame cost measured, work-order 1280); never none
     waterDetailOctaves: 1, // one octave: the water still moves, at the lowest shading cost
     faunaBodySegments: 12, // the frugal floor: 30° facets, the shapes and markings still read
+    herdGait: false, // user decision 29.07.2026: low never carries the herd walk
     figureBodySegments: 0, // the primitive figure stays (user decision 04.10.2026)
     figureGltfBody: false, // the primitive figure stays: no glTF body is loaded at all
     grassFireFlames: 16, // the burning line's tongues; the ground ember edge draws on every level
@@ -256,6 +263,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     placeRiverFlotsam: 48, // ~3x the 16 foam patches it had, now a mixed drift
     waterDetailOctaves: 3, // the field before the presets existed
     faunaBodySegments: 18, // round at the bird's-eye range
+    herdGait: false, // OPEN: the F8 benchmark on the player's hardware decides (work-order 414); off until measured
     figureBodySegments: 16, // the skinned, dressed villager; round at conversation range
     figureGltfBody: true, // the CC0 glTF body under the dress
     grassFireFlames: 28, // the burning line's tongues; the ground ember edge draws on every level
@@ -300,6 +308,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     placeRiverFlotsam: 90, // ~3x the 30 foam patches it had
     waterDetailOctaves: 4, // one octave more structure on the water
     faunaBodySegments: 24, // no facet on the outline at the closest zoom
+    herdGait: true, // user decision 29.07.2026: high always carries the herd walk
     figureBodySegments: 24, // no facet on a head or a hem the player stands beside
     figureGltfBody: true, // the CC0 glTF body under the dress
     grassFireFlames: 40, // the burning line's tongues; the ground ember edge draws on every level
