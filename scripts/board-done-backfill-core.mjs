@@ -33,26 +33,6 @@ export function hasMeasures(card) {
   return String(card).includes(`<p class="status-head">${MEASURES_SECTION_TITLE}</p>`)
 }
 
-/**
- * The picture check an OLD status recorded, as the note's backend label — ''
- * when it names none. Only explicit statements count; anything vaguer leaves
- * the note off, because the note must never claim a check nobody made.
- */
-export function recordedCheck(statusText) {
-  // A sentence counts only with an explicit completion word and without a
-  // negated or pending one ("nicht geprüft", "wird später geprüft", "geplant").
-  const done = /(?<![\p{L}])(?:geprüft|grün|sauber|bestanden|abgenommen)(?![\p{L}])/iu
-  const pending = /(?<![\p{L}])(?:nicht|kein\w*|noch|später|offen|ausstehend|aus|geplant|wird|werden|soll\w*|muss)(?![\p{L}])/iu
-  const sentences = String(statusText ?? '')
-    .split(/(?<=[.!?;])\s+/)
-    .filter((s) => done.test(s) && !pending.test(s))
-  if (sentences.some((s) => /beide[nm]?\s+Backends|WebGPU\s*(?:und|\+|&|\/|sowie)\s*WebGL|WebGL\s*2?\s*(?:und|\+|&|\/|sowie)\s*WebGPU/i.test(s))) {
-    return 'beide Backends'
-  }
-  if (sentences.some((s) => /\bWebGPU\b/.test(s))) return 'WebGPU'
-  return ''
-}
-
 /** One card rewritten: description kept byte for byte, status replaced by the measures section. */
 export function backfillCard(card, measures, { checked = '' } = {}) {
   const m = String(card).match(BODY_RE)
@@ -64,15 +44,6 @@ export function backfillCard(card, measures, { checked = '' } = {}) {
       ? `${inner.slice(0, at).replace(/\s*$/, '')}\n${renderStatusSection({ status: measures, title: MEASURES_SECTION_TITLE, checked })}`
       : `\n${renderCardSections({ description: '', status: measures, title: MEASURES_SECTION_TITLE, checked })}`
   return card.slice(0, m.index) + open + body + close
-}
-
-/** The old status text of a card (plain `<p>` after the divider, or the whole body when unsplit). */
-function oldStatus(card) {
-  const inner = (String(card).match(BODY_RE) ?? [])[2] ?? ''
-  const at = inner.indexOf('<hr class="split">')
-  return [...(at >= 0 ? inner.slice(at) : inner).matchAll(/<p>([\s\S]*?)<\/p>/g)]
-    .map((p) => p[1].replace(/<[^>]+>/g, ' '))
-    .join(' ')
 }
 
 /**
@@ -92,7 +63,8 @@ function backfillRegion(html, from, end, measuresFor) {
     const text = point == null ? null : measuresFor(point)
     const measures = String(text ?? '').trim() || MEASURES_UNKNOWN_TEXT
     cards.push({ point, outcome: measures === MEASURES_UNKNOWN_TEXT ? 'unknown' : 'written' })
-    return backfillCard(card, measures, { checked: recordedCheck(oldStatus(card)) })
+    // No check note: old free-text statuses cannot prove a picture check (point 1535 review).
+    return backfillCard(card, measures)
   })
   return { html: html.slice(0, from) + out + html.slice(end), cards }
 }

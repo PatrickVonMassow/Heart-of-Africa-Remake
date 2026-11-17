@@ -8,7 +8,6 @@ import {
   cardPoint,
   measuresLookup,
   mergedPoint,
-  recordedCheck,
 } from './board-done-backfill-core.mjs'
 import { MEASURES_SECTION_TITLE, MEASURES_UNKNOWN_TEXT, STATUS_SECTION_TITLE, doneCard, doneCards, toDone } from './board-core.mjs'
 
@@ -38,7 +37,8 @@ describe('backfill of done cards (point 1535)', () => {
     const ten = doneCard(html, 10)
     expect(ten).toContain('<p class="desc">Was der Punkt liefert.</p>')
     expect(ten).toContain(`<p class="status-head">${MEASURES_SECTION_TITLE}</p>\n    <p>Kamele laufen jetzt flüssig.</p>`)
-    expect(ten).toContain('<p class="check-note">✓ geprüft: beide Backends</p>')
+    // An old status never yields a check note, however it is worded.
+    expect(ten).not.toContain('check-note')
     expect(ten).not.toContain('Zusammengeführt')
     // Attributable but no text written: not a guess, the fixed sentence.
     expect(doneCard(html, 12)).toContain(`<p>${MEASURES_UNKNOWN_TEXT}</p>`)
@@ -90,20 +90,6 @@ describe('backfill of done cards (point 1535)', () => {
     expect(doneCard(again, 10)).toContain('<p class="desc">Was der Punkt liefert.</p>')
     expect(doneCard(again, 10)).toContain('<p>Neue Maßnahme.</p>')
     expect(doneCard(again, 10)).not.toContain('Kamele')
-  })
-
-  it('reads the picture check only from explicit statements', () => {
-    expect(recordedCheck('Bild auf beiden Backends geprüft.')).toBe('beide Backends')
-    expect(recordedCheck('WebGPU und WebGL 2 sauber.')).toBe('beide Backends')
-    expect(recordedCheck('Bildprüfung auf WebGPU grün.')).toBe('WebGPU')
-    expect(recordedCheck('Zusammengeführt.')).toBe('')
-    expect(recordedCheck('Beide Backends werden später geprüft.')).toBe('')
-    expect(recordedCheck('WebGPU wurde nicht geprüft.')).toBe('')
-    expect(recordedCheck('Bildprüfung steht noch aus.')).toBe('')
-    expect(recordedCheck('Bildprüfung auf WebGPU grün. WebGL 2 folgt noch.')).toBe('WebGPU')
-    expect(recordedCheck('Bildprüfung auf WebGPU geplant.')).toBe('')
-    expect(recordedCheck('WebGPU ungeprüft.')).toBe('')
-    expect(recordedCheck('Beide Backends sind implementiert.')).toBe('')
   })
 
   it('attributes a point only through exactly one merged feat branch', () => {
