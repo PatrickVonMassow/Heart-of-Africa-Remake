@@ -941,8 +941,18 @@ interface BalanceConfig {
     /** Share of the ground's brightness the sun's direct light supplies, i.e.
      *  how far a fully shadowed texel darkens (0 = no shadow, 1 = black). */
     shadowStrength: number
-    /** Half-width (degrees) of the soft shadow edge around the horizon angle. */
+    /** Half-width (degrees) of the soft shadow edge around the horizon angle,
+     *  before the relief term below widens it. */
     shadowSoftnessDeg: number
+    /** Extra edge half-width (degrees) per unit of reliefScale: the exaggerated
+     *  slope swings by several degrees across one ~5.6 km texel, so a fixed
+     *  narrow edge flips texel by texel into stair steps. */
+    shadowSoftnessPerRelief: number
+    /** Screen pixels one horizon texel may cover before the shadow and sky
+     *  occlusion start fading toward 1 (a close zoom magnifies its blocks). */
+    closeFadeStartPx: number
+    /** Pixels per texel at which both terms have faded out completely. */
+    closeFadeEndPx: number
     /** Ambient-light loss of a texel whose surroundings rise 90 degrees all
      *  round; real hollows lose this times sin^2 of their mean horizon. */
     skyOcclusionStrength: number
@@ -2271,6 +2281,9 @@ export const balance: BalanceConfig = {
     reliefScale: 15, // ≈ the rendered relief's exaggeration (1.35 units/km ÷ 10 units/111.32 km); calibratable, debug-editable
     shadowStrength: 0.45, // educated guess: low afternoon sun, strong sky light; calibratable, debug-editable
     shadowSoftnessDeg: 1.5, // ~one texel's worth of soft edge at the low sun; calibratable, debug-editable
+    shadowSoftnessPerRelief: 0.2, // educated guess: 1.5° + 0.2·15 = 4.5° half-width; calibratable, debug-editable
+    closeFadeStartPx: 24, // educated guess: about one texel's size at the default zoom; calibratable, debug-editable
+    closeFadeEndPx: 64, // educated guess: gone well before the closest zoom (~80 px per texel); calibratable, debug-editable
     skyOcclusionStrength: 0.7, // calibratable, debug-editable
   },
   exposure: {

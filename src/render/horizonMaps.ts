@@ -12,7 +12,7 @@
 // Settlements have their own scene and ground and never read these.
 
 import * as THREE from 'three/webgpu'
-import { atan, float, mix, positionWorld, smoothstep, texture, uniform, vec2, vec4 } from 'three/tsl'
+import { atan, float, fwidth, max, min, mix, positionWorld, smoothstep, texture, uniform, vec2, vec4 } from 'three/tsl'
 import { balance } from '../config/balance'
 import { UNITS_PER_DEGREE } from '../world/geo'
 import { createHorizonMapGate } from './horizonMapGate'
@@ -21,6 +21,9 @@ import { horizonSliceBlend } from './horizonSlices'
 /** Geographic extent of the baked maps (= the DEM's; horizonMaps.test.ts
  *  checks it against public/geodata/horizon.json). */
 export const HORIZON_BOUNDS = { lonMin: -20, lonMax: 53, latMin: -37, latMax: 38 } as const
+/** Texel count of the baked maps (checked the same way); the loaded image's
+ *  own size replaces it on arrival. */
+export const HORIZON_MAP_SIZE = { width: 1460, height: 1500 } as const
 
 const DEG = Math.PI / 180
 
@@ -57,6 +60,32 @@ export function horizonUniformValues(opts: {
   }
 }
 
+/** Half-width (degrees) of the soft shadow edge: widened with the relief
+ *  exaggeration so the edge spans more than one texel's slope swing. */
+export function horizonShadowSoftnessDeg(baseDeg: number, reliefScale: number, perRelief: number): number {
+  return baseDeg + perRelief * reliefScale
+}
+
+function smoothstepCpu(e0: number, e1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)))
+  return t * t * (3 - 2 * t)
+}
+
+/** Screen pixels one texel spans along its LONGER projected side, from the
+ *  map UV's per-pixel change (fwidth) and the map size. The shorter side must
+ *  not decide: a foreshortened texel 80 px wide and 20 px deep shows its
+ *  blocks across the 80. The shader node mirrors this per fragment. */
+export function horizonPixelsPerTexel(fwidthU: number, fwidthV: number, width: number, height: number): number {
+  return 1 / Math.max(Math.min(fwidthU * width, fwidthV * height), 1e-6)
+}
+
+/** Weight of the horizon terms by magnification (1 = full, 0 = faded out):
+ *  a texel covering more than `startPx` screen pixels starts to fade, at
+ *  `endPx` it is gone. The shader node mirrors this per fragment. */
+export function horizonCloseFade(pixelsPerTexel: number, startPx: number, endPx: number): number {
+  return 1 - smoothstepCpu(startPx, endPx, pixelsPerTexel)
+}
+
 // --- GPU side: the shared nodes ------------------------------------------------
 
 function placeholder(): THREE.DataTexture {
@@ -71,7 +100,14 @@ const weightsBU = uniform(new THREE.Vector2())
 const sunElevationU = uniform(0.3)
 const reliefU = uniform(balance.horizonMaps.reliefScale)
 const shadowStrengthU = uniform(balance.horizonMaps.shadowStrength)
-const softnessU = uniform(balance.horizonMaps.shadowSoftnessDeg * DEG)
+const softnessDeg = () => {
+  const h = balance.horizonMaps
+  return horizonShadowSoftnessDeg(h.shadowSoftnessDeg, h.reliefScale, h.shadowSoftnessPerRelief)
+}
+const softnessU = uniform(softnessDeg() * DEG)
+const fadeStartU = uniform(balance.horizonMaps.closeFadeStartPx)
+const fadeEndU = uniform(balance.horizonMaps.closeFadeEndPx)
+const mapSizeU = uniform(new THREE.Vector2(HORIZON_MAP_SIZE.width, HORIZON_MAP_SIZE.height))
 const skyStrengthU = uniform(balance.horizonMaps.skyOcclusionStrength)
 
 // World position -> map UV: x = lon * UNITS_PER_DEGREE, z = -lat * UNITS_PER_DEGREE;
@@ -84,13 +120,23 @@ const horizonUV = vec2(
 const mapA = texture(placeholder(), horizonUV)
 const mapB = texture(placeholder(), horizonUV)
 
+// The horizon terms' weight at this fragment: enabled, and faded out where one
+// texel covers so many screen pixels that its blocks would show.
+function createWeightNode() {
+  const texelsPerPixel = min(fwidth(horizonUV.x).mul(mapSizeU.x), fwidth(horizonUV.y).mul(mapSizeU.y))
+  const pixelsPerTexel = float(1).div(max(texelsPerPixel, 1e-6))
+  return enabledU.mul(float(1).sub(smoothstep(fadeStartU, fadeEndU, pixelsPerTexel)))
+}
+let weightNode: ReturnType<typeof createWeightNode> | null = null
+const horizonWeight = () => (weightNode ??= createWeightNode())
+
 /** Ground brightness factor from the sun-direction horizon (1 = sunlit). */
 function createShadeNode() {
   const a = mapA.mul(mapA) // decode: slope = byte^2 (slopeMax 1)
   const b = mapB.mul(mapB)
   const slope = a.dot(vec4(weightsAU)).add(b.xy.dot(vec2(weightsBU))).mul(reliefU)
   const lit = smoothstep(softnessU.negate(), softnessU, sunElevationU.sub(atan(slope)))
-  return mix(float(1), mix(float(1).sub(shadowStrengthU), float(1), lit), enabledU)
+  return mix(float(1), mix(float(1).sub(shadowStrengthU), float(1), lit), horizonWeight())
 }
 
 /** Ambient-light factor from the mean horizon: sin^2 of the mean horizon angle. */
@@ -99,7 +145,7 @@ function createSkyOcclusionNode() {
   const s = b.z.mul(reliefU)
   const s2 = s.mul(s)
   const occluded = float(1).sub(skyStrengthU.mul(s2.div(s2.add(1))))
-  return mix(float(1), occluded, enabledU)
+  return mix(float(1), occluded, horizonWeight())
 }
 
 let shadeNode: ReturnType<typeof createShadeNode> | null = null
@@ -157,6 +203,8 @@ const gate = createHorizonMapGate(async () => {
   const [a, b] = await Promise.all([loadMap('horizon-a'), loadMap('horizon-b')])
   mapA.value = a
   mapB.value = b
+  const img = a.image as { width: number; height: number }
+  mapSizeU.value.set(img.width, img.height)
   loaded = true
   return { a, b }
 })
@@ -172,7 +220,9 @@ function apply(): void {
   sunElevationU.value = v.sunElevation
   reliefU.value = balance.horizonMaps.reliefScale
   shadowStrengthU.value = balance.horizonMaps.shadowStrength
-  softnessU.value = balance.horizonMaps.shadowSoftnessDeg * DEG
+  softnessU.value = softnessDeg() * DEG
+  fadeStartU.value = balance.horizonMaps.closeFadeStartPx
+  fadeEndU.value = balance.horizonMaps.closeFadeEndPx
   skyStrengthU.value = balance.horizonMaps.skyOcclusionStrength
   if (import.meta.env.DEV) {
     // Dev channel: a sun outside the baked arc is clamped, and said so.
@@ -189,6 +239,7 @@ function apply(): void {
       wanted,
       enabled: v.enabled,
       shadowStrength: shadowStrengthU.value,
+      closeFadeStartPx: fadeStartU.value,
       clamped: v.clamped,
       shadedAzimuth: v.shadedAzimuth,
     }

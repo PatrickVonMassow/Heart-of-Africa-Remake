@@ -4,7 +4,17 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { HORIZON_BOUNDS, horizonUniformValues, setHorizonMapsWanted, setHorizonSun } from './horizonMaps'
+import {
+  HORIZON_BOUNDS,
+  HORIZON_MAP_SIZE,
+  horizonCloseFade,
+  horizonPixelsPerTexel,
+  horizonShadowSoftnessDeg,
+  horizonUniformValues,
+  setHorizonMapsWanted,
+  setHorizonSun,
+} from './horizonMaps'
+import { balance } from '../config/balance'
 import { QUALITY_PRESETS } from '../config/quality'
 
 describe('horizon map uniforms', () => {
@@ -31,6 +41,49 @@ describe('horizon map uniforms', () => {
     expect(meta.lonMax).toBeCloseTo(HORIZON_BOUNDS.lonMax, 9)
     expect(meta.latMin).toBeCloseTo(HORIZON_BOUNDS.latMin, 9)
     expect(meta.latMax).toBeCloseTo(HORIZON_BOUNDS.latMax, 9)
+    expect(meta.width).toBe(HORIZON_MAP_SIZE.width)
+    expect(meta.height).toBe(HORIZON_MAP_SIZE.height)
+  })
+})
+
+// Point 1531: the ~5.6 km texels showed as stair steps at a close zoom.
+describe('horizon shadow smoothing', () => {
+  const h = balance.horizonMaps
+
+  it('widen the soft edge with the relief exaggeration', () => {
+    expect(horizonShadowSoftnessDeg(1.5, 1, 0.2)).toBeCloseTo(1.7, 12)
+    expect(horizonShadowSoftnessDeg(1.5, 15, 0.2)).toBeCloseTo(4.5, 12)
+    expect(horizonShadowSoftnessDeg(1.5, 15, 0)).toBe(1.5)
+    // At the shipped values the edge spans more than the old fixed ±1.5°.
+    expect(horizonShadowSoftnessDeg(h.shadowSoftnessDeg, h.reliefScale, h.shadowSoftnessPerRelief)).toBeGreaterThan(3)
+  })
+
+  it('keep full weight below the fade start and none past its end, monotonically', () => {
+    const { closeFadeStartPx: a, closeFadeEndPx: b } = h
+    expect(a).toBeLessThan(b)
+    expect(horizonCloseFade(1, a, b)).toBe(1)
+    expect(horizonCloseFade(a, a, b)).toBe(1)
+    expect(horizonCloseFade((a + b) / 2, a, b)).toBeCloseTo(0.5, 12)
+    expect(horizonCloseFade(b, a, b)).toBe(0)
+    expect(horizonCloseFade(10 * b, a, b)).toBe(0)
+    let last = 1
+    for (let px = 0; px <= b + 8; px += 0.5) {
+      const w = horizonCloseFade(px, a, b)
+      expect(w).toBeLessThanOrEqual(last)
+      last = w
+    }
+  })
+
+  it('measure a foreshortened texel along its longer side, so it still fades', () => {
+    const W = 1000
+    const H = 1000
+    // 80 px across, 20 px deep: per pixel the UV moves 1/80 and 1/20 of a texel.
+    const ppt = horizonPixelsPerTexel(1 / 80 / W, 1 / 20 / H, W, H)
+    expect(ppt).toBeCloseTo(80, 9)
+    expect(horizonPixelsPerTexel(1 / 20 / W, 1 / 80 / H, W, H)).toBeCloseTo(80, 9)
+    expect(horizonCloseFade(ppt, h.closeFadeStartPx, h.closeFadeEndPx)).toBe(0)
+    // A square texel reads its side either way.
+    expect(horizonPixelsPerTexel(1 / 30 / W, 1 / 30 / H, W, H)).toBeCloseTo(30, 9)
   })
 })
 
