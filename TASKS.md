@@ -77,16 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1532. Fade the backdrop hills' rock noise with distance so backlit ridges stop aliasing and trembling
-  User 16.11.2026: "Bei Gegenlicht sehen die Berge nicht gut aus und außerdem zittern sie." (report /backup/hoa/local/hoa-state-2026-11-16-2226741265.zip: seed 2226741265, giza, 15.01.1890 14:00, high, WebGPU); queued at the front ("ja").
-  Measured from code, not yet in the running game: in src/scenes/place/backdropMaterial.ts ~73-83 the `fine` octave is distance-faded (detailFade(70, 200)) but the 4-octave `rock` fractal (freq 0.16/0.28/0.16) is not; it drives colour and bump normal, so its upper octaves alias far below a pixel and TRAA turns them into frame-to-frame trembling on the dark backlit flanks. Side finding in the same picture: a bright yellow sand band at left with stair-stepped edges (likely the backdrop heightfield's coarse biome vertex colour).
-  Player impact: backlit panorama hills are covered in streak noise and tremble.
-  Final state: the rock noise's upper octaves fade with distance or screen frequency like `fine`, the low-frequency banding stays; no sub-pixel noise reaches colour or bump. The yellow band's edge reads smooth or its cause is named and fixed. Constants calibratable in src/config/balance.ts.
-  Test: Vitest for the fade weights; a Playwright backlit frame at the report's spot on both backends, picture-checked, plus two consecutive still-camera frames whose backdrop difference stays below a stated threshold.
-  Source: user request 16.11.2026 16:26 (eb44b158).
-  Split 17.11.2026 (owner decision under the standing split rule): the yellow band side finding moved to point 1534; this point owes the rock fade and the tremble measurement.
-  Bundle: Siedlungsgeometrie.
-
 - [ ] 385. Rain with depth and weather — layers, streak shape, dimmed sun (user
   27.07.2026; the second half of the rain work, deliberately LAST in the queue, after
   point 379). Point 384 makes the rain touch the world; this makes the rain itself read

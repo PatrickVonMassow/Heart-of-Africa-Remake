@@ -37454,3 +37454,13 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Test: Vitest for the fade factor (texel-to-pixel ratio to weight) and the softened curve; Playwright frames of the bird's-eye view at close zoom over Egyptian ground under a low sun (no stair steps) and at an overview zoom (land shading still present), both backends, picture-checked.
   Source: user request 16.11.2026 16:21 (eb44b158).
   Bundle: Sonne & Himmel.
+
+- [x] 1532. Fade the backdrop hills' rock noise with distance so backlit ridges stop aliasing and trembling
+  User 16.11.2026: "Bei Gegenlicht sehen die Berge nicht gut aus und außerdem zittern sie." (report /backup/hoa/local/hoa-state-2026-11-16-2226741265.zip: seed 2226741265, giza, 15.01.1890 14:00, high, WebGPU); queued at the front ("ja").
+  Measured from code, not yet in the running game: in src/scenes/place/backdropMaterial.ts ~73-83 the `fine` octave is distance-faded (detailFade(70, 200)) but the 4-octave `rock` fractal (freq 0.16/0.28/0.16) is not; it drives colour and bump normal, so its upper octaves alias far below a pixel and TRAA turns them into frame-to-frame trembling on the dark backlit flanks. Side finding in the same picture: a bright yellow sand band at left with stair-stepped edges (likely the backdrop heightfield's coarse biome vertex colour).
+  Player impact: backlit panorama hills are covered in streak noise and tremble.
+  Final state: the rock noise's upper octaves fade with distance or screen frequency like `fine`, the low-frequency banding stays; no sub-pixel noise reaches colour or bump. The yellow band's edge reads smooth or its cause is named and fixed. Constants calibratable in src/config/balance.ts.
+  Test: Vitest for the fade weights; a Playwright backlit frame at the report's spot on both backends, picture-checked, plus two consecutive still-camera frames whose backdrop difference stays below a stated threshold.
+  Source: user request 16.11.2026 16:26 (eb44b158).
+  Split 17.11.2026 (owner decision under the standing split rule): the yellow band side finding moved to point 1534; this point owes the rock fade and the tremble measurement.
+  Bundle: Siedlungsgeometrie.
