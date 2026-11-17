@@ -1928,18 +1928,81 @@ if (section('giza-figures')) {
       check(`Giza figures (${lvl}): every head stands at villager height`,
         !!people && people.every((f) => f.headRise > 0.95 && f.headRise < 1.35), JSON.stringify(people))
     }
-    // The wide frame: from the south over the approach, the woman tourist in
-    // front, the donkey-boy, the cameleer and his camel, the guides beyond —
-    // held since arrival, near their anchors (they walk, work-order 1529).
-    await page.evaluate(() => {
-      const p = window.__placePlayer
-      p.x = 3
-      p.z = 40
-      p.yaw = 0.08
-      p.pitch = -0.06
+    // The wide frame: from the south over the approach (the spawn side, +z),
+    // looking north past the plateau's people toward the pyramids. Aimed at
+    // where the held figures stand NOW (they walk, work-order 1529), not at a
+    // fixed spot: a fixed (3, 40) went stale when the site rescale moved the
+    // anchors ~40 m south and stood the camera north of every figure. The
+    // stand backs off along the view until every figure fits the inner 85 %
+    // of the frame width.
+    const wide = await page.evaluate(() => {
+      const live = window.__gizaActivity()
+      const cam = window.__placeCamera
+      const tanH = Math.tan((cam.fov * Math.PI) / 360) * cam.aspect
+      const cx = live.reduce((s, q) => s + q.x, 0) / live.length
+      const cz = live.reduce((s, q) => s + q.z, 0) / live.length
+      const yaw = 0.08
+      const fwd = [-Math.sin(yaw), -Math.cos(yaw)]
+      const right = [Math.cos(yaw), -Math.sin(yaw)]
+      for (let d = 8; d <= 45; d += 0.5) {
+        const x = cx - fwd[0] * d
+        const z = cz - fwd[1] * d
+        const fits = live.every((q) => {
+          const dx = q.x - x
+          const dz = q.z - z
+          const depth = dx * fwd[0] + dz * fwd[1]
+          return depth > 3 && Math.abs((dx * right[0] + dz * right[1]) / depth) < 0.85 * tanH
+        })
+        if (!fits) continue
+        const p = window.__placePlayer
+        p.x = x
+        p.z = z
+        p.yaw = yaw
+        p.pitch = -0.06
+        return { x: +x.toFixed(2), z: +z.toFixed(2), back: d }
+      }
+      return null
     })
+    check('Giza figures: a south stand frames every held figure', !!wide, JSON.stringify(wide))
     await waitForStable(page)
     await frame(shot('1378-giza-ambient'), { place: 'giza', label: "the plateau's ambient life on the villagers' dressed body" })
+    // The frame must actually show them: each live pose's drawn body (the
+    // person's Figure or the mount's marked group, matched within 0.5 m) is
+    // projected through the frame's own camera, 1 m above its feet, and must
+    // fall inside the frame and in front of the camera. A mis-aimed frame
+    // (figures behind or beside the view) turns the section red.
+    const inFrame = await page.evaluate(() => {
+      const live = window.__gizaActivity()
+      const cam = window.__placeCamera
+      cam.updateMatrixWorld(true)
+      const bodies = []
+      window.__placeScene.traverse((o) => {
+        const kind = o.userData?.actor?.kind
+        if (o.name === 'inhabitant' || kind === 'camel' || kind === 'donkey') bodies.push(o)
+      })
+      const v = cam.position.clone()
+      return live.map((q) => {
+        let best = null
+        let bestD = Infinity
+        for (const o of bodies) {
+          o.getWorldPosition(v)
+          const d = Math.hypot(v.x - q.x, v.z - q.z)
+          if (d < bestD) {
+            bestD = d
+            best = o
+          }
+        }
+        if (!best || bestD > 0.5) return { role: q.role, drawn: false }
+        best.getWorldPosition(v)
+        v.y += 1
+        const ahead = v.clone().sub(cam.position).dot(cam.getWorldDirection(cam.position.clone())) > 0
+        v.project(cam)
+        const inside = ahead && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1
+        return { role: q.role, drawn: true, ndc: [+v.x.toFixed(2), +v.y.toFixed(2)], ahead, inside }
+      })
+    })
+    check('Giza figures: the ambient frame shows every plateau figure (projected inside the frame)',
+      inFrame.length === 9 && inFrame.every((f) => f.inside), JSON.stringify({ stand: wide, figures: inFrame }))
     // Closer: the tourist man in his sun helmet beside a guide in galabiya and
     // turban — where they stand NOW, still held.
     const near = await page.evaluate(() => {
