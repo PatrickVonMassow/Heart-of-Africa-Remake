@@ -7,7 +7,6 @@ import * as THREE from 'three/webgpu'
 import {
   attribute,
   cameraPosition,
-  cameraProjectionMatrix,
   cameraViewMatrix,
   color,
   float,
@@ -93,13 +92,15 @@ function screenFadedFbm(p: typeof positionWorld, freq: readonly [number, number,
   // Geometry normal, not normalView: the bump normal is itself built on this.
   const toEye = cameraPosition.sub(p)
   const viewCos = max(normalWorldGeometry.dot(toEye.normalize()).abs(), float(MIN_VIEW_COS))
-  const pixelAngle = float(2).div(cameraProjectionMatrix.element(1).element(1).mul(screenSize.y))
+  // Projection [1][1] = 1 / tan(fovY / 2), read from the rendering camera.
+  const focalY = uniform(1).onRenderUpdate(({ camera }) => camera?.projectionMatrix.elements[5] ?? 1)
+  const pixelAngle = float(2).div(focalY.mul(screenSize.y))
   const cpp0 = float(Math.hypot(...freq)).mul(toEye.length()).mul(pixelAngle).div(viewCos)
   // Read from balance every render, so a debug edit takes effect live.
   const start = uniform(0).onRenderUpdate(() => balance.backdropRock.fadeStartCyclesPerPx)
   const end = uniform(1).onRenderUpdate(() => balance.backdropRock.fadeEndCyclesPerPx)
   const pf = p.mul(vec3(...freq))
-  let sum = float(0)
+  let sum: THREE.Node<'float'> = float(0)
   for (let i = 0; i < octaves; i++) {
     const scale = 2 ** i
     const noise = mx_noise_float(pf.mul(scale)).mul(0.5 ** i)
