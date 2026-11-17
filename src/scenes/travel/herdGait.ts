@@ -55,7 +55,9 @@ export interface HerdGaitCarrier {
   gaitZ?: number
 }
 
-type GaitTuning = Pick<typeof HERD_GAIT, 'standSpeed' | 'maxStep'>
+/** The calibratable herd-gait numbers (`HERD_GAIT`, balance.ts), widened for tests. */
+type HerdGaitTuning = { [K in keyof typeof HERD_GAIT]: number }
+type GaitTuning = Pick<HerdGaitTuning, 'standSpeed' | 'maxStep'>
 
 /**
  * Advance one animal's stride by the ground it actually covered this frame and
@@ -101,7 +103,7 @@ export type HerdGaitBand = 'articulated' | 'lift' | 'none'
 export function herdGaitBand(
   distance: number,
   on: boolean,
-  tune: Pick<typeof HERD_GAIT, 'articulatedRadius' | 'liftRadius'> = HERD_GAIT,
+  tune: Pick<HerdGaitTuning, 'articulatedRadius' | 'liftRadius'> = HERD_GAIT,
 ): HerdGaitBand {
   if (!on) return 'none'
   if (distance <= tune.articulatedRadius) return 'articulated'
