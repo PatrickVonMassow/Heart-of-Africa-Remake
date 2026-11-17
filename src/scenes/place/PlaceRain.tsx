@@ -17,6 +17,10 @@
 // never in mid-air. Its impact replays the same fall in the shader — no CPU
 // spawn. One path for WebGPU and WebGL 2: attributes and uniforms only.
 //
+// Depth (rainLayers.ts): the drops are shared among the preset's layers at
+// different distances and fall speeds, and each streak's length and slant
+// follow the drop's velocity relative to the camera, eased from frame to frame.
+//
 // OPEN: a drop still falls THROUGH a roof to the floor (only its impact is
 // withheld there); ending it on the roof needs a roof-height sampler.
 
@@ -25,12 +29,13 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { balance } from '../../config/balance'
 import { useSceneSun } from '../../render/sceneSun'
-import { effectiveRainDrops, effectiveRainImpacts, effectiveRainLitDrops, useUi } from '../../state/ui'
+import { effectiveRainDrops, effectiveRainImpacts, effectiveRainLayers, effectiveRainLitDrops, useUi } from '../../state/ui'
 import { rainAmount, sunDimFactor } from '../../systems/season'
 import { PlaceGroundContext } from './PlaceGroundContext'
-import { buildRainMaterials, createRainUniforms, RAIN_RADIUS } from './rainMaterials'
+import { buildRainMaterials, createRainUniforms } from './rainMaterials'
+import { cameraVelocity, easeVelocity, layeredDropBases, layeredPeriods, rainLayerSpecs, streakVector, type Vec3 } from './rainLayers'
 import { shelterCoverAt } from '../../render/shelterWetness'
-import { createRainSpotState, dropArrival, dropBases, impactFlag, rainDropCount, stepRainSpots } from './rainTouch'
+import { createRainSpotState, dropArrival, impactFlag, rainDropCount, stepRainSpots } from './rainTouch'
 
 /** Seconds over which a rolling refresh re-reads every arrival (dig spoil grows
  *  slowly under the rain); spread over the frames, never one spike. */
@@ -48,13 +53,18 @@ export function PlaceRain({ wetness }: { wetness: React.MutableRefObject<number>
   const impactMesh = useRef<THREE.InstancedMesh>(null)
   const state = useRef(createRainSpotState(0))
   const entered = useRef(false)
+  const layers = useUi(effectiveRainLayers)
+  const camPrev = useRef<Vec3 | null>(null)
+  const camVel = useRef<Vec3>([0, 0, 0])
 
-  const bases = useMemo(() => dropBases(count, RAIN_RADIUS), [count])
+  const specs = useMemo(() => rainLayerSpecs(layers), [layers])
+  const bases = useMemo(() => layeredDropBases(count, specs), [count, specs])
+  const periods = useMemo(() => layeredPeriods(count, specs), [count, specs])
   const uniforms = useMemo(createRainUniforms, [])
   // `spots`: per-drop world spot (x, arrival y, z, water flag), shared by drops and impacts.
   const { spots, dropMaterial, dropGeometry, impactMaterial, impactGeometry } = useMemo(
-    () => buildRainMaterials(uniforms, lit, count),
-    [lit, uniforms, count],
+    () => buildRainMaterials(uniforms, lit, count, specs),
+    [lit, uniforms, count, specs],
   )
 
   useEffect(
@@ -67,11 +77,33 @@ export function PlaceRain({ wetness }: { wetness: React.MutableRefObject<number>
     [dropMaterial, dropGeometry, impactMaterial, impactGeometry],
   )
 
+  // Dev-only hook for the headless verification (CLAUDE.md §7.2): the live
+  // layer set and each layer's streak length at the current camera velocity.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeRain = () => {
+      const D = balance.rainDepth
+      return {
+        layers: specs.length,
+        presetLayers: layers,
+        fallSpeeds: specs.map((l) => l.fallSpeed),
+        radii: specs.map((l) => l.radiusM),
+        streakLengths: specs.map((l) => streakVector(l.fallSpeed, camVel.current, D.exposureS, D.streakMinM, D.streakMaxM).length),
+        camVel: [...camVel.current],
+        opacity: uniforms.opacity.value,
+      }
+    }
+    return () => {
+      delete w.__placeRain
+    }
+  }, [specs, uniforms, layers])
+
   // A new ground record (place change, dig layout) or a fresh spot buffer
   // re-samples every arrival.
   useEffect(() => {
     state.current = createRainSpotState(count)
-  }, [ground, spots, count])
+  }, [ground, spots, count, periods])
   const sample = useMemo(
     () => (x: number, z: number) => {
       const arrival = dropArrival(ground, x, z)
@@ -89,6 +121,14 @@ export function PlaceRain({ wetness }: { wetness: React.MutableRefObject<number>
     uniforms.opacity.value += (target - uniforms.opacity.value) * Math.min(1, dt * 1.5)
     const on = uniforms.opacity.value > 0.01
     if (group.current) group.current.visible = on
+    // The camera's velocity, tracked even while dry so the first wet frame has
+    // it; a paused frame or a jump never stretches a drop (rainLayers.ts).
+    const pos: Vec3 = [camera.position.x, camera.position.y, camera.position.z]
+    const D = balance.rainDepth
+    const raw = camPrev.current ? cameraVelocity(camPrev.current, pos, dt, D.maxCameraSpeed) : ([0, 0, 0] as Vec3)
+    camPrev.current = pos
+    camVel.current = easeVelocity(camVel.current, raw, dt, D.cameraVelocityTauS)
+    uniforms.camVel.value.set(camVel.current[0], camVel.current[1], camVel.current[2])
     // Off, the sampled arrivals stay valid (a new ground resets them).
     if (!on) return
     uniforms.eye.value.set(camera.position.x, camera.position.z)
@@ -107,7 +147,7 @@ export function PlaceRain({ wetness }: { wetness: React.MutableRefObject<number>
     const st = state.current
     if (st.tiles.length < drawn * 2) return // the reset effect has not run yet
     const a = spots.array as Float32Array
-    const dirty = stepRainSpots(st, a, bases, drawn, camera.position.x, camera.position.z, RAIN_RADIUS * 2, dt, ARRIVAL_REFRESH_S, sample)
+    const dirty = stepRainSpots(st, a, bases, drawn, camera.position.x, camera.position.z, periods, dt, ARRIVAL_REFRESH_S, sample)
     if (dirty) spots.needsUpdate = true
   })
 

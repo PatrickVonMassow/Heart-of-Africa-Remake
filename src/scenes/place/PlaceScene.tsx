@@ -25,6 +25,7 @@ import {
   effectiveShadows,
   effectiveShadowResolution,
   effectiveFireShadows,
+  effectiveRainLightDamping,
   effectiveFireShadowResolution,
   effectiveFireShadowSoft,
   effectivePlaceRiverFlotsam,
@@ -75,6 +76,7 @@ import {
 import { SkyDome } from '../../render/sky'
 import { useSceneSun } from '../../render/sceneSun'
 import { PlaceRain } from './PlaceRain'
+import { rainLightDamping, rainSunDampNow } from './rainLight'
 import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { floraSlotScale, floraSlotSpecies, type FloraSpecies } from './floraSpecies'
@@ -237,6 +239,9 @@ import { getStrings, useStrings } from '../../i18n'
 // (design.md §19.13, point 120g).
 const PLACE_SUN_INTENSITY = 2.4
 const PLACE_HEMI_INTENSITY = 0.8
+// Dry-weather fog planes (m); the rain closes them in (rainLight.ts).
+const PLACE_FOG_NEAR = 42
+const PLACE_FOG_FAR = 320
 // Campfire cube-shadow map (design.md §19.10): the graphics level picks the
 // resolution (FirePit); this is only the fallback size when the level supplies
 // none. Measured 128/256/512 cost the same (the price is the six cube-face
@@ -249,6 +254,7 @@ const FIRE_SHADOW_BIAS = -0.005
 // Frame scratch for the seasonal fog tint (no per-frame allocation).
 const placeFogColor = new THREE.Color()
 const placeRainColor = new THREE.Color(RAIN_GRAY)
+const placeHazeColor = new THREE.Color()
 
 /** Display label of an interactive in the current language. */
 function interactiveLabel(strings: ReturnType<typeof getStrings>, type: Interactive['type']): string {
@@ -2726,6 +2732,26 @@ export function PlaceScene() {
   const placeStrike = useRef<StrikeSchedulerState>({ nextAt: 0, count: 0, lastOpenAt: 0 })
   const placeSunBase = useRef(PLACE_SUN_INTENSITY)
   const placeHemiBase = useRef(PLACE_HEMI_INTENSITY)
+  // Leaving the settlement hands the eye adaptation back its dry key.
+  useEffect(() => () => { rainSunDampNow.value = 1 }, [])
+  /** The rain's eased fog-range multiplier (rainLight.ts), 1 when dry. */
+  const placeFogRange = useRef(1)
+  // The place's fog and background are set imperatively: as JSX attachments
+  // they were nulled by the travel Climate's unmount cleanup, which runs after
+  // the place's attach on the travel-to-place switch, so the first village
+  // entered after a journey had no fog to close in under rain.
+  const hasPlaceScene = !!place && !!layout && !!groundPlate
+  useEffect(() => {
+    if (!hasPlaceScene) return
+    const horizon = (sandy ? PORT_SKY : VILLAGE_SKY).horizon
+    placeFogRange.current = 1
+    r3fScene.fog = new THREE.Fog(horizon, PLACE_FOG_NEAR, PLACE_FOG_FAR)
+    r3fScene.background = new THREE.Color(horizon)
+    return () => {
+      r3fScene.fog = null
+      r3fScene.background = null
+    }
+  }, [r3fScene, hasPlaceScene, sandy])
   // The graphics level (point 276) drives the sun shadow-map resolution (low
   // 1024 / medium 2048 / high 4096, and the half override halves it again) and
   // whether shadows cast at all; the campfire shadows (point 289) are likewise
@@ -2840,6 +2866,9 @@ export function PlaceScene() {
       wetness: placeWetness.current,
       sun: sunRef.current?.intensity ?? 0,
       hemi: hemiRef.current?.intensity ?? 0,
+      // The eased intensities without the lightning flash on top.
+      sunBase: placeSunBase.current,
+      hemiBase: placeHemiBase.current,
       sky: skyOvercast(),
       rain: rainAmount(placeWetness.current, balance.season.weatherStrength),
       tint: SEASON_TINT_U.value,
@@ -2852,6 +2881,14 @@ export function PlaceScene() {
       // Point 348: the indoor-hearth people's yard fire is out under rain.
       fireOut: yardFireOutRef.current,
       fire: VILLAGE_FIRE,
+      // The rain's light damping (rainLight.ts) and the fog it closes in.
+      rainLight: rainLightDamping(
+        rainAmount(placeWetness.current, balance.season.weatherStrength),
+        effectiveRainLightDamping(useUi.getState()),
+      ),
+      // The rendered fog's own distances, null when no fog is attached.
+      fogNear: r3fScene.fog instanceof THREE.Fog ? r3fScene.fog.near : null,
+      fogFar: r3fScene.fog instanceof THREE.Fog ? r3fScene.fog.far : null,
     })
     return () => {
       delete w.__placeSeason
@@ -3128,6 +3165,12 @@ export function PlaceScene() {
       placeGroundWet.current = advanceGroundWetness(placeGroundWet.current, placeRain, dt)
       setGroundWetness(groundWetnessFactor(placeRain, placeGroundWet.current, balance.season.wetGroundStrength))
       const dim = sunDimFactor(wet, balance.season.weatherStrength)
+      // The rain itself damps the light on top of the wetness dim (rainLight.ts):
+      // sun and sky light, a thicker haze, a shorter view. It changes the LIGHTS
+      // and the FOG only — the dome's overcast below (point 354) stays as it is,
+      // and the dome draws fog-free, so the closer fog never grays it again.
+      const damp = rainLightDamping(placeRain, effectiveRainLightDamping(useUi.getState()))
+      rainSunDampNow.value = damp.sun
       // Thunderstorm at THIS settlement (design.md §19.13, point 166): the same
       // gate as the bird's-eye, at the place's own coordinates — lightning flashes
       // brighten the sun/sky and each schedules its thunder 1-4 s later.
@@ -3162,13 +3205,19 @@ export function PlaceScene() {
       if (fog) {
         placeFogColor.set(sandy ? PORT_SKY.horizon : VILLAGE_SKY.horizon)
         placeFogColor.lerp(placeRainColor, sky.grayMix)
-        fog.color.lerp(placeFogColor, k)
+        // The rain's haze grays the fog a step further; the backdrop keeps the
+        // overcast tone alone.
+        placeHazeColor.copy(placeFogColor).lerp(placeRainColor, damp.hazeMix)
+        fog.color.lerp(placeHazeColor, k)
         if (scene.background instanceof THREE.Color) scene.background.lerp(placeFogColor, k)
+        placeFogRange.current += (damp.fogRange - placeFogRange.current) * k
+        fog.near = PLACE_FOG_NEAR * placeFogRange.current
+        fog.far = PLACE_FOG_FAR * placeFogRange.current
       }
       // The dimmed base lerps with the season; the lightning flash is a fast
       // additive burst on top of it (kept out of the lerp so it is not amplified).
-      placeSunBase.current += (PLACE_SUN_INTENSITY * dim - placeSunBase.current) * k
-      placeHemiBase.current += (PLACE_HEMI_INTENSITY * dim - placeHemiBase.current) * k
+      placeSunBase.current += (PLACE_SUN_INTENSITY * dim * damp.sun - placeSunBase.current) * k
+      placeHemiBase.current += (PLACE_HEMI_INTENSITY * dim * damp.hemi - placeHemiBase.current) * k
       if (sunRef.current) sunRef.current.intensity = placeSunBase.current + placeFlash.current * PLACE_SUN_INTENSITY * 2
       if (hemiRef.current) hemiRef.current.intensity = placeHemiBase.current + placeFlash.current * PLACE_HEMI_INTENSITY * 2
     }
@@ -3367,8 +3416,6 @@ export function PlaceScene() {
 
   return (
     <PlaceGroundContext.Provider value={ground}>
-      <color attach="background" args={[sky.horizon]} />
-      <fog attach="fog" args={[sky.horizon, 42, 320]} />
       <SkyDome preset={sky} sunDirection={sun.disc} radius={400} />
       <PlaceRain wetness={placeWetness} />
       <hemisphereLight ref={hemiRef} args={[sandy ? '#cfe2ee' : '#d8e2c2', '#8f7a55', PLACE_HEMI_INTENSITY]} />

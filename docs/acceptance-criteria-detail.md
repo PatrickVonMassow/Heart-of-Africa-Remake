@@ -156,8 +156,8 @@ Animals are water-shy, not water-barred (design.md §19.5): a flight goes into a
 lake instead of skirting it, a §19.8 water drama keeps its actor, anyone else left on the
 water swims out to the nearest bank, and the open sea stays the world's edge.
 
-Settlement rain touches the world (§19.13): the built fabric darkens and glosses with the
-ground's one wetness value; drops end on the ground or water under them, never mid-air.
+Settlement rain (§19.13) wets built fabric with the ground's wetness; drops end on the
+ground or water below, fall in depth layers as velocity streaks and damp the light.
 
 OPEN: tree-climbing-to-flee (§9 open item), and the one seasonal-dress reading the
 research allows but the figures cannot yet show — a wrap worn DIFFERENTLY in the cold

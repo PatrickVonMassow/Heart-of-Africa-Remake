@@ -1120,6 +1120,19 @@ Verifiable (`scripts/verify/settings.mjs`,
   fire-rain, shelter-wetness, settlement-season, settlement-fabric green;
   frames 114-village-rain, 348-*-rain, 353-shelter-wet-rain). OPEN: a drop
   still falls through a roof (only its impact is withheld there).
+- Settlement rain with depth and weather (§19.13): the drops share 1–3
+  layers at different distances and fall speeds (`rainLayers`, low 1), each
+  streak as long and slanted as the drop's velocity relative to the camera,
+  with soft ends; pure-tested in `src/scenes/place/rainLayers.test.ts`
+  (one layer is the earlier curtain, length follows relative speed, a stalled
+  or paused camera does not stretch a drop). The rain damps the sun and sky
+  light, grays the fog and closes it in (`rainLightDamping`, low off); pure in
+  `src/scenes/place/rainLight.test.ts` (rain 0 is today's sun and haze
+  exactly, rain 1 the damped set, monotone). The 2- and 3-layer materials
+  generate on WebGPU and WebGL 2 (`rainMaterials.test.ts`). Live:
+  polish-settlement `rain-depth`, frames 385-rain-open-{low,medium,high} and
+  385-rain-roof-{low,medium,high}. Picture check on both backends: owed (not
+  run in the authoring session).
 OPEN: tree-climbing-to-flee remains to be implemented (§9 open item).
 The seasonal-dress reading the primitive figure could not show — a wrap
 worn DIFFERENTLY in the cold rather than in greater number (§19.13) —

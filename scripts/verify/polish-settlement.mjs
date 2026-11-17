@@ -780,6 +780,119 @@ if (section('shelter-wetness')) {
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 }
 
+// --- Rain with depth and weather (design.md §19.13): at each detail level, in
+// heavy rain, one first-person frame in the open and one from under a hut eave.
+// The judgement is the picture's; the readings only pin the lever per level —
+// low keeps one curtain and the undimmed sun, medium/high damp the sun and sky
+// light and close the fog in (rainLight.ts), while the sky dome's overcast
+// (point 354) reads the same at every level. -----------------------------------
+if (section('rain-depth')) {
+  const PLACE = 'zulu-village'
+  const HUT_CONE_EAVE = 1.45 // keep in sync with roofClearance.ts HUT_CONE_EAVE
+  const EXPECT_LAYERS = { low: 1, medium: 2, high: 3 } // keep in sync with quality.ts rainLayers
+  const before = await page.evaluate(() => window.__ui.getState().detailLevel)
+  const skies = {}
+  const lights = {}
+  for (const level of ['low', 'medium', 'high']) {
+    await page.evaluate(() => { const g = window.__game.getState(); g.setJournalOpen(false); if (g.placeId) g.leavePlace() })
+    await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), level)
+    await page.evaluate((id) => window.__game.getState().enterPlace(id), PLACE)
+    await page.waitForFunction(
+      (id) => window.__game.getState().placeId === id && !!window.__placeLayout && !!window.__placePlayer && !!window.__placeSeason,
+      PLACE,
+      { timeout: 40000 },
+    )
+    // Entering writes the arrival entry and opens the journal over the frame.
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
+    const heavy = await page
+      .waitForFunction(() => window.__placeSeason().rain > 0.5, null, { timeout: 15000 })
+      .then(() => true, () => false)
+    const rainNow = await page.evaluate(() => window.__placeSeason().rain)
+    // The heavy-rain staging is the prerequisite of every frame below: without
+    // it the section would photograph dry weather as rain evidence.
+    check(`${level}: heavy rain is staged before any frame (rain > 0.5)`, heavy && rainNow > 0.5, `rain ${rainNow}`)
+    if (!(heavy && rainNow > 0.5)) continue
+    // Settle by DRAWN frames, not wall clock: the loop stalls for seconds after
+    // the wetness switch, and a wall-clock quiet read the sun two frames into
+    // its ease as settled (measured: 0.1536 of the way, every level).
+    const readLight = () => page.evaluate(() => { const v = window.__placeSeason(); return [v.sunBase, v.hemiBase, v.fogFar ?? 0] })
+    const s = { settled: false, frames: 0, value: await readLight() }
+    for (let i = 1; i <= 120 && !s.settled; i++) {
+      await nextFrames(30)
+      const next = await readLight()
+      s.settled = next.every((n, j) => Math.abs(n - s.value[j]) <= 1e-3)
+      s.value = next
+      s.frames = i * 30
+    }
+    check(`${level}: the rained-in light settles before the frames`, s.settled, `after ${s.frames} frames — ${JSON.stringify(s.value)}`)
+    const v = await page.evaluate(() => window.__placeSeason())
+    skies[level] = v.sky
+    lights[level] = { sun: v.sunBase, hemi: v.hemiBase, damp: v.rainLight }
+    // The depth lever is live: the layer count is the preset's rainLayers, and
+    // with more than one layer the layers' streaks differ in length (they fall
+    // at different speeds), so the section fails when the depth is disabled.
+    const want = EXPECT_LAYERS[level]
+    const r = await page.evaluate(() => window.__placeRain?.() ?? null)
+    check(`${level}: the rain draws the preset's depth layers`, !!r && r.layers === want && r.presetLayers === want, `layers ${r?.layers}, preset ${r?.presetLayers}, expected ${want}`)
+    if (r && r.layers > 1) {
+      const lens = r.streakLengths
+      check(`${level}: the depth layers' streak lengths differ`, new Set(lens.map((x) => x.toFixed(4))).size === lens.length, JSON.stringify(lens))
+    }
+    if (level === 'low') {
+      check('low keeps the undimmed sun and the dry fog under rain', v.rainLight.sun === 1 && v.rainLight.fogRange === 1 && Math.abs(v.fogFar - 320) < 0.5, JSON.stringify(v.rainLight) + ` fogFar ${v.fogFar}`)
+    } else {
+      check(`${level}: rain damps the sun and closes the fog in`, v.rainLight.sun < 1 && v.rainLight.fogRange < 1 && v.fogFar !== null && v.fogFar < 320, JSON.stringify(v.rainLight) + ` fogFar ${v.fogFar}`)
+      // The damping reaches the LIVE lights: at the same wetness the wetness dim
+      // is shared, so this level's intensities over low's undamped ones are the
+      // damping factors themselves.
+      const lo = lights.low
+      check(`${level}: low's live sun and sky light are lit to compare against`, !!lo && lo.sun > 0 && lo.hemi > 0, JSON.stringify(lo))
+      if (lo && lo.sun > 0 && lo.hemi > 0) {
+        // Flash-free bases: a lightning bolt adds onto the live intensity.
+        const sunRatio = v.sunBase / lo.sun
+        const hemiRatio = v.hemiBase / lo.hemi
+        check(`${level}: the live sun and sky light carry the rain damping`,
+          Math.abs(sunRatio - v.rainLight.sun) < 0.03 && Math.abs(hemiRatio - v.rainLight.hemi) < 0.03,
+          `sun ${sunRatio.toFixed(3)} vs ${v.rainLight.sun}, hemi ${hemiRatio.toFixed(3)} vs ${v.rainLight.hemi}`)
+      }
+    }
+    // In the open: the plaza centre, looking level across the village.
+    await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0; p.yaw = 0.6; p.pitch = 0 })
+    await nextFrames(6)
+    await frame(`385-rain-open-${level}`, { place: PLACE, label: `heavy rain in the open, ${level} detail` })
+    // Under a roof: between a hut's wall and its eave line, looking out.
+    const spot = await page.evaluate((eaveK) => {
+      const h = window.__placeLayout.dwellings.find((d) => d.kind === 'hut')
+      if (!h) return null
+      const b = Math.atan2(-h.z, -h.x) // the side facing the plaza
+      const d = h.r * (1 + eaveK) / 2
+      return { x: h.x + Math.cos(b) * d, z: h.z + Math.sin(b) * d, b }
+    }, HUT_CONE_EAVE)
+    check(`${level}: a hut eave to stand under exists`, !!spot, JSON.stringify(spot))
+    if (spot) {
+      await page.evaluate((o) => {
+        const p = window.__placePlayer
+        p.x = o.x
+        p.z = o.z
+        // Face outward along the bearing (forward is −Z rotated by yaw).
+        p.yaw = Math.atan2(-Math.cos(o.b), -Math.sin(o.b))
+        p.pitch = 0.05
+      }, spot)
+      await nextFrames(6)
+      await frame(`385-rain-roof-${level}`, { place: PLACE, label: `heavy rain seen from under a hut eave, ${level} detail` })
+    }
+  }
+  const skyLevels = ['low', 'medium', 'high']
+  check(
+    'the sky dome’s overcast (point 354) is the same at every detail level',
+    skyLevels.every((l) => skies[l] !== undefined && Object.keys(skies.low).every((k) => Math.abs(skies[l][k] - skies.low[k]) < 2e-3)),
+    JSON.stringify(skies),
+  )
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+  await page.evaluate((l) => window.__ui.getState().setDetailLevel(l), before)
+}
+
 // --- Campfire shadows (design.md §19.10): with the debug toggle ON, an occluder
 // between the fire and the ground measurably darkens the ground behind it -------
 if (section('campfire-shadows')) {

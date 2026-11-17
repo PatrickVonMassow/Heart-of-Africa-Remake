@@ -171,6 +171,13 @@ export interface QualityPreset {
   /** Settlement rain drops drawn at full rain (fewer in light rain): one
    *  instanced draw of thin, faint streaks; the CPU samples each arrival. */
   rainDrops: number
+  /** Depth layers of the settlement rain (design.md §19.13): the drops are
+   *  shared among 1..3 layers at different distances and fall speeds (the
+   *  count does not change). 1 is the single curtain. */
+  rainLayers: number
+  /** The rain damps the settlement light: sun and sky light dim, the haze
+   *  thickens and the fog closes in with the rain amount. Off keeps the sun. */
+  rainLightDamping: boolean
 }
 
 export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
@@ -220,6 +227,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     rainImpacts: 0, // plain streaks only: no splash draw
     rainLitDrops: false, // the plain one-colour streak
     rainDrops: 770, // calibratable: the pre-veil count, no extra cost
+    rainLayers: 1, // the single curtain
+    rainLightDamping: false, // the undimmed sun
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
   // (the ~25 % GPU lever kept for high), TRAA + Bloom on, native dpr, normal
@@ -263,6 +272,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     rainImpacts: 250, // calibratable: of the drawn drops
     rainLitDrops: true,
     rainDrops: 2200, // calibratable: a dense veil in heavy rain
+    rainLayers: 2, // calibratable: near and far
+    rainLightDamping: true,
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
   // the softer/higher-res campfire shadow variant, everything else full.
@@ -305,6 +316,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     rainImpacts: 500, // calibratable: of the drawn drops
     rainLitDrops: true,
     rainDrops: 3300, // calibratable
+    rainLayers: 3, // calibratable: near, mid and far
+    rainLightDamping: true,
   },
 }
 
