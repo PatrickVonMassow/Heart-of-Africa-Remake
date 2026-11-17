@@ -49,6 +49,8 @@ const FALLBACK_NAME = MAIN.fallback.displayName
 const RETIRED_CROSS = CROSS.retired.filter((name) => /\s/.test(name))
 /** The three names the cross lane has carried — one lane, whichever is used. */
 const CROSS_NAMES = [CROSS_NAME, ...RETIRED_CROSS]
+// The cross spelling the fixed-sha fixtures below were recorded under.
+const HISTORIC_CROSS = RETIRED_CROSS[1]
 const crossAddress = VENDORS[CROSS.vendor].trailerAddress
 const MAIN_TRAILER = trailerFor('main')
 const SCARCE_TRAILER_NAME = SCARCE.trailerName
@@ -335,7 +337,7 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
   it('turns the real mixed-author ineligibility into a runnable scarce-lane command', () => {
     const decision = decideReview({
       ...okRun(),
-      authorModel: [RETIRED_CROSS.at(-1), MAIN.trailerName],
+      authorModel: [HISTORIC_CROSS, MAIN.trailerName],
     })
     expect(decision).toMatchObject({ model: SCARCE_NAME, kind: OUTCOME.SELF_REVIEW, ready: false })
     expect(formatReviewerCommand({
@@ -393,7 +395,7 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     const failed = { outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: { ok: false } }
     expect(decideReview({ ...failed, scarceState: SCARCE_OFF }).model).toBe(MAIN_NAME)
     expect(fallbackReviewerFor('', SCARCE_OFF)).toBe(MAIN_NAME)
-    expect(decideReview({ authorModel: [RETIRED_CROSS.at(-1), MAIN_NAME], scarceState: SCARCE_OFF }).model).toBe(FALLBACK_NAME)
+    expect(decideReview({ authorModel: [HISTORIC_CROSS, MAIN_NAME], scarceState: SCARCE_OFF }).model).toBe(FALLBACK_NAME)
     expect(decideReview({ ...failed, authorModel: [MAIN_NAME, FALLBACK_NAME], scarceState: SCARCE_OFF })).toMatchObject({
       model: '',
       chain: [MAIN_NAME, FALLBACK_NAME],
@@ -422,9 +424,9 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     const identities = modelTrailerIdentities(
       'Separate review identity\n\n' +
         `Co-Authored-By: ${MAIN_TRAILER}\n` +
-        `Reviewed-By: ${RETIRED_CROSS.at(-1)} <${crossAddress}>\n`,
+        `Reviewed-By: ${HISTORIC_CROSS} <${crossAddress}>\n`,
     )
-    expect(identities).toEqual({ authors: [MAIN_NAME], reviewers: [guardSpelling(RETIRED_CROSS.at(-1))] })
+    expect(identities).toEqual({ authors: [MAIN_NAME], reviewers: [guardSpelling(HISTORIC_CROSS)] })
     expect(reviewIdentityProblem(identities.reviewers[0], { authorModels: identities.authors })).toBe('')
   })
 
@@ -436,15 +438,15 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     for (const [sha, lines] of [
       [
         '836b187bf5c92d086c603e0fe4ba9a09a7408547',
-        [`${RETIRED_CROSS.at(-1)} <${crossAddress}>`, MAIN_TRAILER],
+        [`${HISTORIC_CROSS} <${crossAddress}>`, MAIN_TRAILER],
       ],
       [
         'fd02a519a03e1680f1c6c5b182987c42b4b3424d',
-        [`${RETIRED_CROSS.at(-1)} <${crossAddress}>`, MAIN_TRAILER],
+        [`${HISTORIC_CROSS} <${crossAddress}>`, MAIN_TRAILER],
       ],
       [
         '1f24975053368939872dd1182bf71860e783a7ce',
-        [MAIN_TRAILER, `${RETIRED_CROSS.at(-1)} <${crossAddress}>`],
+        [MAIN_TRAILER, `${HISTORIC_CROSS} <${crossAddress}>`],
       ],
     ]) {
       const identities = modelTrailerIdentities(
@@ -452,7 +454,7 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
           lines.map((line) => `Co-Authored-By: ${line}`).join('\n') +
           '\n',
       )
-      expect(new Set(identities.authors), sha).toEqual(new Set([MAIN_NAME, guardSpelling(RETIRED_CROSS.at(-1))]))
+      expect(new Set(identities.authors), sha).toEqual(new Set([MAIN_NAME, guardSpelling(HISTORIC_CROSS)]))
       expect(identities.reviewers, sha).toEqual([])
     }
   })
@@ -648,7 +650,7 @@ describe('the record the command prints', () => {
   // short-fall there must still say WHOSE review it is waiting for.
   it('keeps naming the reviewer when a hand-over is refused a record', () => {
     const swap = formatReviewReport({
-      decision: decideReview({ outcome: { ok: false, kind: 'self-review', cause: 'the cross lane authored it' }, parsed: {}, authorModel: [RETIRED_CROSS.at(-1)] }),
+      decision: decideReview({ outcome: { ok: false, kind: 'self-review', cause: 'the cross lane authored it' }, parsed: {}, authorModel: [HISTORIC_CROSS] }),
       sha: 'a'.repeat(40),
       mode: 'review',
       shortfall: { reason: 'needs-passes', passes: [{ index: 1, files: ['x.mjs'] }], budget: 10, rawSize: 99, truncated: [], omitted: [] },
@@ -1054,7 +1056,7 @@ describe('the reviewer is chosen by lane vendor, read from the registry', () => 
 // lane's over a range it WROTE. That reads green at both gates and is nobody's second
 // pair of eyes.
 describe('the reversed direction — where the CROSS LANE authored', () => {
-  const CROSS_COMMIT = `${RETIRED_CROSS.at(-1)} <${crossAddress}>`
+  const CROSS_COMMIT = `${HISTORIC_CROSS} <${crossAddress}>`
 
   it('recognises the cross lane as an author in every spelling of its name', () => {
     const familyWord = CROSS.familyWords[0][0].toUpperCase() + CROSS.familyWords[0].slice(1)

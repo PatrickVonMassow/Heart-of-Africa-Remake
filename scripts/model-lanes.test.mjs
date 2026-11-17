@@ -80,6 +80,13 @@ describe('resolving designations', () => {
     }
   })
 
+  it('keeps every former cross-lane spelling resolving, ids included', () => {
+    // Landed trailers and ledger rows carry these; a dropped alias would orphan them.
+    for (const s of ['GPT-6.1 Sol', 'gpt-6.1-sol', 'GPT-5.6 Sol', 'gpt-5.6-sol', 'GPT-6 Astra', 'gpt-6-astra']) {
+      expect(resolveModel(s)?.lane.role, s).toBe('cross')
+    }
+  })
+
   it('reads the context suffix the harness writes as the same model', () => {
     expect(identityKey(`${MAIN.trailerName} (1M context)`)).toBe('main')
   })
