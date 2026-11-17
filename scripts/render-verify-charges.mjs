@@ -65,6 +65,14 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1533,
+    suite: 'polish-settlement',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /KILLED after \d+ min wall timeout/i,
+    why: 'Full WebGPU pass on main 579e7c4e6, 17.11.2026 00:01-00:45: no frame after inhabitants-glance (00:25), killed at 45 min; fire-smoke, walker-dust and kraal-cattle green alone on the same SHA. The charge dies with 1533.',
+  },
+  {
     point: 1292,
     backend: 'webgpu',
     featureLevel: 'compatibility',
