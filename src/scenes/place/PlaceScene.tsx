@@ -76,7 +76,7 @@ import {
 import { SkyDome } from '../../render/sky'
 import { useSceneSun } from '../../render/sceneSun'
 import { PlaceRain } from './PlaceRain'
-import { rainLightDamping } from './rainLight'
+import { rainLightDamping, rainSunDampNow } from './rainLight'
 import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { floraSlotScale, floraSlotSpecies, type FloraSpecies } from './floraSpecies'
@@ -2732,6 +2732,8 @@ export function PlaceScene() {
   const placeStrike = useRef<StrikeSchedulerState>({ nextAt: 0, count: 0, lastOpenAt: 0 })
   const placeSunBase = useRef(PLACE_SUN_INTENSITY)
   const placeHemiBase = useRef(PLACE_HEMI_INTENSITY)
+  // Leaving the settlement hands the eye adaptation back its dry key.
+  useEffect(() => () => { rainSunDampNow.value = 1 }, [])
   /** The rain's eased fog-range multiplier (rainLight.ts), 1 when dry. */
   const placeFogRange = useRef(1)
   // The place's fog and background are set imperatively: as JSX attachments
@@ -3168,6 +3170,7 @@ export function PlaceScene() {
       // and the FOG only — the dome's overcast below (point 354) stays as it is,
       // and the dome draws fog-free, so the closer fog never grays it again.
       const damp = rainLightDamping(placeRain, effectiveRainLightDamping(useUi.getState()))
+      rainSunDampNow.value = damp.sun
       // Thunderstorm at THIS settlement (design.md §19.13, point 166): the same
       // gate as the bird's-eye, at the place's own coordinates — lightning flashes
       // brighten the sun/sky and each schedules its thunder 1-4 s later.

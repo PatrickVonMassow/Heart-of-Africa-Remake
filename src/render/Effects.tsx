@@ -22,6 +22,7 @@ import { POST_RENDER_PRIORITY } from './cascadeSkip'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
+import { rainAdaptedExposure, rainSunDampNow } from '../scenes/place/rainLight'
 import { float, max, mix, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
@@ -265,7 +266,7 @@ export function Effects() {
     }
     const size = new THREE.Vector2()
     const render = (dt: number) => {
-      adaptation?.sync(balance.exposure, dt, gl.toneMappingExposure)
+      adaptation?.sync(rainAdaptedExposure(balance.exposure, rainSunDampNow.value), dt, gl.toneMappingExposure)
       if (glare) {
         gl.getDrawingBufferSize(size)
         const sun = glare.sync(camera, sunDirRef.current, balance.sunGlare, size.x / Math.max(size.y, 1))

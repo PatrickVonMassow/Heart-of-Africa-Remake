@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
-import { RAIN_LIGHT_IDENTITY, rainLightDamping } from './rainLight'
+import { RAIN_LIGHT_IDENTITY, rainAdaptedExposure, rainLightDamping } from './rainLight'
+import { exposureTarget } from '../../render/exposureControl'
 
 const L = balance.rainLight
 
@@ -45,5 +46,21 @@ describe('rain damps the settlement light (design.md §19.13)', () => {
     expect(d.sun).toBeGreaterThan(0)
     expect(d.fogRange).toBeGreaterThan(0)
     expect(d.hazeMix).toBeLessThanOrEqual(1)
+  })
+})
+
+describe('rainAdaptedExposure', () => {
+  const p = balance.exposure
+  it('leaves the dry parameters untouched', () => {
+    expect(rainAdaptedExposure(p, 1)).toBe(p)
+    expect(rainAdaptedExposure(p, Number.NaN)).toBe(p)
+  })
+  it('keeps the eye from opening the damped scene back up', () => {
+    for (const lum of [0.2, 0.55, 1.4]) {
+      for (const damp of [0.5, 0.75]) {
+        const wet = exposureTarget(lum * damp, rainAdaptedExposure(p, damp))
+        expect(wet).toBeCloseTo(exposureTarget(lum, p), 9)
+      }
+    }
   })
 })

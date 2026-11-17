@@ -42,3 +42,17 @@ export function rainLightDamping(rain: number, enabled: boolean, cfg = balance.r
     hazeMix: cfg.hazeMix * s * r,
   }
 }
+
+/** The settlement's live rain sun damping, 1 when dry or outside a settlement.
+ *  PlaceScene writes it per frame; the eye adaptation (render/Effects.tsx) reads it. */
+export const rainSunDampNow = { value: 1 }
+
+/**
+ * The eye adaptation's parameters under rain: the key luminance falls with the
+ * sun damping, so the adapted exposure does not open the damped scene back up
+ * (a frame `damp` times as bright maps to the dry frame's exposure).
+ */
+export function rainAdaptedExposure<P extends { keyLuminance: number }>(p: P, sunDamp: number): P {
+  const d = Math.min(1, Math.max(0, Number.isFinite(sunDamp) ? sunDamp : 1))
+  return d === 1 ? p : { ...p, keyLuminance: p.keyLuminance * d }
+}
