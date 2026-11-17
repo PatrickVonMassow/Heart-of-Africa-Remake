@@ -3,6 +3,8 @@
 // off the monuments and inside the site, and a mount stays beside its handler.
 
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { GIZA_ACTIVITY } from '../../config/balance'
 import { standingClear } from './collision'
 import { GIZA_AMBIENT, GIZA_SITE_RADIUS, gizaColliders } from './gizaSite'
@@ -253,5 +255,16 @@ describe('Giza activity: turning', () => {
     expect(turnToward(0, 1, 0.1, 2)).toBeCloseTo(0.2, 9)
     expect(turnToward(0, 0.05, 0.1, 2)).toBeCloseTo(0.05, 9)
     expect(turnToward(3, -3, 1, 10)).toBeGreaterThan(3)
+  })
+})
+
+describe('the routine and the figure agree on a frame', () => {
+  it('advances no further per frame than the figure measures its stride over', () => {
+    // skinnedFigure.tsx clamps its frame to 0.1 s for its ground-speed
+    // measure; a longer routine step reads a hitch as a sprint.
+    const src = readFileSync(resolve(process.cwd(), 'src/scenes/place/skinnedFigure.tsx'), 'utf8')
+    const clamp = Number(/const dt = Math\.min\(rawDt, ([\d.]+)\)/.exec(src)?.[1])
+    expect(clamp).toBeGreaterThan(0)
+    expect(GIZA_ACTIVITY.maxFrame).toBeLessThanOrEqual(clamp)
   })
 })

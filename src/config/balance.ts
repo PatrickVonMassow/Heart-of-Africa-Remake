@@ -3342,10 +3342,11 @@ export const GIZA_ACTIVITY = {
    *  this length whatever the frame rate, so the same elapsed time gives the
    *  same positions at 5 or 120 FPS. */
   step: 0.05,
-  /** Most elapsed time one frame may advance the routine (s): a sustained
-   *  low frame rate is followed in full, only a long hitch (a background tab)
-   *  is walked as this much. */
-  maxFrame: 0.5,
+  /** Most elapsed time one frame may advance the routine (s). Equal to the
+   *  figure's own frame clamp (skinnedFigure.tsx), which measures its stride
+   *  speed over at most this much: a longer step would read a frame hitch as
+   *  a sprint and throw the walker into a sprinting lean. */
+  maxFrame: 0.1,
 } as const
 
 /**

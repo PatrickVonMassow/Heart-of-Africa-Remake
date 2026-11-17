@@ -2434,8 +2434,8 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
     const state = activity.current
     if (!state) return
     // The dev life freeze holds them like every inhabitant (lifeFreeze.ts).
-    // The routine consumes the whole elapsed time in fixed substeps, so a low
-    // frame rate does not slow it; only a long hitch is bounded (maxFrame).
+    // The routine consumes the elapsed time in fixed substeps, bounded like
+    // the figure's own stride measure (maxFrame), so a hitch is no sprint.
     if (!isLifeFrozen()) stepGizaActivity(state, Math.min(delta, GIZA_ACTIVITY.maxFrame))
     anchors.forEach((a, i) => {
       const g = refs.current[i]
