@@ -2734,6 +2734,22 @@ export function PlaceScene() {
   const placeHemiBase = useRef(PLACE_HEMI_INTENSITY)
   /** The rain's eased fog-range multiplier (rainLight.ts), 1 when dry. */
   const placeFogRange = useRef(1)
+  // The place's fog and background are set imperatively: as JSX attachments
+  // they were nulled by the travel Climate's unmount cleanup, which runs after
+  // the place's attach on the travel-to-place switch, so the first village
+  // entered after a journey had no fog to close in under rain.
+  const hasPlaceScene = !!place && !!layout && !!groundPlate
+  useEffect(() => {
+    if (!hasPlaceScene) return
+    const horizon = (sandy ? PORT_SKY : VILLAGE_SKY).horizon
+    placeFogRange.current = 1
+    r3fScene.fog = new THREE.Fog(horizon, PLACE_FOG_NEAR, PLACE_FOG_FAR)
+    r3fScene.background = new THREE.Color(horizon)
+    return () => {
+      r3fScene.fog = null
+      r3fScene.background = null
+    }
+  }, [r3fScene, hasPlaceScene, sandy])
   // The graphics level (point 276) drives the sun shadow-map resolution (low
   // 1024 / medium 2048 / high 4096, and the half override halves it again) and
   // whether shadows cast at all; the campfire shadows (point 289) are likewise
@@ -2865,8 +2881,9 @@ export function PlaceScene() {
         rainAmount(placeWetness.current, balance.season.weatherStrength),
         effectiveRainLightDamping(useUi.getState()),
       ),
-      fogNear: PLACE_FOG_NEAR * placeFogRange.current,
-      fogFar: PLACE_FOG_FAR * placeFogRange.current,
+      // The rendered fog's own distances, null when no fog is attached.
+      fogNear: r3fScene.fog instanceof THREE.Fog ? r3fScene.fog.near : null,
+      fogFar: r3fScene.fog instanceof THREE.Fog ? r3fScene.fog.far : null,
     })
     return () => {
       delete w.__placeSeason
@@ -3393,8 +3410,6 @@ export function PlaceScene() {
 
   return (
     <PlaceGroundContext.Provider value={ground}>
-      <color attach="background" args={[sky.horizon]} />
-      <fog attach="fog" args={[sky.horizon, PLACE_FOG_NEAR, PLACE_FOG_FAR]} />
       <SkyDome preset={sky} sunDirection={sun.disc} radius={400} />
       <PlaceRain wetness={placeWetness} />
       <hemisphereLight ref={hemiRef} args={[sandy ? '#cfe2ee' : '#d8e2c2', '#8f7a55', PLACE_HEMI_INTENSITY]} />
