@@ -54,6 +54,16 @@ const ALLOW = new Map([
       'point 1079.',
   ],
   [
+    'GHSA-fc5q-39xc-vjpf',
+    'picomatch (ReDoS through single-branch repeated extglobs): a DEV/build ' +
+      'dependency of vite, vitest, fdir and tinyglobby that never enters the ' +
+      'shipped bundle; it only matches globs from our own config and scripts, ' +
+      'never player or network input. Seen 17.11.2026 with NO patched release ' +
+      '(advisory range <=4.0.7, latest published 4.0.7); npm offers only the ' +
+      'semver-major vitest jump owned by point 1079. Drop this entry once a ' +
+      'fixed picomatch is published.',
+  ],
+  [
     'GHSA-hp3w-g68c-fv3c',
     'sprintf-js (DoS via unbounded precision specifiers): a TRANSITIVE Node dep of ' +
       'kokoro-js (onnxruntime-node > global-agent > roarr), like sharp above NOT in ' +
