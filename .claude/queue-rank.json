@@ -1916,12 +1916,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1530": {
-      "at": "2026-11-16T16:42:31.123Z",
-      "why": "User order 16.11.2026: queued at the front of the work order, behind the running point 384",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1531": {
       "at": "2026-11-16T16:42:31.236Z",
       "why": "User order 16.11.2026: queued at the front of the work order, behind the running point 384",
@@ -1967,7 +1961,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-17T03:38:58.204Z",
+    "at": "2026-11-17T06:12:06.036Z",
     "points": [
       184,
       200,
@@ -2415,7 +2409,6 @@
       1525,
       1526,
       1528,
-      1530,
       1531,
       1532,
       1533
