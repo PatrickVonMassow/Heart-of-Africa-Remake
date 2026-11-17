@@ -231,6 +231,7 @@ function apply(): void {
       wanted,
       enabled: v.enabled,
       shadowStrength: shadowStrengthU.value,
+      closeFadeStartPx: fadeStartU.value,
       clamped: v.clamped,
       shadedAzimuth: v.shadedAzimuth,
     }

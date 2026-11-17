@@ -12457,6 +12457,89 @@ if (section('horizon-maps')) {
     JSON.stringify({ low, off, lowVsOff: +(low.ratio / off.ratio).toFixed(3) }),
   )
   await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+
+  // Point 1531: over Nile-valley ground under a low December sun the ~5.6 km
+  // texels showed as stair-step blocks at a close zoom. Isolated comparison at
+  // the closest zoom: the horizon terms' effect (frame minus the zeroed frame)
+  // with the close fade switched off — the old picture — against with it on;
+  // the fade must remove most of it. Cloud shadows, birds and LOD swaps change
+  // pixels in both pairs alike. At an overview zoom the land still shades.
+  const LUXOR = { lat: 25.72, lon: 32.5 } // Theban hills on the west bank, over the Nile valley
+  const DEC_21 = 354
+  const zoomWas = await page.evaluate(() => ({ z: window.__ui.getState().travelZoom, wheel: window.__ui.getState().wheelZoomEnabled }))
+  await page.evaluate(([d, la, lo]) => {
+    window.__ui.getState().setWheelZoomEnabled(true)
+    window.__game.setState({ day: d })
+    window.__game.getState().debugJumpTo(la, lo)
+  }, [DEC_21, LUXOR.lat, LUXOR.lon])
+  await page.waitForFunction(() => window.__horizonMaps?.enabled === 1 && window.__sceneSun?.dayOfYear === 354, null, { timeout: 60000 })
+  const lumaOf = async (label) => {
+    await page.waitForFunction(() => window.__camera?.settled?.(), null, { timeout: 30000 }).catch(() => {})
+    await page.waitForTimeout(400)
+    const { data, info } = await sharp(await capturePixels(page, `horizon smoothing: ${label}`)).raw().toBuffer({ resolveWithObject: true })
+    // The ground band between the HUD rows: top bar and bottom bar excluded.
+    const y0 = Math.round(info.height * 0.15)
+    const y1 = Math.round(info.height * 0.85)
+    const out = new Float32Array(info.width * (y1 - y0))
+    for (let y = y0; y < y1; y++) {
+      for (let x = 0; x < info.width; x++) {
+        const i = (y * info.width + x) * info.channels
+        // Water (blue over red) animates on its own and never reads the horizon maps.
+        out[(y - y0) * info.width + x] = data[i + 2] > data[i] ? NaN : 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]
+      }
+    }
+    return out
+  }
+  const hz = await page.evaluate(() => ({ ...window.__balance.horizonMaps }))
+  const setHz = async (patch) => {
+    await page.evaluate((p) => {
+      Object.assign(window.__balance.horizonMaps, p)
+      window.__game.getState().bumpBalance()
+    }, patch)
+    await page.waitForFunction((p) => window.__horizonMaps?.shadowStrength === p.shadowStrength && window.__horizonMaps?.closeFadeStartPx === p.closeFadeStartPx, { shadowStrength: hz.shadowStrength, closeFadeStartPx: hz.closeFadeStartPx, ...patch }, { timeout: 30000 })
+  }
+  // Mean absolute luma change on land the horizon terms make.
+  const effect = (a, b) => {
+    let s = 0
+    let land = 0
+    for (let i = 0; i < a.length; i++) {
+      if (Number.isNaN(a[i]) || Number.isNaN(b[i])) continue
+      land++
+      s += Math.abs(a[i] - b[i])
+    }
+    return +(s / Math.max(1, land)).toFixed(3)
+  }
+  const ZERO = { shadowStrength: 0, skyOcclusionStrength: 0 }
+  const NO_FADE = { closeFadeStartPx: 1e6, closeFadeEndPx: 2e6 }
+  const smoothing = {}
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.125))
+  await setHz(NO_FADE)
+  await shot(backend('1531-horizon-close-unfaded'), { world: LUXOR, label: 'Theban hills on 21 December at 16:00, closest zoom, close fade switched off (the old blocks)' })
+  const unfaded = await lumaOf('close, fade off')
+  await setHz({ ...NO_FADE, ...ZERO })
+  smoothing.closeUnfaded = effect(unfaded, await lumaOf('close, fade off, zeroed'))
+  await setHz(hz)
+  await shot(backend('1531-horizon-close'), { world: LUXOR, label: 'Theban hills on 21 December at 16:00, closest zoom, horizon maps on (medium)' })
+  const faded = await lumaOf('close, fade on')
+  await setHz(ZERO)
+  smoothing.closeFaded = effect(faded, await lumaOf('close, zeroed'))
+  await setHz(hz)
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(4))
+  await shot(backend('1531-horizon-overview'), { world: LUXOR, label: 'Upper Egypt round Luxor on 21 December at 16:00, overview zoom, horizon maps on (medium)' })
+  const over = await lumaOf('overview')
+  await setHz(ZERO)
+  smoothing.overview = effect(over, await lumaOf('overview, zeroed'))
+  await setHz(hz)
+  await page.evaluate((was) => {
+    window.__ui.getState().setTravelZoom(was.z)
+    window.__ui.getState().setWheelZoomEnabled(was.wheel)
+  }, zoomWas)
+  check(
+    'horizon smoothing: the close fade removes most of the horizon terms at the closest zoom',
+    smoothing.closeUnfaded > 0.5 && smoothing.closeFaded < 0.5 * smoothing.closeUnfaded,
+    JSON.stringify(smoothing),
+  )
+  check('horizon smoothing: the overview zoom still shades the land', smoothing.overview > 0.3, JSON.stringify(smoothing))
   check('horizon maps: no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
 }
 
