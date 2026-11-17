@@ -77,15 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1529. Give the Giza plateau's people something to do: guides lead tourists, the cameleer tends his camel, the donkey-boy walks his donkey
-  User 16.11.2026: "Bei den Pyramiden stehen die Leute untätig rum"; queued at the front ("ja, beide vorne einreihen").
-  Measured: every `GizaAmbient` figure (src/scenes/place/PlaceScene.tsx ~2398-2466; anchors `GIZA_AMBIENT` in src/scenes/place/gizaSite.ts ~231-245) stands on its anchor and only turns on the spot; seen in verification/1378-giza-ambient.png. The villages' PlaceLife/adultWork walkers and talkers are not used here.
-  Player impact: the plateau reads as a set of statues next to lively villages.
-  Final state: within docs/giza-1890.md §4 (no throng, no new roles) guides/dragomen lead or walk with tourists between monument viewpoints, the cameleer tends or leads his camel, the donkey-boy walks his donkey, tourists stroll, stop and look. Movement stays on free ground clear of monuments with settlement collision respected; mounts move with their handlers. Reuse PlaceLife/adultWork where it fits, no new framework; speeds and pauses calibratable in src/config/balance.ts.
-  Test: Vitest for routing and role behaviour (positions change over time, stay off monuments); a Playwright polish frame of the Giza site showing figures in activity, both backends.
-  Source: user request 16.11.2026 16:16 (eb44b158).
-  Bundle: Monumente.
-
 - [ ] 1530. Replace the Giza camel's box primitives with a proper camel model
   User 16.11.2026: "dem für das Kamel fehlt noch das Modell"; queued at the front ("ja, beide vorne einreihen").
   Measured: `Camel()` in src/scenes/place/PlaceScene.tsx ~2319 is a box body, a sphere hump, a cylinder neck, a box head and four straight stick legs; in verification/1378-giza-ambient.png it reads as a crate on stilts.
