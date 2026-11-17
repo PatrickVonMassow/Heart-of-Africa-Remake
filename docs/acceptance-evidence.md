@@ -2207,6 +2207,29 @@ gate above now reports `landscape-backdrop` as the surface behind every
 silhouette's feet, and its `max()` no longer has to fire — pinned as such
 (`onLine === 0`), so a reopened seam fails the pure layer too.
 
+The pitched view of that seam (point 428). The checks above judge the seam from
+an eye-level horizon, where it sits on the vanishing line; the vertical look
+put it in frame (`verification/145-look-down-disc-edge.png`) as a straight
+brightness step, the backdrop side darker, on both backends. Cause, from the
+two surfaces' shading inputs: same lighting model, lights, tone mapping and fog,
+but different ALBEDO (the disc's region palette × baked earth structure × season
+tint × wetness against the map's biome colour with its own rock-steepness term)
+and a tilted NORMAL on the backdrop's disc-edge ring, into which smoothing
+averaged the 45° tucked-rim strip. The point-381 geometry stays as it was. The
+backdrop now carries a per-vertex seam weight (`backdropSeamWeight`, 1 on the
+disc edge, easing to 0 across `balance.backdropSeam.blendWidth`) and there takes
+the disc's own memoized albedo, normal and roughness nodes (`groundSurface` in
+`src/render/materials.ts`) with no rock term, and `computeBackdropNormals`
+keeps the tuck out of the edge ring's normal. Pure layer:
+`src/scenes/place/backdrop.test.ts` ("disc-to-backdrop seam reads as one
+ground") asserts both materials' colour and roughness graphs reach the SAME
+mottle, structure, season and wetness nodes, that the seam weight drives every
+backdrop shading term, and that the edge ring's normal is the disc's. Rendered
+layer: `scripts/verify/settings.mjs --section=pitched-frames` scans a pixel band
+across the projected seam IN THE 145 FRAME and asserts the luminance step stays
+under `SEAM_STEP_MAX` (a within-frame measure, never a cross-run diff), beside
+the eye-level checks above.
+
 And that in Cairo no
 visible silhouette's azimuth lies inside the Giza skyline span
 (`__placeSkylineExclusion`/`__placePanoramaWildlifeInfo`, point 102),

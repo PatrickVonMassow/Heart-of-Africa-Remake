@@ -141,6 +141,63 @@ async function mouseLook(dx, dy, times = 1) {
   )
 }
 
+/** Largest relative luminance step allowed across the disc/backdrop seam in one
+ *  frame (point 428). The reported step was a markedly darker backdrop band;
+ *  the ground's own mottling stays well under this. Calibratable. */
+const SEAM_STEP_MAX = 0.12
+
+/**
+ * Luminance step across the walkable disc's edge straight ahead, in the frame
+ * on screen now: the edge's screen row is projected through the place camera
+ * from the drawn plate's own rim, and a band of columns at the frame centre is
+ * averaged on each side of it (rows 4–16 px away, clear of the seam's own
+ * anti-aliasing). The step is |above − below| / below.
+ */
+async function measureSeamStep() {
+  const seam = await page.evaluate(() => {
+    const disc = window.__placeScene?.getObjectByName('ground-disc')
+    const cam = window.__placeCamera
+    if (!disc || !cam) return { ok: false, reason: 'no ground disc or place camera mounted' }
+    disc.updateMatrixWorld()
+    const pos = disc.geometry.attributes.position
+    // The rim vertex furthest along +Z: the edge the camera faces.
+    let best = null
+    for (let i = 0; i < pos.count; i++) {
+      const z = pos.getZ(i)
+      if (!best || z > best.z) best = { x: pos.getX(i), y: pos.getY(i), z }
+    }
+    const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+    const m = disc.matrixWorld.elements
+    const world = apply(m, [best.x, best.y, best.z, 1])
+    const clip = apply(cam.projectionMatrix.elements, apply(cam.matrixWorldInverse.elements, world))
+    if (!(clip[3] > 0)) return { ok: false, reason: 'the disc edge is behind the camera' }
+    return { ok: true, ndcX: clip[0] / clip[3], ndcY: clip[1] / clip[3], edgeZ: world[2] }
+  })
+  if (!seam.ok) return seam
+  const png = await capturePixels(page, 'disc-to-backdrop seam column')
+  const { data, info } = await sharp(png).greyscale().raw().toBuffer({ resolveWithObject: true })
+  const row = Math.round(((1 - seam.ndcY) / 2) * info.height)
+  const col = Math.round(((1 + seam.ndcX) / 2) * info.width)
+  const HALF = 40
+  if (row < 20 || row > info.height - 20 || col < HALF || col > info.width - HALF) {
+    return { ok: false, reason: `the seam projects to ${col}/${row}, outside the measurable frame` }
+  }
+  const band = (from, to) => {
+    let sum = 0
+    let n = 0
+    for (let y = from; y <= to; y++) {
+      for (let x = col - HALF; x <= col + HALF; x++) {
+        sum += data[y * info.width + x]
+        n++
+      }
+    }
+    return sum / n
+  }
+  const above = band(row - 16, row - 4)
+  const below = band(row + 4, row + 16)
+  return { ok: true, row, above, below, step: Math.abs(above - below) / Math.max(below, 1) }
+}
+
 // --- First-person eye height -------------------------------------------------
 if (section('eye-height')) {
   const eyeY = await page.evaluate(() => window.__placeCamera?.position.y)
@@ -455,6 +512,17 @@ if (section('pitched-frames')) {
     local: { x: 0, y: 0, z: edge + 8 },
     label: 'the ground past the walkable disc edge, seen over it',
   })
+  // The same frame must show ONE ground (point 428): a vertical pixel column
+  // across the seam, in this one frame — never a cross-run diff (point 361).
+  const seamStep = await measureSeamStep()
+  check(
+    'the walkable disc and the backdrop read as one ground at the seam (pitched view)',
+    seamStep.ok && seamStep.step < SEAM_STEP_MAX,
+    seamStep.ok
+      ? `seam at row ${seamStep.row}: backdrop side ${seamStep.above.toFixed(1)}, disc side ${seamStep.below.toFixed(1)}, ` +
+          `step ${(seamStep.step * 100).toFixed(1)} % (max ${SEAM_STEP_MAX * 100} %)`
+      : seamStep.reason,
+  )
 
   await resetLook()
 }
