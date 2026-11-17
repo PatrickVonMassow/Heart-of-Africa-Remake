@@ -39,7 +39,14 @@ export function hasMeasures(card) {
  * the note off, because the note must never claim a check nobody made.
  */
 export function recordedCheck(statusText) {
-  const t = String(statusText ?? '')
+  // A negated or still pending sentence ("nicht geprüft", "wird später geprüft") records no check.
+  const pending = /\b(?:nicht|kein\w*|noch|später|offen|ausstehend|aus|wird|werden|soll\w*|muss)\b/i
+  const sentences = String(statusText ?? '').split(/(?<=[.!?;])\s+/).filter((s) => !pending.test(s))
+  for (const label of ['beide Backends', 'WebGPU']) if (sentences.some((s) => checkLabel(s) === label)) return label
+  return ''
+}
+
+function checkLabel(t) {
   if (/beide[nm]?\s+Backends|WebGPU\s*(?:und|\+|&|\/|sowie)\s*WebGL\s*2?|WebGL\s*2?\s*(?:und|\+|&|\/|sowie)\s*WebGPU/i.test(t)) {
     return 'beide Backends'
   }

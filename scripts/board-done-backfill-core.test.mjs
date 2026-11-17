@@ -97,6 +97,10 @@ describe('backfill of done cards (point 1535)', () => {
     expect(recordedCheck('WebGPU und WebGL 2 sauber.')).toBe('beide Backends')
     expect(recordedCheck('Bildprüfung auf WebGPU grün.')).toBe('WebGPU')
     expect(recordedCheck('Zusammengeführt.')).toBe('')
+    expect(recordedCheck('Beide Backends werden später geprüft.')).toBe('')
+    expect(recordedCheck('WebGPU wurde nicht geprüft.')).toBe('')
+    expect(recordedCheck('Bildprüfung steht noch aus.')).toBe('')
+    expect(recordedCheck('Bildprüfung auf WebGPU grün. WebGL 2 folgt noch.')).toBe('WebGPU')
   })
 
   it('attributes a point only through exactly one merged feat branch', () => {
