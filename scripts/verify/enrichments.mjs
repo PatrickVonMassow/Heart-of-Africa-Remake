@@ -12477,7 +12477,7 @@ if (section('horizon-maps')) {
   await page.waitForFunction(() => window.__horizonMaps?.enabled === 1 && window.__sceneSun?.dayOfYear === 354, null, { timeout: 60000 })
   const lumaOf = async (label) => {
     await page.waitForFunction(() => window.__camera?.settled?.(), null, { timeout: 30000 }).catch(() => {})
-    await page.waitForTimeout(400)
+    await page.evaluate(() => new Promise((done) => { let n = 10; const t = () => (--n <= 0 ? done() : requestAnimationFrame(t)); requestAnimationFrame(t) }))
     const { data, info } = await sharp(await capturePixels(page, `horizon smoothing: ${label}`)).raw().toBuffer({ resolveWithObject: true })
     // The ground band between the HUD rows: top bar and bottom bar excluded.
     const y0 = Math.round(info.height * 0.15)
