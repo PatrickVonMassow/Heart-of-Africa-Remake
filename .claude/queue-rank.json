@@ -1927,6 +1927,12 @@
       "why": "test-infrastructure hang; homed in its bundle, no player impact ahead of game points",
       "origin": "machine",
       "place": "last"
+    },
+    "1534": {
+      "at": "2026-11-17T08:53:36.355Z",
+      "why": "Side finding split from 1532; it edits the same backdrop files, so it follows 1532 rather than running beside it",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1955,7 +1961,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-17T07:40:56.026Z",
+    "at": "2026-11-17T08:53:36.363Z",
     "points": [
       184,
       200,
@@ -2404,7 +2410,8 @@
       1526,
       1528,
       1532,
-      1533
+      1533,
+      1534
     ]
   }
 }
