@@ -147,6 +147,7 @@ import {
   vicinitySeedBounds,
   vicinityAttemptSeed,
   dramaFlowFactor,
+  seasonFlowFactor,
   floodSweepsCrossingCalf,
   floodTearStep,
   shouldMourn,
@@ -2368,7 +2369,8 @@ function Herds() {
         const wetness = CURRENT_WEATHER.wetness
         const strength = dramaCurrent(lat, lon).strength
         const season = flowFactorAt(lat, lon)
-        return { wetness, strength, season, effective: strength * season, drownThreshold: bw.drownFlowThreshold }
+        const dir = dramaCurrent(lat, lon)
+        return { wetness, strength, season, effective: strength * season, drownThreshold: bw.drownFlowThreshold, dirLat: dir.dirLat, dirLon: dir.dirLon }
       } }
     return () => {
       delete w.__wildlife
@@ -3303,22 +3305,28 @@ function Herds() {
             // run unchanged. Deterministic per frame, hashed like the lame roll.
             if (ter.type === 'water' && a.crossing !== undefined && !inFlight && a.parent && !a.parent.dead) {
               const bw = balance.waterDrama
+              const factor = flowFactorAt(ll.lat, ll.lon)
+              // Only the remote flood's crest sweeps; rain alone keeps the
+              // older drift and drowning roads.
+              const crest = factor > seasonFlowFactor(CURRENT_WEATHER.wetness, bw.dryFlowFactor, bw.wetFlowFactor)
+              const fl = dramaCurrent(ll.lat, ll.lon)
               const h = Math.sin(a.phase * 77.7 + simTimeRef.current * 13.1 + a.x * 3.3) * 43758.5453
-              if (floodSweepsCrossingCalf(
-                dramaCurrent(ll.lat, ll.lon).strength * flowFactorAt(ll.lat, ll.lon),
-                bw.drownFlowThreshold, bw.floodSweepChancePerSecond, dt, h - Math.floor(h),
+              if (crest && floodSweepsCrossingCalf(
+                fl.strength * factor, bw.drownFlowThreshold, bw.floodSweepChancePerSecond, dt, h - Math.floor(h),
               )) {
-                a.crossing = undefined
-                a.floodSwept = true
                 // Torn away at once: beside its parent the calf would be
-                // pulled out the same frame and the crest never seen.
-                const fl = dramaCurrent(ll.lat, ll.lon)
+                // pulled out the same frame and the crest never seen. A tear
+                // the bank cuts short inside that reach is no sweep.
                 const torn = floodTearStep(a.x, a.z, fl.dirLon, -fl.dirLat, bw.floodSweepTearUnits, (wx, wz) => {
                   const w = worldToLatLon(wx, wz)
                   return sampleTerrain(w.lat, w.lon, seed).type === 'water'
                 })
-                a.x = torn.x
-                a.z = torn.z
+                if (Math.hypot(torn.x - a.parent.x, torn.z - a.parent.z) > RESCUE_REACH) {
+                  a.crossing = undefined
+                  a.floodSwept = true
+                  a.x = torn.x
+                  a.z = torn.z
+                }
               }
             }
             const cause =

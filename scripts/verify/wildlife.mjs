@@ -820,7 +820,8 @@ if (section('flood-crest-calf')) {
       const mid = at((line.wetFrom + line.far) / 2, 0)
       const ll = { lat: -mid.z / U, lon: mid.x / U }
       const dd = window.__wildlife.waterDrama(ll.lat, ll.lon)
-      window.__floodScene = { parent, calf, line, t0: window.__simTime(), crest, swept: null }
+      // World downstream: x = lon, z = -lat.
+      window.__floodScene = { parent, calf, line, t0: window.__simTime(), crest, swept: null, down: { x: dd.dirLon, z: -dd.dirLat } }
       const rec = []
       window.__floodRec = rec
       window.__floodRecTimer = setInterval(() => {
@@ -868,7 +869,7 @@ if (section('flood-crest-calf')) {
       }
     }
     // Let the drama resolve: the drowning window plus the walk out.
-    await page.evaluate(() => window.__pollSim(window.__balance.waterDrama.drownSeconds + 20, () => {
+    const resolved = await page.evaluate(() => window.__pollSim(window.__balance.waterDrama.drownSeconds + 20, () => {
       const sc = window.__floodScene
       return (sc.calf.dead || sc.calf.inWater === undefined) && (sc.parent.dead || sc.parent.wadeTime === undefined || !sc.calf.inWater)
     }))
@@ -887,7 +888,11 @@ if (section('flood-crest-calf')) {
       const driftZ = last.calf.z - sc.swept.z
       const parentDX = last.parent.x - sc.swept.px
       const parentDZ = last.parent.z - sc.swept.pz
-      const parentAlongDrift = calfCarried > 1e-6 ? (parentDX * driftX + parentDZ * driftZ) / calfCarried : 0
+      // Both measured along the river's own downstream direction, so a
+      // reversed current cannot pass.
+      const dl = Math.hypot(sc.down.x, sc.down.z) || 1
+      const calfDown = (driftX * sc.down.x + driftZ * sc.down.z) / dl
+      const parentAlongDrift = (parentDX * sc.down.x + parentDZ * sc.down.z) / dl
       // The parent's WADE speed: mean step speed while it is in the water and
       // the calf still struggles unrescued.
       let dist = 0
@@ -904,6 +909,7 @@ if (section('flood-crest-calf')) {
         swept: true,
         flag: sc.swept.flag,
         calfCarried: +calfCarried.toFixed(2),
+        calfDown: +calfDown.toFixed(2),
         parentAlongDrift: +parentAlongDrift.toFixed(2),
         wadeSpeed: time > 0.3 ? +(dist / time).toFixed(3) : null,
         wadeSeconds: +time.toFixed(2),
@@ -923,7 +929,7 @@ if (section('flood-crest-calf')) {
       window.__floodBackup = undefined
       window.__floodScene = undefined
     })
-    return { staged, inWater, verdict, carriedShot }
+    return { staged, inWater, verdict, carriedShot, resolved }
   }
 
   const crestRun = await runScene(CREST_DAY, true)
@@ -936,7 +942,11 @@ if (section('flood-crest-calf')) {
   check('at the crest the current tears the calf off its crossing line (point 364)',
     crestRun.inWater && crestRun.verdict?.swept && crestRun.verdict.flag === true, both)
   check('the swept calf is carried downstream, and its parent turns downstream after it (point 364)',
-    (crestRun.verdict?.calfCarried ?? 0) > 2.5 && (crestRun.verdict?.parentAlongDrift ?? 0) > 0.5, both)
+    (crestRun.verdict?.calfDown ?? 0) > 2.5 && (crestRun.verdict?.parentAlongDrift ?? 0) > 0.5, both)
+  check('both dramas end: the calf pulled out or drowned, and low water never sweeps (point 364)',
+    crestRun.resolved === true && dryRun.resolved === true &&
+      (crestRun.verdict?.rescueAfter != null || crestRun.verdict?.calfDead === true) &&
+      dryRun.verdict?.flag === false, both)
   check('the crest rescue is slower than the same seed in the dry season (point 364)',
     crestRun.verdict?.wadeSpeed != null && dryRun.verdict?.wadeSpeed != null &&
       crestRun.verdict.wadeSpeed < dryRun.verdict.wadeSpeed * 0.8, both)
