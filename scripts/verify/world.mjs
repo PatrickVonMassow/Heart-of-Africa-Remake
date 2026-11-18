@@ -401,10 +401,15 @@ if (section('communication-errand')) {
         ui.clearDrumMessage()
         ui.setDialog(null)
         window.__toastLog = []
+        // Where he stood when the answer was SET: the position the act judged.
+        window.__toastPos = []
         window.__toastUnsub =
           window.__toastUnsub ??
           window.__game.subscribe((s, prev) => {
-            if (s.toast && s.toast !== prev.toast) window.__toastLog.push(s.toast)
+            if (s.toast && s.toast !== prev.toast) {
+              window.__toastLog.push(s.toast)
+              window.__toastPos.push({ x: s.pos.x, z: s.pos.z })
+            }
           })
       })
       // WHERE HE STOOD IS READ ON BOTH SIDES OF THE CLICK. The act resolves
@@ -424,7 +429,8 @@ if (section('communication-errand')) {
       await page.locator('[data-form="rock-relief"]').click()
       const after = await at()
       return page.evaluate(
-        ([b, a]) => {
+        async ([b, a]) => {
+          const geo = await import('/src/world/geo.ts')
           const s = window.__game.getState()
           return {
             said: window.__toastLog,
@@ -436,6 +442,7 @@ if (section('communication-errand')) {
             dialog: window.__ui.getState().dialog ?? null,
             before: b,
             after: a,
+            judged: window.__toastPos.map((p) => geo.worldToLatLon(p.x, p.z)),
           }
         },
         [before, after],
@@ -458,7 +465,8 @@ if (section('communication-errand')) {
     const clickDetail = (r) =>
       `said ${JSON.stringify(r.said)}, spent ${JSON.stringify(r.spent)}, mode ${r.mode}, ` +
       `dialog ${JSON.stringify(r.dialog)}, stood at ${place(r.before)} and after the click ` +
-      `at ${place(r.after)} (the talus is at ${place(talus)})`
+      `at ${place(r.after)}, judged at ${r.judged.map(place).join(', ') || 'no answer'} ` +
+      `(the talus is at ${place(talus)})`
     const missOk = miss.said.includes(strings.noFit) && !miss.spent.includes('bandiagara-talus')
     console.log(
       `${missOk ? 'PASS' : 'FAIL'}  the inventory click clear of the escarpment answers in the traveller's own voice` +
@@ -494,12 +502,15 @@ if (section('communication-errand')) {
 
     // A spent socket answers like a wrong place, and writes no second page.
     const again = await clickForm(talus)
-    // A noFit from OUT of reach would pass this too, so both readings must
-    // show him at the socket: then the answer is the spent one.
+    // A noFit from OUT of reach would pass this too, so the readings around
+    // the click AND the one taken as the answer was set must show him at the
+    // socket: then the answer is the spent one.
     const atSocket = (ll) => Math.hypot(ll.lat - talus.lat, ll.lon - talus.lon) < reachDeg
     const againOk =
       atSocket(again.before) &&
       atSocket(again.after) &&
+      again.judged.length > 0 &&
+      again.judged.every(atSocket) &&
       again.said.includes(strings.noFit) &&
       again.keys.filter((k) => k === 'journal.mouldFitted').length === 1
     console.log(
