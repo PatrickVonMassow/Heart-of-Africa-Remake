@@ -1630,9 +1630,9 @@ if (section('children-bank-game')) {
         })
         return { W, H, cam: [cam.position.x, cam.position.y, cam.position.z].map((v) => +v.toFixed(2)), out }
       })
-      ;(await import('node:fs')).writeFileSync('/tmp/claude-1000/-workspace-hoa/52f335f1-7ce3-4969-b3e8-0a636d8823af/scratchpad/diag1164-' + Date.now() + '.json', JSON.stringify(diag))
+      ;(await import('node:fs')).writeFileSync('/tmp/claude-1000/-workspace-hoa/23811f0d-a561-4a12-9931-2e75099237a7/scratchpad/diag1164-' + Date.now() + '.json', JSON.stringify(diag))
       {
-        const S = '/tmp/claude-1000/-workspace-hoa/52f335f1-7ce3-4969-b3e8-0a636d8823af/scratchpad/'
+        const S = '/tmp/claude-1000/-workspace-hoa/23811f0d-a561-4a12-9931-2e75099237a7/scratchpad/'
         const flip = (step) => page.evaluate((step) => {
           let hit = null
           window.__placeScene.traverse((o) => {
@@ -1644,12 +1644,15 @@ if (section('children-bank-game')) {
           if (step === 'norecv') hit.receiveShadow = false
           if (step === 'nocast') hit.castShadow = false
           if (step === 'hidden') hit.visible = false
-          if (step === 'restore') { hit.visible = true; hit.castShadow = true; hit.receiveShadow = true }
+          if (step === 'noao') { window.__ui.setState({ ssaoEnabled: false }); return 'ao off' }
+          if (step === 'plain') { hit.userData.m0 = hit.material; hit.material = new hit.material.constructor(); hit.material.color.set('#8a8178'); hit.material.roughness = 0.95 }
+          if (step === 'probe') { const n = hit.geometry.attributes.normal; const c = hit.geometry.attributes.color; return `normal ${n ? n.count : 'NONE'} first ${n ? [n.getX(0), n.getY(0), n.getZ(0)].map((v) => v.toFixed(2)) : ''} color ${c ? [c.getX(0), c.getY(0), c.getZ(0)].map((v) => v.toFixed(2)) : 'NONE'} attrs ${Object.keys(hit.geometry.attributes)}` }
+          if (step === 'restore') { if (hit.userData.m0) hit.material = hit.userData.m0; window.__ui.setState({ ssaoEnabled: true }); hit.visible = true; hit.castShadow = true; hit.receiveShadow = true }
           const m = hit.material; m.needsUpdate = true
           return `${hit.geometry.attributes.position.count} verts, count ${hit.count}, recv ${hit.receiveShadow}, cast ${hit.castShadow}, vis ${hit.visible}`
         }, step)
         const log = []
-        for (const step of ['base', 'norecv', 'nocast', 'hidden']) {
+        for (const step of ['probe', 'base', 'plain', 'restore', 'noao', 'hidden']) {
           log.push(step + ': ' + (await flip(step)))
           await page.waitForTimeout(1500)
           await page.screenshot({ path: S + 'exp-' + step + '.png' })
