@@ -68,9 +68,9 @@ describe('pickHuntSpecies', () => {
     expect(pickHuntSpecies(unknown, null, rolls(0.5, 0))).toEqual(pickHuntSpecies('east', null, rolls(0.5, 0)))
   })
 
-  it('keeps a cast that began east when the chase crosses into the central forest', () => {
-    // The scene picks once from the start region; the same rolls asked of the
-    // region the chase ran into would have cast a different, central pair.
+  it('casts by the start region alone, so an east cast may hold prey the forest lacks', () => {
+    // Only the picker's side: the scene's actual border crossing (start region
+    // recorded once, crossings logged) is asserted by scripts/verify/enrichments.mjs.
     const begun = pickHuntSpecies('east', null, rolls(0.5, 0))
     expect(begun).toEqual({ predator: 'hyena', prey: 'wildebeest' })
     expect(REGION_PREY.central).not.toContain(begun.prey)
