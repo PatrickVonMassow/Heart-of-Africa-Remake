@@ -1,11 +1,5 @@
 {
   "ranked": {
-    "336": {
-      "at": "2026-08-21T16:06:02.037Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174), plus the branch decision of the same day: feat/336-croc-staging was deleted because two of two files had moved on main, so nothing is left to fall behind and the rebuild this point demands waits until after the release.",
-      "origin": "user",
-      "place": "last"
-    },
     "553": {
       "at": "2026-08-21T16:06:01.436Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It states the weekly-volume diagnosis correctly but overlaps 745 and 746 and is the largest build in the block.",
@@ -1932,7 +1926,6 @@
   "boundary": {
     "at": "2026-08-21T00:55:14.962Z",
     "points": [
-      336,
       553,
       596,
       660,
@@ -1955,7 +1948,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-18T00:44:03.799Z",
+    "at": "2026-11-18T03:29:15.262Z",
     "points": [
       184,
       200,
@@ -1968,7 +1961,6 @@
       322,
       330,
       333,
-      336,
       364,
       415,
       422,
