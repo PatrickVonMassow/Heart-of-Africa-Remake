@@ -134,10 +134,14 @@ const hazeIn = (config, wantShown) =>
       { timeout: routeLeft(), polling: 50 },
     )
     .then((h) => h.jsonValue(), wallCapToNull)
+// Each sample is judged as soon as it returns, so a later timeout cannot
+// suppress an observed failure.
 const hazeOff = await hazeIn('climate-haze-off', null)
-const hazeBack = hazeOff ? await hazeIn('all-off', true) : null
-if (hazeOff && hazeBack) {
+if (hazeOff) {
   check('climate-haze-off hides the ground haze in its desert phase', hazeOff.enabled === false && hazeOff.shown === false, JSON.stringify(hazeOff))
+}
+const hazeBack = hazeOff ? await hazeIn('all-off', true) : null
+if (hazeBack) {
   check('the next config draws the ground haze again in its desert phase', hazeBack.shown === true, JSON.stringify(hazeBack))
 }
 const routeDone =
