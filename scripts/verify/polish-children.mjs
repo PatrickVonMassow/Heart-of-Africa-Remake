@@ -1654,7 +1654,7 @@ if (section('children-bank-game')) {
         const log = []
         for (const step of ['probe', 'base', 'plain', 'restore', 'noao', 'hidden']) {
           log.push(step + ': ' + (await flip(step)))
-          await page.waitForTimeout(1500)
+          await nextFrames(30)
           await frameShutter(page, S)('exp-' + step, { general: 'temporary bank-play sand projection probe' })
         }
         log.push('restore: ' + (await flip('restore')))
