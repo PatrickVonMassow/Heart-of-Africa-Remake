@@ -56,7 +56,7 @@ import {
   type Species,
 } from './animalBodies'
 import { isOnScreen } from './frameVisibility'
-import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon } from '../../world/geo'
+import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { renderedSheetY, waterSurfaceY } from './waterSurface'
 import { drinkWalkDistance, crocodileNeedsReanchor } from './waterEdgeRules'
@@ -140,8 +140,8 @@ import {
   calfMayPlay,
   juvenileAnchor,
   isPredatorSpecies,
-  PREDATOR_PREY,
   REGION_PREY,
+  pickHuntSpecies,
   type PredatorKind,
   type PreyKind,
   vicinitySeedBounds,
@@ -735,6 +735,8 @@ interface LionHuntState {
   predator: PredatorKind
   /** Species being hunted (chosen per hunt from the predator's food web). */
   prey: PreyKind
+  /** Region where this hunt began — the one its cast was picked for. */
+  startRegion: RegionId
   /** A hunted/eaten herd calf (then its sacrificed parent) when the hunt targets
    *  a family (design.md §19); null for a generic scripted-prey hunt. When set,
    *  this real herd animal is the visible victim and the scripted prey mesh hides. */
@@ -761,7 +763,7 @@ interface LionHuntState {
 }
 const LION_STATE: LionHuntState = {
   mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
-  predator: 'lion', prey: 'zebra', victim: null, victimHunt: false,
+  predator: 'lion', prey: 'zebra', startRegion: 'east', victim: null, victimHunt: false,
 }
 
 /** The COMPLETE co-active drama/hunt state of one animal (point 252), fed to
@@ -7028,21 +7030,12 @@ function LionHunt() {
       s.pz = pz
       // Pick a region-appropriate predator, then prey from its food web that the
       // region actually holds (design.md §19): predator → grazer → grassland.
-      const region = regionAt(ll.lat, ll.lon)
-      const predPool = REGION_PREDATORS[region] ?? REGION_PREDATORS.east
-      // A victim hunt's predator must hold the victim's species in its own
-      // food web (point 124): a giraffe calf is run down by the LION only.
-      // The lion takes every prey kind and roams every region, so the fit
-      // pool is never empty for a huntable species.
-      const vs = victimSpecies
-      const fitPool = vs ? predPool.filter((p) => PREDATOR_PREY[p].includes(vs)) : predPool
-      s.predator = fitPool.length > 0 ? fitPool[Math.floor(Math.random() * fitPool.length)] : 'lion'
-      const regionPrey = REGION_PREY[region] ?? REGION_PREY.east
-      const preyPool = PREDATOR_PREY[s.predator].filter((p) => regionPrey.includes(p))
-      const pool = preyPool.length > 0 ? preyPool : regionPrey
-      // The recorded prey species: the victim's own kind for a grazer family
-      // hunt, a food-web pick for the generic hunt and the lion-cub hunt.
-      s.prey = vs ?? pool[Math.floor(Math.random() * pool.length)]
+      // The cast belongs to the region where the hunt BEGINS (point 1063): the
+      // chase may carry it across a border, so the start region is kept.
+      s.startRegion = regionAt(ll.lat, ll.lon)
+      const cast = pickHuntSpecies(s.startRegion, victimSpecies, Math.random)
+      s.predator = cast.predator
+      s.prey = cast.prey
       // The lion-cub hunt is always a hyena's (point 145c): the lioness would
       // rout any lighter cat, so only the bold hyena makes the threat read —
       // and it only spawns where hyenas roam. The scripted prey mesh stays
