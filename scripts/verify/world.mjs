@@ -381,14 +381,14 @@ if (section('communication-errand')) {
         const s = window.__game.getState()
         return geo.worldToLatLon(s.pos.x, s.pos.z)
       })
-    // HE DOES NOT STAY WHERE HE IS PUT. Measured 15.09.2026: after the jump had
-    // landed him exactly on the talus, three idle seconds carried him 0.14° of
-    // the 0.30° reach, and a first click — which waits for the button to be
-    // actionable where a keypress does not — carried him out of reach
-    // altogether, red in two of six first attempts. `driftCurrent` (design.md
-    // §11) is the suspect and point 1133 owns naming it; what matters here is
-    // that the act stands him where it is about to be JUDGED as its last step
-    // before pressing, and that the reading pair below proves he was there.
+    // THE ACT STANDS HIM WHERE IT IS JUDGED, as its last step before pressing,
+    // and the reading pair below proves he was there. The old order — jump,
+    // photograph, change zoom, then act — went red on 08.-15.09.2026 with the
+    // reach test reading him out of range. Measured 18.11.2026 on main and on
+    // the 15.09. tree, fresh and after the errand: jumped onto the talus he
+    // stands at 0.0000° from the socket for five idle seconds (savanna, no
+    // current), so the game reads the position the player has and the red was
+    // the harness's ordering, not the player path.
     const clickForm = async (standAt) => {
       await page.evaluate(([la, lo]) => {
         window.__game.getState().debugJumpTo(la, lo)
