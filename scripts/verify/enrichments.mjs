@@ -4405,8 +4405,8 @@ if (section('predator-food-web')) {
     const REGION_PREY = {
       east: ['wildebeest', 'zebra', 'antelope', 'warthog', 'giraffe'],
       south: ['wildebeest', 'zebra', 'antelope', 'warthog', 'giraffe'],
-      central: ['antelope', 'warthog', 'zebra'],
-      west: ['antelope', 'warthog', 'zebra'],
+      central: ['antelope', 'warthog'],
+      west: ['antelope', 'warthog'],
       north: ['antelope', 'warthog'],
     }
     const REGION_PREDATORS = {
@@ -4447,6 +4447,11 @@ if (section('predator-food-web')) {
     const preyMismatch = []
     const predMismatch = []
     const webMismatch = []
+    // Point 1063/1013: a hunt's cast is picked for the region where it BEGAN
+    // (s.startRegion); the chase can carry it over a border before this read.
+    // The checks ask the start region; a hunt whose current spot lies in
+    // another region is logged here so a crossing stays visible.
+    const crossings = []
     let familyHunts = 0
     const sAll = window.__simTime()
     const tAll = Date.now()
@@ -4468,7 +4473,9 @@ if (section('predator-food-web')) {
           continue
         }
         const ll = geo.worldToLatLon(s.px, s.pz)
-        const region = geo.regionAt(ll.lat, ll.lon)
+        const region = s.startRegion
+        const nowRegion = geo.regionAt(ll.lat, ll.lon)
+        if (nowRegion !== region) crossings.push({ predator: s.predator, prey: s.prey, startRegion: region, nowRegion })
         prey.push(s.prey)
         predators.push(s.predator)
         if (!REGION_PREY[region]?.includes(s.prey)) preyMismatch.push({ prey: s.prey, region })
@@ -4486,13 +4493,13 @@ if (section('predator-food-web')) {
       familyHunts,
       distinctPrey: [...new Set(prey)],
       distinctPredators: [...new Set(predators)],
-      preyMismatch, predMismatch, webMismatch,
+      preyMismatch, predMismatch, webMismatch, crossings,
     }
   })
   check('several kinds of predator hunt (lion + others)', preyVar.distinctPredators.length >= 2, JSON.stringify(preyVar))
-  check('every predator fits the region and period', preyVar.count >= 6 && preyVar.predMismatch.length === 0, JSON.stringify(preyVar))
+  check('every predator fits the region where its hunt began, and the period', preyVar.count >= 6 && preyVar.predMismatch.length === 0, JSON.stringify(preyVar))
   check('the predator takes more than one kind of prey', preyVar.distinctPrey.length >= 2, JSON.stringify(preyVar))
-  check('every hunted prey fits the region and the predator food web',
+  check('every hunted prey fits the region where its hunt began, and the predator food web',
     preyVar.count >= 6 && preyVar.preyMismatch.length === 0 && preyVar.webMismatch.length === 0, JSON.stringify(preyVar))
 }
 

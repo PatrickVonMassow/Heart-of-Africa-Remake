@@ -3047,6 +3047,26 @@ export const REGION_PREDATORS: Record<RegionId, PredatorKind[]> = {
   north: ['lion', 'cheetah', 'leopard'],
 }
 
+/** A hunt's cast, picked for the region where the hunt BEGINS (design.md §19):
+ *  a region-appropriate predator, then prey from its food web that the region
+ *  holds. A victim hunt keeps the victim's own species and needs a predator
+ *  whose scheme holds it (point 124); the lion takes every prey kind, so it is
+ *  the fallback. `rPred`/`rPrey` are uniform rolls in [0, 1). */
+export function pickHuntSpecies(
+  region: RegionId,
+  victimSpecies: PreyKind | null,
+  rPred: number,
+  rPrey: number,
+): { predator: PredatorKind; prey: PreyKind } {
+  const predPool = REGION_PREDATORS[region] ?? REGION_PREDATORS.east
+  const fitPool = victimSpecies ? predPool.filter((p) => PREDATOR_PREY[p].includes(victimSpecies)) : predPool
+  const predator = fitPool.length > 0 ? fitPool[Math.floor(rPred * fitPool.length)] : 'lion'
+  const regionPrey = REGION_PREY[region] ?? REGION_PREY.east
+  const preyPool = PREDATOR_PREY[predator].filter((p) => regionPrey.includes(p))
+  const pool = preyPool.length > 0 ? preyPool : regionPrey
+  return { predator, prey: victimSpecies ?? pool[Math.floor(rPrey * pool.length)] }
+}
+
 /** The decorative predators of ~1890 Africa as a species set (design.md §19):
  *  the four `PredatorKind`s plus the crocodile ambusher (§19.16). Read through
  *  isPredatorSpecies, so the orphan-adoption match can reject a predator as an
