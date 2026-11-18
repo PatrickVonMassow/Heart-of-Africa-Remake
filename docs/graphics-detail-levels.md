@@ -28,7 +28,7 @@ device pixel ratio is kept (no cap).
 
 | Setting | Low | Medium | High |
 | --- | --- | --- | --- |
-| `dprCap` | 0.8 | native | native |
+| `dprCap` | 0.8 | 1 | native |
 | `ssao` | off | off | on |
 | `traa` | off | on | on |
 | `bloom` | off | on | on |
@@ -83,7 +83,8 @@ added.
   CSS pixels and upscales. The single biggest fill-rate lever on real hardware
   (~35 % GPU), so low leads with it: `0.8` (0.64x the pixels of dpr 1,
   calibratable) because the LOW frame is pixel-bound
-  (`docs/bench/310-projection.md`). The internal allow-flag `subOneDprEnabled`
+  (`docs/bench/310-projection.md`). Medium caps at `1` (calibratable, point
+  1541: -26..30 % GPU on a dpr-1.25 notebook); high keeps `native`. The internal allow-flag `subOneDprEnabled`
   clamps a sub-1 cap back to 1 for A/B tuning within the level.
 - **`ssao`** — Screen-space ambient occlusion (design.md §2.7). High only — a
   ~25 % GPU cost kept for the richest level.

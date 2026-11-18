@@ -23,7 +23,9 @@ const check = (name, ok, detail) => {
 }
 
 const browser = await launchVerifyBrowser()
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// A dpr > 1 viewport (the user's notebook runs at 1.25), so a capped preset
+// row measurably differs from a native one (point 1541).
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1.25 })
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -206,6 +208,13 @@ for (const name of ['high-preset', 'medium-preset']) {
   const n = report.rows.filter((r) => r.config === name).length
   check(`the sweep includes the ${name} pass (one row per phase)`, n === phases.length, `${n} ${name} rows`)
 }
+// Point 1541: low caps at 0.8, medium at one pixel per CSS pixel, high keeps the native 1.25.
+const presetRatios = (name) => JSON.stringify([...new Set(report.rows.filter((r) => r.config === name).map((r) => r.pixelRatio))])
+check(
+  'the low/medium/high preset rows render at pixel ratio 0.80 / 1.00 / the native 1.25',
+  presetRatios('low-preset') === '[0.8]' && presetRatios('medium-preset') === '[1]' && presetRatios('high-preset') === '[1.25]',
+  `low ${presetRatios('low-preset')}, medium ${presetRatios('medium-preset')}, high ${presetRatios('high-preset')}`,
+)
 check(
   'every row records the pixel ratio it was measured at',
   report.rows.every((r) => typeof r.pixelRatio === 'number' && r.pixelRatio > 0),

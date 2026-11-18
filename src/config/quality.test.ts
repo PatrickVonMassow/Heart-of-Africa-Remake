@@ -62,7 +62,7 @@ describe('preset calibration invariants (a clear, visible low→high climb)', ()
   })
 
   it('medium (default) keeps TRAA+Bloom and the 256² campfire shadows, SSAO off', () => {
-    expect(QUALITY_PRESETS.medium.dprCap).toBeNull()
+    expect(QUALITY_PRESETS.medium.dprCap).toBe(1)
     expect(QUALITY_PRESETS.medium.ssao).toBe(false)
     expect(QUALITY_PRESETS.medium.traa).toBe(true)
     expect(QUALITY_PRESETS.medium.bloom).toBe(true)
@@ -70,6 +70,13 @@ describe('preset calibration invariants (a clear, visible low→high climb)', ()
     expect(QUALITY_PRESETS.medium.fireShadowResolution).toBe(256)
     expect(QUALITY_PRESETS.medium.fireShadowSoft).toBe(false)
     expect(QUALITY_PRESETS.medium.terrainRefine).toBe(true)
+  })
+
+  it('dpr cap strictly climbs low < medium < high, high native', () => {
+    // Point 1541: medium caps at 1, high keeps the native ratio (null = no cap).
+    expect(QUALITY_PRESETS.high.dprCap).toBeNull()
+    expect(QUALITY_PRESETS.low.dprCap!).toBeLessThan(QUALITY_PRESETS.medium.dprCap!)
+    expect(QUALITY_PRESETS.medium.dprCap).toBe(1)
   })
 
   it('high is the richest: SSAO on and the soft, higher-res campfire variant', () => {
