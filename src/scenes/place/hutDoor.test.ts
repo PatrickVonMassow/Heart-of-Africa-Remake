@@ -74,20 +74,25 @@ function eyes(r: number, base: number): THREE.Vector3[] {
   return out
 }
 
-/** The hut's floor (ground or stilt platform) — the threshold a steep look
- *  down through the opening lands on before reaching the door panel. */
-function floorMesh(base: number): THREE.Mesh {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(40, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial())
-  m.name = 'floor'
-  m.position.set(0, base, 0)
-  m.updateMatrixWorld()
-  return m
+/** The ground, and on stilts the platform as VillageHut draws it (a 0.12 m
+ *  disc of radius 1.15·r centred on `base`, its top 0.06 above it) — the
+ *  threshold a steep look down through the opening lands on. */
+function floorMeshes(r: number, base: number): THREE.Mesh[] {
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial())
+  ground.name = 'floor'
+  ground.updateMatrixWorld()
+  if (base === 0) return [ground]
+  const platform = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.15, r * 1.15, 0.12, 12), new THREE.MeshBasicMaterial())
+  platform.name = 'floor'
+  platform.position.set(0, base, 0)
+  platform.updateMatrixWorld()
+  return [ground, platform]
 }
 
 /** Every (eye, opening point) pair whose first hit is wall surface, or nothing. */
 function wallInOpening(meshes: THREE.Mesh[], r: number, wallH: number, base: number): string[] {
   const ray = new THREE.Raycaster()
-  const scene = [...meshes, floorMesh(base)]
+  const scene = [...meshes, ...floorMeshes(r, base)]
   const bad: string[] = []
   for (const eye of eyes(r, base))
     for (const target of openingPoints(r, wallH, base)) {
