@@ -14,6 +14,33 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 - 2026-10-23 cloud probe — `parseMarker` in `scripts/cloud-switch.mjs` reads only `hostname: <h>`; the probe of 23.10. wrote `hostname vm` and read NOT PASSED until recorded by hand. Accept both forms when the switch is next touched.
 - 2026-10-23 model guard — `model-handoff-core.mjs` sets `verifiedThrough` to the commit's own second while `findForbiddenCommits` skips only `c.when < sinceMs`, so a verified commit stays a hit and the handoff answers 'no advanceable timestamp' (199be6e; baseline advanced by hand in 657b243bd). Fix: compare `<=` or add 1000 ms; adjust model-handoff-core.test.mjs:41.
 - 2026-10-06 pre-push gate — the unit gate for 124d7b9 (TASKS split only) went red while a Blender fit loaded the host, without naming the failing file or test; the superset run on f8cb1ab was green (588 files / 17299 tests) and the next gated push passed. Suspected load-sensitive unit test; the gate should print the failing test names.
+- 2026-11-18 parked work-order point 1163. The red band at the leftmost Giza pyramid is Menkaure's red Aswan-granite skirt, drawn on purpose: `src/render/landmarks.ts` `gizaSitePyramidParts` (`p.skirt`, tint `#96604b`), set only for Menkaure in `src/scenes/place/gizaSite.ts` and required by design.md §4.4 ("a red Aswan-granite base casing (a solid, seated lower course, not a floating band)") and docs/giza-1890.md §3 item 3 (point 273). It is a solid seated course, not depth fighting. The point's final state ("nothing reads as a different material") would remove a design-mandated feature, so it is parked rather than built; reopen only with a design.md §4.4 change. Owner decision 18.11.2026, veto via the board's decision log.
+  Original text:
+    - [ ] 1163. The leftmost pyramid stands on a red band the other two do not have (seen
+    18.09.2026 in the covering polish frame `verification/139-giza-walkable-site.png`, WebGPU
+    run 2026-09-18T22:17:33 and the WebGL 2 run after it, both GREEN — no check reads the
+    colour, so the suite walks past it).
+    MEASURED STATE: at the monument site the middle and right pyramids meet the ground in a
+    tan sand apron that reads as the site's own plate. The leftmost pyramid's lowest band is
+    a distinctly reddish terracotta instead, the one saturated colour in an otherwise sand
+    and sky picture, and it stops at a hard horizontal line rather than fading into the
+    ground. `src/scenes/place/gizaSite.ts` carries no colour at all, so the band comes from
+    somewhere else — the sand apron, the pyramid material's lower ring, or a plate drawn at
+    the same height as the ground and fighting it for depth.
+    Final state:
+    - The three pyramids meet the ground the same way: whatever the middle one does at its
+      base, the left one does too, and nothing reads as a different material.
+    - The cause is NAMED in the commit — which mesh drew the red, and why only this one —
+      rather than repainted at the symptom.
+    - If the band turns out to be depth fighting rather than a colour, it is fixed as depth
+      fighting; a colour that merely hides it does not close this.
+    Test: `polish --section=giza-site` on both backends, and the frame
+    `139-giza-walkable-site` is INSPECTED, not merely green — the suite has no check for
+    this and a new one is only worth adding if it can read the base band without pinning the
+    art.
+    Criticality: low — it costs nothing but the look of the site the player walks up to.
+    Refs: verification/139-giza-walkable-site.png, src/scenes/place/gizaSite.ts
+    Bundle: Monumente.
 - 2026-10-01 parked work-order point 1257. On WebGL 2 the loom helper never walks the warp inside the section's waits — parked by point 1258 while the loom is
   switched off (`loom.placed: false`, user 29.09.2026); reopen as a point when it is switched on.
   Original text:

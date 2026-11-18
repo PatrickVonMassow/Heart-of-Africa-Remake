@@ -77,31 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 1163. The leftmost pyramid stands on a red band the other two do not have (seen
-  18.09.2026 in the covering polish frame `verification/139-giza-walkable-site.png`, WebGPU
-  run 2026-09-18T22:17:33 and the WebGL 2 run after it, both GREEN — no check reads the
-  colour, so the suite walks past it).
-  MEASURED STATE: at the monument site the middle and right pyramids meet the ground in a
-  tan sand apron that reads as the site's own plate. The leftmost pyramid's lowest band is
-  a distinctly reddish terracotta instead, the one saturated colour in an otherwise sand
-  and sky picture, and it stops at a hard horizontal line rather than fading into the
-  ground. `src/scenes/place/gizaSite.ts` carries no colour at all, so the band comes from
-  somewhere else — the sand apron, the pyramid material's lower ring, or a plate drawn at
-  the same height as the ground and fighting it for depth.
-  Final state:
-  - The three pyramids meet the ground the same way: whatever the middle one does at its
-    base, the left one does too, and nothing reads as a different material.
-  - The cause is NAMED in the commit — which mesh drew the red, and why only this one —
-    rather than repainted at the symptom.
-  - If the band turns out to be depth fighting rather than a colour, it is fixed as depth
-    fighting; a colour that merely hides it does not close this.
-  Test: `polish --section=giza-site` on both backends, and the frame
-  `139-giza-walkable-site` is INSPECTED, not merely green — the suite has no check for
-  this and a new one is only worth adding if it can read the base band without pinning the
-  art.
-  Criticality: low — it costs nothing but the look of the site the player walks up to.
-  Refs: verification/139-giza-walkable-site.png, src/scenes/place/gizaSite.ts
-  Bundle: Monumente.
 
 - [ ] 1164. A shadow lies on the river sand with nothing above it to cast it (seen
   18.09.2026 in the covering polish frame `verification/687-bank-play-rocks.png`, WebGPU
