@@ -240,10 +240,10 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     rainLightDamping: false, // the undimmed sun
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
-  // (the ~25 % GPU lever kept for high), TRAA + Bloom on, native dpr, normal
+  // (the ~25 % GPU lever kept for high), TRAA + Bloom on, dpr capped at 1, normal
   // shadows, the point-289 256² campfire shadows on, full geometry.
   medium: {
-    dprCap: null,
+    dprCap: 1, // calibratable: -26..30 % GPU on a dpr-1.25 notebook (user benchmark 18.11.2026)
     ssao: false,
     traa: true,
     bloom: true,

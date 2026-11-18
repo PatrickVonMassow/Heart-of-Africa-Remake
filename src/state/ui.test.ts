@@ -171,7 +171,7 @@ describe('graphics quality level (design.md §21, F9 / point 276 part B)', () =>
   it('defaults to medium and reads that preset through every effective selector', () => {
     expect(u().detailLevel).toBe('medium')
     const m = QUALITY_PRESETS.medium
-    expect(effectiveDprCap(u())).toBe(m.dprCap) // null → native dpr
+    expect(effectiveDprCap(u())).toBe(m.dprCap) // 1 → capped at one pixel per CSS pixel
     expect(effectiveSsao(u())).toBe(false) // SSAO only in high
     expect(effectiveTraa(u())).toBe(true)
     expect(effectiveBloom(u())).toBe(true)
@@ -211,7 +211,7 @@ describe('graphics quality level (design.md §21, F9 / point 276 part B)', () =>
     u().setSubOneDprEnabled(true)
     expect(effectiveDprCap(u())).toBe(QUALITY_PRESETS.low.dprCap)
     // A native-ratio level is never touched by the flag.
-    u().setDetailLevel('medium')
+    u().setDetailLevel('high')
     u().setSubOneDprEnabled(false)
     expect(effectiveDprCap(u())).toBeNull()
   })
