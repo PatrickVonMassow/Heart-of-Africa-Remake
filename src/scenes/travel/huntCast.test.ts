@@ -56,4 +56,26 @@ describe('pickHuntSpecies', () => {
     pickHuntSpecies('south', null, g)
     expect(g.draws).toBe(2)
   })
+
+  it('falls back to the lion without a draw when no region predator holds the victim', () => {
+    const r = rolls()
+    expect(pickHuntSpecies('east', 'unicorn' as PreyKind, r)).toEqual({ predator: 'lion', prey: 'unicorn' })
+    expect(r.draws).toBe(0)
+  })
+
+  it('falls back to the east tables for a region it does not know', () => {
+    const unknown = 'atlantis' as RegionId
+    expect(pickHuntSpecies(unknown, null, rolls(0.5, 0))).toEqual(pickHuntSpecies('east', null, rolls(0.5, 0)))
+  })
+
+  it('keeps a cast that began east when the chase crosses into the central forest', () => {
+    // The scene picks once from the start region; the same rolls asked of the
+    // region the chase ran into would have cast a different, central pair.
+    const begun = pickHuntSpecies('east', null, rolls(0.5, 0))
+    expect(begun).toEqual({ predator: 'hyena', prey: 'wildebeest' })
+    expect(REGION_PREY.central).not.toContain(begun.prey)
+    const central = pickHuntSpecies('central', null, rolls(0.5, 0))
+    expect(REGION_PREY.central).toContain(central.prey)
+    expect(central).not.toEqual(begun)
+  })
 })
