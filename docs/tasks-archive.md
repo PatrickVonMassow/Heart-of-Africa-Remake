@@ -37604,3 +37604,40 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Effort medium applies to the cross lane only after the switch to 6.2 succeeds; if 6.2 fails, the user decides separately whether 6.1 goes to medium.
   Source: user request 17.11.2026 ("Ja, reihe ihn so ein."; findings carrier, session 6dd36831).
   Bundle: Chat & Tafel.
+
+- [x] 336. The whole crocodile staging family is fragile — rebuild it, not one case
+  AT A TIME (escalated 25.07.2026 after four consecutive runs each failed a DIFFERENT
+  crocodile check). History: the lunge case was found resting on an unpinned
+  assumption (its red turned out to be machine load, proven by a quiet-machine
+  repeat) and was pinned; the next run failed the TOO-LATE case, where the parent
+  arrived in time after all and the crocodile took it instead of the calf; that was
+  pinned too; the next run failed the VANISH case with gripped:false — the crocodile
+  never seized at all (diag: drink true, dist 0.1, crocLunge false). Fixing one case
+  per run is a treadmill: the family shares one `crocDrama` helper whose five modes
+  each depend on a different implicit precondition (a distance, an arrival time, a
+  drink state, a lunge that must fire), and every one of them is a separate way for
+  the staging to miss while the GAME behaves correctly.
+  DO INSTEAD — one rebuild of the helper: (a) every mode states its preconditions
+  EXPLICITLY and asserts them before measuring, so a miss reports "staging did not
+  reach its precondition" instead of accusing the product; (b) every mode pins its
+  outcome roll (rescue, lunge and too-late now do; vanish and sacrifice must too);
+  (c) the seizure itself is established deterministically — poll for the grip with a
+  generous sim budget and FAIL THE STAGING, not the behaviour, if it never happens;
+  (d) each mode gets its own tiny setup helper instead of one branching function, so
+  a change to one ending cannot shift another's timing (the point-311 lesson at test
+  level). VERIFIABLE: enrichments green on BOTH backends THREE times in a row on a
+  quiet machine — the flake-free bar the closing gate needs; a staging miss produces
+  a distinct, self-naming failure message; the five §19.16 endings still each assert
+  their real outcome (no masking). RELATED: this is the concrete first slice of point
+  200's flake work, and point 294's auto-classification would have labelled all four
+  reds "staging, not product" without a manual repeat each time.
+  ITS BRANCH IS GONE, DELIBERATELY (user decision 21.08.2026). `feat/336-croc-staging` carried
+  five commits from 04.08.2026 and stood 2,791 commits behind `main`; measured against its merge
+  base it touched TWO files and `main` had since changed BOTH of them, so reviving it meant
+  resolving the whole file surface it owns. The user ruled that where reviving a hopelessly stale
+  branch costs about what a rebuild costs, the branch goes — and this point demands a rebuild of
+  the `crocDrama` helper anyway, so the branch carried exactly what is to be replaced. Deleted
+  locally and on `origin` (tip 4c6d7eec, recorded here so nobody hunts for it). The same
+  measurement cleared every other standing branch: none of the rest reaches that ratio, so nothing
+  else was discarded.
+  QUEUED BEHIND THE RELEASE with the rest of the front block (user decision 21.08.2026).
