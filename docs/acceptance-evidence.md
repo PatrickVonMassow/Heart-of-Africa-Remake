@@ -1111,8 +1111,10 @@ Verifiable (`scripts/verify/settings.mjs`,
   delta, scaled by the debug-editable `floodFlowScale`), so rainless Cairo's
   October crest drowns a calf the dry season lets clamber out; a swollen
   current tears a crossing calf off its line on the debug-editable
-  `floodSweepChancePerSecond` (`floodSweepsCrossingCalf`) into the unchanged
-  drift, braked wade and drowning window. Pure-tested in
+  `floodSweepChancePerSecond` (`floodSweepsCrossingCalf`), carries it the
+  calibratable `floodSweepTearUnits` downstream past the parent's pulling
+  reach (`floodTearStep`), into the unchanged drift, braked wade and drowning
+  window. Pure-tested in
   `src/scenes/travel/wildlifeBehavior.test.ts` (crest vs. floor, the
   never-lower sweep over the year and both systems, the hazard); the flood
   changes no water mask, river width or village clearance
