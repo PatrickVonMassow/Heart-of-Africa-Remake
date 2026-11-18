@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { float, hash, instanceIndex, max, mix, mx_fractal_noise_float, positionLocal, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
+import { float, hash, instanceIndex, max, mix, mx_perlin_noise_float, positionLocal, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
 import { demElevation, demInlandWater } from '../../render/demElevation'
 import { balance, START_YEAR } from '../../config/balance'
 import { useGame } from '../../state/store'
@@ -150,10 +150,10 @@ export function Climate() {
     m.fog = false
     // Fine-grained dust streaks: a lower frequency turns the noise features
     // into ~20-unit patches that read as gray cloud blobs over the terrain.
-    const n = mx_fractal_noise_float(
-      vec3(positionWorld.xz.mul(0.13).add(time.mul(0.03)), time.mul(0.05)),
-      3,
-    )
+    // One Perlin octave (point 1542): the former `mx_fractal_noise_float(p, 3)`
+    // call passed no lacunarity/diminish, which TSL turns into 0, so octaves 2-3
+    // added exactly zero yet cost two more 3D noise evaluations per layer pixel.
+    const n = mx_perlin_noise_float(vec3(positionWorld.xz.mul(0.13).add(time.mul(0.03)), time.mul(0.05)))
       .mul(0.5)
       .add(0.5)
     // Square (Chebyshev) fade toward the quad edges, wide enough that no rotated-square
