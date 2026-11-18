@@ -1921,34 +1921,28 @@
       "why": "Kosmetischer Hüttenbefund aus der 1167-Prüfung, niedrige Kritikalität; hinten im Bündel Siedlungsgeometrie richtig",
       "origin": "machine",
       "place": "last"
+    },
+    "1541": {
+      "at": "2026-11-18T17:48:51.150Z",
+      "why": "User order 18.11.2026: ganz vorne in der Queue, performance orders in this sequence",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1542": {
+      "at": "2026-11-18T17:48:51.347Z",
+      "why": "User order 18.11.2026: ganz vorne in der Queue, performance orders in this sequence",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1543": {
+      "at": "2026-11-18T17:48:51.515Z",
+      "why": "User order 18.11.2026: ganz vorne in der Queue, performance orders in this sequence",
+      "origin": "user",
+      "place": "ahead"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      553,
-      596,
-      660,
-      708,
-      715,
-      719,
-      733,
-      735,
-      736,
-      738,
-      739,
-      746,
-      747,
-      750,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
-    "at": "2026-11-18T15:55:17.277Z",
+    "at": "2026-11-18T17:35:39.221Z",
     "points": [
       184,
       200,
@@ -2392,7 +2386,34 @@
       1537,
       1538,
       1539,
-      1540
+      1540,
+      1541,
+      1542,
+      1543
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      553,
+      596,
+      660,
+      708,
+      715,
+      719,
+      733,
+      735,
+      736,
+      738,
+      739,
+      746,
+      747,
+      750,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
