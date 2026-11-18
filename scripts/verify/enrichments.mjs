@@ -6344,8 +6344,9 @@ if (section('crocodile-ambush')) {
   //    staging miss only when the trigger's preconditions never held together
   //    and the crocodile never went for any animal.
   // Mirrors of Wildlife.tsx constants: PARENT_SACRIFICE_DIST, PARENT_TOO_LATE_DIST,
-  // and rescueSpeed()'s PREY_WALK_SPEED (the charge runs at walk × rescueBurst).
-  const CROC_REACH = { sacrifice: 1.3, tooLate: 3.2, walk: 3 }
+  // CAUGHT_DURATION (the nominal struggle window) and rescueSpeed()'s
+  // PREY_WALK_SPEED (the charge runs at walk × rescueBurst).
+  const CROC_REACH = { sacrifice: 1.3, tooLate: 3.2, walk: 3, window: 5 }
   const installCrocStage = () =>
     page.evaluate((REACH) => {
       const U = 10
@@ -6428,11 +6429,17 @@ if (section('crocodile-ambush')) {
             return false
           }
           const { p0, water, bank } = site
-          // Isolate: the natural crocodiles stand down for the scenario; the
-          // undo returns them (and any streamed in meanwhile) and retires the
-          // staged one.
+          // Isolate: the natural crocodiles stand down for the scenario. The
+          // undo removes ONLY what staging added (the staged crocodile) and
+          // re-adds what it took out (the naturals, and any purged mid-poll),
+          // keeping every other live member — one streamed in after the last
+          // isolation poll included.
           const naturals = H().crocodile.slice()
-          ctx.undo.push(() => { H().crocodile = naturals.concat(ctx.purged) })
+          ctx.undo.push(() => {
+            const live = H().crocodile.filter((k) => k !== ctx.croc)
+            for (const k of naturals.concat(ctx.purged)) if (!live.includes(k)) live.push(k)
+            H().crocodile = live
+          })
           H().crocodile.splice(0)
           // Chunk-LESS staging (point 126): the despawn filter keeps chunk-less
           // animals, so no ring change can filter the stage out mid-scenario.
@@ -6449,7 +6456,14 @@ if (section('crocodile-ambush')) {
           const parent = { x: p0.x - 200, z: p0.z, y: 0.2, rot: 0, scale: 1, phase: 0.4, chunk: undefined }
           const ul = Math.hypot(bank.x - water.x, bank.z - water.z) || 1
           Object.assign(ctx, { croc, calf, parent, water, bank, ux: (bank.x - water.x) / ul, uz: (bank.z - water.z) / ul })
-          ctx.undo.push(() => { H().zebra = H().zebra.filter((a) => a !== parent && a !== calf) })
+          // The undo also returns any OTHER adult's child link that came to point
+          // at the staged calf (an adoption) to its value at staging — unset for
+          // an adult that streamed in later.
+          const priorChild = new Map(H().zebra.map((a) => [a, a.child]))
+          ctx.undo.push(() => {
+            H().zebra = H().zebra.filter((a) => a !== parent && a !== calf)
+            for (const a of H().zebra) if (a.child === calf) a.child = priorChild.get(a)
+          })
           H().zebra.push(calf)
           // NO THIRD PARENT (27.07.2026): a childless adult within the adoption
           // radius would adopt the lone calf and resolve the drama itself.
@@ -6565,12 +6579,13 @@ if (section('crocodile-ambush')) {
         },
         // Link the parent `d` out on the LAND side of the bank (a parent parked
         // across the channel got relocated by the water sweep mid-charge) and
-        // assert what the fixture controls at the grip: placed, linked, and on
-        // the stated side of the charge window. `arrive`: the charge at
-        // walk × rescueBurst reaches the sacrifice reach inside the remaining
-        // struggle; `false`: it cannot reach even the too-late ring in it;
-        // `null`: no window side (a pinned parent).
-        // What the charge then does is the game's.
+        // assert what the fixture controls: placed, linked, and its distance on
+        // the stated side of the NOMINAL struggle window (CAUGHT_DURATION).
+        // `arrive`: the charge at walk × rescueBurst reaches the sacrifice reach
+        // inside it; `false`: it cannot reach even the too-late ring in it;
+        // `null`: no window side (a pinned parent). The LIVE struggle timer is
+        // the game's and only recorded: a grip that gives the calf too little
+        // time fails the real check, never the staging.
         linkParent(ctx, d, { arrive }) {
           const { calf, parent, out } = ctx
           out.foreignParent = H().zebra.some((z) => z !== parent && z.child === calf)
@@ -6580,11 +6595,12 @@ if (section('crocodile-ambush')) {
           calf.parent = parent
           H().zebra.push(parent)
           const left = calf.caught ?? 0
+          const win = REACH.window
           const v = charge()
           const need = arrive === null ? null : (arrive ? (d - REACH.sacrifice) / v : (d - REACH.tooLate) / v)
-          out.parentLink = { d, caughtLeft: +left.toFixed(2), charge: v, need: need === null ? null : +need.toFixed(2), arrive }
+          out.parentLink = { d, caughtLeft: +left.toFixed(2), window: win, charge: v, need: need === null ? null : +need.toFixed(2), arrive }
           const ok = H().zebra.includes(parent) && calf.parent === parent && Math.abs(dist(parent, calf) - d) < 0.01 &&
-            left > 0 && (arrive === null || (arrive ? need < left : need > left))
+            (arrive === null || (arrive ? need < win : need > win))
           if (!ok) out.stagingMiss = miss(ctx.mode, `the parent was not placed on the stated side of the charge window (${JSON.stringify(out.parentLink)})`)
           return ok
         },
@@ -6817,25 +6833,38 @@ if (section('crocodile-ambush')) {
           const sim = () => window.__wildlife.simTime()
           const grip0 = sim()
           // The deadline counts HELD time in the feeding grip (after the haul).
-          // Bracket the grip phase's start and the release by the polls around
-          // them, so the longest possible held time is known exactly.
+          // Both instants are bracketed by the polls around them: the grip
+          // phase began in (lastNotGripped, firstGripped], the release came in
+          // (lastHeld, releasedAt]. So the true held time lies in
+          // [minHeld, maxHeld] = [lastHeld − firstGripped, releasedAt − lastNotGripped],
+          // and the poll interval is inside that bracket, not a fudge factor.
           let lastNotGripped = grip0
-          let gripSeen = false
+          let firstGripped = null
+          let lastHeld = null
           let releasedAt = null
           const released = () => croc.lunge === undefined || croc.lunge.retreat === true
           await window.__pollSim(bc.dragSeconds + bc.gripSeconds + 20, () => {
             const now = sim()
             if (released()) { releasedAt = now; return true }
-            if (croc.lunge?.gripped === true) gripSeen = true
-            else lastNotGripped = now
+            if (croc.lunge?.gripped === true) {
+              if (firstGripped === null) firstGripped = now
+              lastHeld = now
+            } else lastNotGripped = now
             return false
           })
           out.releaseSim = +(sim() - grip0).toFixed(1)
-          // Released no EARLIER than the hard deadline: even the longest possible
-          // held time (release seen − last poll before the grip phase) must reach it.
-          const maxHeld = releasedAt === null ? null : +(releasedAt - lastNotGripped).toFixed(2)
-          out.deadline = { gripSeen, maxHeld, gripSeconds: bc.gripSeconds }
-          out.releasedAtDeadline = gripSeen && maxHeld !== null && maxHeld >= bc.gripSeconds
+          // LATE_TOLERANCE (stated, sim-s): the grip timer runs a touch slower
+          // than the sim clock (point 249 — a frame here and there where the
+          // croc update does not reach the increment), so the true held time may
+          // exceed gripSeconds by that slip; 1 s is generous for it and still
+          // far below a release that merely waited for the poll budget.
+          const LATE_TOLERANCE = 1
+          const minHeld = firstGripped === null || lastHeld === null ? null : +(lastHeld - firstGripped).toFixed(2)
+          const maxHeld = releasedAt === null || firstGripped === null ? null : +(releasedAt - lastNotGripped).toFixed(2)
+          out.deadline = { gripSeen: firstGripped !== null, minHeld, maxHeld, gripSeconds: bc.gripSeconds, lateTolerance: LATE_TOLERANCE }
+          out.deadline.early = maxHeld !== null && maxHeld < bc.gripSeconds // provably released before the deadline
+          out.deadline.late = minHeld !== null && minHeld > bc.gripSeconds + LATE_TOLERANCE // provably held past it
+          out.releasedAtDeadline = maxHeld !== null && minHeld !== null && !out.deadline.early && !out.deadline.late
           return out
         } finally { S.finish(ctx) }
       }),
