@@ -37834,3 +37834,34 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   User approval 18.11.2026: "Ja, so als drei Aufträge einreihen"
   Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
   Bundle: Steuerung & Performance.
+
+- [x] 1542. Find and fix the desert pixel cost and the shadows-off inversion
+  Observed: Part A: with every benchmark lever off at dpr 1, the desert still costs 18.1 ms GPU against 10.4 ms in the savanna, although it draws less than half the triangles — a per-pixel cost no lever covers. The suspect is the Sahara ground haze (travel-climate: 5 transparent layer meshes, 10 triangles, visible only in the desert phase; the savanna's 'east' region has haze 0). Desert is the slowest phase on every preset (medium 30.5 ms), so it decides playability.
+
+  Part B: turning shadows off RAISES the GPU median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and triangles fall — a costlier fallback path or a benchmark artefact. LOW runs without sun shadows, and any later shadow lever for medium is unreadable until this is understood.
+
+  Both parts are GPU investigations in the same benchmark phases with the same tooling (new sweep levers, measurement runs, one before/after picture check), so they share one branch, one review and one picture pass (user decision 18.11.2026 to bundle them).
+
+  Two parts, one branch.
+
+  PART A — desert pixel cost. Final state:
+  1. The benchmark sweep (src/systems/benchmark.ts BENCH_CONFIGS) has a `climate-haze-off` config that hides the travel ground-haze layers of src/scenes/travel/Climate.tsx, and the report's desert-standing row prices it. (If a measurement shows the desert's extra cost lies elsewhere, the point names the real cause with numbers and fixes that instead.)
+  2. The desert's always-on per-pixel cost is reduced on ALL presets without visible change: e.g. fewer/merged haze layers, cheaper noise, no full-screen overdraw for layers that cover only near ground, or a lower-cost evaluation — the author chooses by measurement.
+  3. Picture check desert-standing (world subject, Sahara, day 181) before/after on high: no noticeable difference in the dust veils (side-by-side in the point's evidence).
+
+  PART B — moved to point 1549 (main-session decision 18.11.2026 21:47, for veto: not reproducible on this host without timestamp queries). Original text: shadows-off inversion. Final state: switching sun shadows off never makes a frame more expensive. The cause of the measured inversion (benchmark `shadows-off` slower than `baseline`) is identified with numbers and fixed in the product code, or — if it is a benchmark artefact — fixed in the benchmark so the lever prices only the shadows.
+
+  Evidence required:
+  - Benchmark rows on WebGPU: desert-standing all-off GPU median moves clearly toward savanna-standing all-off (reference: 18.1 ms vs 10.4 ms at dpr 1 on the user's notebook); medium and high desert-standing GPU medians drop.
+  - Root cause of the inversion named in the point's evidence (which pass/material/path runs when shadowsEnabled is false); shadows-off GPU median <= baseline in savanna-standing, desert-standing and savanna-driving.
+  - Vitest for any changed config/logic; Playwright picture check (both backends if isBackendSensitivePath applies), including a shadowless frame if that rendering path changes.
+
+  Bounds the user named (verbatim):
+  - Queue position: FIRST in the work order, ahead of every open point (user order 18.11.2026: "ganz vorne in der Queue"). The three performance requests of 18.11.2026 run in this order: medium dpr cap, desert pixel cost + shadows-off inversion, driving CPU hitches. A request that does not converge is split (standing rule).
+  - Four eyes (user order 18.11.2026: "als Vier-Augen-Task"): convergent review by a cross-vendor model per scripts/cross-review.mjs before landing; record the reviewer in a Reviewed-By trailer.
+  - Reference measurement: user benchmark "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, AMD RDNA-3 notebook GPU, 1536x960 @ dpr 1.25, build c8f3995). The older "Lenovo GIP-Notebook.json" (without "(neu)") is void by user order and must not be used.
+  - Target for this notebook class: medium below 20 ms GPU median in savanna-standing, desert-standing and savanna-driving (> 50 fps). Low is already playable and must not get worse. High may gain speed only without noticeable loss of picture quality.
+  - All preset values stay in src/config/quality.ts (calibratable marked); no new runtime dependency.
+  User approval 18.11.2026: "Ja, so als drei Aufträge einreihen"
+  Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
+  Bundle: Steuerung & Performance.
