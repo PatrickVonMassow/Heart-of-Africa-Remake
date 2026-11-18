@@ -37641,3 +37641,45 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   measurement cleared every other standing branch: none of the rest reaches that ratio, so nothing
   else was discarded.
   QUEUED BEHIND THE RELEASE with the rest of the front block (user decision 21.08.2026).
+
+- [x] 364. The flood swells the drama current — and can take a calf at the crest
+  (user 26.07.2026; design.md §19.8 states the target). This point fixes a real
+  inconsistency first and adds a drama second; both land together.
+  THE BUG. `seasonFlowFactor(CURRENT_WEATHER.wetness, dryFlowFactor, wetFlowFactor)`
+  (Wildlife.tsx ~2373/2466/2485/3855) keys the drama current on LOCAL wetness alone.
+  The game's own flood model is deliberately REMOTE-fed (design.md §19.9, points
+  138/139): the Nile crests at Cairo in October where it never rains, and the
+  Okavango peaks in July inside Botswana's dry season. So today the water dramas run
+  at their dry-season gentlest exactly when the modelled river is at its most
+  dangerous. THE FIX: the effective factor is the HIGHER of the wetness-fed factor
+  and a flood-fed one — `nileFloodAt`/`okavangoFloodAt` (`src/systems/season.ts`)
+  scaled by a calibratable balance value (§21.2, debug-editable) — so the crest
+  swells the current, shortens the self-rescue and brakes the rescue burst through
+  the paths that already read the factor. Wire it in ONE place (a helper beside
+  `seasonFlowFactor`) so no call site can be forgotten.
+  THE DRAMA. At a swollen crest a crossing (point 362) can lose the calf to the
+  CURRENT rather than to a crocodile: it is carried downstream past its parent's
+  reach, and the parent turns downstream after it — a rescue on the same rolls and
+  the same brake, which the point-122 drowning window may end for BOTH. This is the
+  existing drowning drama reached by a new road, not a new death: reuse
+  `drownSeconds`/`drownFlowThreshold` unchanged.
+  WHAT MUST NOT CHANGE: the flood stays VERTICAL (§19.9) — no ground becomes water,
+  no §4.2 village clearance moves, the ribbon keeps its width. Only the force
+  changes. A test must pin that.
+  SEQUENCING: 362 lands first (this point's drama rides its crossing); the flow-factor
+  fix is independent and may land even if 362 slips.
+  ANCHORS: `src/systems/season.ts` (`nileFloodAt`, `okavangoFloodAt`),
+  `src/scenes/travel/wildlifeBehavior.ts` (`seasonFlowFactor`, `wadeSpeed`, the
+  drowning core ~1745), `Wildlife.tsx` at the four call sites above,
+  `src/config/balance.ts` `waterDrama`, `src/i18n/{de,en}.ts`.
+  VERIFIABLE: pure — at Cairo in October (wetness 0) the effective factor is
+  significantly above the dry floor and near the wet case, while a rainless
+  non-flood day stays at the floor; the Okavango does the same in July; the factor
+  is never LOWER than today's wetness-fed value anywhere (a pure sweep over the
+  year × both systems); the drowning window and threshold are untouched; the flood
+  changes no water mask, ribbon width or clearance (assert against the existing
+  world sweep). Live (`scripts/verify/wildlife.mjs`, ONE backend): at the October
+  crest a seeded crossing is visibly carried downstream and its rescue is slower
+  than the same seed in the dry season.
+  DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
+  acceptance-evidence line under §12.
