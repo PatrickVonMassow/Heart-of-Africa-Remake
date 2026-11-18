@@ -1753,7 +1753,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 18.11.2026, 08:03 · Quellen-Fingerprint: `f17ab2a0657c…`
+Zuletzt aktualisiert: Mittwoch, 18.11.2026, 08:58 · Quellen-Fingerprint: `514f52cb22de…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1873,8 +1873,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 110 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 185 Prozess-/Meta-TASKS-Punkte (davon 72 offen).
 
-<!-- RETRO-FINGERPRINT: f17ab2a0657cecc57bcfa18e75c809f50b16fa5ba16f91c5278ab862cdde56d3 -->
-<!-- RETRO-LAST-REFRESHED: 2026-11-18T07:03:18.072Z -->
+<!-- RETRO-FINGERPRINT: 514f52cb22ded69c1f934b0ce8f7858daa0f16ea415a2a531ef3c648f44262fa -->
+<!-- RETRO-LAST-REFRESHED: 2026-11-18T07:58:26.947Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
