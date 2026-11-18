@@ -6456,13 +6456,12 @@ if (section('crocodile-ambush')) {
           const parent = { x: p0.x - 200, z: p0.z, y: 0.2, rot: 0, scale: 1, phase: 0.4, chunk: undefined }
           const ul = Math.hypot(bank.x - water.x, bank.z - water.z) || 1
           Object.assign(ctx, { croc, calf, parent, water, bank, ux: (bank.x - water.x) / ul, uz: (bank.z - water.z) / ul })
-          // The undo also returns any OTHER adult's child link that came to point
-          // at the staged calf (an adoption) to its value at staging — unset for
-          // an adult that streamed in later.
-          const priorChild = new Map(H().zebra.map((a) => [a, a.child]))
+          // The undo also clears any OTHER adult's child link that points at the
+          // staged calf (an adoption) — only that link: any other current value
+          // is left as the game set it, never overwritten by a staging-time one.
           ctx.undo.push(() => {
             H().zebra = H().zebra.filter((a) => a !== parent && a !== calf)
-            for (const a of H().zebra) if (a.child === calf) a.child = priorChild.get(a)
+            for (const a of H().zebra) if (a.child === calf) a.child = undefined
           })
           H().zebra.push(calf)
           // NO THIRD PARENT (27.07.2026): a childless adult within the adoption
@@ -6838,10 +6837,14 @@ if (section('crocodile-ambush')) {
           // (lastHeld, releasedAt]. So the true held time lies in
           // [minHeld, maxHeld] = [lastHeld − firstGripped, releasedAt − lastNotGripped],
           // and the poll interval is inside that bracket, not a fudge factor.
+          // The start bracket FREEZES at the first gripped poll. A poll that sees
+          // the grip dropped before the release signal ends the observation as a
+          // failure (gripLost): the game let go outside the deadline path.
           let lastNotGripped = grip0
           let firstGripped = null
           let lastHeld = null
           let releasedAt = null
+          let gripLost = false
           const released = () => croc.lunge === undefined || croc.lunge.retreat === true
           await window.__pollSim(bc.dragSeconds + bc.gripSeconds + 20, () => {
             const now = sim()
@@ -6849,7 +6852,8 @@ if (section('crocodile-ambush')) {
             if (croc.lunge?.gripped === true) {
               if (firstGripped === null) firstGripped = now
               lastHeld = now
-            } else lastNotGripped = now
+            } else if (firstGripped === null) lastNotGripped = now
+            else { gripLost = true; return true }
             return false
           })
           out.releaseSim = +(sim() - grip0).toFixed(1)
@@ -6859,12 +6863,17 @@ if (section('crocodile-ambush')) {
           // exceed gripSeconds by that slip; 1 s is generous for it and still
           // far below a release that merely waited for the poll budget.
           const LATE_TOLERANCE = 1
-          const minHeld = firstGripped === null || lastHeld === null ? null : +(lastHeld - firstGripped).toFixed(2)
-          const maxHeld = releasedAt === null || firstGripped === null ? null : +(releasedAt - lastNotGripped).toFixed(2)
-          out.deadline = { gripSeen: firstGripped !== null, minHeld, maxHeld, gripSeconds: bc.gripSeconds, lateTolerance: LATE_TOLERANCE }
-          out.deadline.early = maxHeld !== null && maxHeld < bc.gripSeconds // provably released before the deadline
-          out.deadline.late = minHeld !== null && minHeld > bc.gripSeconds + LATE_TOLERANCE // provably held past it
-          out.releasedAtDeadline = maxHeld !== null && minHeld !== null && !out.deadline.early && !out.deadline.late
+          // Compared RAW; only the reported diagnostics are rounded.
+          const minHeld = firstGripped === null || lastHeld === null ? null : lastHeld - firstGripped
+          const maxHeld = releasedAt === null || firstGripped === null ? null : releasedAt - lastNotGripped
+          const r2 = (v) => (v === null ? null : +v.toFixed(2))
+          const early = maxHeld !== null && maxHeld < bc.gripSeconds // provably released before the deadline
+          const late = minHeld !== null && minHeld > bc.gripSeconds + LATE_TOLERANCE // provably held past it
+          out.deadline = {
+            gripSeen: firstGripped !== null, gripLost, minHeld: r2(minHeld), maxHeld: r2(maxHeld),
+            gripSeconds: bc.gripSeconds, lateTolerance: LATE_TOLERANCE, early, late,
+          }
+          out.releasedAtDeadline = !gripLost && releasedAt !== null && maxHeld !== null && minHeld !== null && !early && !late
           return out
         } finally { S.finish(ctx) }
       }),
