@@ -62,7 +62,11 @@ const FOG_PRESETS: Record<RegionId, FogPreset> = {
   south: { color: '#d5dde4', near: 105, far: 280, haze: 0, hazeColor: '#ffffff', hazeHeight: 1.5 },
 }
 
-const HAZE_LAYERS = 5
+// Three layers (point 1542, was five): each layer is a full-coverage
+// transparent pass, the desert's main pixel cost. The per-layer opacity is
+// raised by 5/3 so the stacked density matches the former five layers.
+const HAZE_LAYERS = 3
+const HAZE_LAYER_GAIN = 5 / HAZE_LAYERS
 
 // Rain field (design.md §19 seasons, point 120c): thin falling streaks in a
 // column around the traveller. MODULE singletons like the fog (point 96): a
@@ -172,7 +176,7 @@ export function Climate() {
       demInlandWater(lon, lat).oneMinus(),
     )
     m.colorNode = colorU
-    m.opacityNode = n.mul(n).mul(opacityU).mul(edgeFade).mul(overLand)
+    m.opacityNode = n.mul(n).mul(opacityU).mul(HAZE_LAYER_GAIN).mul(edgeFade).mul(overLand)
     return { material: m, opacityU, colorU }
   }, [])
 
@@ -368,7 +372,7 @@ export function Climate() {
         g.children.forEach((layer, i) => {
           layer.position.set(
             Math.sin(t * 0.03 + i * 2.1) * 14,
-            preset.hazeHeight + i * 0.5,
+            preset.hazeHeight + i * 1.0,
             Math.cos(t * 0.024 + i * 1.7) * 14,
           )
         })
