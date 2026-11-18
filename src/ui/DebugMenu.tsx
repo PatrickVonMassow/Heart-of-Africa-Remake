@@ -573,6 +573,11 @@ export function DebugMenu() {
         (v) => { balance.waterDrama.drownSeconds = Math.max(1, v); bump() }, 5),
       num(t.debug.wetFlowFactor, balance.waterDrama.wetFlowFactor,
         (v) => { balance.waterDrama.wetFlowFactor = Math.max(0, v); bump() }, 0.1),
+      // The flood swells the drama current (design.md §19.8, point 364).
+      num(t.debug.floodFlowScale, balance.waterDrama.floodFlowScale,
+        (v) => { balance.waterDrama.floodFlowScale = Math.max(0, v); bump() }, 0.1),
+      num(t.debug.floodSweepChance, balance.waterDrama.floodSweepChancePerSecond,
+        (v) => { balance.waterDrama.floodSweepChancePerSecond = Math.max(0, v); bump() }, 0.05),
       // The straggler (design.md §19.8, point 363).
       num(t.debug.stragglerLameChance, balance.straggler.lameChance,
         (v) => { balance.straggler.lameChance = Math.max(0, Math.min(1, v)); bump() }, 0.05),

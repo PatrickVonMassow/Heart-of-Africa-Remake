@@ -16,6 +16,15 @@
 // its herd: the calf limps after the herd's centroid at the lame pace, its
 // parent stays beside it, and once the window heals the limp ends and the pair
 // is back with the herd — never left detached.
+//
+// flood-crest-calf (point 364, design.md §19.8): the same seeded family
+// crossing on the rainless lower Nile, staged twice — at the October crest and
+// at spring low water. At the crest the swollen current tears the calf off its
+// crossing line (sweep chance forced high) and carries it downstream while the
+// parent turns downstream after it; in the dry season the calf is set in at the
+// same spot by hand (calm water never sweeps). The crest rescue is slower: the
+// parent's wade speed is braked by the flood-fed flow factor. One screenshot
+// holds the carried calf.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter, waitForSceneReady } from './frameSubject.mjs'
 import { sectionGate } from './sections.mjs'
@@ -729,6 +738,239 @@ if (section('straggler')) {
 // the same pose): it must be drawn in the walking pool (body + four legs), its legs must
 // have swung between the frames, and the same animal held still must settle
 // to neutral legs (the stride follows distance, not the clock).
+if (section('flood-crest-calf')) {
+  // The lower Nile below Cairo: hyper-arid (wetness 0 all year), so only the
+  // remote flood can swell its current. The drift is frozen as in point 362.
+  await page.evaluate(() => {
+    window.__floodPrevDrift = window.__balance.currentDrift
+    window.__balance.currentDrift = 0
+    window.__floodPrevDay = window.__game.getState().day
+    window.__game.getState().debugJumpTo(29.0, 31.25)
+    window.__ui.getState().setWheelZoomEnabled(true)
+    window.__ui.getState().setTravelZoom(1)
+  })
+  await page.waitForFunction(() => !!window.__wildlife?.restock, null, { timeout: 60000 })
+  // The crest frame is shot in motion (`settle: false`): on WebGL 2 it caught
+  // the bare haze before the jumped-to terrain streamed in, so the scene
+  // settles once here, as in the walk frames below.
+  const floodGround = await waitForSceneReady(page)
+  check('the lower Nile scene finished drawing before the crest frame (point 364)', !floodGround.timedOut, JSON.stringify(floodGround))
+  // In-game days of 1890: 5 October (the crest) and 15 April (low water).
+  const CREST_DAY = 277
+  const LOW_DAY = 104
+  const runScene = async (day, crest) => {
+    const staged = await page.evaluate(({ day, crest }) => {
+      window.__game.setState({ day })
+      const herds = window.__wildlife.herdsRef.current
+      const seed = window.__game.getState().seed
+      const U = 10
+      const ter = (x, z) => window.__terrainType(-z / U, x / U, seed)
+      const isLand = (x, z) => { const t = ter(x, z); return t !== 'water' && t !== 'ocean' }
+      const p0 = window.__game.getState().pos
+      const maxUnits = window.__balance.waterCross.maxUnits
+      // The first crossing line clear of the traveller's shy ring, searched in
+      // a fixed order so both runs stage the identical scene.
+      // The second run reuses the first run's line.
+      let line = window.__floodLine ?? null
+      if (!line) outer: for (let r = 12; r <= 45; r += 2) {
+        for (let k = 0; k < 24; k++) {
+          const ang = (k / 24) * Math.PI * 2
+          const ax = p0.x + Math.cos(ang) * r
+          const az = p0.z + Math.sin(ang) * r
+          if (!isLand(ax, az)) continue
+          for (let h = 0; h < 16; h++) {
+            const sx = Math.sin((h / 16) * Math.PI * 2)
+            const sz = Math.cos((h / 16) * Math.PI * 2)
+            if (!isLand(ax - sx * 4, az - sz * 4)) continue
+            let wetFrom = -1
+            let far = -1
+            for (let st = 0.5; st <= maxUnits + 2; st += 0.25) {
+              const t = ter(ax + sx * st, az + sz * st)
+              if (t === 'ocean') break
+              if (t === 'water') { if (wetFrom < 0) wetFrom = st }
+              else if (wetFrom >= 0) { far = st; break }
+            }
+            if (wetFrom < 0 || wetFrom > 1.5 || far < 0 || far - wetFrom < 3 || far - wetFrom > maxUnits) continue
+            line = { ax, az, sx, sz, wetFrom, far }
+            break outer
+          }
+        }
+      }
+      if (!line) return { staged: false, reason: 'no crossing line near the traveller' }
+      window.__floodLine = line
+      // Isolate the family (restored afterwards): no hunt, no crocodile, no adoption.
+      const backup = {}
+      for (const sp of Object.keys(herds)) backup[sp] = herds[sp].splice(0)
+      window.__floodBackup = backup
+      const lion = window.__lionHunt.state
+      lion.mode = 'idle'; lion.timer = 99999; lion.victim = null; lion.victimHunt = false
+      const wd = window.__balance.waterDrama
+      window.__floodPrev ??= { adoption: window.__balance.family.adoptionRadius, sweep: wd.floodSweepChancePerSecond }
+      window.__balance.family.adoptionRadius = 0.001
+      wd.floodSweepChancePerSecond = 1000 // the crest takes the calf at its first swollen frame
+      const at = (st, lat) => ({ x: line.ax + line.sx * st + line.sz * lat, z: line.az + line.sz * st - line.sx * lat })
+      const heading = Math.atan2(line.sx, line.sz)
+      const mk = (st, lat, extra = {}) => {
+        const p = at(st, lat)
+        return { x: p.x, z: p.z, y: window.__wildlife.groundAt(p.x, p.z), rot: heading, face: heading, scale: 1, phase: 0.2, chunk: undefined, ...extra }
+      }
+      const parent = mk(0, 0, { phase: 0.41 })
+      const calf = mk(-1, 0.6, { scale: 0.55, young: true, phase: 0.73 })
+      parent.child = calf
+      calf.parent = parent
+      herds.zebra.push(parent, calf)
+      const b = at(line.far + 0.5, 0)
+      const entered = window.__wildlife.startCrossing(parent, b.x, b.z)
+      // The downstream direction at the channel's middle (world units).
+      const mid = at((line.wetFrom + line.far) / 2, 0)
+      const ll = { lat: -mid.z / U, lon: mid.x / U }
+      const dd = window.__wildlife.waterDrama(ll.lat, ll.lon)
+      // World downstream: x = lon, z = -lat.
+      window.__floodScene = { parent, calf, line, t0: window.__simTime(), crest, swept: null, down: { x: dd.dirLon, z: -dd.dirLat } }
+      const rec = []
+      window.__floodRec = rec
+      window.__floodRecTimer = setInterval(() => {
+        const sc = window.__floodScene
+        if (!sc) return
+        const tc = ter(sc.calf.x, sc.calf.z)
+        // The dry run: calm water never sweeps, so the calf is set in by hand
+        // at the same point of its swim the crest took it.
+        // It goes in where the crest tore the crest run's calf to, so both
+        // parents wade the same way out to it.
+        if (!sc.crest && sc.swept === null && tc === 'water' && sc.calf.crossing !== undefined) {
+          sc.calf.crossing = undefined
+          sc.calf.fleeAt = undefined
+          if (window.__floodTorn) { sc.calf.x = window.__floodTorn.x; sc.calf.z = window.__floodTorn.z }
+        }
+        // The last spot on its crossing line: the crest's tear counts as carried.
+        if (sc.swept === null && sc.calf.crossing !== undefined) sc.pre = { x: sc.calf.x, z: sc.calf.z }
+        if (sc.swept === null && sc.calf.inWater !== undefined) {
+          const from = sc.crest && sc.pre ? sc.pre : { x: sc.calf.x, z: sc.calf.z }
+          sc.swept = { t: window.__simTime(), x: from.x, z: from.z, px: sc.parent.x, pz: sc.parent.z, flag: sc.calf.floodSwept === true }
+          if (sc.crest) window.__floodTorn = { x: sc.calf.x, z: sc.calf.z }
+        }
+        rec.push({
+          t: window.__simTime(),
+          calf: { x: sc.calf.x, z: sc.calf.z, inWater: sc.calf.inWater !== undefined, rescued: !!sc.calf.rescued, dead: !!sc.calf.dead },
+          parent: { x: sc.parent.x, z: sc.parent.z, wet: ter(sc.parent.x, sc.parent.z) === 'water', dead: !!sc.parent.dead },
+        })
+      }, 50)
+      return { staged: true, entered, day, effective: dd.effective, season: dd.season, threshold: dd.drownThreshold, width: +(line.far - line.wetFrom).toFixed(2) }
+    }, { day, crest })
+    if (!staged.staged) return { staged }
+    // The calf goes in (swept at the crest, set in by hand in the dry run).
+    const inWater = await page.evaluate(() => window.__pollSim(20, () => window.__floodScene.swept !== null))
+    let carriedShot = false
+    if (crest && inWater) {
+      // Shutter once the current has carried the calf a visible way downstream.
+      const carried = await page.evaluate(() => window.__pollSim(8, () => {
+        const sc = window.__floodScene
+        return Math.hypot(sc.calf.x - sc.swept.x, sc.calf.z - sc.swept.z) > 2.5 || sc.calf.dead || sc.calf.rescued
+      }))
+      const pos = await page.evaluate(() => ({ x: window.__floodScene.calf.x, z: window.__floodScene.calf.z, alive: !window.__floodScene.calf.dead }))
+      if (carried && pos.alive) {
+        await shot('364-flood-crest-calf', { world: { x: pos.x, z: pos.z }, label: 'a calf carried downstream by the October Nile crest, its parent wading after it', settle: false })
+        carriedShot = true
+      }
+    }
+    // Let the drama resolve: the drowning window plus the walk out.
+    const resolved = await page.evaluate(() => window.__pollSim(window.__balance.waterDrama.drownSeconds + 20, () => {
+      const sc = window.__floodScene
+      return (sc.calf.dead || sc.calf.inWater === undefined) && (sc.parent.dead || sc.parent.wadeTime === undefined || !sc.calf.inWater)
+    }))
+    const verdict = await page.evaluate(() => {
+      clearInterval(window.__floodRecTimer)
+      const sc = window.__floodScene
+      const rec = window.__floodRec
+      if (!sc.swept) return { swept: false }
+      const i0 = rec.findIndex((r) => r.t >= sc.swept.t)
+      const during = rec.slice(Math.max(0, i0)).filter((r) => r.calf.inWater && !r.calf.rescued && !r.calf.dead && !r.parent.dead)
+      const last = during.at(-1) ?? rec.at(-1)
+      const calfCarried = Math.hypot(last.calf.x - sc.swept.x, last.calf.z - sc.swept.z)
+      // The parent turns downstream: its displacement during the struggle
+      // points along the calf's drift (positive dot with the drift vector).
+      const driftX = last.calf.x - sc.swept.x
+      const driftZ = last.calf.z - sc.swept.z
+      const parentDX = last.parent.x - sc.swept.px
+      const parentDZ = last.parent.z - sc.swept.pz
+      // Both measured along the river's own downstream direction, so a
+      // reversed current cannot pass.
+      const dl = Math.hypot(sc.down.x, sc.down.z) || 1
+      const calfDown = (driftX * sc.down.x + driftZ * sc.down.z) / dl
+      const parentAlongDrift = (parentDX * sc.down.x + parentDZ * sc.down.z) / dl
+      // The parent's WADE speed: mean step speed while it is in the water and
+      // the calf still struggles unrescued.
+      let dist = 0
+      let time = 0
+      for (let i = 1; i < during.length; i++) {
+        if (!during[i].parent.wet || !during[i - 1].parent.wet) continue
+        const dt = during[i].t - during[i - 1].t
+        if (dt <= 0 || dt > 0.5) continue
+        dist += Math.hypot(during[i].parent.x - during[i - 1].parent.x, during[i].parent.z - during[i - 1].parent.z)
+        time += dt
+      }
+      const firstRescue = rec.find((r) => r.calf.rescued)
+      return {
+        swept: true,
+        flag: sc.swept.flag,
+        calfCarried: +calfCarried.toFixed(2),
+        calfDown: +calfDown.toFixed(2),
+        parentAlongDrift: +parentAlongDrift.toFixed(2),
+        wadeSpeed: time > 0.3 ? +(dist / time).toFixed(3) : null,
+        wadeSeconds: +time.toFixed(2),
+        rescueAfter: firstRescue ? +(firstRescue.t - sc.swept.t).toFixed(2) : null,
+        calfDead: !!sc.calf.dead,
+        parentDead: !!sc.parent.dead,
+        calfCause: sc.calf.deathCause ?? null,
+      }
+    })
+    // Clear the family before the next run; the natural animals come back.
+    await page.evaluate(() => {
+      const herds = window.__wildlife.herdsRef.current
+      const sc = window.__floodScene
+      const ours = new Set([sc.parent, sc.calf])
+      for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !ours.has(a))
+      for (const [sp, list] of Object.entries(window.__floodBackup ?? {})) herds[sp].push(...list)
+      window.__floodBackup = undefined
+      window.__floodScene = undefined
+    })
+    return { staged, inWater, verdict, carriedShot, resolved }
+  }
+
+  const crestRun = await runScene(CREST_DAY, true)
+  const dryRun = await runScene(LOW_DAY, false)
+  const both = JSON.stringify({ crest: crestRun, dry: dryRun })
+  check('the October crest swells the rainless Nile past the drown threshold; spring low water does not (point 364)',
+    crestRun.staged?.staged && dryRun.staged?.staged &&
+      crestRun.staged.effective >= crestRun.staged.threshold && dryRun.staged.effective < dryRun.staged.threshold &&
+      crestRun.staged.season > dryRun.staged.season, both)
+  check('at the crest the current tears the calf off its crossing line (point 364)',
+    crestRun.inWater && crestRun.verdict?.swept && crestRun.verdict.flag === true, both)
+  check('the swept calf is carried downstream, and its parent turns downstream after it (point 364)',
+    (crestRun.verdict?.calfDown ?? 0) > 2.5 && (crestRun.verdict?.parentAlongDrift ?? 0) > 0.5, both)
+  check('both dramas end: the calf pulled out or drowned, and low water never sweeps (point 364)',
+    crestRun.resolved === true && dryRun.resolved === true &&
+      (crestRun.verdict?.rescueAfter != null || crestRun.verdict?.calfDead === true) &&
+      dryRun.verdict?.flag === false, both)
+  check('the crest rescue is slower than the same seed in the dry season (point 364)',
+    crestRun.verdict?.wadeSpeed != null && dryRun.verdict?.wadeSpeed != null &&
+      crestRun.verdict.wadeSpeed < dryRun.verdict.wadeSpeed * 0.8, both)
+  check('one screenshot holds the carried calf (point 364)', crestRun.carriedShot === true, both)
+
+  await page.evaluate(() => {
+    const prev = window.__floodPrev
+    if (prev) {
+      window.__balance.family.adoptionRadius = prev.adoption
+      window.__balance.waterDrama.floodSweepChancePerSecond = prev.sweep
+    }
+    if (window.__floodPrevDrift !== undefined) window.__balance.currentDrift = window.__floodPrevDrift
+    if (window.__floodPrevDay !== undefined) window.__game.setState({ day: window.__floodPrevDay })
+    window.__floodPrev = undefined
+    window.__floodLine = undefined
+    window.__floodTorn = undefined
+  })
+}
+
 if (section('herd-walk')) {
   // Staging (owner picture review 17.11.2026): the first frames stood at the
   // falls in January — spray, rain and fog, the animal a speck. So: the open

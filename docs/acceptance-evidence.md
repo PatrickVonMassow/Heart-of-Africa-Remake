@@ -1104,6 +1104,26 @@ Verifiable (`scripts/verify/settings.mjs`,
   herd at the lame pace with the parent beside it, and heals back to the
   herd, with screenshot 363. OPEN: grazer herds do not roam, so the gap
   behind the herd arises from a post-hunt scatter and is staged in the check.
+  The flood swells the drama current (§19.8, point 364): every water-drama
+  site reads one factor, the higher of the wetness-fed and a flood-fed one
+  (`dramaFlowFactor`: `nileFloodAt` on the Nile channel via `riverIdAt`,
+  `okavangoFloodAt` within `balance.waterDrama.okavangoFloodRadiusDeg` of the
+  delta, scaled by the debug-editable `floodFlowScale`), so rainless Cairo's
+  October crest drowns a calf the dry season lets clamber out; a swollen
+  current tears a crossing calf off its line on the debug-editable
+  `floodSweepChancePerSecond` (`floodSweepsCrossingCalf`), carries it the
+  calibratable `floodSweepTearUnits` downstream past the parent's pulling
+  reach (`floodTearStep`), into the unchanged drift, braked wade and drowning
+  window. Pure-tested in
+  `src/scenes/travel/wildlifeBehavior.test.ts` (crest vs. floor, the
+  never-lower sweep over the year and both systems, the hazard); the flood
+  changes no water mask, river width or village clearance
+  (`src/world/world.test.ts`). Live in `scripts/verify/wildlife.mjs` (one
+  backend, section `flood-crest-calf`): the same seeded crossing at the crest
+  and at low water — swept and carried downstream with the parent following,
+  the crest wade slower — with screenshot 364. OPEN: the Okavango has no
+  authored river, so its flood swells no drift there yet (only swim pace and
+  wading near the delta's water).
 - Settlement rain touches the world (§19.13): roofs, walls, wood and cloth
   read the ground's one `GROUND_WET_U` (albedo × (1 − `balance.rain.
   fabricDarken`·wet), roughness × (1 − `fabricGloss`·wet); dry unchanged;

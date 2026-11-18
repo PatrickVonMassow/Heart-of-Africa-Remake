@@ -685,6 +685,8 @@ export const en: Strings = {
     springGlow: 'Spring welling glow',
     drownSeconds: 'Drowning: seconds in a strong current',
     wetFlowFactor: 'Drowning: wet-season current factor',
+    floodFlowScale: 'Drowning: flood crest current scale',
+    floodSweepChance: 'Drowning: flood sweeps a crossing calf (per second)',
     stragglerLameChance: 'Straggler: lameness chance after a survived hunt',
     stragglerSpeedFactor: 'Straggler: speed factor of the lame calf',
     stragglerHealSeconds: 'Straggler: seconds until the limp heals',

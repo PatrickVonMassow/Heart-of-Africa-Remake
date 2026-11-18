@@ -61,7 +61,7 @@ import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { renderedSheetY, waterSurfaceY } from './waterSurface'
 import { drinkWalkDistance, crocodileNeedsReanchor } from './waterEdgeRules'
 import { climateZoneAt, CURRENT_WEATHER } from '../../systems/season'
-import { dramaCurrent, lakeDistance, riverDistance } from '../../world/geoIndex'
+import { dramaCurrent, lakeDistance, riverDistance, riverIdAt } from '../../world/geoIndex'
 import { hashChunk, mulberry32 } from '../../world/noise'
 import { balance } from '../../config/balance'
 import {
@@ -146,7 +146,10 @@ import {
   type PreyKind,
   vicinitySeedBounds,
   vicinityAttemptSeed,
+  dramaFlowFactor,
   seasonFlowFactor,
+  floodSweepsCrossingCalf,
+  floodTearStep,
   shouldMourn,
   mournDeadline,
   elephantStepAllowed,
@@ -298,6 +301,23 @@ import {
   type DeathCause,
 } from './deathCause'
 
+/**
+ * The §19.8 drama flow factor at a point (point 364): local wetness OR the
+ * remote-fed flood there, whichever swells the current more
+ * (wildlifeBehavior.dramaFlowFactor). Every water-drama site reads this.
+ */
+function flowFactorAt(lat: number, lon: number): number {
+  return dramaFlowFactor(
+    CURRENT_WEATHER.wetness, riverIdAt(lat, lon), lat, lon, useGame.getState().day, START_YEAR, balance.waterDrama,
+  )
+}
+
+/** flowFactorAt for a world position. */
+function flowFactorAtWorld(x: number, z: number): number {
+  const l = worldToLatLon(x, z)
+  return flowFactorAt(l.lat, l.lon)
+}
+
 const CHUNK_SIZE = 24
 
 /** The actor of a death (point 326): the killer's position, 'here' for an
@@ -448,6 +468,9 @@ interface Animal extends HerdGaitCarrier {
   lionFed?: boolean
   /** Seconds this calf has been struggling in open water (design.md §19). */
   inWater?: number
+  /** Marker: the swollen current tore this calf off a family crossing
+   *  (point 364); cleared once it is back on the bank. Read by the live check. */
+  floodSwept?: boolean
   /** Seconds a rescuing parent has been wading in open water (point 122) —
    *  its own field, NOT inWater: that one carries calf-only pose/behaviour
    *  couplings (facing freeze, dodge exemption, render struggle). */
@@ -2345,8 +2368,9 @@ function Herds() {
         const bw = balance.waterDrama
         const wetness = CURRENT_WEATHER.wetness
         const strength = dramaCurrent(lat, lon).strength
-        const season = seasonFlowFactor(wetness, bw.dryFlowFactor, bw.wetFlowFactor)
-        return { wetness, strength, season, effective: strength * season, drownThreshold: bw.drownFlowThreshold }
+        const season = flowFactorAt(lat, lon)
+        const dir = dramaCurrent(lat, lon)
+        return { wetness, strength, season, effective: strength * season, drownThreshold: bw.drownFlowThreshold, dirLat: dir.dirLat, dirLon: dir.dirLon }
       } }
     return () => {
       delete w.__wildlife
@@ -2687,10 +2711,8 @@ function Herds() {
       const ll = worldToLatLon(nx, nz)
       return sampleTerrain(ll.lat, ll.lon, seed).type
     }
-    const swimPace = wadeSpeed(
-      CROSS_SWIM_SPEED,
-      seasonFlowFactor(CURRENT_WEATHER.wetness, balance.waterDrama.dryFlowFactor, balance.waterDrama.wetFlowFactor),
-    )
+    // Per position (point 364): the flood swells the Nile and the Okavango only.
+    const swimPaceAt = (x: number, z: number) => wadeSpeed(CROSS_SWIM_SPEED, flowFactorAtWorld(x, z))
     // Stamp the flight and set the body height at the new spot (returns the
     // terrain type there): chest-deep on the sheet in water, grounded on land.
     const settleFlight = (a: Animal, wader: boolean): string => {
@@ -2713,7 +2735,8 @@ function Herds() {
     const fleeMove = (a: Animal, heading: number, speed: number, wader = false) => {
       // An elder runs at its calibratable reduced pace (design.md §19.18).
       const aged = speed * elderSpeedFactor(a.elderly, balance.elderly.speedFactor)
-      const pace = wader ? aged : swimBrakedPace(aged, terrainTypeAtWorld(a.x, a.z), swimPace)
+      const fromType = terrainTypeAtWorld(a.x, a.z)
+      const pace = wader || fromType !== 'water' ? aged : swimBrakedPace(aged, fromType, swimPaceAt(a.x, a.z))
       const step = fleeWaterStep(a.x, a.z, heading, pace * dt, terrainTypeAtWorld, 0.8)
       a.x = step.x
       a.z = step.z
@@ -2728,7 +2751,7 @@ function Herds() {
       const fromType = terrainTypeAtWorld(a.x, a.z)
       const fromX = a.x
       const fromZ = a.z
-      const pace = swimBrakedPace(speed, fromType, swimPace)
+      const pace = fromType === 'water' ? swimBrakedPace(speed, fromType, swimPaceAt(a.x, a.z)) : speed
       const step = chaseFleeStep(a.x, a.z, hunterX, hunterZ, pace * dt, terrainTypeAtWorld, 0.8, a.fleeCorridor)
       a.fleeCorridor = step.corridor
       a.x = step.x
@@ -3009,7 +3032,7 @@ function Herds() {
           let gaveUp = false
           if (channelCroc) {
             const r = (a.channelReturn ??= { time: a.crossingSpent ?? 0, heading: a.face ?? a.rot })
-            const flow = seasonFlowFactor(CURRENT_WEATHER.wetness, balance.waterDrama.dryFlowFactor, balance.waterDrama.wetFlowFactor)
+            const flow = flowFactorAtWorld(a.x, a.z)
             const pace = channelReturnPace(terrainTypeAtWorld(a.x, a.z) === 'water', RESCUE_SPEED, flow)
             const st = channelReturnStep(a.x, a.z, r, calf.x, calf.z, dt, FACE_TURN, pace, balance.waterCross.resolveSeconds)
             r.time = st.time
@@ -3275,6 +3298,37 @@ function Herds() {
             const ter = sampleTerrain(ll.lat, ll.lon, seed)
             const inFlight =
               fleeing || (a.fleeAt !== undefined && simTimeRef.current - a.fleeAt < FLIGHT_GRACE_SECONDS)
+            // The crest takes the calf (point 364): a family crossing in a
+            // swollen current may lose the calf to the CURRENT — it leaves its
+            // line and becomes the ordinary struggling calf, so the drift, the
+            // parent's braked wade downstream and the point-122 drowning window
+            // run unchanged. Deterministic per frame, hashed like the lame roll.
+            if (ter.type === 'water' && a.crossing !== undefined && !inFlight && a.parent && !a.parent.dead) {
+              const bw = balance.waterDrama
+              const factor = flowFactorAt(ll.lat, ll.lon)
+              // Only the remote flood's crest sweeps; rain alone keeps the
+              // older drift and drowning roads.
+              const crest = factor > seasonFlowFactor(CURRENT_WEATHER.wetness, bw.dryFlowFactor, bw.wetFlowFactor)
+              const fl = dramaCurrent(ll.lat, ll.lon)
+              const h = Math.sin(a.phase * 77.7 + simTimeRef.current * 13.1 + a.x * 3.3) * 43758.5453
+              if (crest && floodSweepsCrossingCalf(
+                fl.strength * factor, bw.drownFlowThreshold, bw.floodSweepChancePerSecond, dt, h - Math.floor(h),
+              )) {
+                // Torn away at once: beside its parent the calf would be
+                // pulled out the same frame and the crest never seen. A tear
+                // the bank cuts short inside that reach is no sweep.
+                const torn = floodTearStep(a.x, a.z, fl.dirLon, -fl.dirLat, bw.floodSweepTearUnits, (wx, wz) => {
+                  const w = worldToLatLon(wx, wz)
+                  return sampleTerrain(w.lat, w.lon, seed).type === 'water'
+                })
+                if (Math.hypot(torn.x - a.parent.x, torn.z - a.parent.z) > RESCUE_REACH) {
+                  a.crossing = undefined
+                  a.floodSwept = true
+                  a.x = torn.x
+                  a.z = torn.z
+                }
+              }
+            }
             const cause =
               ter.type === 'water'
                 ? calfWaterCause({ inFlight, crossing: a.crossing !== undefined, chaseSwim: false })
@@ -3313,7 +3367,7 @@ function Herds() {
             // harder in the rains: the wet season swells the whole drama
             // current (point 122, calibratable in balance.waterDrama).
             const bw = balance.waterDrama
-            const season = seasonFlowFactor(CURRENT_WEATHER.wetness, bw.dryFlowFactor, bw.wetFlowFactor)
+            const season = flowFactorAt(ll.lat, ll.lon)
             // dramaCurrent, not riverFlow: the sea-mouth slack is the
             // traveller's rule (point 316) and killed the drowning on the last
             // reach of every sea-bound river (geoIndex.dramaCurrent).
@@ -3378,6 +3432,7 @@ function Herds() {
               a.inWater = undefined
               a.rescued = undefined
               a.rescueEntry = undefined
+              a.floodSwept = undefined
               a.y = Math.max(0.02, ter.height)
             }
           }
@@ -3406,10 +3461,9 @@ function Herds() {
               // rains' drowning drama survives the sprint. On the bank the
               // parent runs the full burst.
               const pll = worldToLatLon(a.x, a.z)
-              const bw0 = balance.waterDrama
               const wspd =
                 sampleTerrain(pll.lat, pll.lon, seed).type === 'water'
-                  ? wadeSpeed(RESCUE_SPEED, seasonFlowFactor(CURRENT_WEATHER.wetness, bw0.dryFlowFactor, bw0.wetFlowFactor))
+                  ? wadeSpeed(RESCUE_SPEED, flowFactorAt(pll.lat, pll.lon))
                   : RESCUE_SPEED
               a.x += (dx / d) * wspd * dt
               a.z += (dz / d) * wspd * dt
@@ -3428,7 +3482,7 @@ function Herds() {
               a.y = sheetAnchorY(waterSurfaceY(ll.lat, ll.lon, seed, ter.height), ter.height, 0.32)
               a.wadeTime = (a.wadeTime ?? 0) + dt
               const bw = balance.waterDrama
-              const season = seasonFlowFactor(CURRENT_WEATHER.wetness, bw.dryFlowFactor, bw.wetFlowFactor)
+              const season = flowFactorAt(ll.lat, ll.lon)
               const wadeFlow = dramaCurrent(ll.lat, ll.lon) // same drama current as the calf's
               const swept = fallsDistanceDeg(ll.lat, ll.lon) < FALLS_DEATH_RADIUS_DEG
               const drowned =
@@ -5714,7 +5768,7 @@ function Herds() {
             const cdx = c.tx - a.x
             const cdz = c.tz - a.z
             const cs = crossingStep(
-              a.x, a.z, c, dt, swimPace,
+              a.x, a.z, c, dt, swimPaceAt(a.x, a.z),
               (x, z) => { const t = terrainTypeAtWorld(x, z); return t !== 'water' && t !== 'ocean' },
               balance.waterCross.resolveSeconds, balance.waterCross.arriveUnits,
             )
@@ -6816,11 +6870,7 @@ function LionHunt() {
       return sampleTerrain(ll.lat, ll.lon, seed).type
     }
     // The seasonal swim pace, the same the herds' flights use (fleeMove).
-    const huntSwimPace = () =>
-      wadeSpeed(
-        CROSS_SWIM_SPEED,
-        seasonFlowFactor(CURRENT_WEATHER.wetness, balance.waterDrama.dryFlowFactor, balance.waterDrama.wetFlowFactor),
-      )
+    const huntSwimPace = (x: number, z: number) => wadeSpeed(CROSS_SWIM_SPEED, flowFactorAtWorld(x, z))
 
     if (s.mode === 'idle') {
       // Idle clears any stale calf-hunt bookkeeping so a re-armed hunt starts clean.
@@ -7122,7 +7172,7 @@ function LionHunt() {
         // swimming calf quarry does (design.md §19.5; the generic scripted prey
         // runs unbraked), so the water is a real escape: a close
         // pursuer still catches, a distant one sees it reach the far bank.
-        const lionPace = swimBrakedPace(huntPredatorSpeed(), terrainAt(s.lx, s.lz), huntSwimPace())
+        const lionPace = swimBrakedPace(huntPredatorSpeed(), terrainAt(s.lx, s.lz), huntSwimPace(s.lx, s.lz))
         s.lx += Math.sin(s.lionHeading) * lionPace * dt
         s.lz += Math.cos(s.lionHeading) * lionPace * dt
         // SWEPT catch (point 179): test the lion's MOVE SEGMENT against the prey,

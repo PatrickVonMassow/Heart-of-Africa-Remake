@@ -3,6 +3,11 @@ import { VULTURE_SHAPE, vultureLandedBox } from '../../render/vultureShape'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   channelDriftStep,
+  dramaFlowFactor,
+  floodFlowFactor,
+  floodSweepsCrossingCalf,
+  floodTearStep,
+  remoteFloodAt,
   drinkCatchment,
   mireFate,
   lamenessRoll,
@@ -181,9 +186,11 @@ import {
   REGION_PREY,
 } from './wildlifeBehavior'
 import { releaseBereavedParent } from './youngKill'
-import { balance } from '../../config/balance'
+import { balance, START_YEAR } from '../../config/balance'
 import { mulberry32 } from '../../world/noise'
-import { dramaCurrent, riverFlow } from '../../world/geoIndex'
+import { dramaCurrent, riverFlow, riverIdAt } from '../../world/geoIndex'
+import { nileFloodAt, okavangoFloodAt, wetnessAt } from '../../systems/season'
+import { NATURAL_SITES } from '../../world/data/landmarks'
 import { sampleTerrain } from '../../world/terrain'
 import { setupGeodata } from '../../test/geodata'
 
@@ -3151,7 +3158,12 @@ describe('the rains drown a calf on a sea-bound river (design.md §19.8, point 1
   /** One struggling calf, followed to its fate — the Wildlife.tsx drift loop. */
   function driftFate(wetness: number): { fate: string; seconds: number } {
     const bw = balance.waterDrama
-    const season = seasonFlowFactor(wetness, bw.dryFlowFactor, bw.wetFlowFactor)
+    return driftFateAt(seasonFlowFactor(wetness, bw.dryFlowFactor, bw.wetFlowFactor))
+  }
+
+  /** driftFate for a given effective season factor (the flood-fed one, point 364). */
+  function driftFateAt(season: number): { fate: string; seconds: number } {
+    const bw = balance.waterDrama
     let x = STAGED_LON * UNITS_PER_DEGREE
     let z = -STAGED_LAT * UNITS_PER_DEGREE
     let t = 0
@@ -3195,6 +3207,19 @@ describe('the rains drown a calf on a sea-bound river (design.md §19.8, point 1
     expect(dry.seconds).toBeCloseTo(STRUGGLE_SELF_RESCUE, 0)
   })
 
+  it('at the October crest the rainless Nile drowns the same calf (point 364)', () => {
+    // Cairo's sky stays dry in October; the flood alone swells the current.
+    const day = (Date.UTC(START_YEAR, 9, 15) - Date.UTC(START_YEAR, 0, 1)) / 86400000
+    const wetness = wetnessAt(day, STAGED_LAT, STAGED_LON, START_YEAR, 0)
+    expect(wetness).toBeLessThan(0.05)
+    const season = dramaFlowFactor(
+      wetness, riverIdAt(STAGED_LAT, STAGED_LON), STAGED_LAT, STAGED_LON, day, START_YEAR, balance.waterDrama,
+    )
+    const crest = driftFateAt(season)
+    expect(crest.fate).toBe('drowned')
+    expect(crest.seconds).toBeCloseTo(balance.waterDrama.drownSeconds, 1)
+  })
+
   it('the mouth slack stays intact for the traveller, and only for him', () => {
     // Where the drift ends (the Nile's last reach, inside the slack band) the
     // traveller's current is tamed while the drama current still runs full.
@@ -3204,6 +3229,123 @@ describe('the rains drown a calf on a sea-bound river (design.md §19.8, point 1
     expect(riverFlow(lat, lon).strength).toBeLessThan(dramaCurrent(lat, lon).strength)
     expect(riverFlow(lat, lon).strength * season).toBeLessThan(balance.waterDrama.drownFlowThreshold)
     expect(dramaCurrent(lat, lon).strength * season).toBeGreaterThanOrEqual(balance.waterDrama.drownFlowThreshold)
+  })
+})
+
+describe('the flood swells the drama current (design.md §19.8, point 364)', () => {
+  const bw = balance.waterDrama
+  /** In-game day for a calendar date in the start year. */
+  const on = (month: number, dom: number): number =>
+    (Date.UTC(START_YEAR, month - 1, dom) - Date.UTC(START_YEAR, 0, 1)) / 86400000
+  const CAIRO = { lat: 30.06, lon: 31.23 } // on the Nile's own channel
+  const OKAVANGO = NATURAL_SITES.find((n) => n.id === 'okavango') ?? { lat: -19.5, lon: 22.9 }
+  const factorAt = (lat: number, lon: number, day: number): number =>
+    dramaFlowFactor(wetnessAt(day, lat, lon, START_YEAR, 0), riverIdAt(lat, lon), lat, lon, day, START_YEAR, bw)
+
+  it('the Nile at Cairo is the Nile, and the flood reads it', () => {
+    expect(riverIdAt(CAIRO.lat, CAIRO.lon)).toBe('nile')
+    expect(remoteFloodAt('nile', CAIRO.lat, CAIRO.lon, on(10, 5), START_YEAR, bw.okavangoFloodRadiusDeg)).toBeGreaterThan(0.8)
+  })
+
+  it('Cairo in October (wetness 0): far above the dry floor, near the wet case', () => {
+    const day = on(10, 5)
+    expect(wetnessAt(day, CAIRO.lat, CAIRO.lon, START_YEAR, 0)).toBe(0)
+    const f = factorAt(CAIRO.lat, CAIRO.lon, day)
+    const span = bw.wetFlowFactor - bw.dryFlowFactor
+    expect(f).toBeGreaterThan(bw.dryFlowFactor + 0.75 * span)
+    expect(f).toBeLessThanOrEqual(bw.wetFlowFactor)
+    // A mid-channel flow now crosses the drown threshold — the self-rescue ends.
+    expect(1.0 * f).toBeGreaterThanOrEqual(bw.drownFlowThreshold)
+  })
+
+  it('Cairo at low water (a rainless non-flood day) stays at the dry floor', () => {
+    // The low-water stretch of the modelled cycle (spring, before the June rise).
+    const lowDays = Array.from({ length: 365 }, (_, d) => d).filter((d) => nileFloodAt(d, START_YEAR) === 0)
+    expect(lowDays.length).toBeGreaterThan(30)
+    for (const day of lowDays) expect(factorAt(CAIRO.lat, CAIRO.lon, day)).toBeCloseTo(bw.dryFlowFactor, 9)
+  })
+
+  it('the Okavango in July (Botswana\'s dry season) swells the same way, and lies low in its rains-off months', () => {
+    const july = on(7, 15)
+    const f = factorAt(OKAVANGO.lat, OKAVANGO.lon, july)
+    expect(okavangoFloodAt(july, START_YEAR)).toBeGreaterThan(0.8)
+    expect(f).toBeGreaterThan(bw.dryFlowFactor + 0.75 * (bw.wetFlowFactor - bw.dryFlowFactor))
+    // Low flood months: never below the wetness-fed factor, which there is the
+    // local rain alone.
+    const nov = on(11, 15)
+    expect(okavangoFloodAt(nov, START_YEAR)).toBeLessThan(0.1)
+  })
+
+  it('a river the flood does not feed keeps its wetness-fed factor', () => {
+    // The Congo near Kinshasa and the Niger at Ségou: no remote flood here.
+    for (const p of [{ lat: -4.3, lon: 15.3 }, { lat: 13.45, lon: -6.27 }]) {
+      expect(remoteFloodAt(riverIdAt(p.lat, p.lon), p.lat, p.lon, on(10, 5), START_YEAR, bw.okavangoFloodRadiusDeg)).toBe(0)
+      const day = on(10, 5)
+      const w = wetnessAt(day, p.lat, p.lon, START_YEAR, 0)
+      expect(factorAt(p.lat, p.lon, day)).toBeCloseTo(seasonFlowFactor(w, bw.dryFlowFactor, bw.wetFlowFactor), 9)
+    }
+  })
+
+  it('never LOWER than the wetness-fed factor: a sweep over the year x both systems', () => {
+    const spots = [CAIRO, { lat: 25.7, lon: 32.64 }, { lat: 17.6, lon: 33.6 }, OKAVANGO, { lat: -18.6, lon: 22.2 }]
+    for (const p of spots) {
+      for (let day = 0; day < 365; day += 3) {
+        const w = wetnessAt(day, p.lat, p.lon, START_YEAR, 0)
+        const wetOnly = seasonFlowFactor(w, bw.dryFlowFactor, bw.wetFlowFactor)
+        const f = factorAt(p.lat, p.lon, day)
+        expect(f, `${p.lat},${p.lon} day ${day}`).toBeGreaterThanOrEqual(wetOnly - 1e-12)
+        expect(f).toBeLessThanOrEqual(bw.wetFlowFactor + 1e-12)
+      }
+    }
+  })
+
+  it('floodFlowFactor is the max of both ramps and scales with the calibratable value', () => {
+    expect(floodFlowFactor(0, 0, 0.6, 1.8, 0.9)).toBeCloseTo(0.6, 9)
+    expect(floodFlowFactor(0, 1, 0.6, 1.8, 0.9)).toBeCloseTo(0.6 + 1.2 * 0.9, 9)
+    expect(floodFlowFactor(1, 0.2, 0.6, 1.8, 0.9)).toBeCloseTo(1.8, 9)
+    expect(floodFlowFactor(0, 1, 0.6, 1.8, 0)).toBeCloseTo(0.6, 9) // scale 0 switches the flood off
+  })
+
+  it('the crest can take a crossing calf only in a swollen current, frame-rate independent', () => {
+    // Calm water never sweeps, whatever the roll.
+    expect(floodSweepsCrossingCalf(0.79, 0.8, 10, 1, 0)).toBe(false)
+    expect(floodSweepsCrossingCalf(1.5, 0.8, 0, 1, 0)).toBe(false)
+    expect(floodSweepsCrossingCalf(1.5, 0.8, 0.25, 0, 0)).toBe(false)
+    // Swollen: the hazard 1 - exp(-rate*dt) decides.
+    const p = 1 - Math.exp(-0.25 / 30)
+    expect(floodSweepsCrossingCalf(1.5, 0.8, 0.25, 1 / 30, p * 0.99)).toBe(true)
+    expect(floodSweepsCrossingCalf(1.5, 0.8, 0.25, 1 / 30, p * 1.01)).toBe(false)
+    // Survival over 2 s is the same at 30 and 120 fps.
+    const survive = (fps: number) => Math.pow(1 - (1 - Math.exp(-0.25 / fps)), 2 * fps)
+    expect(survive(30)).toBeCloseTo(survive(120), 12)
+  })
+
+  it('the crest tears the swept calf downstream past the rescue reach, never onto land', () => {
+    const water = (x: number) => x < 10
+    const t = floodTearStep(0, 0, 2, 0, bw.floodSweepTearUnits, water)
+    expect(t.x).toBeCloseTo(bw.floodSweepTearUnits, 9)
+    expect(t.z).toBe(0)
+    expect(bw.floodSweepTearUnits).toBeGreaterThan(1.2 + 0.6) // reach plus the calf's swim offset
+    // The water ends at x = 10: the tear stops on the last wet step.
+    const short = floodTearStep(9, 0, 1, 0, 5, water)
+    expect(short.x).toBeLessThan(10)
+    expect(short.x).toBeGreaterThan(9.5)
+    expect(floodTearStep(3, 4, 0, 0, 5, water)).toEqual({ x: 3, z: 4 })
+  })
+
+  it('at the October crest the shipped balance can sweep a Nile crossing; at low water it cannot', () => {
+    const lat = 29
+    const lon = 31
+    const flow = dramaCurrent(lat, lon).strength
+    const crest = on(10, 5)
+    const low = Array.from({ length: 365 }, (_, d) => d).find((d) => nileFloodAt(d, START_YEAR) === 0) ?? 100
+    expect(floodSweepsCrossingCalf(flow * factorAt(lat, lon, crest), bw.drownFlowThreshold, bw.floodSweepChancePerSecond, 1, 0)).toBe(true)
+    expect(floodSweepsCrossingCalf(flow * factorAt(lat, lon, low), bw.drownFlowThreshold, bw.floodSweepChancePerSecond, 1, 0)).toBe(false)
+  })
+
+  it('the drowning window and threshold are untouched by the flood', () => {
+    expect(bw.drownSeconds).toBe(30)
+    expect(bw.drownFlowThreshold).toBe(0.8)
   })
 })
 
