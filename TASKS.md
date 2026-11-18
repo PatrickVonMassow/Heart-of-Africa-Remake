@@ -14440,3 +14440,13 @@ to land than a mechanism that needs a review.
   Also: where the near backdrop hill crosses the far hill, the overlap edge reads as a stair-stepped dark silhouette line (verification/1532-backdrop-backlit.png, x~720-850 y~400-465, both backends); geometry/silhouette aliasing, not rock noise. Measure and fix it in the same pass.
   Source: point 1532 side finding, user report 16.11.2026.
   Bundle: Siedlungsgeometrie.
+- [ ] 1537. Frame 130-crocodile-lunge shows no crocodile on either backend
+  Defect: after the crocodile staging rebuild (point 336) the enrichments frame `130-crocodile-lunge`
+  aims at calfAt, but at the shutter no crocodile is visible: canoe and two giraffes on the bank, no
+  lunge (verification/130-crocodile-lunge.png, WebGPU and WebGL 2, main 02e419de0, full enrichments
+  runs 18.11.2026). The frame passes while missing its declared subject (CLAUDE.md §7.2), so it
+  can back a false approval of the lunge staging.
+  Done when: the frame holds the lunging crocodile wholly on screen at the shutter on both backends
+  (closer camera or a shutter tied to the lunge pose), and a check asserts its projected presence.
+  Test: Playwright enrichments section crocodile-ambush on both backends, picture-checked.
+  Source: boundary picture check of point 336, 18.11.2026.

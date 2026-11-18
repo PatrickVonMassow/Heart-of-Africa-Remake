@@ -1921,6 +1921,12 @@
       "why": "Side finding split from 1532; it edits the same backdrop files, so it follows 1532 rather than running beside it",
       "origin": "machine",
       "place": "last"
+    },
+    "1537": {
+      "at": "2026-11-18T05:55:43.871Z",
+      "why": "Verify-staging defect from the 336 boundary check; no player impact, so last is right",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1948,7 +1954,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-18T03:29:15.262Z",
+    "at": "2026-11-18T05:55:43.879Z",
     "points": [
       184,
       200,
@@ -2393,7 +2399,8 @@
       1526,
       1528,
       1533,
-      1534
+      1534,
+      1537
     ]
   }
 }
