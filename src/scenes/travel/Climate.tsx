@@ -6,7 +6,8 @@
 // fog far, the ground soak).
 
 import { useEffect, useMemo, useRef } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useThree } from '@react-three/fiber'
+import { useTimedFrame } from '../../render/useTimedFrame'
 import * as THREE from 'three/webgpu'
 import { float, hash, instanceIndex, max, mix, mx_fractal_noise_float, positionLocal, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
 import { demElevation, demInlandWater } from '../../render/demElevation'
@@ -242,7 +243,7 @@ export function Climate() {
     }
   }, [scene, haze, rain])
 
-  useFrame(({ clock }, rawDt) => {
+  useTimedFrame('climate', ({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const k = Math.min(1, dt * 0.8) // slow blend across region borders
     const s = useGame.getState()

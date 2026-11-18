@@ -1,4 +1,5 @@
-// DEV frame/burst attribution probe (docs/perf-driving-hitches.md): the two
+// DEV frame/burst attribution probe (docs/perf-driving-hitches.md,
+// docs/perf-1543-driving-hitches.md): the two
 // movement-threshold bursts in the travel view — the terrain chunk builds on a
 // boundary crossing and the flora instance rebuild every 16 wu (amortised over
 // up to FLORA_FILL_MAX_FRAMES frames) — record their per-frame cost here, alongside a ring buffer of frame deltas. TravelScene
@@ -17,13 +18,31 @@ function makeStat(): BurstStat {
   return { count: 0, lastMs: 0, maxMs: 0, totalMs: 0 }
 }
 
-/** Ring-buffer capacity: ~10 s of frames at 60 fps. */
-export const FRAME_RING_CAP = 600
+/** Ring-buffer capacity: ~25 s of frames at 120 fps (a full bench sample). */
+export const FRAME_RING_CAP = 3000
+
+/** One rendered frame's CPU cost, measured exactly as the F8 benchmark does
+ *  (R3F's before-effect to after-effect: useFrame work plus render submission),
+ *  with the per-system bookings of src/systems/longFrame.ts inside it and the
+ *  JS-heap drop across it (> 0: a garbage collection ran in the frame). */
+export interface CpuFrame {
+  t: number
+  cpu: number
+  work: Record<string, number>
+  heapDropMb: number
+}
 
 export const PERF = {
   terrain: makeStat(),
   flora: makeStat(),
   frames: [] as Array<{ t: number; dt: number }>,
+  cpuFrames: [] as CpuFrame[],
+}
+
+/** Append one CPU frame to its bounded ring. */
+export function recordCpuFrame(frame: CpuFrame): void {
+  PERF.cpuFrames.push(frame)
+  if (PERF.cpuFrames.length > FRAME_RING_CAP) PERF.cpuFrames.shift()
 }
 
 /** Fold one burst's elapsed milliseconds into its stat. */
@@ -58,4 +77,5 @@ export function resetPerf(): void {
     s.totalMs = 0
   }
   PERF.frames.length = 0
+  PERF.cpuFrames.length = 0
 }

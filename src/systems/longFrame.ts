@@ -16,7 +16,19 @@
 import { balance } from '../config/balance'
 
 /** System names the travel view attributes long frames to. */
-export type FrameSystem = 'terrain-stream' | 'flora-stream' | 'shader-programs' | 'environment-rebake'
+export type FrameSystem =
+  | 'terrain-stream'
+  | 'flora-stream'
+  | 'shader-programs'
+  | 'environment-rebake'
+  // Per-frame CPU attribution of the driving hitches (docs/perf-1543-driving-hitches.md):
+  // the remaining travel-view frame callbacks, booked through `timedFrame`.
+  | 'render-submit'
+  | 'wildlife'
+  | 'travel-core'
+  | 'climate'
+  | 'rivers'
+  | 'scene-misc'
 
 export interface LongFrameReport {
   /** Length of the closed frame window (ms). */
@@ -29,6 +41,10 @@ export interface LongFrameReport {
 }
 
 const work: Partial<Record<FrameSystem, number>> = {}
+// The same bookings, drained once per rendered frame by the __perf probe
+// (`takeFrameLedger`), so a CPU frame — R3F's before-to-after effect window,
+// the number the F8 benchmark reports — carries its own per-system split.
+const ledger: Partial<Record<FrameSystem, number>> = {}
 let windowStart: number | null = null
 const lastWarned = new Map<string, number>()
 const WARN_RATE_MS = 2000
@@ -38,6 +54,28 @@ const LOG_CAP = 100
 export function markFrameWork(system: FrameSystem, ms: number): void {
   if (!import.meta.env.DEV) return
   work[system] = (work[system] ?? 0) + ms
+  ledger[system] = (ledger[system] ?? 0) + ms
+}
+
+/** Return and clear the per-system milliseconds booked since the last call. */
+export function takeFrameLedger(): Partial<Record<FrameSystem, number>> {
+  const out = { ...ledger }
+  for (const k of Object.keys(ledger) as FrameSystem[]) delete ledger[k]
+  return out
+}
+
+/** Wrap a frame callback so its main-thread time is booked as `system` work.
+ *  Production gets the callback itself — no wrapper, no clock reads. */
+export function timedFrame<A extends unknown[]>(system: FrameSystem, fn: (...args: A) => void): (...args: A) => void {
+  if (!import.meta.env.DEV) return fn
+  return (...args: A) => {
+    const t0 = performance.now()
+    try {
+      fn(...args)
+    } finally {
+      markFrameWork(system, performance.now() - t0)
+    }
+  }
 }
 
 /** The owner of a frame window: the system with the most instrumented work,

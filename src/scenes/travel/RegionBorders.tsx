@@ -3,7 +3,8 @@
 // with the region's name shown on its side of the line.
 
 import { useEffect, useMemo, useState } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useThree } from '@react-three/fiber'
+import { useTimedFrame } from '../../render/useTimedFrame'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
 import { useGame } from '../../state/store'
@@ -53,7 +54,7 @@ function BorderLabels({ seed }: { seed: number }) {
     [seed],
   )
   const [visible, setVisible] = useState<BorderLabel[]>([])
-  useFrame(() => {
+  useTimedFrame('scene-misc', () => {
     const pos = useGame.getState().pos
     const near = anchors.filter((a) => Math.hypot(a.x - pos.x, a.z - pos.z) < LABEL_VIEW_RADIUS)
     if (near.length !== visible.length || near.some((a, i) => a.key !== visible[i]?.key)) {

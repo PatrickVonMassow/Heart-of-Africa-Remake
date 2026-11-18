@@ -20,7 +20,8 @@
 // line or, with no room left, says nothing.
 
 import { useEffect, useRef, useState } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useThree } from '@react-three/fiber'
+import { useTimedFrame } from '../render/useTimedFrame'
 import { Html } from '@react-three/drei'
 import { balance } from '../config/balance'
 import { useStrings } from '../i18n'
@@ -97,7 +98,7 @@ function ActorLabelLayer() {
   // rather than a tenth of a second later.
   const since = useRef(REFRESH_SECONDS)
 
-  useFrame((_, dt) => {
+  useTimedFrame('scene-misc', (_, dt) => {
     since.current += dt
     if (since.current < REFRESH_SECONDS) return
     since.current = 0

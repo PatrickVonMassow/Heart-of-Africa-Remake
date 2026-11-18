@@ -9,7 +9,7 @@
 // Lakes are flat polygon surfaces just above their highest interior bed sample.
 
 import { useEffect, useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useTimedFrame } from '../../render/useTimedFrame'
 import * as THREE from 'three/webgpu'
 import {
   attribute,
@@ -486,7 +486,7 @@ function Spring({ spring, seed }: { spring: SpringDef; seed: number }) {
     }
   }, [body, spring])
   const crest = body.peakY - spring.y
-  useFrame(({ clock }) => {
+  useTimedFrame('rivers', ({ clock }) => {
     SPRING_BUBBLE_AMP_U.value = balance.spring.bubbleAmplitude
     SPRING_GLOW_U.value = balance.spring.glow
     const t = clock.elapsedTime
@@ -545,7 +545,7 @@ export function RiversAndLakes() {
 
   // Mirror the CPU flood rise into the ribbon uniform each frame (point 138):
   // one source (waterSurface.NILE_FLOOD), two readers, no drift.
-  useFrame(() => {
+  useTimedFrame('rivers', () => {
     NILE_FLOOD_U.value = NILE_FLOOD.rise
   })
   const { geometry, falls, springs, report } = bundle.rivers

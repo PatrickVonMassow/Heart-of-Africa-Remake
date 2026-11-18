@@ -13,7 +13,11 @@
 //   BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-bench.mjs
 // Env: BENCH_SAMPLE_MS, BENCH_SETTLE_MS, BENCH_CONFIGS (comma list, default all),
 //      BENCH_POINTS (comma list of point names), BENCH_LABEL (tag for the output),
-//      BENCH_SPIKE_MS (hitch threshold, default 25), BENCH_DPR (device pixel ratio, default 1).
+//      BENCH_SPIKE_MS (hitch threshold, default 25), BENCH_DPR (device pixel ratio, default 1),
+//      BENCH_PRESET (low|medium|high: graphics level; default keeps the store's level).
+// Each row also reports the CPU frame time exactly as the F8 benchmark measures it
+// (window.__perf.cpuFrames: R3F before-to-after effect) and attributes the CPU
+// spikes (> 2x CPU median) to the systems booked in them (src/systems/longFrame.ts).
 import { chromium } from 'playwright'
 
 // VSYNC DISABLED so the measured frame time is the TRUE per-frame cost, not a
@@ -152,6 +156,47 @@ function spikeReport(frames, spikeMs) {
   }
 }
 
+/** CPU spike attribution: a frame whose CPU time exceeds 2x the CPU median is a
+ *  spike; it is owned by the system with the most booked ms in it (render-submit
+ *  net of the shader-program builds nested inside it), by 'gc' when no system
+ *  owns 30 % of it and the heap dropped, else by 'unattributed'. */
+function cpuSpikeReport(cpuFrames) {
+  const cpu = stats(cpuFrames.map((f) => f.cpu))
+  const line = 2 * cpu.median
+  const spikes = cpuFrames.filter((f) => f.cpu > line)
+  const spikeMs = spikes.reduce((a, f) => a + f.cpu, 0)
+  const systems = {}
+  const bump = (name, ms, owned) => {
+    const e = (systems[name] ??= { owned: 0, maxMs: 0, totalMs: 0 })
+    if (owned) e.owned += 1
+    if (ms > e.maxMs) e.maxMs = ms
+    e.totalMs += ms
+  }
+  for (const f of spikes) {
+    const work = { ...f.work }
+    if (work['render-submit'] !== undefined && work['shader-programs'] !== undefined)
+      work['render-submit'] = Math.max(0, work['render-submit'] - work['shader-programs'])
+    let owner = null
+    let best = 0
+    for (const [k, v] of Object.entries(work)) if (v > best) [owner, best] = [k, v]
+    const booked = Object.values(work).reduce((a, v) => a + v, 0)
+    if (owner === null || best < 0.3 * f.cpu) owner = f.heapDropMb > 0 ? 'gc' : 'unattributed'
+    for (const [k, v] of Object.entries(work)) bump(k, v, k === owner)
+    bump('unbooked', Math.max(0, f.cpu - booked), false)
+    if (owner === 'gc' || owner === 'unattributed') bump(owner, 0, true)
+    if (f.heapDropMb > 0) bump('gc-in-frame', f.heapDropMb, false)
+  }
+  const table = Object.entries(systems)
+    .map(([name, e]) => ({
+      name,
+      owned: e.owned,
+      maxMs: +e.maxMs.toFixed(1),
+      share: spikeMs > 0 ? +(e.totalMs / spikeMs).toFixed(2) : 0,
+    }))
+    .sort((a, b) => b.owned - a.owned || b.share - a.share)
+  return { median: +cpu.median.toFixed(2), p95: +cpu.p95.toFixed(2), max: +cpu.max.toFixed(1), n: cpu.n, spikes: spikes.length, table }
+}
+
 async function measure(page, point) {
   await point.setup(page)
   await page.waitForTimeout(SETTLE_MS)
@@ -165,9 +210,11 @@ async function measure(page, point) {
     const pick = (s) => (s ? { n: s.count, max: +s.maxMs.toFixed(1), total: +s.totalMs.toFixed(1) } : null)
     return { terrain: pick(p.terrain), flora: pick(p.flora) }
   })
+  const cpuFrames = await page.evaluate(() => (window.__perf?.cpuFrames ? window.__perf.cpuFrames().slice(3) : []))
   if (point.teardown) await point.teardown(page)
   const st = stats(frames.map((f) => f.dt))
-  return { fps: 1000 / st.median, ...st, burst, spike: spikeReport(frames, SPIKE_MS) }
+  const cpu = cpuFrames.length ? cpuSpikeReport(cpuFrames) : null
+  return { fps: 1000 / st.median, ...st, burst, spike: spikeReport(frames, SPIKE_MS), cpu }
 }
 
 async function main() {
@@ -201,6 +248,10 @@ async function main() {
     window.__game.getState().leavePlace()
   })
   await page.waitForFunction(() => window.__rivers, null, { timeout: 60000 })
+  const preset = process.env.BENCH_PRESET
+  if (preset) await page.evaluate((p) => window.__ui.getState().setDetailLevel(p), preset)
+  const gotBackend = await page.evaluate(() => (window.__renderer?.backend?.isWebGPUBackend ? 'webgpu' : 'webgl2'))
+  console.log(`# preset ${preset ?? '(store default)'}, renderer backend ${gotBackend}`)
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
   await page.waitForTimeout(1500)
 
@@ -223,9 +274,16 @@ async function main() {
           `      spikes>=${SPIKE_MS}ms: ${r.spike.spikes} (streaming-attributed ${r.spike.attributed}, ` +
           `burst share ${r.spike.burstShare}, worst ${r.spike.worst}ms)  ${bs}`,
       )
+      if (r.cpu) {
+        console.log(
+          `      CPU median=${r.cpu.median}ms p95=${r.cpu.p95} (${(r.cpu.p95 / r.cpu.median).toFixed(2)}x) max=${r.cpu.max} n=${r.cpu.n} spikes>2x=${r.cpu.spikes}`,
+        )
+        for (const e of r.cpu.table)
+          console.log(`        ${e.name.padEnd(18)} owned=${String(e.owned).padStart(3)} max=${String(e.maxMs).padStart(6)}ms share=${e.share}`)
+      }
     }
   }
-  console.log(`# console errors: ${errors.length}`)
+  console.log(`# console errors: ${errors.length}${errors.length ? ` (first: ${errors[0].slice(0, 200)})` : ''}`)
   console.log('# JSON ' + JSON.stringify(rows))
   await browser.close()
 }

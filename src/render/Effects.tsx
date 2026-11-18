@@ -20,7 +20,8 @@
 
 import { POST_RENDER_PRIORITY } from './cascadeSkip'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useThree } from '@react-three/fiber'
+import { useTimedFrame } from './useTimedFrame'
 import * as THREE from 'three/webgpu'
 import { rainAdaptedExposure, rainSunDampNow } from '../scenes/place/rainLight'
 import { float, max, mix, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
@@ -299,7 +300,7 @@ export function Effects() {
   }, [post])
 
   // Priority render: replaces R3F's default render with the post pipeline.
-  useFrame((_, delta) => {
+  useTimedFrame('render-submit', (_, delta) => {
     post.render(delta)
   }, POST_RENDER_PRIORITY)
 

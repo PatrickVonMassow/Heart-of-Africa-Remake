@@ -17,7 +17,7 @@
 // traveller's movement.
 
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useTimedFrame } from '../../render/useTimedFrame'
 import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
 import { effectiveFaunaBodySegments, effectiveGrassFireFlames, effectiveHerdGait, effectiveGrassFireSmoke, effectiveOffscreenBehaviourInterval, useUi } from '../../state/ui'
@@ -2684,7 +2684,7 @@ function Herds() {
     return () => setWildlifeDumpSource(null)
   }, [])
 
-  useFrame(({ clock, camera }, delta) => {
+  useTimedFrame('wildlife', ({ clock, camera }, delta) => {
     const dt = Math.min(delta, 0.1)
     // Accumulate the SIM clock (point 177): drama verifications budget in these
     // sim-seconds so they stay deterministic when headless load drops the fps.
@@ -6859,7 +6859,7 @@ function LionHunt() {
 
   const FEED_DURATION = 20
 
-  useFrame(({ clock }, rawDt) => {
+  useTimedFrame('wildlife', ({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const t = clock.elapsedTime
     const s = state.current
@@ -7464,7 +7464,7 @@ function Vultures() {
     })
   }
 
-  useFrame(({ clock }, rawDt) => {
+  useTimedFrame('wildlife', ({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const s = useGame.getState()
     const t = clock.elapsedTime

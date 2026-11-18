@@ -2,7 +2,7 @@
 // clouds. TSL keeps it renderer-agnostic (WebGPU / WebGL 2, CLAUDE.md §3).
 
 import { useLayoutEffect, useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useTimedFrame } from './useTimedFrame'
 import * as THREE from 'three/webgpu'
 import {
   clamp,
@@ -162,7 +162,7 @@ export function SkyDome({
   }, [preset, sunU, discGainU])
 
   // Keep the dome glued to the camera so it behaves like a far sky.
-  useFrame(({ camera }) => {
+  useTimedFrame('scene-misc', ({ camera }) => {
     ref.current?.position.copy(camera.position)
   })
 

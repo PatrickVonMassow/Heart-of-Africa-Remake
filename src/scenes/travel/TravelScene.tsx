@@ -6,7 +6,7 @@ import { registerRangedCaster, updateRangedCasters } from '../../render/shadowCa
 import { CASCADE_SELECT_PRIORITY, updateCascadeSkip } from '../../render/cascadeSkip'
 import { monumentGlyph, villageGlyph, type GlyphPart } from '../../render/placeMarkerGlyphs'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { addAfterEffect, addEffect, useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { TalusSocket } from './TalusSocket'
 import { FieldSphinx } from '../../render/sphinxProbe'
@@ -135,8 +135,9 @@ import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurche
   buildWetland,
 } from '../../render/landmarks'
 import { mulberry32, hashChunk } from '../../world/noise'
-import { PERF, maxFrameMs, recordBurst, recordFrame, resetPerf } from './perfProbe'
-import { closeFrameWindow, markFrameWork, resetFrameWindow } from '../../systems/longFrame'
+import { PERF, maxFrameMs, recordBurst, recordCpuFrame, recordFrame, resetPerf } from './perfProbe'
+import { closeFrameWindow, markFrameWork, resetFrameWindow, takeFrameLedger } from '../../systems/longFrame'
+import { useTimedFrame } from '../../render/useTimedFrame'
 import { Climate } from './Climate'
 import { FRAME_EDGE_MARGIN, pointOnScreen, setFrameVisibilityTest } from './frameVisibility'
 import { FLORA_SPECIES, type FloraSpecies } from './floraSpecies'
@@ -828,7 +829,7 @@ function TerrainChunks() {
 function WaterPlane() {
   const ref = useRef<THREE.Mesh>(null)
   const { material, offset, calm, planeScale } = useMemo(() => (waterHandleCache ??= createWaterMaterial()), [])
-  useFrame(() => {
+  useTimedFrame('scene-misc', () => {
     const pos = useGame.getState().pos
     const zoom = useUi.getState().travelZoom
     if (ref.current) {
@@ -1064,12 +1065,12 @@ function Sun() {
   // Only the cascades the view can sample re-render (point 1524), selected on
   // THIS frame's camera: after the follow (priority 0), before the post render.
   // The travel ground never lies below sea level, the plane measured against.
-  useFrame(({ camera }) => {
+  useTimedFrame('scene-misc', ({ camera }) => {
     const cascadesInUse = updateCascadeSkip(csm, camera as THREE.PerspectiveCamera, 0)
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__cascadesInUse = cascadesInUse
   }, CASCADE_SELECT_PRIORITY)
 
-  useFrame(() => {
+  useTimedFrame('scene-misc', () => {
     const pos = useGame.getState().pos
     updateRangedCasters(pos.x, pos.z, useUi.getState().travelZoom, sunDir[1] / Math.max(1e-6, Math.hypot(sunDir[0], sunDir[2])))
     light.position.set(pos.x + sunDir[0] * 130, sunDir[1] * 130, pos.z + sunDir[2] * 130)
@@ -1913,7 +1914,7 @@ const CAPTURE_APPROACH_RING = 4 // world units beyond the enter radius
 function PanoramaCaptureTrigger() {
   const gl = useThree((s) => s.gl)
   const scene = useThree((s) => s.scene)
-  useFrame(() => {
+  useTimedFrame('scene-misc', () => {
     const s = useGame.getState()
     if (s.placeId) return
     const ring = balance.placeEnterRadius + CAPTURE_APPROACH_RING
@@ -2434,7 +2435,7 @@ function NaturalSites() {
   // is not (the bare-branches shards, point 144).
   const deltaWaterRef = useRef<THREE.Mesh>(null)
   const deltaFlood = useRef(0)
-  useFrame(() => {
+  useTimedFrame('scene-misc', () => {
     const m = deltaWaterRef.current
     if (!m) return
     const target = okavangoFloodAt(useGame.getState().day, START_YEAR)
@@ -2565,7 +2566,7 @@ function Player() {
     }
   }, [])
 
-  useFrame((_, dt) => {
+  useTimedFrame('travel-core', (_, dt) => {
     const s = useGame.getState()
     if (!ref.current) return
     const ll = worldToLatLon(s.pos.x, s.pos.z)
@@ -2971,15 +2972,32 @@ export function TravelScene() {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
+    // Per-frame CPU split (docs/perf-1543-driving-hitches.md): the same
+    // before/after window the F8 benchmark measures, with the booked systems.
+    const heap = () => (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0
+    let cpuStart = 0
+    let heapStart = 0
+    const offBefore = addEffect(() => {
+      takeFrameLedger() // work booked between frames belongs to no frame
+      cpuStart = performance.now()
+      heapStart = heap()
+    })
+    const offAfter = addAfterEffect(() => {
+      const now = performance.now()
+      recordCpuFrame({ t: now, cpu: now - cpuStart, work: takeFrameLedger(), heapDropMb: Math.max(0, heapStart - heap()) / 1e6 })
+    })
     w.__perf = {
       terrain: PERF.terrain,
       flora: PERF.flora,
       frames: () => PERF.frames.slice(),
+      cpuFrames: () => PERF.cpuFrames.slice(),
       maxFrameMs: (sinceT?: number) => maxFrameMs(sinceT ?? 0),
       now: () => performance.now(),
       reset: resetPerf,
     }
     return () => {
+      offBefore()
+      offAfter()
       delete w.__perf
       resetFrameWindow()
     }
@@ -3056,7 +3074,7 @@ export function TravelScene() {
     return off
   }, [])
 
-  useFrame((_, rawDt) => {
+  useTimedFrame('travel-core', (_, rawDt) => {
     if (import.meta.env.DEV) {
       const now = performance.now()
       recordFrame(now, rawDt * 1000)
