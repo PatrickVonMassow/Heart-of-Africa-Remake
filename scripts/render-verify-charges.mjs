@@ -301,26 +301,6 @@ export const RED_CHARGES = [
       + 'out (333c0c66d) — a stale expectation. The charge dies with 1217.',
   },
   {
-    point: 1078,
-    suite: 'world',
-    kind: 'check',
-    match: /(the use key at the talus foot fits the impression|a second press at the spent socket answers like a wrong place)/i,
-    // NO detailMatch: a SUSPECT record carries its first attempt's reds by NAME
-    // only, and both records this entry has to own are of that shape — the
-    // 07:38:23 run's own reds and the 07:40:15 run that passed only on the retry.
-    why:
-      'FILED AS 1078 ON 08.09.2026 OUT OF THE RUN THAT PRINTED IT. In webgl/world at '
-      + '07:38:23.395Z both presses at the talus foot answered noFit — `said ["...noFit"], '
-      + 'spent [], mode travel, dialog null` — and the retry then passed 10/0; the record at '
-      + '07:40:15.798Z is the same pair as a SUSPECT retry-pass. The press reached the game and '
-      + 'the game answered, so what failed is the REACH between the jumped position and '
-      + '`bandiagara-talus`, not the key, the toast expiry (the probe records the toast as it is '
-      + 'set), the settle time (600 ms for the passing miss against 2500 ms plus a screenshot '
-      + 'here) or the camera (the frame between the two presses passed its own shutter). 1078 '
-      + 'owns deciding FIRST whether the player path or only the harness jump is hit, and the '
-      + 'charge dies with it.',
-  },
-  {
     point: 1062,
     suite: 'gamepad',
     kind: 'check',
