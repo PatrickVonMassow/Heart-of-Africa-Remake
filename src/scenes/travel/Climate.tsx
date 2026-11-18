@@ -64,7 +64,9 @@ const FOG_PRESETS: Record<RegionId, FogPreset> = {
 
 // Three layers (point 1542, was five): each layer is a full-coverage
 // transparent pass, the desert's main pixel cost. The per-layer opacity is
-// raised by 5/3 so the stacked density matches the former five layers.
+// raised by 5/3 so the stacked density matches the former five layers to
+// first order (equal-alpha stacking: 37.6 % vs 38.6 % at the desert's 0.09,
+// 47.2 % vs 48.8 % at the central mist's 0.12).
 const HAZE_LAYERS = 3
 const HAZE_LAYER_GAIN = 5 / HAZE_LAYERS
 
