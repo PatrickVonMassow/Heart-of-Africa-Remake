@@ -92,7 +92,7 @@ put it is the mistake this line exists to stop.
   2. The desert's always-on per-pixel cost is reduced on ALL presets without visible change: e.g. fewer/merged haze layers, cheaper noise, no full-screen overdraw for layers that cover only near ground, or a lower-cost evaluation — the author chooses by measurement.
   3. Picture check desert-standing (world subject, Sahara, day 181) before/after on high: no noticeable difference in the dust veils (side-by-side in the point's evidence).
 
-  PART B — shadows-off inversion. Final state: switching sun shadows off never makes a frame more expensive. The cause of the measured inversion (benchmark `shadows-off` slower than `baseline`) is identified with numbers and fixed in the product code, or — if it is a benchmark artefact — fixed in the benchmark so the lever prices only the shadows.
+  PART B — moved to point 1549 (main-session decision 18.11.2026 21:47, for veto: not reproducible on this host without timestamp queries). Original text: shadows-off inversion. Final state: switching sun shadows off never makes a frame more expensive. The cause of the measured inversion (benchmark `shadows-off` slower than `baseline`) is identified with numbers and fixed in the product code, or — if it is a benchmark artefact — fixed in the benchmark so the lever prices only the shadows.
 
   Evidence required:
   - Benchmark rows on WebGPU: desert-standing all-off GPU median moves clearly toward savanna-standing all-off (reference: 18.1 ms vs 10.4 ms at dpr 1 on the user's notebook); medium and high desert-standing GPU medians drop.
@@ -14438,3 +14438,18 @@ to land than a mechanism that needs a review.
   Picture check: polish-villagers --section=hut-doorway on BOTH backends, the band visible on the wall.
   Source: finding of the 1167 session, 18.11.2026 15:29.
   Bundle: Siedlungsgeometrie.
+
+- [ ] 1549. Find the cause of the shadows-off GPU inversion
+  Split from 1542 Part B (main-session decision 18.11.2026 21:47, for veto). Observed in the user benchmark
+  "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the
+  GPU median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and
+  triangles fall. Not reproducible on the batch host: it offers no WebGPU timestamp query.
+  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
+  Final state: the F8 benchmark report carries a per-pass GPU breakdown of the measured frame (the
+  WebGPUTimestampQueryPool timestamps per pass, in pass order), so a run on the user's notebook names the
+  pass that grows when shadows are off; with that number the cause is fixed in the product code, or — if
+  it is a measurement artefact — in the benchmark, so `shadows-off` prices only the shadows and its GPU
+  median is <= baseline in savanna-standing, desert-standing and savanna-driving.
+  Test: Vitest for the breakdown's formatting and report rows; Playwright benchmark suite on WebGPU.
+  Source: 1542 session, 18.11.2026 21:47.
+  Bundle: Steuerung & Performance.
