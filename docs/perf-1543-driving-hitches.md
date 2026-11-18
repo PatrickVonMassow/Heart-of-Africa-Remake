@@ -107,3 +107,20 @@ frame instead of bursts); p95 and max fall.
 
 Caveat: headless numbers only. The acceptance number is the owner's F8
 benchmark on the real notebook (WebGPU, medium and high, savanna-driving).
+
+## Owner rejection (19.11.2026, real GPU)
+
+F8 benchmark (`node scripts/perf-f8-bench.mjs`, WebGPU, 1536x960 @ dpr 1.25,
+real AMD GPU), savanna-driving CPU median / p95 (ratio), before 7050a53 →
+after 7935956:
+
+| Preset | Before | After |
+| --- | --- | --- |
+| low | 3.8 / 11.4 (3.0) | 5.6 / 10.9 (1.95) — median worse, forbidden |
+| medium | 15.6 / 41.0 (2.63) | 15.9 / 46.1 (2.90) |
+| high | 21.3 / 45.9 (2.15) | 22.3 / 47.2 (2.12) |
+
+Only max improved (142 → 63 ms). Conclusion: the headless drive above does not
+describe the F8 `cpu` number. Next step: attribute the F8 savanna-driving phase
+itself (fixed timestep, its own route) with the per-system probe running inside
+the F8 run, and make low not worse than before.
