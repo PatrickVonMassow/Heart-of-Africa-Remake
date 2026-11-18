@@ -1244,21 +1244,9 @@
       "origin": "machine",
       "place": "last"
     },
-    "1163": {
-      "at": "2026-09-18T23:49:52.580Z",
-      "why": "Kosmetik ohne Spielwirkung, unter allem was heute blockiert — hinten ist richtig.",
-      "origin": "machine",
-      "place": "last"
-    },
     "1164": {
       "at": "2026-09-18T23:49:52.672Z",
       "why": "Kosmetik ohne Spielwirkung, unter allem was heute blockiert — hinten ist richtig.",
-      "origin": "machine",
-      "place": "last"
-    },
-    "1167": {
-      "at": "2026-09-19T15:58:24.864Z",
-      "why": "Ein kleiner, aber in jedem Dorf sichtbarer Geometriefehler an der Hüttentür; er blockiert nichts und wartet hinter der bereits geordneten Arbeit.",
       "origin": "machine",
       "place": "last"
     },
@@ -1927,6 +1915,12 @@
       "why": "test flake without player impact; already placed in the animal behaviour bundle, behind the open work",
       "origin": "machine",
       "place": "last"
+    },
+    "1540": {
+      "at": "2026-11-18T15:55:17.267Z",
+      "why": "Kosmetischer Hüttenbefund aus der 1167-Prüfung, niedrige Kritikalität; hinten im Bündel Siedlungsgeometrie richtig",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1954,7 +1948,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-18T12:33:42.910Z",
+    "at": "2026-11-18T15:55:17.277Z",
     "points": [
       184,
       200,
@@ -2284,9 +2278,7 @@
       1123,
       1144,
       1153,
-      1163,
       1164,
-      1167,
       1169,
       1171,
       1172,
@@ -2399,7 +2391,8 @@
       1534,
       1537,
       1538,
-      1539
+      1539,
+      1540
     ]
   }
 }
