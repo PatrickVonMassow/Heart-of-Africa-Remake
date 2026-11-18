@@ -212,6 +212,7 @@ import {
   SHED_ROOF,
   hutWallHeight,
 } from './roofClearance'
+import { cylinderArgs, hutWallParts } from './hutDoor'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
 import {
   silhouetteScale,
@@ -469,6 +470,8 @@ function VillageHut({
   const base = style.stilts ? HUT_STILT_BASE : 0
   const wallH = hutWallHeight(style.roof, h)
   const coneKind = style.roof === 'tallCone' || style.roof === 'cone' ? style.roof : null
+  // Wall with the doorway cut out of it (hutDoor.ts).
+  const parts = hutWallParts(r, wallH, base)
   return (
     <group position={[x, 0, z]} rotation={[0, facing, 0]}>
       {style.stilts && (
@@ -490,9 +493,16 @@ function VillageHut({
           </mesh>
         </>
       )}
-      {/* Wall */}
-      <mesh position={[0, base + wallH / 2, 0]} castShadow receiveShadow material={mats.mud}>
-        <cylinderGeometry args={[r, r * 1.06, wallH, 12]} />
+      {/* Wall around the doorway, the lintel above it, and the dark inner lining */}
+      <mesh position={[0, parts.wall.y, 0]} castShadow receiveShadow material={mats.mud}>
+        <cylinderGeometry args={cylinderArgs(parts.wall)} />
+      </mesh>
+      <mesh position={[0, parts.lintel.y, 0]} castShadow receiveShadow material={mats.mud}>
+        <cylinderGeometry args={cylinderArgs(parts.lintel)} />
+      </mesh>
+      <mesh position={[0, parts.lining.y, 0]}>
+        <cylinderGeometry args={cylinderArgs(parts.lining)} />
+        <meshStandardMaterial color="#1f150b" roughness={1} side={THREE.BackSide} />
       </mesh>
       {/* Roof per region style */}
       {style.roof === 'flat' ? (
@@ -521,14 +531,14 @@ function VillageHut({
           </mesh>
         </>
       ) : null}
-      {/* Door opening */}
-      <mesh position={[0, base + wallH * 0.36, r * 0.99]}>
-        <boxGeometry args={[r * 0.55, wallH * 0.72, 0.12]} />
+      {/* Door panel, set back behind the opening */}
+      <mesh position={[parts.door.x, parts.door.y, parts.door.z]}>
+        <boxGeometry args={[parts.door.width, parts.door.height, parts.door.depth]} />
         <meshStandardMaterial color="#332412" roughness={0.95} />
       </mesh>
       {/* Painted band */}
       <mesh position={[0, base + wallH * 0.8, 0]}>
-        <cylinderGeometry args={[r * 1.005, r * 1.005, wallH * 0.09, 12, 1, true]} />
+        <cylinderGeometry args={[r * 1.005, r * 1.005, wallH * 0.09, 12, 1, true, parts.lining.thetaStart]} />
         <meshStandardMaterial color={chief ? '#8c2f22' : style.bandColor} roughness={0.9} side={THREE.DoubleSide} />
       </mesh>
       {chief && (
