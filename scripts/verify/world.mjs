@@ -384,15 +384,12 @@ if (section('communication-errand')) {
     // THE ACT STANDS HIM WHERE IT IS JUDGED, as its last step before pressing,
     // and the reading pair below proves he was there. The old order — jump,
     // photograph, change zoom, then act — went red on 08.-15.09.2026 with the
-    // reach test reading him out of range. Measured 18.11.2026 on main and on
+    // reach test reading him out of range; since this order it has not. What
+    // moved him then was never measured. Measured 18.11.2026, on main and on
     // the 15.09. tree, fresh and after the errand: jumped onto the talus he
-    // stands at 0.0000° from the socket for five idle seconds (savanna, no
-    // current), so the game reads the position the player has and the red was
-    // the harness's ordering, not the player path.
+    // stays 0.0000° from the socket for five idle seconds (savanna, no
+    // current), so a player standing there is read where he stands.
     const clickForm = async (standAt) => {
-      await page.evaluate(([la, lo]) => {
-        window.__game.getState().debugJumpTo(la, lo)
-      }, [standAt.lat, standAt.lon])
       await page.evaluate(() => {
         const g = window.__game.getState()
         g.setToast(null)
@@ -414,6 +411,9 @@ if (section('communication-errand')) {
       // against the LIVE position, so a red that says "no fit" has two very
       // different causes — he was never brought there, or the click itself
       // moved him — and only the pair of readings tells them apart.
+      await page.evaluate(([la, lo]) => {
+        window.__game.getState().debugJumpTo(la, lo)
+      }, [standAt.lat, standAt.lon])
       const before = await at()
       // A dialog standing over the inventory turns the click into a bare
       // Playwright timeout; name the dialog instead.
@@ -494,7 +494,12 @@ if (section('communication-errand')) {
 
     // A spent socket answers like a wrong place, and writes no second page.
     const again = await clickForm(talus)
+    // A noFit from OUT of reach would pass this too, so both readings must
+    // show him at the socket: then the answer is the spent one.
+    const atSocket = (ll) => Math.hypot(ll.lat - talus.lat, ll.lon - talus.lon) < reachDeg
     const againOk =
+      atSocket(again.before) &&
+      atSocket(again.after) &&
       again.said.includes(strings.noFit) &&
       again.keys.filter((k) => k === 'journal.mouldFitted').length === 1
     console.log(
