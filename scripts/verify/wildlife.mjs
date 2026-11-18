@@ -829,12 +829,19 @@ if (section('flood-crest-calf')) {
         const tc = ter(sc.calf.x, sc.calf.z)
         // The dry run: calm water never sweeps, so the calf is set in by hand
         // at the same point of its swim the crest took it.
+        // It goes in where the crest tore the crest run's calf to, so both
+        // parents wade the same way out to it.
         if (!sc.crest && sc.swept === null && tc === 'water' && sc.calf.crossing !== undefined) {
           sc.calf.crossing = undefined
           sc.calf.fleeAt = undefined
+          if (window.__floodTorn) { sc.calf.x = window.__floodTorn.x; sc.calf.z = window.__floodTorn.z }
         }
+        // The last spot on its crossing line: the crest's tear counts as carried.
+        if (sc.swept === null && sc.calf.crossing !== undefined) sc.pre = { x: sc.calf.x, z: sc.calf.z }
         if (sc.swept === null && sc.calf.inWater !== undefined) {
-          sc.swept = { t: window.__simTime(), x: sc.calf.x, z: sc.calf.z, px: sc.parent.x, pz: sc.parent.z, flag: sc.calf.floodSwept === true }
+          const from = sc.crest && sc.pre ? sc.pre : { x: sc.calf.x, z: sc.calf.z }
+          sc.swept = { t: window.__simTime(), x: from.x, z: from.z, px: sc.parent.x, pz: sc.parent.z, flag: sc.calf.floodSwept === true }
+          if (sc.crest) window.__floodTorn = { x: sc.calf.x, z: sc.calf.z }
         }
         rec.push({
           t: window.__simTime(),
@@ -945,6 +952,7 @@ if (section('flood-crest-calf')) {
     if (window.__floodPrevDay !== undefined) window.__game.setState({ day: window.__floodPrevDay })
     window.__floodPrev = undefined
     window.__floodLine = undefined
+    window.__floodTorn = undefined
   })
 }
 

@@ -6,6 +6,7 @@ import {
   dramaFlowFactor,
   floodFlowFactor,
   floodSweepsCrossingCalf,
+  floodTearStep,
   remoteFloodAt,
   drinkCatchment,
   mireFate,
@@ -3317,6 +3318,19 @@ describe('the flood swells the drama current (design.md §19.8, point 364)', () 
     // Survival over 2 s is the same at 30 and 120 fps.
     const survive = (fps: number) => Math.pow(1 - (1 - Math.exp(-0.25 / fps)), 2 * fps)
     expect(survive(30)).toBeCloseTo(survive(120), 12)
+  })
+
+  it('the crest tears the swept calf downstream past the rescue reach, never onto land', () => {
+    const water = (x: number) => x < 10
+    const t = floodTearStep(0, 0, 2, 0, bw.floodSweepTearUnits, water)
+    expect(t.x).toBeCloseTo(bw.floodSweepTearUnits, 9)
+    expect(t.z).toBe(0)
+    expect(bw.floodSweepTearUnits).toBeGreaterThan(1.2 + 0.6) // reach plus the calf's swim offset
+    // The water ends at x = 10: the tear stops on the last wet step.
+    const short = floodTearStep(9, 0, 1, 0, 5, water)
+    expect(short.x).toBeLessThan(10)
+    expect(short.x).toBeGreaterThan(9.5)
+    expect(floodTearStep(3, 4, 0, 0, 5, water)).toEqual({ x: 3, z: 4 })
   })
 
   it('at the October crest the shipped balance can sweep a Nile crossing; at low water it cannot', () => {

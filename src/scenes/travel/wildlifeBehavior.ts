@@ -2700,6 +2700,34 @@ export function floodSweepsCrossingCalf(
   return roll < 1 - Math.exp(-chancePerSecond * dt)
 }
 
+/**
+ * The tear of the crest (point 364): the swept calf is carried `units`
+ * downstream at once, along the channel in small channelDriftStep steps, so it
+ * leaves the parent's pulling reach and the braked wade after it plays out.
+ * Stops early where the water ends.
+ */
+export function floodTearStep(
+  x: number,
+  z: number,
+  dirX: number,
+  dirZ: number,
+  units: number,
+  isWater: (x: number, z: number) => boolean,
+): { x: number; z: number } {
+  const len = Math.hypot(dirX, dirZ)
+  if (len < 1e-9 || units <= 0) return { x, z }
+  const n = Math.ceil(units / 0.25)
+  const sx = (dirX / len) * (units / n)
+  const sz = (dirZ / len) * (units / n)
+  let p = { x, z }
+  for (let i = 0; i < n; i++) {
+    const q = channelDriftStep(p.x, p.z, sx, sz, isWater)
+    if (q.x === p.x && q.z === p.z) break
+    p = q
+  }
+  return p
+}
+
 export type StruggleFate = 'struggling' | 'self-rescue' | 'drowned'
 
 /**

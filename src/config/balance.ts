@@ -515,6 +515,9 @@ interface BalanceConfig {
     /** Per-second chance that a swollen current (effective flow at/above
      *  `drownFlowThreshold`) tears a crossing calf off its line (point 364). */
     floodSweepChancePerSecond: number
+    /** World units the crest tears a swept calf downstream at once (point 364)
+     *  — past the parent's pulling reach, so the wade after it plays out. */
+    floodSweepTearUnits: number
     /** Chance per finished gambol bout AT a dry-season lake bank to mire (point 123). */
     mireChancePerBout: number
     /** Local wetness below which a lake bank turns to miring mud. */
@@ -2124,6 +2127,7 @@ export const balance: BalanceConfig = {
     wetFlowFactor: 1.8, // the rains swell the current past the drown threshold
     floodFlowScale: 0.9, // calibratable: the crest reads ~1.68 — near the full rains, above the drown threshold mid-channel
     floodSweepChancePerSecond: 0.25, // calibratable: ~half the calves crossing a swollen channel for ~3 s are carried off
+    floodSweepTearUnits: 4, // calibratable: well clear of the 1.2-unit rescue reach, so the braked wade after the calf is seen
     okavangoFloodRadiusDeg: 2.5, // calibratable: covers the panhandle and the distal fan around the delta site
     mireChancePerBout: 0.35, // per bout ENDING at a dry lake bank — the bank visits are already rare
     mireDrynessThreshold: 0.25, // wetness below this turns the shrinking bank to mud

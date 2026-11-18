@@ -148,6 +148,7 @@ import {
   vicinityAttemptSeed,
   dramaFlowFactor,
   floodSweepsCrossingCalf,
+  floodTearStep,
   shouldMourn,
   mournDeadline,
   elephantStepAllowed,
@@ -3309,6 +3310,15 @@ function Herds() {
               )) {
                 a.crossing = undefined
                 a.floodSwept = true
+                // Torn away at once: beside its parent the calf would be
+                // pulled out the same frame and the crest never seen.
+                const fl = dramaCurrent(ll.lat, ll.lon)
+                const torn = floodTearStep(a.x, a.z, fl.dirLon, -fl.dirLat, bw.floodSweepTearUnits, (wx, wz) => {
+                  const w = worldToLatLon(wx, wz)
+                  return sampleTerrain(w.lat, w.lon, seed).type === 'water'
+                })
+                a.x = torn.x
+                a.z = torn.z
               }
             }
             const cause =
