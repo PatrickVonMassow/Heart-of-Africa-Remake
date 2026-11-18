@@ -1523,6 +1523,72 @@ if (section('bambara-no-well')) {
   }
 }
 
+// A family hut's doorway seen from walking distance: the opening is cut out
+// of the wall, so it stays dark through its whole height (no wall wedge).
+if (section('hut-doorway')) {
+  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
+  try {
+    await page.evaluate(() => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+    })
+    await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+    await page.evaluate(() => {
+      window.__game.setState({ seed: 1838110026 })
+      window.__game.getState().enterPlace('bambara-village')
+      window.__game.getState().setJournalOpen(false)
+    })
+    await page.waitForFunction(
+      () => window.__game.getState().placeId === 'bambara-village' && !!window.__placeLayout,
+      null, { timeout: 40000 })
+    await waitForSceneBuilt(page)
+    const staged = await page.evaluate(() => {
+      const layout = window.__placeLayout
+      const clear = (x, z, skip) => Math.min(...layout.colliders
+        .filter((c) => c !== skip).map((c) => window.__clearanceTo(c, x, z)))
+      // Stand 3.5 m out along the door's own axis of the first family hut
+      // with a clear stand and a clear sight line to its door.
+      for (const d of layout.dwellings) {
+        if (d.kind !== 'hut') continue
+        const dx = Math.sin(d.rot)
+        const dz = Math.cos(d.rot)
+        const own = layout.colliders.find((c) => window.__clearanceTo(c, d.x, d.z) < 0)
+        const x = d.door[0] + dx * 3.5
+        const z = d.door[1] + dz * 3.5
+        if (Math.hypot(x, z) > layout.radius - 1 || clear(x, z) < 0.35) continue
+        let visible = true
+        for (let step = 1; step < 16; step++) {
+          const t = step / 16
+          if (clear(x + (d.door[0] - x) * t, z + (d.door[1] - z) * t, own) < 0.1) visible = false
+        }
+        if (!visible) continue
+        const p = window.__placePlayer
+        p.x = x
+        p.z = z
+        p.yaw = Math.atan2(d.door[0] - x, d.door[1] - z) + Math.PI
+        p.pitch = -0.05
+        return { hut: { x: d.x, z: d.z, r: d.r, h: d.h }, door: d.door, stand: { x, z }, gap: clear(x, z) }
+      }
+      return null
+    })
+    check('a family hut stands with a clear walking-distance view of its door', !!staged, JSON.stringify(staged))
+    if (staged) {
+      await nextFrames(3)
+      await frame('1167-hut-doorway', {
+        local: { x: staged.door[0], y: 1, z: staged.door[1] },
+        label: 'a bambara family hut door seen from 3.5 m: the opening dark from '
+          + 'threshold to lintel, no wall surface standing in it',
+      })
+    }
+  } finally {
+    await page.evaluate((seed) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      window.__game.setState({ seed })
+    }, bootSeed)
+  }
+}
+
 // The fixed weaver in the user's "Festklemmend" report, not a moving adult.
 // Run on each backend with the ordinary polish launcher; the frame declares
 // the live figure as its subject, and frames the trading post with her only
