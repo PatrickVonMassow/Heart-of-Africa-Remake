@@ -5,7 +5,7 @@
 // helpers live in ./_polish.mjs, and every section below owns its staging.
 import { rmSync } from 'node:fs'
 import { assertBackend } from './_browser.mjs'
-import { waitForSceneReady } from './frameSubject.mjs'
+import { frameShutter, waitForSceneReady } from './frameSubject.mjs'
 import { AXIS_SAMPLES, CONFIRMED_RATIO, KID_HEIGHT, MIN_CHILD_PIXELS, OCCLUDED_RATIO, armMinZ, armSweep, describeReading, judgeChildFigure, judgePrepareArms, judgeRunnerArms, judgeTagStandpoint, ARM_ACQUISITION, recordArmFrame } from './tagFrameReading.mjs'
 import { CHILD_MOTION, holdsAGame, judgedEnough, rescueRate, shuffleWindows, traceLiveness } from './childMotionMetric.mjs'
 import { section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, OUT } from './_polish.mjs'
@@ -1655,7 +1655,7 @@ if (section('children-bank-game')) {
         for (const step of ['probe', 'base', 'plain', 'restore', 'noao', 'hidden']) {
           log.push(step + ': ' + (await flip(step)))
           await page.waitForTimeout(1500)
-          await page.screenshot({ path: S + 'exp-' + step + '.png' })
+          await frameShutter(page, S)('exp-' + step, { general: 'temporary bank-play sand projection probe' })
         }
         log.push('restore: ' + (await flip('restore')))
         ;(await import('node:fs')).writeFileSync(S + 'exp-log.txt', log.join('\n'))
