@@ -78,6 +78,78 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 
+- [ ] 1541. Cap the medium preset at device pixel ratio 1.0
+  Observed: In the user's notebook benchmark the medium preset still renders at the full dpr 1.25 (21.2 / 30.5 / 30.3 ms GPU in savanna / desert / driving). The dpr-1 row cuts GPU time by 26-30 % in all three phases — the single largest lever, bigger than SSAO (~4 ms) or TRAA (~1.7 ms). The user requires medium to become clearly faster on mid-range notebooks.
+
+  Final state: the MEDIUM graphics preset caps the device pixel ratio at 1.0 (`dprCap: 1` in src/config/quality.ts, marked calibratable). HIGH keeps the native pixel ratio (`dprCap: null`); LOW keeps 0.8. The low < medium < high climb of the preset tests stays strict.
+
+  Evidence required:
+  - Vitest: quality.test.ts asserts medium.dprCap === 1, high.dprCap === null, and the strict climb.
+  - Benchmark (scripts/verify/benchmark.mjs or the in-game benchmark) on a dpr > 1 viewport: the medium-preset rows show pixelRatio 1.00 and a lower GPU median than before.
+  - Picture check medium vs. previous medium (TRAA still smooths edges; no visible aliasing regression on HUD-free world shots).
+  - docs: design.md §21 preset table (if it lists dpr per level) updated together.
+
+  Bounds the user named (verbatim):
+  - Queue position: FIRST in the work order, ahead of every open point (user order 18.11.2026: "ganz vorne in der Queue"). The three performance requests of 18.11.2026 run in this order: medium dpr cap, desert pixel cost + shadows-off inversion, driving CPU hitches. A request that does not converge is split (standing rule).
+  - Four eyes (user order 18.11.2026: "als Vier-Augen-Task"): convergent review by a cross-vendor model per scripts/cross-review.mjs before landing; record the reviewer in a Reviewed-By trailer.
+  - Reference measurement: user benchmark "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, AMD RDNA-3 notebook GPU, 1536x960 @ dpr 1.25, build c8f3995). The older "Lenovo GIP-Notebook.json" (without "(neu)") is void by user order and must not be used.
+  - Target for this notebook class: medium below 20 ms GPU median in savanna-standing, desert-standing and savanna-driving (> 50 fps). Low is already playable and must not get worse. High may gain speed only without noticeable loss of picture quality.
+  - All preset values stay in src/config/quality.ts (calibratable marked); no new runtime dependency.
+  User approval 18.11.2026: "Ja, so als drei Aufträge einreihen"
+  Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
+  Bundle: Steuerung & Performance.
+
+- [ ] 1542. Find and fix the desert pixel cost and the shadows-off inversion
+  Observed: Part A: with every benchmark lever off at dpr 1, the desert still costs 18.1 ms GPU against 10.4 ms in the savanna, although it draws less than half the triangles — a per-pixel cost no lever covers. The suspect is the Sahara ground haze (travel-climate: 5 transparent layer meshes, 10 triangles, visible only in the desert phase; the savanna's 'east' region has haze 0). Desert is the slowest phase on every preset (medium 30.5 ms), so it decides playability.
+
+  Part B: turning shadows off RAISES the GPU median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and triangles fall — a costlier fallback path or a benchmark artefact. LOW runs without sun shadows, and any later shadow lever for medium is unreadable until this is understood.
+
+  Both parts are GPU investigations in the same benchmark phases with the same tooling (new sweep levers, measurement runs, one before/after picture check), so they share one branch, one review and one picture pass (user decision 18.11.2026 to bundle them).
+
+  Two parts, one branch.
+
+  PART A — desert pixel cost. Final state:
+  1. The benchmark sweep (src/systems/benchmark.ts BENCH_CONFIGS) has a `climate-haze-off` config that hides the travel ground-haze layers of src/scenes/travel/Climate.tsx, and the report's desert-standing row prices it. (If a measurement shows the desert's extra cost lies elsewhere, the point names the real cause with numbers and fixes that instead.)
+  2. The desert's always-on per-pixel cost is reduced on ALL presets without visible change: e.g. fewer/merged haze layers, cheaper noise, no full-screen overdraw for layers that cover only near ground, or a lower-cost evaluation — the author chooses by measurement.
+  3. Picture check desert-standing (world subject, Sahara, day 181) before/after on high: no noticeable difference in the dust veils (side-by-side in the point's evidence).
+
+  PART B — shadows-off inversion. Final state: switching sun shadows off never makes a frame more expensive. The cause of the measured inversion (benchmark `shadows-off` slower than `baseline`) is identified with numbers and fixed in the product code, or — if it is a benchmark artefact — fixed in the benchmark so the lever prices only the shadows.
+
+  Evidence required:
+  - Benchmark rows on WebGPU: desert-standing all-off GPU median moves clearly toward savanna-standing all-off (reference: 18.1 ms vs 10.4 ms at dpr 1 on the user's notebook); medium and high desert-standing GPU medians drop.
+  - Root cause of the inversion named in the point's evidence (which pass/material/path runs when shadowsEnabled is false); shadows-off GPU median <= baseline in savanna-standing, desert-standing and savanna-driving.
+  - Vitest for any changed config/logic; Playwright picture check (both backends if isBackendSensitivePath applies), including a shadowless frame if that rendering path changes.
+
+  Bounds the user named (verbatim):
+  - Queue position: FIRST in the work order, ahead of every open point (user order 18.11.2026: "ganz vorne in der Queue"). The three performance requests of 18.11.2026 run in this order: medium dpr cap, desert pixel cost + shadows-off inversion, driving CPU hitches. A request that does not converge is split (standing rule).
+  - Four eyes (user order 18.11.2026: "als Vier-Augen-Task"): convergent review by a cross-vendor model per scripts/cross-review.mjs before landing; record the reviewer in a Reviewed-By trailer.
+  - Reference measurement: user benchmark "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, AMD RDNA-3 notebook GPU, 1536x960 @ dpr 1.25, build c8f3995). The older "Lenovo GIP-Notebook.json" (without "(neu)") is void by user order and must not be used.
+  - Target for this notebook class: medium below 20 ms GPU median in savanna-standing, desert-standing and savanna-driving (> 50 fps). Low is already playable and must not get worse. High may gain speed only without noticeable loss of picture quality.
+  - All preset values stay in src/config/quality.ts (calibratable marked); no new runtime dependency.
+  User approval 18.11.2026: "Ja, so als drei Aufträge einreihen"
+  Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
+  Bundle: Steuerung & Performance.
+
+- [ ] 1543. Smooth the CPU hitches while driving on medium and high
+  Observed: The user's notebook benchmark shows CPU p95 of 41 ms (medium) and 52 ms (high) during the drive against medians of 9-12 ms: periodic hitches that the player feels as stutter even when the GPU average would be fine. The user requires medium to be clearly smoother on mid-range notebooks.
+
+  Final state: while driving (savanna-driving route), the CPU frame time on medium and high has no recurring multi-frame spikes: CPU p95 stays within 2x the CPU median. The responsible systems (streaming of terrain/flora dressing, chunk builds, shader/pipeline compilation, GC — identified by measurement) spread their work across frames, move it off the frame (worker/idle time) or pre-warm it.
+
+  Evidence required:
+  - Per-system attribution of the spikes (profile or timing marks) in the point's evidence.
+  - Benchmark on WebGPU, medium-preset and high-preset savanna-driving: CPU p95 <= 2x median (reference before: medium 8.8 / 41.2 ms, high 12.2 / 52.4 ms on the user's notebook).
+  - Vitest for changed scheduling logic; no visible pop-in regression (picture check of a driving frame).
+
+  Bounds the user named (verbatim):
+  - Queue position: FIRST in the work order, ahead of every open point (user order 18.11.2026: "ganz vorne in der Queue"). The three performance requests of 18.11.2026 run in this order: medium dpr cap, desert pixel cost + shadows-off inversion, driving CPU hitches. A request that does not converge is split (standing rule).
+  - Four eyes (user order 18.11.2026: "als Vier-Augen-Task"): convergent review by a cross-vendor model per scripts/cross-review.mjs before landing; record the reviewer in a Reviewed-By trailer.
+  - Reference measurement: user benchmark "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, AMD RDNA-3 notebook GPU, 1536x960 @ dpr 1.25, build c8f3995). The older "Lenovo GIP-Notebook.json" (without "(neu)") is void by user order and must not be used.
+  - Target for this notebook class: medium below 20 ms GPU median in savanna-standing, desert-standing and savanna-driving (> 50 fps). Low is already playable and must not get worse. High may gain speed only without noticeable loss of picture quality.
+  - All preset values stay in src/config/quality.ts (calibratable marked); no new runtime dependency.
+  User approval 18.11.2026: "Ja, so als drei Aufträge einreihen"
+  Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
+  Bundle: Steuerung & Performance.
+
 - [ ] 1164. A shadow lies on the river sand with nothing above it to cast it (seen
   18.09.2026 in the covering polish frame `verification/687-bank-play-rocks.png`, WebGPU
   run 2026-09-18T22:17:33 and the WebGL 2 run after it, both GREEN).
