@@ -7033,7 +7033,7 @@ function LionHunt() {
       // The cast belongs to the region where the hunt BEGINS (point 1063): the
       // chase may carry it across a border, so the start region is kept.
       s.startRegion = regionAt(ll.lat, ll.lon)
-      const cast = pickHuntSpecies(s.startRegion, victimSpecies, Math.random(), Math.random())
+      const cast = pickHuntSpecies(s.startRegion, victimSpecies, Math.random)
       s.predator = cast.predator
       s.prey = cast.prey
       // The lion-cub hunt is always a hyena's (point 145c): the lioness would

@@ -4,6 +4,11 @@ import { PREDATOR_PREY, REGION_PREDATORS, REGION_PREY, pickHuntSpecies, type Pre
 
 const REGIONS: RegionId[] = ['east', 'south', 'central', 'west', 'north']
 const ROLLS = [0, 0.13, 0.27, 0.41, 0.55, 0.69, 0.83, 0.999]
+/** A scripted roll source that also counts its draws. */
+const rolls = (...seq: number[]) => {
+  const f = Object.assign(() => seq[f.draws++], { draws: 0 })
+  return f
+}
 
 // Point 1063: the cast is picked for the region where the hunt BEGINS, so the
 // enrichments check `every hunted prey fits the region and the predator food
@@ -13,7 +18,7 @@ describe('pickHuntSpecies', () => {
     for (const region of REGIONS) {
       for (const a of ROLLS) {
         for (const b of ROLLS) {
-          const { predator, prey } = pickHuntSpecies(region, null, a, b)
+          const { predator, prey } = pickHuntSpecies(region, null, rolls(a, b))
           expect(REGION_PREDATORS[region]).toContain(predator)
           expect(REGION_PREY[region]).toContain(prey)
           expect(PREDATOR_PREY[predator]).toContain(prey)
@@ -23,15 +28,32 @@ describe('pickHuntSpecies', () => {
   })
 
   it('never puts wildebeest in a central hunt', () => {
-    for (const a of ROLLS) for (const b of ROLLS) expect(pickHuntSpecies('central', null, a, b).prey).not.toBe('wildebeest')
+    for (const a of ROLLS) for (const b of ROLLS) expect(pickHuntSpecies('central', null, rolls(a, b)).prey).not.toBe('wildebeest')
   })
 
   it('keeps a victim species and gives it a predator whose scheme holds it', () => {
     const giraffe: PreyKind = 'giraffe'
     for (const a of ROLLS) {
-      const { predator, prey } = pickHuntSpecies('east', giraffe, a, 0.5)
+      const { predator, prey } = pickHuntSpecies('east', giraffe, rolls(a))
       expect(prey).toBe('giraffe')
       expect(predator).toBe('lion')
     }
+  })
+
+  it('selects by fixed rolls exactly as the inline pick did', () => {
+    // east predators [lion, cheetah, hyena, leopard]; hyena's east prey [wildebeest, zebra, warthog]
+    expect(pickHuntSpecies('east', null, rolls(0.5, 0))).toEqual({ predator: 'hyena', prey: 'wildebeest' })
+    expect(pickHuntSpecies('east', null, rolls(0, 0.99))).toEqual({ predator: 'lion', prey: 'giraffe' })
+    // central predators [lion, leopard]; leopard's central prey [antelope, warthog]
+    expect(pickHuntSpecies('central', null, rolls(0.75, 0.6))).toEqual({ predator: 'leopard', prey: 'warthog' })
+  })
+
+  it('draws once for a victim hunt and twice for a generic one', () => {
+    const v = rolls(0.3)
+    pickHuntSpecies('south', 'zebra', v)
+    expect(v.draws).toBe(1)
+    const g = rolls(0.3, 0.3)
+    pickHuntSpecies('south', null, g)
+    expect(g.draws).toBe(2)
   })
 })
