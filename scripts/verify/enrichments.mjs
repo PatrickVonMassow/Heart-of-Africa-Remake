@@ -6326,20 +6326,26 @@ if (section('crocodile-ambush')) {
   // row failed four different checks while the game behaved correctly. Now:
   //  - the shared library below only STAGES, SEIZES and CLEANS UP; every ending
   //    is its own small helper (crocMode.*), so a change to one ending cannot
-  //    shift another's timing;
-  //  - every precondition is stated and asserted before anything is measured. A
-  //    miss returns `stagingMiss`, a self-naming "STAGING MISS [crocodile
-  //    <mode>]: …" line, instead of an outcome that accuses the product;
+  //    shift another's timing. Every mutation happens inside the mode's
+  //    try/finally and is undone there (prior values restored, not cleared);
+  //  - every precondition the FIXTURE controls is stated and asserted before
+  //    anything is measured. Only a fixture failure returns `stagingMiss`, a
+  //    self-naming "STAGING MISS [crocodile <mode>]: …" line. Whatever the GAME
+  //    does once it has control (a wrong victim, a burst that never grips, a
+  //    charge that never arrives, an early release) is outcome and fails the
+  //    real check — no masking;
   //  - every mode pins its parent-defence roll (forceOutcome), including vanish
   //    and sacrifice;
   //  - the seizure is established deterministically: every ending except
   //    `lunge` ARMS the staged crocodile on the calf through the ordinary
   //    §19.16 burst (the same entry the in-game crocodile scenario uses), and
   //    the grip is polled with a generous sim budget. `lunge` alone keeps the
-  //    natural ambush trigger, because the trigger is what it tests; it fails
-  //    the STAGING when the trigger's preconditions never held together, and
-  //    the PRODUCT only when they held and no lunge came.
-  const CROC_REACH = { sacrifice: 1.3, tooLate: 3.2 } // mirror PARENT_SACRIFICE_DIST / PARENT_TOO_LATE_DIST in Wildlife.tsx
+  //    natural ambush trigger, because the trigger is what it tests; it is a
+  //    staging miss only when the trigger's preconditions never held together
+  //    and the crocodile never went for any animal.
+  // Mirrors of Wildlife.tsx constants: PARENT_SACRIFICE_DIST, PARENT_TOO_LATE_DIST,
+  // and rescueSpeed()'s PREY_WALK_SPEED (the charge runs at walk × rescueBurst).
+  const CROC_REACH = { sacrifice: 1.3, tooLate: 3.2, walk: 3 }
   const installCrocStage = () =>
     page.evaluate((REACH) => {
       const U = 10
@@ -6349,8 +6355,14 @@ if (section('crocodile-ambush')) {
       const terr = (x, z) => window.__terrainType(-z / U, x / U, seed())
       const wet = (t) => t === 'water' || t === 'ocean'
       const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z)
+      const charge = () => REACH.walk * Math.max(1, B().family.rescueBurst)
       const miss = (mode, what) =>
         `STAGING MISS [crocodile ${mode}]: ${what} — the staging did not reach its precondition; this is no verdict on the game`
+      const describe = (v, croc) => {
+        const herds = H()
+        const species = Object.keys(herds).find((sp) => Array.isArray(herds[sp]) && herds[sp].includes(v)) ?? 'unknown'
+        return { species, young: v.young === true, d: +dist(v, croc).toFixed(2) }
+      }
       const findSite = () => {
         const p0 = window.__game.getState().pos
         for (let r = 4; r <= 40; r += 3) {
@@ -6396,50 +6408,64 @@ if (section('crocodile-ambush')) {
         REACH,
         dist,
         miss,
-        // Stage croc + calf and pin everything that is not under test. `outcome`
-        // pins the parent-defence roll for the WHOLE drama (every mode).
-        stage(mode, outcome) {
+        // A context with NO side effects yet: the mode opens its try/finally
+        // around everything that follows.
+        begin(mode) {
           const out = {
             mode, staged: false, stagingMiss: null, lunged: false, noTeleport: true, gripped: false,
-            calfAlive: null, parentAlive: null, crocRetreated: false, lionTouched: false, foreignParent: false,
+            calfAlive: null, parentAlive: null, calfCaught: null, crocRetreated: false, lionTouched: false, foreignParent: false,
           }
-          const ctx = { mode, out, undo: [], purged: [] }
+          return { mode, out, undo: [], purged: [] }
+        },
+        // Stage croc + calf and pin everything that is not under test. Every
+        // mutation registers its undo FIRST; `outcome` pins the parent-defence
+        // roll for the whole drama (every mode). Returns whether it staged.
+        stage(ctx, outcome) {
+          const { mode, out } = ctx
           const site = findSite()
           if (!site) {
             out.stagingMiss = miss(mode, 'no river/lake cell with a land neighbour within 40 of the traveller')
-            return ctx
+            return false
           }
           const { p0, water, bank } = site
-          const herds = H()
-          // Isolate: the natural crocodiles stand down for the scenario.
-          ctx.naturals = herds.crocodile.splice(0)
+          // Isolate: the natural crocodiles stand down for the scenario; the
+          // undo returns them (and any streamed in meanwhile) and retires the
+          // staged one.
+          const naturals = H().crocodile.slice()
+          ctx.undo.push(() => { H().crocodile = naturals.concat(ctx.purged) })
+          H().crocodile.splice(0)
           // Chunk-LESS staging (point 126): the despawn filter keeps chunk-less
           // animals, so no ring change can filter the stage out mid-scenario.
           // Seated on the DRAWN sheet (points 187/274) so the hidden pose shows
           // the eye knobs on the screenshots too.
           const ws = window.__rivers?.sheetAt(-water.z / U, water.x / U) ?? window.__rivers?.surfaceAt(-water.z / U, water.x / U)
           const croc = { x: water.x, z: water.z, y: ws ?? 0.4, rot: 0, scale: 1, phase: 0.1, chunk: undefined }
-          herds.crocodile.push(croc)
+          H().crocodile.push(croc)
           // The calf stands at the bank ALONE: a pre-linked parent dragged it off
           // the stand through the young-follow drive. Its parent is built now
           // but enters the herds only after the grip (linkParent).
           const calf = { x: bank.x, z: bank.z, y: 0.2, rot: 0, scale: 0.5, phase: 0, chunk: undefined, young: true }
           calf.drink = { tx: bank.x, tz: bank.z }
-          herds.zebra.push(calf)
           const parent = { x: p0.x - 200, z: p0.z, y: 0.2, rot: 0, scale: 1, phase: 0.4, chunk: undefined }
           const ul = Math.hypot(bank.x - water.x, bank.z - water.z) || 1
           Object.assign(ctx, { croc, calf, parent, water, bank, ux: (bank.x - water.x) / ul, uz: (bank.z - water.z) / ul })
+          ctx.undo.push(() => { H().zebra = H().zebra.filter((a) => a !== parent && a !== calf) })
+          H().zebra.push(calf)
           // NO THIRD PARENT (27.07.2026): a childless adult within the adoption
           // radius would adopt the lone calf and resolve the drama itself.
           const prevAdoption = B().family.adoptionRadius
-          B().family.adoptionRadius = 0.001
           ctx.undo.push(() => { B().family.adoptionRadius = prevAdoption })
-          // The defence roll is pinned for every ending (point 177 precedent).
+          B().family.adoptionRadius = 0.001
+          // The defence roll is pinned for every ending (point 177 precedent);
+          // the prior value, override or not, comes back afterwards.
+          const prevOutcome = B().parentDefense.forceOutcome
+          ctx.undo.push(() => { B().parentDefense.forceOutcome = prevOutcome })
           B().parentDefense.forceOutcome = outcome
-          ctx.undo.push(() => { B().parentDefense.forceOutcome = undefined })
           // The scripted lion hunt is parked (point 194), so lionTouched verifies
-          // the CROC drama itself never sets lion.victim.
+          // the CROC drama itself never sets lion.victim; restored afterwards.
           const lion = window.__lionHunt.state
+          const prevLion = { mode: lion.mode, timer: lion.timer, victim: lion.victim, victimHunt: lion.victimHunt }
+          ctx.undo.push(() => { Object.assign(window.__lionHunt.state, prevLion) })
           lion.mode = 'idle'
           lion.timer = 9999
           lion.victim = null
@@ -6449,10 +6475,10 @@ if (section('crocodile-ambush')) {
           out.pre = pre
           if (!pre.crocOnWater || !pre.calfOnLand || !pre.calfInReach) {
             out.stagingMiss = miss(mode, `the staged site fails its geometry (${JSON.stringify(pre)})`)
-            return ctx
+            return false
           }
           out.staged = true
-          return ctx
+          return true
         },
         // Keep the stage clean while polling: a crocodile streamed in mid-drama
         // could seize the calf and resolve the scenario in place of the staged one.
@@ -6466,15 +6492,29 @@ if (section('crocodile-ambush')) {
         },
         // Establish the grip. `armed`: the staged crocodile is handed the calf
         // through the ordinary burst; otherwise the natural trigger must fire.
+        // A STAGING miss only where the fixture failed (the arm could not be
+        // set, the isolation let a foreign crocodile in, or the natural
+        // trigger's preconditions never held while the crocodile went for
+        // nothing). A wrong victim or a burst that never grips is the GAME's.
         async seize(ctx, { armed, budget }) {
           const { croc, calf, bank, out } = ctx
-          if (armed) croc.lunge = { victim: calf, timer: 0, homeX: croc.x, homeZ: croc.z, gripped: false }
+          if (armed) {
+            const p = ambushPre(ctx)
+            out.armPre = p
+            if (!(p.crocInHerds && p.calfInHerds && p.crocIdle && p.calfUnclaimed)) {
+              out.stagingMiss = miss(ctx.mode, `the arm's preconditions failed before arming (${JSON.stringify(p)})`)
+              return false
+            }
+            croc.lunge = { victim: calf, timer: 0, homeX: croc.x, homeZ: croc.z, gripped: false }
+          }
           let lastX = croc.x
           let lastZ = croc.z
           let lastSimT = window.__wildlife.simTime()
           let preHeld = 0
           let lastPre = null
           let seizer = null
+          let calfLunge = false
+          let wrongVictim = null
           // point 177: the lunge step is gauged against SIM time (floored at
           // 1/60 s per poll): a real teleport jumps far more than lungeSpeed·dt.
           await window.__pollSim(budget, () => {
@@ -6485,7 +6525,13 @@ if (section('crocodile-ambush')) {
               if (dist(calf, bank) > 3) { calf.x = bank.x; calf.z = bank.z }
               calf.phase = (calf.phase + 0.1) % 75 // sweep the drink window
             }
-            if (!armed && croc.lunge === undefined) {
+            if (croc.lunge) {
+              if (croc.lunge.victim === calf) calfLunge = true
+              else if (croc.lunge.victim) {
+                wrongVictim = describe(croc.lunge.victim, croc)
+                return true
+              }
+            } else if (!armed) {
               lastPre = ambushPre(ctx)
               if (lastPre.all) preHeld++
             }
@@ -6508,24 +6554,39 @@ if (section('crocodile-ambush')) {
           }
           out.diag = {
             armed, drink: !!calf.drink, dist: +dist(calf, bank).toFixed(1), crocLunge: croc.lunge !== undefined,
-            crocToBank: +dist(croc, bank).toFixed(2), lastPre,
+            calfLunge, crocToBank: +dist(croc, bank).toFixed(2), lastPre,
           }
-          if (seizer === 'foreign') out.stagingMiss = miss(ctx.mode, 'a crocodile other than the staged one seized the calf')
-          else if (armed) out.stagingMiss = miss(ctx.mode, `the armed staged crocodile never seized the calf within ${budget} sim-s`)
-          else if (preHeld === 0) out.stagingMiss = miss(ctx.mode, `the ambush preconditions never held together (last: ${JSON.stringify(lastPre)})`)
-          // else: the preconditions held and no lunge came — a PRODUCT failure, left unmasked.
+          if (wrongVictim) out.wrongVictim = wrongVictim // PRODUCT: the staged crocodile went for another animal
+          else if (seizer === 'foreign') out.stagingMiss = miss(ctx.mode, 'a crocodile other than the staged one seized the calf (isolation failed)')
+          else if (!armed && !calfLunge && preHeld === 0)
+            out.stagingMiss = miss(ctx.mode, `the ambush preconditions never held together (last: ${JSON.stringify(lastPre)})`)
+          // else PRODUCT: the preconditions held (or the arm was set) and no grip came.
           return false
         },
         // Link the parent `d` out on the LAND side of the bank (a parent parked
-        // across the channel got relocated by the water sweep mid-charge).
-        linkParent(ctx, d) {
-          const { calf, parent } = ctx
-          ctx.out.foreignParent = H().zebra.some((z) => z !== parent && z.child === calf)
+        // across the channel got relocated by the water sweep mid-charge) and
+        // assert what the fixture controls at the grip: placed, linked, and on
+        // the stated side of the charge window. `arrive`: the charge at
+        // walk × rescueBurst reaches the sacrifice reach inside the remaining
+        // struggle; `false`: it cannot reach even the too-late ring in it;
+        // `null`: no window side (a pinned parent).
+        // What the charge then does is the game's.
+        linkParent(ctx, d, { arrive }) {
+          const { calf, parent, out } = ctx
+          out.foreignParent = H().zebra.some((z) => z !== parent && z.child === calf)
           parent.x = calf.x + ctx.ux * d
           parent.z = calf.z + ctx.uz * d
           parent.child = calf
           calf.parent = parent
           H().zebra.push(parent)
+          const left = calf.caught ?? 0
+          const v = charge()
+          const need = arrive === null ? null : (arrive ? (d - REACH.sacrifice) / v : (d - REACH.tooLate) / v)
+          out.parentLink = { d, caughtLeft: +left.toFixed(2), charge: v, need: need === null ? null : +need.toFixed(2), arrive }
+          const ok = H().zebra.includes(parent) && calf.parent === parent && Math.abs(dist(parent, calf) - d) < 0.01 &&
+            left > 0 && (arrive === null || (arrive ? need < left : need > left))
+          if (!ok) out.stagingMiss = miss(ctx.mode, `the parent was not placed on the stated side of the charge window (${JSON.stringify(out.parentLink)})`)
+          return ok
         },
         // Hold the parent EXACTLY `d` from the calf for the whole struggle,
         // whatever the frame cadence: its own charge writes are ignored. The
@@ -6533,7 +6594,6 @@ if (section('crocodile-ambush')) {
         pinParent(ctx, d) {
           const { calf, parent } = ctx
           const at = { x: () => calf.x + ctx.ux * d, z: () => calf.z + ctx.uz * d }
-          for (const k of ['x', 'z']) Object.defineProperty(parent, k, { configurable: true, enumerable: true, get: at[k], set: () => {} })
           ctx.undo.push(() => {
             const x = parent.x
             const z = parent.z
@@ -6542,8 +6602,9 @@ if (section('crocodile-ambush')) {
             parent.x = x
             parent.z = z
           })
+          for (const k of ['x', 'z']) Object.defineProperty(parent, k, { configurable: true, enumerable: true, get: at[k], set: () => {} })
         },
-        // Track the closest parent approach while the calf is still held.
+        // Track the closest parent approach while the calf is still held (diagnostic).
         track(ctx) {
           const { calf, parent, out } = ctx
           if (calf.caught !== undefined && !calf.dead) {
@@ -6553,19 +6614,20 @@ if (section('crocodile-ambush')) {
         },
         finish(ctx) {
           const { out, croc, calf, parent } = ctx
-          if (croc) {
-            out.calfAlive = !calf.dead
-            out.parentAlive = !parent.dead
-            out.crocRetreated = croc.lunge === undefined || croc.lunge.retreat === true
-            const lion = window.__lionHunt.state
-            out.lionTouched = lion.victim === calf || lion.victim === parent
-            out.calfAt = { x: +calf.x.toFixed(1), z: +calf.z.toFixed(1), bankX: +ctx.bank.x.toFixed(1), bankZ: +ctx.bank.z.toFixed(1) }
-          }
-          for (const u of ctx.undo.reverse()) u()
-          if (croc) {
-            const herds = H()
-            herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
-            herds.crocodile = ctx.naturals.concat(ctx.purged) // the staged croc retires, the naturals return
+          try {
+            if (croc) {
+              out.calfAlive = !calf.dead
+              out.calfCaught = calf.caught !== undefined
+              out.parentAlive = !parent.dead
+              out.crocRetreated = croc.lunge === undefined || croc.lunge.retreat === true
+              const lion = window.__lionHunt.state
+              out.lionTouched = lion.victim === calf || lion.victim === parent
+              // No adult but the staged parent may have taken the calf in.
+              out.foreignParent = out.foreignParent || H().zebra.some((z) => z !== parent && z.child === calf)
+              out.calfAt = { x: +calf.x.toFixed(1), z: +calf.z.toFixed(1), bankX: +ctx.bank.x.toFixed(1), bankZ: +ctx.bank.z.toFixed(1) }
+            }
+          } finally {
+            for (const u of ctx.undo.reverse()) u()
           }
           return out
         },
@@ -6579,14 +6641,12 @@ if (section('crocodile-ambush')) {
     lunge: () =>
       page.evaluate(async () => {
         const S = window.__crocStage
-        const ctx = S.stage('lunge', 'taken')
+        const ctx = S.begin('lunge')
         try {
-          if (!ctx.out.staged || !(await S.seize(ctx, { armed: false, budget: 30 }))) return ctx.out
-          S.linkParent(ctx, 60) // 60 / rescue speed 6 ≈ 10 s, twice the struggle window
+          if (!S.stage(ctx, 'taken') || !(await S.seize(ctx, { armed: false, budget: 30 }))) return ctx.out
+          if (!S.linkParent(ctx, 60, { arrive: false })) return ctx.out
           await window.__pollSim(window.__balance.crocodile.dragSeconds + 15, () => { S.track(ctx); return ctx.calf.dead === true })
           await window.__sleepSim(0.4)
-          if ((ctx.out.parentMinWhileCaught ?? Infinity) < S.REACH.tooLate)
-            ctx.out.stagingMiss = S.miss('lunge', `the parked parent came within the too-late ring (${ctx.out.parentMinWhileCaught})`)
           return ctx.out
         } finally { S.finish(ctx) }
       }),
@@ -6594,19 +6654,17 @@ if (section('crocodile-ambush')) {
     rescue: () =>
       page.evaluate(async () => {
         const S = window.__crocStage
-        const ctx = S.stage('rescue', 'driveOff')
+        const ctx = S.begin('rescue')
         try {
-          if (!ctx.out.staged || !(await S.seize(ctx, { armed: true, budget: 10 }))) return ctx.out
-          S.linkParent(ctx, 8) // 8 / rescue speed 6 ≈ 1.3 s, well inside the 5 s window
+          if (!S.stage(ctx, 'driveOff') || !(await S.seize(ctx, { armed: true, budget: 10 }))) return ctx.out
+          if (!S.linkParent(ctx, 8, { arrive: true })) return ctx.out
           const { calf, croc } = ctx
           // Wait for BOTH the freed calf and the retreat flag (point 249).
-          await window.__pollSim(25, () => {
+          ctx.out.resolved = await window.__pollSim(25, () => {
             S.track(ctx)
             return calf.caught === undefined && !calf.dead && (croc.lunge === undefined || croc.lunge.retreat === true)
           })
           await window.__sleepSim(0.6)
-          if (calf.dead && (ctx.out.parentMinWhileCaught ?? Infinity) >= S.REACH.sacrifice)
-            ctx.out.stagingMiss = S.miss('rescue', `the parent never reached the sacrifice reach inside the struggle window (closest ${ctx.out.parentMinWhileCaught})`)
           return ctx.out
         } finally { S.finish(ctx) }
       }),
@@ -6614,15 +6672,16 @@ if (section('crocodile-ambush')) {
     sacrifice: () =>
       page.evaluate(async () => {
         const S = window.__crocStage
-        const ctx = S.stage('sacrifice', 'taken')
+        const ctx = S.begin('sacrifice')
         try {
-          if (!ctx.out.staged || !(await S.seize(ctx, { armed: true, budget: 10 }))) return ctx.out
-          S.linkParent(ctx, 8)
+          if (!S.stage(ctx, 'taken') || !(await S.seize(ctx, { armed: true, budget: 10 }))) return ctx.out
+          if (!S.linkParent(ctx, 8, { arrive: true })) return ctx.out
           const { calf, parent } = ctx
-          await window.__pollSim(25, () => { S.track(ctx); return parent.dead === true || calf.dead === true })
+          ctx.out.resolved = await window.__pollSim(25, () => {
+            S.track(ctx)
+            return (parent.dead === true && calf.caught === undefined) || calf.dead === true
+          })
           await window.__sleepSim(0.6)
-          if (!parent.dead && (ctx.out.parentMinWhileCaught ?? Infinity) >= S.REACH.sacrifice)
-            ctx.out.stagingMiss = S.miss('sacrifice', `the parent never reached the sacrifice reach inside the struggle window (closest ${ctx.out.parentMinWhileCaught})`)
           return ctx.out
         } finally { S.finish(ctx) }
       }),
@@ -6631,15 +6690,16 @@ if (section('crocodile-ambush')) {
     toolate: () =>
       page.evaluate(async () => {
         const S = window.__crocStage
-        const ctx = S.stage('toolate', 'taken')
+        const ctx = S.begin('toolate')
         try {
-          if (!ctx.out.staged || !(await S.seize(ctx, { armed: true, budget: 10 }))) return ctx.out
+          if (!S.stage(ctx, 'taken') || !(await S.seize(ctx, { armed: true, budget: 10 }))) return ctx.out
           const hold = 2.6 // inside [sacrifice 1.3, too-late 3.2), clear of both edges
-          S.linkParent(ctx, hold)
+          if (!S.linkParent(ctx, hold, { arrive: null })) return ctx.out // no window side: the pin holds it
           S.pinParent(ctx, hold)
           const { calf, parent } = ctx
           await window.__pollSim(25, () => { S.track(ctx); return calf.dead === true && parent.dead === true })
           await window.__sleepSim(0.6)
+          // The pin is fixture: it must have held the band the whole window.
           const d = ctx.out.parentMinWhileCaught ?? Infinity
           if (d < S.REACH.sacrifice || d >= S.REACH.tooLate)
             ctx.out.stagingMiss = S.miss('toolate', `the held parent left the too-late band [${S.REACH.sacrifice}, ${S.REACH.tooLate}) (closest ${d})`)
@@ -6651,14 +6711,17 @@ if (section('crocodile-ambush')) {
     leaves: () =>
       page.evaluate(async () => {
         const S = window.__crocStage
-        const ctx = S.stage('leaves', 'taken')
+        const ctx = S.begin('leaves')
         try {
-          if (!ctx.out.staged || !(await S.seize(ctx, { armed: true, budget: 10 }))) return ctx.out
-          S.linkParent(ctx, 60)
+          if (!S.stage(ctx, 'taken') || !(await S.seize(ctx, { armed: true, budget: 10 }))) return ctx.out
+          if (!S.linkParent(ctx, 60, { arrive: false })) return ctx.out
           const { calf, parent, croc, out } = ctx
           const t0 = performance.now()
           out.aftermath = { freedAlive: false, sank: false, heldWhileSinking: true, croc319: 'leaves' }
           await window.__pollSim(2, () => { S.track(ctx); return false })
+          // The grip must still HOLD at the removal instant: an early release
+          // would make the "freed alive" below prove nothing.
+          out.aftermath.heldAtRemoval = croc.lunge?.victim === calf && calf.caught !== undefined && calf.caughtBy === 'crocodile' && !calf.dead
           // The view-ring cull, reproduced: the crocodile leaves the herds while
           // the calf is still held. It stays out (finish() restores the naturals).
           const herds = window.__wildlife.herdsRef.current
@@ -6679,8 +6742,6 @@ if (section('crocodile-ambush')) {
           out.aftermath.asserts = (window.__assertLog ?? [])
             .filter((e) => e.t >= t0 && (e.code === 'carcass-shrink-has-feeder' || e.code === 'croc-victim-detached'))
             .map((e) => `${e.code}: ${e.detail}`)
-          if ((out.parentMinWhileCaught ?? Infinity) < S.REACH.tooLate)
-            out.stagingMiss = S.miss('leaves', `the parked parent came within the too-late ring (${out.parentMinWhileCaught})`)
           return out
         } finally { S.finish(ctx) }
       }),
@@ -6688,10 +6749,10 @@ if (section('crocodile-ambush')) {
     sinkhold: () =>
       page.evaluate(async () => {
         const S = window.__crocStage
-        const ctx = S.stage('sinkhold', 'taken')
+        const ctx = S.begin('sinkhold')
         try {
-          if (!ctx.out.staged || !(await S.seize(ctx, { armed: true, budget: 10 }))) return ctx.out
-          S.linkParent(ctx, 60)
+          if (!S.stage(ctx, 'taken') || !(await S.seize(ctx, { armed: true, budget: 10 }))) return ctx.out
+          if (!S.linkParent(ctx, 60, { arrive: false })) return ctx.out
           const { calf, croc, out } = ctx
           const bc = window.__balance.crocodile
           const t0 = performance.now()
@@ -6702,6 +6763,7 @@ if (section('crocodile-ambush')) {
           // the mouth anchor — sampled once per NEW draw pass.
           const reach = bc.mouthOffsetLocal * croc.scale
           const sk = { samples: 0, stale: 0, rises: 0, y0: null, yLast: null, s0: null, sDev: 0, jawErrMax: 0, frame: -1 }
+          const isGone = () => calf.gone === true || (calf.dissolve !== undefined && calf.dissolve <= 0)
           await window.__pollSim(bc.gripSeconds + 12, () => {
             if (calf.dead && !calf.gone && (calf.dissolve ?? 0) > 0) {
               if (!(croc.lunge && croc.lunge.victim === calf && !croc.lunge.retreat)) out.aftermath.heldWhileSinking = false
@@ -6720,7 +6782,7 @@ if (section('crocodile-ambush')) {
                 sk.jawErrMax = Math.max(sk.jawErrMax, Math.hypot(d.x - jx, d.z - jz))
               }
             }
-            return calf.gone === true || (calf.dissolve !== undefined && calf.dissolve <= 0)
+            return isGone()
           })
           const depth = bc.sinkDepth * calf.scale
           out.aftermath.sink = {
@@ -6729,13 +6791,13 @@ if (section('crocodile-ambush')) {
             scaleDev: +sk.sDev.toFixed(3), jawErrMax: +sk.jawErrMax.toFixed(2),
           }
           const m = out.aftermath.sink
+          // The sink must also COMPLETE (the body gone), not merely drop far enough and stall.
+          out.aftermath.gone = isGone()
           out.aftermath.sank = calf.dead === true && calf.inWater !== undefined && m.samples >= 3 && m.stale === 0 &&
-            m.rises === 0 && m.drop >= 0.5 * depth && sk.sDev <= 0.05 && sk.jawErrMax <= 0.5
+            m.rises === 0 && m.drop >= 0.5 * depth && sk.sDev <= 0.05 && sk.jawErrMax <= 0.5 && out.aftermath.gone
           out.aftermath.asserts = (window.__assertLog ?? [])
             .filter((e) => e.t >= t0 && (e.code === 'carcass-shrink-has-feeder' || e.code === 'croc-victim-detached'))
             .map((e) => `${e.code}: ${e.detail}`)
-          if ((out.parentMinWhileCaught ?? Infinity) < S.REACH.tooLate)
-            out.stagingMiss = S.miss('sinkhold', `the parked parent came within the too-late ring (${out.parentMinWhileCaught})`)
           return out
         } finally { S.finish(ctx) }
       }),
@@ -6745,18 +6807,35 @@ if (section('crocodile-ambush')) {
     vanish: () =>
       page.evaluate(async () => {
         const S = window.__crocStage
-        const ctx = S.stage('vanish', 'taken')
+        const ctx = S.begin('vanish')
         try {
-          if (!ctx.out.staged || !(await S.seize(ctx, { armed: true, budget: 10 }))) return ctx.out
+          if (!S.stage(ctx, 'taken') || !(await S.seize(ctx, { armed: true, budget: 10 }))) return ctx.out
           const { calf, croc, out } = ctx
           const herds = window.__wildlife.herdsRef.current
           herds.zebra = herds.zebra.filter((a) => a !== calf)
-          const grip0 = window.__wildlife.simTime()
           const bc = window.__balance.crocodile
-          // Generous: the haul's own deadline, then the grip's, then a margin
-          // (point 249: the grip timer runs a touch slower than the sim clock).
-          await window.__pollSim(bc.dragSeconds + bc.gripSeconds + 20, () => croc.lunge === undefined || croc.lunge.retreat === true)
-          out.releaseSim = +(window.__wildlife.simTime() - grip0).toFixed(1)
+          const sim = () => window.__wildlife.simTime()
+          const grip0 = sim()
+          // The deadline counts HELD time in the feeding grip (after the haul).
+          // Bracket the grip phase's start and the release by the polls around
+          // them, so the longest possible held time is known exactly.
+          let lastNotGripped = grip0
+          let gripSeen = false
+          let releasedAt = null
+          const released = () => croc.lunge === undefined || croc.lunge.retreat === true
+          await window.__pollSim(bc.dragSeconds + bc.gripSeconds + 20, () => {
+            const now = sim()
+            if (released()) { releasedAt = now; return true }
+            if (croc.lunge?.gripped === true) gripSeen = true
+            else lastNotGripped = now
+            return false
+          })
+          out.releaseSim = +(sim() - grip0).toFixed(1)
+          // Released no EARLIER than the hard deadline: even the longest possible
+          // held time (release seen − last poll before the grip phase) must reach it.
+          const maxHeld = releasedAt === null ? null : +(releasedAt - lastNotGripped).toFixed(2)
+          out.deadline = { gripSeen, maxHeld, gripSeconds: bc.gripSeconds }
+          out.releasedAtDeadline = gripSeen && maxHeld !== null && maxHeld >= bc.gripSeconds
           return out
         } finally { S.finish(ctx) }
       }),
@@ -6767,6 +6846,7 @@ if (section('crocodile-ambush')) {
   }
   // A staging miss fails the check under its unchanged NAME (the red ledger's
   // identity) with a detail that leads with the self-naming STAGING MISS line.
+  // Everything else is judged by the real outcome predicate.
   const crocCheck = (name, r, ok) =>
     check(name, !r.stagingMiss && ok, r.stagingMiss ? `${r.stagingMiss}  ${JSON.stringify(r)}` : JSON.stringify(r))
 
@@ -6780,25 +6860,28 @@ if (section('crocodile-ambush')) {
   crocCheck(
     'the hidden crocodile lunges visibly (no teleport) and grips the bank drinker (point 130)',
     crocLunge,
-    crocLunge.staged && crocLunge.lunged && crocLunge.noTeleport && crocLunge.gripped && !crocLunge.calfAlive && !crocLunge.lionTouched,
+    crocLunge.staged && crocLunge.lunged && crocLunge.noTeleport && crocLunge.gripped && !crocLunge.calfAlive &&
+      !crocLunge.lionTouched && !crocLunge.foreignParent,
   )
   const crocRescue = await crocDrama('rescue')
   crocCheck(
     'a charging parent drives the crocodile off — the calf rises, everyone lives (point 130)',
     crocRescue,
-    crocRescue.staged && crocRescue.gripped && crocRescue.calfAlive && crocRescue.parentAlive && crocRescue.crocRetreated && !crocRescue.lionTouched,
+    crocRescue.staged && crocRescue.gripped && crocRescue.resolved === true && crocRescue.calfAlive && !crocRescue.calfCaught &&
+      crocRescue.parentAlive && crocRescue.crocRetreated && !crocRescue.lionTouched && !crocRescue.foreignParent,
   )
   const crocSac = await crocDrama('sacrifice')
   crocCheck(
     'the sacrifice at the waterline: the crocodile takes the parent, the calf escapes (point 130)',
     crocSac,
-    crocSac.staged && crocSac.gripped && !crocSac.parentAlive && crocSac.calfAlive && !crocSac.lionTouched,
+    crocSac.staged && crocSac.gripped && !crocSac.parentAlive && crocSac.calfAlive && !crocSac.calfCaught &&
+      !crocSac.lionTouched && !crocSac.foreignParent,
   )
   const crocLate = await crocDrama('toolate')
   crocCheck(
     'too late at the bank: the crocodile takes calf and parent both (point 130)',
     crocLate,
-    crocLate.staged && crocLate.gripped && !crocLate.calfAlive && !crocLate.parentAlive && !crocLate.lionTouched,
+    crocLate.staged && crocLate.gripped && !crocLate.calfAlive && !crocLate.parentAlive && !crocLate.lionTouched && !crocLate.foreignParent,
   )
   // Point 319: the crocodile kill's aftermath. (a) The crocodile is streamed
   // out mid-struggle: the victim stands up alive, no sink with no crocodile
@@ -6808,21 +6891,21 @@ if (section('crocodile-ambush')) {
   crocCheck(
     'a crocodile streamed out mid-struggle frees its victim ALIVE — no feederless dissolve (point 319)',
     crocLeaves,
-    crocLeaves.staged && crocLeaves.gripped && crocLeaves.aftermath?.freedAlive === true &&
-      crocLeaves.aftermath.asserts.length === 0 && !crocLeaves.lionTouched,
+    crocLeaves.staged && crocLeaves.gripped && crocLeaves.aftermath?.heldAtRemoval === true && crocLeaves.aftermath.freedAlive === true &&
+      crocLeaves.aftermath.asserts.length === 0 && !crocLeaves.lionTouched && !crocLeaves.foreignParent,
   )
   const crocSink = await crocDrama('sinkhold')
   crocCheck(
     'a crocodile kill SINKS at the jaws and the crocodile holds it until it is gone (point 319)',
     crocSink,
     crocSink.staged && crocSink.gripped && !crocSink.calfAlive && crocSink.aftermath?.sank === true &&
-      crocSink.aftermath.heldWhileSinking === true && crocSink.aftermath.asserts.length === 0,
+      crocSink.aftermath.heldWhileSinking === true && crocSink.aftermath.asserts.length === 0 && !crocSink.foreignParent,
   )
   const crocVanish = await crocDrama('vanish')
   crocCheck(
     'a crocodile whose gripped victim vanishes releases on the hard deadline, never pinned forever (point 186)',
     crocVanish,
-    crocVanish.staged && crocVanish.gripped && crocVanish.crocRetreated,
+    crocVanish.staged && crocVanish.gripped && crocVanish.crocRetreated && crocVanish.releasedAtDeadline === true,
   )
 
   // --- Point 275: the BROADENED waterline ambush --------------------------------
