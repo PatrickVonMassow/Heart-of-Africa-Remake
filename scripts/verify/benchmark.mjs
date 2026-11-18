@@ -105,33 +105,46 @@ const routeNeedFps = Math.max(1, Math.ceil(progressNames.total / ((ROUTE_BUDGET_
 // A failed probe leaves the rate unmeasured (null), never the boot reading.
 const routeFps = await page.evaluate(laneFpsProbe, 2000).catch(() => null)
 const routeStarted = Date.now()
+// Every wait of the route shares its one deadline, so a slow lane still ends
+// in the UNMEASURED verdict below instead of a throw.
+const routeLeft = () => Math.max(1, routeStarted + ROUTE_BUDGET_MS - Date.now())
+const wallCapToNull = (err) => {
+  if (!isWallCap(err)) throw err
+  return null
+}
 // The climate-haze-off lever, live (point 1542): its desert phase must draw no
 // haze, and the next config ('all-off', haze on) must draw it again. The
 // desert is the only route phase with haze, so both samples are taken there.
-const hazeAt = (config) =>
+// One poll reads config, phase and haze together, so a sample never comes from
+// a later phase; `want` waits within the phase, `{ missed }` once it has ended.
+const hazeIn = (config, wantShown) =>
   page
     .waitForFunction(
-      (c) => {
-        const p = window.__ui.getState().benchProgress
-        return p && p.config === c && p.phase === 'desert-standing' ? true : null
+      ({ c, want }) => {
+        const s = window.__ui.getState()
+        const p = s.benchProgress
+        if (p && p.config === c && p.phase === 'desert-standing') {
+          window.__hazePhaseSeen = c
+          const shown = window.__climate.hazeShown()
+          return want === null || shown === want ? { enabled: window.__climate.hazeEnabled(), shown } : null
+        }
+        return window.__hazePhaseSeen === c || s.benchReport !== null ? { missed: true } : null
       },
-      config,
-      { timeout: ROUTE_BUDGET_MS, polling: 50 },
+      { c: config, want: wantShown },
+      { timeout: routeLeft(), polling: 50 },
     )
-    .then(() => page.evaluate(() => ({ enabled: window.__climate.hazeEnabled(), shown: window.__climate.hazeShown() })))
-const hazeOff = await hazeAt('climate-haze-off')
-check('climate-haze-off hides the ground haze in its desert phase', !hazeOff.enabled && !hazeOff.shown, JSON.stringify(hazeOff))
-await hazeAt('all-off')
-const hazeBack = await page
-  .waitForFunction(() => window.__climate.hazeShown() || null, null, { timeout: 20000, polling: 50 })
-  .then(() => true, () => false)
-check('the next config draws the ground haze again', hazeBack)
-const routeDone = await page
-  .waitForFunction(() => window.__ui.getState().benchReport !== null, null, { timeout: ROUTE_BUDGET_MS })
-  .then(() => true, (err) => {
-    if (!isWallCap(err)) throw err
-    return false
-  })
+    .then((h) => h.jsonValue(), wallCapToNull)
+const hazeOff = await hazeIn('climate-haze-off', null)
+const hazeBack = hazeOff ? await hazeIn('all-off', true) : null
+if (hazeOff && hazeBack) {
+  check('climate-haze-off hides the ground haze in its desert phase', hazeOff.enabled === false && hazeOff.shown === false, JSON.stringify(hazeOff))
+  check('the next config draws the ground haze again in its desert phase', hazeBack.shown === true, JSON.stringify(hazeBack))
+}
+const routeDone =
+  hazeBack !== null &&
+  (await page
+    .waitForFunction(() => window.__ui.getState().benchReport !== null, null, { timeout: routeLeft() })
+    .then(() => true, (err) => wallCapToNull(err) ?? false))
 const routeName = 'the fixed-frame benchmark route completes and reports'
 const routeLane = timingVerdict({ ok: routeDone, needFps: routeNeedFps, measuredFps: routeFps })
 if (routeLane.verdict === 'unmeasured') console.log(unmeasuredLine(routeName, routeLane.reason))
@@ -347,14 +360,22 @@ await page.waitForFunction(
   null,
   { timeout: ROUTE_BUDGET_MS, polling: 50 },
 )
-const abortedOff = await page.evaluate(() => window.__climate.hazeEnabled())
-await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' })))
-await page.waitForFunction(() => window.__ui.getState().benchProgress === null, null, { timeout: 60000 })
-const abortedAfter = await page.evaluate(() => window.__climate.hazeEnabled())
+// Config, lever and Esc in one browser call, so the abort lands inside the
+// haze-off pass; the report must then say it was aborted, not completed.
+const abortedAt = await page.evaluate(() => {
+  const at = { config: window.__ui.getState().benchProgress?.config, enabled: window.__climate.hazeEnabled() }
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' }))
+  return at
+})
+await page.waitForFunction(() => window.__ui.getState().benchReport !== null, null, { timeout: 60000 })
+const abortedAfter = await page.evaluate(() => ({
+  aborted: window.__ui.getState().benchReport.aborted,
+  enabled: window.__climate.hazeEnabled(),
+}))
 check(
   'an abort during climate-haze-off re-enables the ground haze',
-  abortedOff === false && abortedAfter === true,
-  `during ${abortedOff}, after ${abortedAfter}`,
+  abortedAt.config === 'climate-haze-off' && abortedAt.enabled === false && abortedAfter.aborted === true && abortedAfter.enabled === true,
+  `during ${JSON.stringify(abortedAt)}, after ${JSON.stringify(abortedAfter)}`,
 )
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' })))
 
