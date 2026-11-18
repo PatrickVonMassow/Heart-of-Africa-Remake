@@ -94,6 +94,17 @@ put it is the mistake this line exists to stop.
   Test: `polish --section=children-bank-game` on both backends with the frame
   `687-bank-play-rocks` INSPECTED.
   Criticality: low — a small wrong thing in a picture the player stands in front of.
+  MEASURED 18.11.2026 (branch feat/1164-shadow-without-caster, temporary probe commit to revert):
+  the dark ellipses on that sand are the SCATTER BOULDERS THEMSELVES (GroundScatter rock
+  instances, scale 0.33-0.68, i.e. 17-36 cm high, 30-58 m off; e.g. instance 4 at
+  -12.83/-18.77 projects to px 1122/482 of the 09.11 frame), neither a culled caster nor a
+  decal (the place scene has none). On the 09.11 frame they read #050300-#0a0502, darker
+  than the big rock's shaded side (#181106) and its cast shadow (#31290f), top faces
+  included. Switching their shadow receive, shadow cast or both changes their pixels by
+  under 3 %, so shadow-map acne is ruled out. Under the frontlit sun of 18.11 they read
+  #413321-#54432b against sand #786138, still far below their #8a8178 albedo. Next
+  suspect: GTAO (`src/render/Effects.tsx`, AO_FLOOR 0.4) occluding a stone smaller than
+  its radius; test via `window.__ui.setState({ ssaoEnabled: false })` at the shutter.
   Refs: verification/687-bank-play-rocks.png
   Bundle: Siedlungsgeometrie.
 
