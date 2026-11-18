@@ -208,12 +208,12 @@ for (const name of ['high-preset', 'medium-preset']) {
   const n = report.rows.filter((r) => r.config === name).length
   check(`the sweep includes the ${name} pass (one row per phase)`, n === phases.length, `${n} ${name} rows`)
 }
-// Point 1541: medium caps at one pixel per CSS pixel, high keeps the native 1.25.
-const presetRatios = (name) => [...new Set(report.rows.filter((r) => r.config === name).map((r) => r.pixelRatio))]
+// Point 1541: low caps at 0.8, medium at one pixel per CSS pixel, high keeps the native 1.25.
+const presetRatios = (name) => JSON.stringify([...new Set(report.rows.filter((r) => r.config === name).map((r) => r.pixelRatio))])
 check(
-  'the medium-preset rows render at pixel ratio 1.00, the high-preset rows at the native 1.25',
-  JSON.stringify(presetRatios('medium-preset')) === '[1]' && JSON.stringify(presetRatios('high-preset')) === '[1.25]',
-  `medium ${JSON.stringify(presetRatios('medium-preset'))}, high ${JSON.stringify(presetRatios('high-preset'))}`,
+  'the low/medium/high preset rows render at pixel ratio 0.80 / 1.00 / the native 1.25',
+  presetRatios('low-preset') === '[0.8]' && presetRatios('medium-preset') === '[1]' && presetRatios('high-preset') === '[1.25]',
+  `low ${presetRatios('low-preset')}, medium ${presetRatios('medium-preset')}, high ${presetRatios('high-preset')}`,
 )
 check(
   'every row records the pixel ratio it was measured at',
