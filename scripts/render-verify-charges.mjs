@@ -2201,16 +2201,4 @@ export const RED_CHARGES = [
       + 'detailReadsPrefix: the measurement is cut at the 200-character bound; what the bound removes is the trailing '
       + 'death, calf and settle fields. The signature sits at character ~150, clear of the bound.',
   })),
-  {
-    point: 336,
-    suite: 'wildlife',
-    backend: 'webgl',
-    kind: 'console',
-    match: /^console error: \[ASSERT\] croc-victim-detached\b/i,
-    why:
-      'MEASURED 17.11.2026 on WebGL 2, feat/414-bird-eye-gait cf5824d85 (wildlife, log 2026-11-17T17-53-51-881): the '
-      + 'dev assert croc-victim-detached fired (antelope caught 3.32 s, not in water, not dead) in the same run as the '
-      + 'point-1528 crossing reds. A detached crocodile victim belongs to the crocodile staging family, point 336\'s '
-      + 'rebuild. The charge dies with point 336.',
-  },
 ]
