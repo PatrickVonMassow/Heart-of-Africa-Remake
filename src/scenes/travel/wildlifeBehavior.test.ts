@@ -5,6 +5,7 @@ import {
   channelDriftStep,
   dramaFlowFactor,
   floodFlowFactor,
+  floodSweepsCrossingCalf,
   remoteFloodAt,
   drinkCatchment,
   mireFate,
@@ -3302,6 +3303,30 @@ describe('the flood swells the drama current (design.md §19.8, point 364)', () 
     expect(floodFlowFactor(0, 1, 0.6, 1.8, 0.9)).toBeCloseTo(0.6 + 1.2 * 0.9, 9)
     expect(floodFlowFactor(1, 0.2, 0.6, 1.8, 0.9)).toBeCloseTo(1.8, 9)
     expect(floodFlowFactor(0, 1, 0.6, 1.8, 0)).toBeCloseTo(0.6, 9) // scale 0 switches the flood off
+  })
+
+  it('the crest can take a crossing calf only in a swollen current, frame-rate independent', () => {
+    // Calm water never sweeps, whatever the roll.
+    expect(floodSweepsCrossingCalf(0.79, 0.8, 10, 1, 0)).toBe(false)
+    expect(floodSweepsCrossingCalf(1.5, 0.8, 0, 1, 0)).toBe(false)
+    expect(floodSweepsCrossingCalf(1.5, 0.8, 0.25, 0, 0)).toBe(false)
+    // Swollen: the hazard 1 - exp(-rate*dt) decides.
+    const p = 1 - Math.exp(-0.25 / 30)
+    expect(floodSweepsCrossingCalf(1.5, 0.8, 0.25, 1 / 30, p * 0.99)).toBe(true)
+    expect(floodSweepsCrossingCalf(1.5, 0.8, 0.25, 1 / 30, p * 1.01)).toBe(false)
+    // Survival over 2 s is the same at 30 and 120 fps.
+    const survive = (fps: number) => Math.pow(1 - (1 - Math.exp(-0.25 / fps)), 2 * fps)
+    expect(survive(30)).toBeCloseTo(survive(120), 12)
+  })
+
+  it('at the October crest the shipped balance can sweep a Nile crossing; at low water it cannot', () => {
+    const lat = 29
+    const lon = 31
+    const flow = dramaCurrent(lat, lon).strength
+    const crest = on(10, 5)
+    const low = Array.from({ length: 365 }, (_, d) => d).find((d) => nileFloodAt(d, START_YEAR) === 0) ?? 100
+    expect(floodSweepsCrossingCalf(flow * factorAt(lat, lon, crest), bw.drownFlowThreshold, bw.floodSweepChancePerSecond, 1, 0)).toBe(true)
+    expect(floodSweepsCrossingCalf(flow * factorAt(lat, lon, low), bw.drownFlowThreshold, bw.floodSweepChancePerSecond, 1, 0)).toBe(false)
   })
 
   it('the drowning window and threshold are untouched by the flood', () => {

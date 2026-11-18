@@ -2681,6 +2681,25 @@ export function dramaFlowFactor(
   return floodFlowFactor(wetness, flood, bw.dryFlowFactor, bw.wetFlowFactor, bw.floodFlowScale)
 }
 
+/**
+ * The crest takes the calf (design.md §19.8, point 364): a calf swimming a
+ * family crossing in a current at or above the drown threshold is torn off its
+ * line with a calibratable per-second chance (a hazard, so the frame rate does
+ * not change the odds). It then becomes the ordinary struggling calf — the
+ * drift, the parent's braked wade and the point-122 drowning window — the
+ * existing drowning drama reached by a new road, never a new death.
+ */
+export function floodSweepsCrossingCalf(
+  effectiveFlow: number,
+  drownFlowThreshold: number,
+  chancePerSecond: number,
+  dt: number,
+  roll: number,
+): boolean {
+  if (effectiveFlow < drownFlowThreshold || chancePerSecond <= 0 || dt <= 0) return false
+  return roll < 1 - Math.exp(-chancePerSecond * dt)
+}
+
 export type StruggleFate = 'struggling' | 'self-rescue' | 'drowned'
 
 /**

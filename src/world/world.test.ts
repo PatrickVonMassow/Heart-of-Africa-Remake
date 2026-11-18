@@ -6,7 +6,7 @@ import * as THREE from 'three'
 import { describe, it, expect, beforeAll } from 'vitest'
 import { PLACES, RIVERS, regionAt, VILLAGE_HEARTLANDS, VILLAGE_RIVER_CLEARANCE_DEG, PORT_RIVER_CLEARANCE_DEG, placeById, landmarkLabelHiddenByMapPoint, placeDiscovered } from './geo'
 import { sampleTerrain, isBlocked, RIVER_WIDTH_DEG } from './terrain'
-import { cellAt, coastDistance, riverDistance, CELL_LAKE, CELL_OCEAN, CELL_LAND } from './geoIndex'
+import { cellAt, coastDistance, riverDistance, riverIdAt, CELL_LAKE, CELL_OCEAN, CELL_LAND } from './geoIndex'
 import { lakeContains } from './hydro'
 import { landFractionAt } from './geodata'
 import { LAKES } from './data/lakes'
@@ -16,7 +16,9 @@ import { MOUNTAINS, WATERFALLS, ELEPHANT_GRAVEYARD, CULTURAL_LANDMARKS, NATURAL_
 import { GIZA_PLATEAU } from './data/gizaPlateau'
 import { setupGeodata } from '../test/geodata'
 import { densifyRiver } from '../scenes/travel/waterSurface'
-import { balance } from '../config/balance'
+import { balance, START_YEAR } from '../config/balance'
+import { nileFloodAt } from '../systems/season'
+import { dramaFlowFactor } from '../scenes/travel/wildlifeBehavior'
 import { buildWetland } from '../render/landmarks'
 
 // The rendered XZ footprint radius (in degrees, 10 world units/°) of a landmark
@@ -615,6 +617,42 @@ describe('one site, one shape (point 338)', () => {
     for (const place of PLACES) {
       if (place.id === 'giza' || place.id === 'abu-simbel') continue
       expect(mapPointGlyphHiddenByLandmark(place.id)).toBe(false)
+    }
+  })
+})
+
+describe('the flood changes the water force, never its extent (design.md §19.8/§19.9, point 364)', () => {
+  // The crest at Cairo and the low-water stretch of the same year.
+  const crest = (Date.UTC(START_YEAR, 9, 5) - Date.UTC(START_YEAR, 0, 1)) / 86400000
+  const low = Array.from({ length: 365 }, (_, d) => d).find((d) => nileFloodAt(d, START_YEAR) === 0) ?? 100
+  const snapshot = () => {
+    const mask: string[] = []
+    // A sweep across the lower Nile and the Okavango fan: the water mask.
+    for (const [lat0, lon0] of [[29, 31], [-19.5, 22.9]]) {
+      for (let dy = -1; dy <= 1; dy += 0.1) {
+        for (let dx = -1; dx <= 1; dx += 0.1) mask.push(sampleTerrain(lat0 + dy, lon0 + dx, 1).type)
+      }
+    }
+    const clearance = villages.map((v) => riverDistance(v.lat, v.lon, 4, 2))
+    return { mask, clearance, width: RIVER_WIDTH_DEG }
+  }
+
+  it('the crest swells the drama factor while mask, ribbon width and clearance stay identical', () => {
+    const bw = balance.waterDrama
+    const factor = (day: number) =>
+      dramaFlowFactor(0, riverIdAt(30.06, 31.23), 30.06, 31.23, day, START_YEAR, bw)
+    const before = snapshot()
+    // Force the flood as hard as the debug menu can.
+    const savedScale = bw.floodFlowScale
+    bw.floodFlowScale = 5
+    try {
+      expect(factor(crest)).toBeGreaterThan(factor(low))
+      expect(snapshot()).toEqual(before)
+    } finally {
+      bw.floodFlowScale = savedScale
+    }
+    for (const [i, v] of villages.entries()) {
+      expect(before.clearance[i], v.id).toBeGreaterThanOrEqual(VILLAGE_RIVER_CLEARANCE_DEG - 1e-9)
     }
   })
 })

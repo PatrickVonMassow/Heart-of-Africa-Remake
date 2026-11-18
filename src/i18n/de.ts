@@ -685,6 +685,7 @@ export const de: Strings = {
     drownSeconds: 'Ertrinken: Sekunden in starker Strömung',
     wetFlowFactor: 'Ertrinken: Strömungsfaktor Regenzeit',
     floodFlowScale: 'Ertrinken: Strömungsskala Hochwasser',
+    floodSweepChance: 'Ertrinken: Hochwasser reißt querendes Kalb mit (pro Sekunde)',
     stragglerLameChance: 'Nachzügler: Lahmheitschance nach überlebter Jagd',
     stragglerSpeedFactor: 'Nachzügler: Tempofaktor des lahmen Jungtiers',
     stragglerHealSeconds: 'Nachzügler: Sekunden bis das Lahmen heilt',

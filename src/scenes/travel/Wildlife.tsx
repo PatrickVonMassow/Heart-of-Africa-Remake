@@ -147,6 +147,7 @@ import {
   vicinitySeedBounds,
   vicinityAttemptSeed,
   dramaFlowFactor,
+  floodSweepsCrossingCalf,
   shouldMourn,
   mournDeadline,
   elephantStepAllowed,
@@ -465,6 +466,9 @@ interface Animal extends HerdGaitCarrier {
   lionFed?: boolean
   /** Seconds this calf has been struggling in open water (design.md §19). */
   inWater?: number
+  /** Marker: the swollen current tore this calf off a family crossing
+   *  (point 364); cleared once it is back on the bank. Read by the live check. */
+  floodSwept?: boolean
   /** Seconds a rescuing parent has been wading in open water (point 122) —
    *  its own field, NOT inWater: that one carries calf-only pose/behaviour
    *  couplings (facing freeze, dodge exemption, render struggle). */
@@ -3291,6 +3295,22 @@ function Herds() {
             const ter = sampleTerrain(ll.lat, ll.lon, seed)
             const inFlight =
               fleeing || (a.fleeAt !== undefined && simTimeRef.current - a.fleeAt < FLIGHT_GRACE_SECONDS)
+            // The crest takes the calf (point 364): a family crossing in a
+            // swollen current may lose the calf to the CURRENT — it leaves its
+            // line and becomes the ordinary struggling calf, so the drift, the
+            // parent's braked wade downstream and the point-122 drowning window
+            // run unchanged. Deterministic per frame, hashed like the lame roll.
+            if (ter.type === 'water' && a.crossing !== undefined && !inFlight && a.parent && !a.parent.dead) {
+              const bw = balance.waterDrama
+              const h = Math.sin(a.phase * 77.7 + simTimeRef.current * 13.1 + a.x * 3.3) * 43758.5453
+              if (floodSweepsCrossingCalf(
+                dramaCurrent(ll.lat, ll.lon).strength * flowFactorAt(ll.lat, ll.lon),
+                bw.drownFlowThreshold, bw.floodSweepChancePerSecond, dt, h - Math.floor(h),
+              )) {
+                a.crossing = undefined
+                a.floodSwept = true
+              }
+            }
             const cause =
               ter.type === 'water'
                 ? calfWaterCause({ inFlight, crossing: a.crossing !== undefined, chaseSwim: false })
@@ -3394,6 +3414,7 @@ function Herds() {
               a.inWater = undefined
               a.rescued = undefined
               a.rescueEntry = undefined
+              a.floodSwept = undefined
               a.y = Math.max(0.02, ter.height)
             }
           }

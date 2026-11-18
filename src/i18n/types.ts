@@ -707,6 +707,7 @@ export interface Strings {
     drownSeconds: string
     wetFlowFactor: string
     floodFlowScale: string
+    floodSweepChance: string
     stragglerLameChance: string
     stragglerSpeedFactor: string
     stragglerHealSeconds: string
