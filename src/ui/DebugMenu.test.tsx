@@ -947,7 +947,7 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.health', 'health.fever', 'health.sunblind', 'health.woundsSevere',
   ],
   wildlife: [
-    'debug.stageEvent', 'debug.drownSeconds', 'debug.wetFlowFactor',
+    'debug.stageEvent', 'debug.drownSeconds', 'debug.wetFlowFactor', 'debug.floodFlowScale',
     'debug.stragglerLameChance', 'debug.stragglerSpeedFactor', 'debug.stragglerHealSeconds', 'debug.vigilPredatorDelay',
     'debug.vultureClusterRadius',
     'debug.rescueBurst', 'debug.calfFraction', 'debug.calfFollowRadius', 'debug.calfGambolRange',

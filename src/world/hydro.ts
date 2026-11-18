@@ -21,6 +21,8 @@ let lakeSegs: Float64Array
 // the free-running course, ramping to 0 over the last MOUTH_SLACK_DEG of a
 // course that ends at the sea.
 let riverSegSlack: Float64Array
+// RIVERS_DATA index of each river segment (parallel to riverSegSlack).
+let riverSegRiver: Int32Array
 const riverBuckets = new Map<string, number[]>()
 const lakeBuckets = new Map<string, number[]>()
 // Densified closed lake rings for point-in-polygon tests.
@@ -151,6 +153,7 @@ function buildRiverSlack(paths: Array<Array<[number, number]>>): Float64Array {
   const riverPaths = RIVERS_DATA.map((r) => densify(r.points, false))
   riverSegs = indexSegments(riverPaths, false, riverBuckets)
   riverSegSlack = buildRiverSlack(riverPaths)
+  riverSegRiver = new Int32Array(riverPaths.flatMap((path, pi) => Array<number>(Math.max(0, path.length - 1)).fill(pi)))
   const lakePaths = LAKES.map((l) => densify(l.points, true))
   lakeSegs = indexSegments(lakePaths, true, lakeBuckets)
   lakeRings = lakePaths.map((path) => {
@@ -225,6 +228,40 @@ export function lakeShoreDistanceExact(lat: number, lon: number, maxDist = MAX_Q
   return bucketDistance(lon, lat, lakeSegs, lakeBuckets, maxDist, range)
 }
 
+/** Nearest river segment (flat index into riverSegs, -1 when none) within
+ *  `maxDist`, with its squared distance. */
+function nearestRiverSeg(lat: number, lon: number, maxDist: number): { idx: number; distSq: number } {
+  const bx = Math.floor(lon / BUCKET)
+  const by = Math.floor(lat / BUCKET)
+  let best = maxDist * maxDist
+  let bestIdx = -1
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const list = riverBuckets.get(bucketKey(bx + dx, by + dy))
+      if (!list) continue
+      for (const idx of list) {
+        const d = segDistSq(lon, lat, riverSegs, idx)
+        if (d < best) {
+          best = d
+          bestIdx = idx
+        }
+      }
+    }
+  }
+  return { idx: bestIdx, distSq: best }
+}
+
+/**
+ * Id of the river whose channel covers a point (`RIVERS_DATA` id), or null off
+ * the rivers. Same nearest-segment rule and reach as riverFlowExact, so it
+ * names exactly the river whose current that query returns — the flood-fed
+ * drama current (point 364) asks it which remote flood the water carries.
+ */
+export function riverIdAt(lat: number, lon: number, maxDist = RIVER_WIDTH_DEG + 0.05): string | null {
+  const { idx } = nearestRiverSeg(lat, lon, maxDist)
+  return idx < 0 ? null : RIVERS_DATA[riverSegRiver[idx / 4]].id
+}
+
 /**
  * Downstream flow at a point (design.md §11): the nearest river segment's
  * direction — the river data runs source → mouth, so the segment orientation
@@ -243,23 +280,7 @@ export function riverFlowExact(
   // which reproduces the funnel that trapped the swimmer.
   mouthSlack = true,
 ): { dirLat: number; dirLon: number; strength: number } {
-  const bx = Math.floor(lon / BUCKET)
-  const by = Math.floor(lat / BUCKET)
-  let best = maxDist * maxDist
-  let bestIdx = -1
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      const list = riverBuckets.get(bucketKey(bx + dx, by + dy))
-      if (!list) continue
-      for (const idx of list) {
-        const d = segDistSq(lon, lat, riverSegs, idx)
-        if (d < best) {
-          best = d
-          bestIdx = idx
-        }
-      }
-    }
-  }
+  const { idx: bestIdx, distSq: best } = nearestRiverSeg(lat, lon, maxDist)
   if (bestIdx < 0) return { dirLat: 0, dirLon: 0, strength: 0 }
   let dLon = riverSegs[bestIdx + 2] - riverSegs[bestIdx]
   let dLat = riverSegs[bestIdx + 3] - riverSegs[bestIdx + 1]

@@ -4,6 +4,8 @@
 
 import type { RegionId } from '../../world/geo'
 import { vultureLandedBox, vultureLandedCorners } from '../../render/vultureShape'
+import { nileFloodAt, okavangoFloodAt } from '../../systems/season'
+import { NATURAL_SITES } from '../../world/data/landmarks'
 
 // Heading convention across the wildlife sim: a heading `h` points in the
 // direction `(sin h, cos h)` in world (x, z), so `Math.atan2(dx, dz)` yields the
@@ -2612,6 +2614,71 @@ export function calfFleeStep(
 export function seasonFlowFactor(wetness: number, dryFactor: number, wetFactor: number): number {
   const w = Math.min(1, Math.max(0, wetness))
   return dryFactor + (wetFactor - dryFactor) * w
+}
+
+/**
+ * The flood-fed drama current (design.md §19.8, point 364): the HIGHER of the
+ * wetness-fed factor and a flood-fed one. The flood level (0..1) times the
+ * calibratable `floodScale` rides the same dry..wet ramp as the wetness, so a
+ * remote-fed crest swells a river under a rainless sky (the Nile at Cairo in
+ * October, the Okavango in Botswana's dry July) — and the result is never
+ * lower than the wetness-fed factor alone.
+ */
+export function floodFlowFactor(
+  wetness: number,
+  flood: number,
+  dryFactor: number,
+  wetFactor: number,
+  floodScale: number,
+): number {
+  return Math.max(
+    seasonFlowFactor(wetness, dryFactor, wetFactor),
+    seasonFlowFactor(flood * floodScale, dryFactor, wetFactor),
+  )
+}
+
+const OKAVANGO_SITE = NATURAL_SITES.find((n) => n.id === 'okavango')
+
+/**
+ * The remote-fed flood level (0..1) of the water at a point (point 364): the
+ * Nile flood on the Nile's own channel (`riverId === 'nile'`, the same stretch
+ * whose ribbon rises with the flood, point 138), the Okavango flood within
+ * `okavangoRadiusDeg` of the delta (point 139; the delta has no authored
+ * river), 0 everywhere else — the other rivers follow their local rains.
+ */
+export function remoteFloodAt(
+  riverId: string | null,
+  lat: number,
+  lon: number,
+  day: number,
+  startYear: number,
+  okavangoRadiusDeg: number,
+): number {
+  if (riverId === 'nile') return nileFloodAt(day, startYear)
+  if (OKAVANGO_SITE && Math.hypot(lat - OKAVANGO_SITE.lat, lon - OKAVANGO_SITE.lon) <= okavangoRadiusDeg) {
+    return okavangoFloodAt(day, startYear)
+  }
+  return 0
+}
+
+/**
+ * THE one place the §19.8 water dramas read their seasonal flow factor
+ * (point 364): every drift, drowning, swim pace and rescue brake goes through
+ * here, so no call site can keep keying on local wetness alone. The flood only
+ * changes the current's FORCE — no water mask, ribbon width or clearance reads
+ * this (§19.9's rise stays vertical).
+ */
+export function dramaFlowFactor(
+  wetness: number,
+  riverId: string | null,
+  lat: number,
+  lon: number,
+  day: number,
+  startYear: number,
+  bw: { dryFlowFactor: number; wetFlowFactor: number; floodFlowScale: number; okavangoFloodRadiusDeg: number },
+): number {
+  const flood = remoteFloodAt(riverId, lat, lon, day, startYear, bw.okavangoFloodRadiusDeg)
+  return floodFlowFactor(wetness, flood, bw.dryFlowFactor, bw.wetFlowFactor, bw.floodFlowScale)
 }
 
 export type StruggleFate = 'struggling' | 'self-rescue' | 'drowned'

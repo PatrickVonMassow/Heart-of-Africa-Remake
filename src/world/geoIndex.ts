@@ -10,6 +10,8 @@
 import { coastDistanceAt, landFractionAt } from './geodata'
 import { lakeContains, lakeShoreDistanceExact, riverDistanceExact, riverFlowExact } from './hydro'
 
+export { riverIdAt } from './hydro'
+
 export const CELL_OCEAN = 0
 export const CELL_LAND = 1
 export const CELL_LAKE = 2

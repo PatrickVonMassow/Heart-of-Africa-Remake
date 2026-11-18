@@ -706,6 +706,7 @@ export interface Strings {
     springGlow: string
     drownSeconds: string
     wetFlowFactor: string
+    floodFlowScale: string
     stragglerLameChance: string
     stragglerSpeedFactor: string
     stragglerHealSeconds: string
