@@ -381,18 +381,15 @@ if (section('communication-errand')) {
         const s = window.__game.getState()
         return geo.worldToLatLon(s.pos.x, s.pos.z)
       })
-    // HE DOES NOT STAY WHERE HE IS PUT. Measured 15.09.2026: after the jump had
-    // landed him exactly on the talus, three idle seconds carried him 0.14° of
-    // the 0.30° reach, and a first click — which waits for the button to be
-    // actionable where a keypress does not — carried him out of reach
-    // altogether, red in two of six first attempts. `driftCurrent` (design.md
-    // §11) is the suspect and point 1133 owns naming it; what matters here is
-    // that the act stands him where it is about to be JUDGED as its last step
-    // before pressing, and that the reading pair below proves he was there.
+    // THE ACT STANDS HIM WHERE IT IS JUDGED, as its last step before pressing,
+    // and the reading pair below proves he was there. The old order — jump,
+    // photograph, change zoom, then act — went red on 08.-15.09.2026 with the
+    // reach test reading him out of range; since this order it has not. What
+    // moved him then was never measured. Measured 18.11.2026, on main and on
+    // the 15.09. tree, fresh and after the errand: jumped onto the talus he
+    // stays 0.0000° from the socket for five idle seconds (savanna, no
+    // current), so a player standing there is read where he stands.
     const clickForm = async (standAt) => {
-      await page.evaluate(([la, lo]) => {
-        window.__game.getState().debugJumpTo(la, lo)
-      }, [standAt.lat, standAt.lon])
       await page.evaluate(() => {
         const g = window.__game.getState()
         g.setToast(null)
@@ -404,16 +401,24 @@ if (section('communication-errand')) {
         ui.clearDrumMessage()
         ui.setDialog(null)
         window.__toastLog = []
+        // Where he stood when the answer was SET: the position the act judged.
+        window.__toastPos = []
         window.__toastUnsub =
           window.__toastUnsub ??
           window.__game.subscribe((s, prev) => {
-            if (s.toast && s.toast !== prev.toast) window.__toastLog.push(s.toast)
+            if (s.toast && s.toast !== prev.toast) {
+              window.__toastLog.push(s.toast)
+              window.__toastPos.push({ x: s.pos.x, z: s.pos.z })
+            }
           })
       })
       // WHERE HE STOOD IS READ ON BOTH SIDES OF THE CLICK. The act resolves
       // against the LIVE position, so a red that says "no fit" has two very
       // different causes — he was never brought there, or the click itself
       // moved him — and only the pair of readings tells them apart.
+      await page.evaluate(([la, lo]) => {
+        window.__game.getState().debugJumpTo(la, lo)
+      }, [standAt.lat, standAt.lon])
       const before = await at()
       // A dialog standing over the inventory turns the click into a bare
       // Playwright timeout; name the dialog instead.
@@ -424,7 +429,8 @@ if (section('communication-errand')) {
       await page.locator('[data-form="rock-relief"]').click()
       const after = await at()
       return page.evaluate(
-        ([b, a]) => {
+        async ([b, a]) => {
+          const geo = await import('/src/world/geo.ts')
           const s = window.__game.getState()
           return {
             said: window.__toastLog,
@@ -436,6 +442,7 @@ if (section('communication-errand')) {
             dialog: window.__ui.getState().dialog ?? null,
             before: b,
             after: a,
+            judged: window.__toastPos.map((p) => geo.worldToLatLon(p.x, p.z)),
           }
         },
         [before, after],
@@ -458,7 +465,8 @@ if (section('communication-errand')) {
     const clickDetail = (r) =>
       `said ${JSON.stringify(r.said)}, spent ${JSON.stringify(r.spent)}, mode ${r.mode}, ` +
       `dialog ${JSON.stringify(r.dialog)}, stood at ${place(r.before)} and after the click ` +
-      `at ${place(r.after)} (the talus is at ${place(talus)})`
+      `at ${place(r.after)}, judged at ${r.judged.map(place).join(', ') || 'no answer'} ` +
+      `(the talus is at ${place(talus)})`
     const missOk = miss.said.includes(strings.noFit) && !miss.spent.includes('bandiagara-talus')
     console.log(
       `${missOk ? 'PASS' : 'FAIL'}  the inventory click clear of the escarpment answers in the traveller's own voice` +
@@ -494,7 +502,15 @@ if (section('communication-errand')) {
 
     // A spent socket answers like a wrong place, and writes no second page.
     const again = await clickForm(talus)
+    // A noFit from OUT of reach would pass this too, so the readings around
+    // the click AND the one taken as the answer was set must show him at the
+    // socket: then the answer is the spent one.
+    const atSocket = (ll) => Math.hypot(ll.lat - talus.lat, ll.lon - talus.lon) < reachDeg
     const againOk =
+      atSocket(again.before) &&
+      atSocket(again.after) &&
+      again.judged.length > 0 &&
+      again.judged.every(atSocket) &&
       again.said.includes(strings.noFit) &&
       again.keys.filter((k) => k === 'journal.mouldFitted').length === 1
     console.log(
