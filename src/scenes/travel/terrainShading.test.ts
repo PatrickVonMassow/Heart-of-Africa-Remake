@@ -23,7 +23,7 @@ import {
   REFINE_SEGMENT_CAP,
 } from './terrainLod'
 import { BENCH_CONFIGS } from '../../systems/benchmark'
-import { buildChunkGeometry, stitchedEdgeHeights } from './TravelScene'
+import { buildChunkGeometry, ChunkGeometryBuild, stitchedEdgeHeights } from './TravelScene'
 import { setupGeodata } from '../../test/geodata'
 
 const src = readFileSync(resolve(process.cwd(), 'src/scenes/travel/TravelScene.tsx'), 'utf8')
@@ -287,5 +287,46 @@ describe('seam stitch: shared-edge height morph (no T-junction crack, point 220)
     expect(maxOddGap).toBeGreaterThan(1e-3)
     A.dispose()
     B.dispose()
+  })
+})
+
+describe('sliced chunk build (docs/perf-1543-driving-hitches.md)', () => {
+  const chunkOf = (lat: number, lon: number): [number, number] => [
+    Math.floor((lon * 10) / 24),
+    Math.floor((-lat * 10) / 24),
+  ]
+
+  it('a build sliced one unit per step equals the one-shot build exactly', () => {
+    const [cx, cz] = chunkOf(-3.07, 37.35)
+    const edges = [112, 56, 112, 56] as const
+    const whole = buildChunkGeometry(cx, cz, 1, 112, edges)
+    const sliced = new ChunkGeometryBuild(cx, cz, 1, 112, edges)
+    // A clock that is always past the deadline: every step does one unit.
+    let steps = 0
+    while (!sliced.step(0, () => 1)) steps++
+    // 115 height rows + 113 vertex rows + the finish, one unit each.
+    expect(steps + 1).toBe(115 + 113 + 1)
+    const geo = sliced.geometry as NonNullable<typeof sliced.geometry>
+    for (const name of ['position', 'normal', 'color', 'splat', 'uv', 'seasonUV']) {
+      expect(Array.from(geo.getAttribute(name).array)).toEqual(Array.from(whole.getAttribute(name).array))
+    }
+    expect(Array.from(geo.getIndex()!.array)).toEqual(Array.from(whole.getIndex()!.array))
+    whole.dispose()
+    geo.dispose()
+  })
+
+  it('a step works until the deadline and then yields', () => {
+    const [cx, cz] = chunkOf(-3.07, 37.35)
+    const build = new ChunkGeometryBuild(cx, cz, 1, 56, [56, 56, 56, 56])
+    let t = 0
+    // Each clock read advances 1 ms; deadline 5 → yields after a few units.
+    expect(build.step(5, () => t++)).toBe(false)
+    expect(build.geometry).toBeNull()
+    expect(t).toBeLessThanOrEqual(6)
+    while (!build.step(Infinity)) {
+      // finish
+    }
+    expect(build.geometry).not.toBeNull()
+    build.geometry?.dispose()
   })
 })

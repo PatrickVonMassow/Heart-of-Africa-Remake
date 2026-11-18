@@ -6,7 +6,10 @@
 // heading prefetch predicts the next window without false triggers.
 import { describe, expect, it } from 'vitest'
 import {
-  drainChunkQueue,
+  drainSlicedQueue,
+  MAX_PARKED_BUILDS,
+  newSlicedDrainState,
+  type SliceBuild,
   orderChunkJobs,
   planChunkWindow,
   predictedNextCenter,
@@ -93,46 +96,6 @@ describe('orderChunkJobs (holes first, then nearest — a hole would be visible)
   })
 })
 
-describe('drainChunkQueue (per-frame budget, guaranteed progress, none dropped)', () => {
-  it('builds all queued jobs across several frames under the budget, in order, exactly once', () => {
-    const queue = Array.from({ length: 10 }, (_, i) => i)
-    const built: number[] = []
-    // Fake clock: each build advances time by 2 ms; the 5 ms budget admits 3
-    // builds per frame (2, 4, then 6 ≥ 5 stops the frame).
-    let t = 0
-    const now = () => t
-    const build = (j: number) => {
-      built.push(j)
-      t += 2
-    }
-    const perFrame: number[] = []
-    let frames = 0
-    while (queue.length > 0) {
-      perFrame.push(drainChunkQueue(queue, 5, now, build))
-      frames += 1
-      expect(frames).toBeLessThan(100) // never stalls
-    }
-    expect(built).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) // all, in order, once
-    expect(perFrame).toEqual([3, 3, 3, 1])
-  })
-
-  it('always builds at least one job even when a single build exceeds the budget', () => {
-    const queue = [1, 2]
-    let t = 0
-    const built: number[] = []
-    const n = drainChunkQueue(queue, 5, () => t, (j) => {
-      built.push(j)
-      t += 40 // one refined chunk blows the whole budget
-    })
-    expect(n).toBe(1) // progressed, but did not drag the second job in too
-    expect(queue).toEqual([2])
-  })
-
-  it('returns 0 on an empty queue without reading the clock', () => {
-    expect(drainChunkQueue([], 5, () => { throw new Error('clock read') }, () => {})).toBe(0)
-  })
-})
-
 describe('predictedNextCenter (heading prefetch trigger)', () => {
   const CHUNK = 24
 
@@ -159,5 +122,115 @@ describe('predictedNextCenter (heading prefetch trigger)', () => {
       12,
     )
     expect(p).toEqual({ cx: 1, cz: 1 }) // south-east into the diagonal chunk
+  })
+})
+
+// Sliced drain (docs/perf-1543-driving-hitches.md): a fake build of `units`
+// steps, each costing `unitMs` on a fake clock.
+interface Job {
+  key: string
+  units: number
+  hole?: boolean
+}
+function fakeWorld(unitMs: number) {
+  let t = 0
+  const log: string[] = []
+  const begin = (job: Job): SliceBuild => {
+    let left = job.units
+    return {
+      step(deadline: number) {
+        do {
+          t += unitMs
+          left -= 1
+          log.push(job.key)
+        } while (left > 0 && t < deadline)
+        return left === 0
+      },
+    }
+  }
+  return { now: () => t, begin, log }
+}
+
+describe('drainSlicedQueue (per-frame budget across sliced builds)', () => {
+  it('spreads one oversized build over frames, never past budget + one unit', () => {
+    const w = fakeWorld(1)
+    const queue: Job[] = [{ key: 'big', units: 12 }]
+    const state = newSlicedDrainState<Job>()
+    const done: string[] = []
+    const perFrame: number[] = []
+    for (let f = 0; f < 10 && (queue.length > 0 || state.current); f++) {
+      const t0 = w.now()
+      drainSlicedQueue(queue, state, 4, w.now, w.begin, (j) => done.push(j.key), () => false)
+      perFrame.push(w.now() - t0)
+    }
+    expect(done).toEqual(['big'])
+    expect(perFrame).toEqual([4, 4, 4])
+  })
+
+  it('completes several small builds inside one budget and skips cached jobs', () => {
+    const w = fakeWorld(1)
+    const queue: Job[] = [{ key: 'a', units: 1 }, { key: 'cached', units: 1 }, { key: 'b', units: 1 }, { key: 'c', units: 5 }]
+    const state = newSlicedDrainState<Job>()
+    const done: string[] = []
+    const begin = (j: Job) => (j.key === 'cached' ? null : w.begin(j))
+    const n = drainSlicedQueue(queue, state, 4, w.now, begin, (j) => done.push(j.key), () => false)
+    expect(n).toBe(2)
+    expect(done).toEqual(['a', 'b'])
+    expect(state.current?.job.key).toBe('c')
+    expect(w.now()).toBe(4)
+  })
+
+  it('always makes progress, even with a zero budget', () => {
+    const w = fakeWorld(1)
+    const queue: Job[] = [{ key: 'a', units: 3 }]
+    const state = newSlicedDrainState<Job>()
+    drainSlicedQueue(queue, state, 0, w.now, w.begin, () => {}, () => false)
+    expect(w.log).toEqual(['a'])
+  })
+
+  it('an urgent hole preempts a non-urgent build, which resumes where it stopped', () => {
+    const w = fakeWorld(1)
+    const queue: Job[] = [{ key: 'lod', units: 6 }]
+    const state = newSlicedDrainState<Job>()
+    const done: string[] = []
+    const urgent = (j: Job) => j.hole === true
+    const complete = (j: Job) => done.push(j.key)
+    drainSlicedQueue(queue, state, 2, w.now, w.begin, complete, urgent)
+    expect(w.log).toEqual(['lod', 'lod'])
+    // A crossing requeues: a hole first, the in-flight LOD job behind it.
+    queue.push({ key: 'hole', units: 2, hole: true }, { key: 'lod', units: 6 })
+    drainSlicedQueue(queue, state, 2, w.now, w.begin, complete, urgent)
+    expect(done).toEqual(['hole'])
+    expect(state.parked.has('lod')).toBe(true)
+    while (queue.length > 0 || state.current) drainSlicedQueue(queue, state, 2, w.now, w.begin, complete, urgent)
+    expect(done).toEqual(['hole', 'lod'])
+    // Resumed, not restarted: 6 units of lod in total.
+    expect(w.log.filter((k) => k === 'lod').length).toBe(6)
+  })
+
+  it('an urgent build is not preempted by another urgent job', () => {
+    const w = fakeWorld(1)
+    const queue: Job[] = [{ key: 'h1', units: 4, hole: true }]
+    const state = newSlicedDrainState<Job>()
+    const urgent = (j: Job) => j.hole === true
+    drainSlicedQueue(queue, state, 2, w.now, w.begin, () => {}, urgent)
+    queue.push({ key: 'h2', units: 1, hole: true })
+    drainSlicedQueue(queue, state, 2, w.now, w.begin, () => {}, urgent)
+    expect(w.log.slice(0, 4)).toEqual(['h1', 'h1', 'h1', 'h1'])
+  })
+
+  it('keeps at most MAX_PARKED_BUILDS parked builds, dropping the oldest', () => {
+    const w = fakeWorld(1)
+    const state = newSlicedDrainState<Job>()
+    const urgent = (j: Job) => j.hole === true
+    for (let i = 0; i <= MAX_PARKED_BUILDS; i++) {
+      const queue: Job[] = [{ key: `lod${i}`, units: 10 }]
+      drainSlicedQueue(queue, state, 1, w.now, w.begin, () => {}, urgent)
+      queue.push({ key: `hole${i}`, units: 100, hole: true })
+      drainSlicedQueue(queue, state, 1, w.now, w.begin, () => {}, urgent)
+      state.current = null // the hole is abandoned (window moved on)
+    }
+    expect(state.parked.size).toBe(MAX_PARKED_BUILDS)
+    expect(state.parked.has('lod0')).toBe(false)
   })
 })

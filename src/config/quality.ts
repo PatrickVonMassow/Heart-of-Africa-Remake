@@ -47,6 +47,11 @@ export interface QualityPreset {
   /** Near-ring terrain refinement (point 209); off on low for weak, geometry-
    *  bound GPUs. */
   terrainRefine: boolean
+  /** Main-thread milliseconds per frame the terrain chunk streaming may spend
+   *  on sliced chunk builds while driving (docs/perf-1543-driving-hitches.md).
+   *  Smaller = smoother CPU frame time but slower window fill; the prefetch
+   *  ahead of the heading hides the fill. Calibratable. */
+  terrainBuildBudgetMs: number
   /** Flora fog-radius factor; <1 tightens the spawn circle so the instance
    *  count falls quadratically (floraStreaming.ts). */
   floraFogFactor: number
@@ -207,6 +212,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     fireShadowResolution: 0,
     fireShadowSoft: false,
     terrainRefine: false,
+    terrainBuildBudgetMs: 3, // calibratable
     floraFogFactor: 0.55,
     floraDensity: 0.6, // calibratable: 40 % fewer small-dressing instances (docs/bench/310-projection.md)
     floraCastShadow: false,
@@ -253,6 +259,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     fireShadowResolution: 256, // the point-289 variant
     fireShadowSoft: false,
     terrainRefine: true,
+    terrainBuildBudgetMs: 3, // calibratable
     floraFogFactor: 1,
     floraDensity: 1,
     floraCastShadow: true,
@@ -298,6 +305,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     fireShadowResolution: 512, // the costlier variant
     fireShadowSoft: true,
     terrainRefine: true,
+    terrainBuildBudgetMs: 3, // calibratable
     floraFogFactor: 1,
     floraDensity: 1,
     floraCastShadow: true,

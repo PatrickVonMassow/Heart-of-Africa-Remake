@@ -38,6 +38,7 @@ device pixel ratio is kept (no cap).
 | `fireShadowResolution` | 0 | 256 | 512 |
 | `fireShadowSoft` | off | off | on |
 | `terrainRefine` | off | on | on |
+| `terrainBuildBudgetMs` | 3 | 3 | 3 |
 | `floraFogFactor` | 0.55 | 1 | 1 |
 | `floraDensity` | 0.6 | 1 | 1 |
 | `floraCastShadow` | off | on | on |
@@ -110,6 +111,8 @@ added.
   realistic high-only variant (design.md §19.10).
 - **`terrainRefine`** — Near-ring terrain refinement (point 209); off on low for
   weak, geometry-bound GPUs.
+- **`terrainBuildBudgetMs`** — Main-thread ms per frame for sliced terrain chunk
+  builds while driving (docs/perf-1543-driving-hitches.md); calibratable.
 - **`floraFogFactor`** — Flora fog-radius factor; `< 1` tightens the spawn circle
   so the plant instance count falls quadratically (`floraStreaming.ts`). Low
   tightens it to 0.55.

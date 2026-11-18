@@ -86,28 +86,76 @@ export function orderChunkJobs(
     .map((e) => e.job)
 }
 
+/** A resumable build: `step` advances it until `deadline` (performance.now ms)
+ *  passes, always doing at least one unit of work, and returns true once done. */
+export interface SliceBuild {
+  step(deadline: number): boolean
+}
+
+/** The in-flight state of a sliced drain, kept across frames by the caller. */
+export interface SlicedDrainState<T extends { key: string }> {
+  current: { job: T; build: SliceBuild } | null
+  /** Builds set aside for an urgent job, resumed when their job comes up again. */
+  parked: Map<string, SliceBuild>
+}
+
+/** At most this many parked partial builds are kept; the oldest is dropped (its
+ *  job simply restarts if it is still wanted). */
+export const MAX_PARKED_BUILDS = 4
+
+export function newSlicedDrainState<T extends { key: string }>(): SlicedDrainState<T> {
+  return { current: null, parked: new Map() }
+}
+
 /**
- * Drain jobs from the queue front until the per-frame time budget (ms) is
- * spent. Always builds at least one job so the queue can never stall, and
- * stops the moment the budget is crossed — one oversized job (a refined
- * 112-seg chunk) overshoots its own frame but never drags others with it.
- * `now` is injectable for the pure test. Returns the number built.
+ * Drain the queue under a per-frame time budget, slicing each build
+ * (docs/perf-1543-driving-hitches.md): an atomic per-job drain let one refined
+ * 112-seg chunk overrun its frame by ~35 ms headless — the measured driving
+ * hitch. Here a build that does not fit the budget yields mid-way and resumes
+ * next frame. `begin` starts a job's build, or returns null when the job needs
+ * none (already cached). `complete` receives a finished build. An `urgent` job
+ * at the queue front (a chunk with no stand-in, i.e. a visible hole) preempts a
+ * non-urgent build in flight, which is parked and resumed later, so near holes
+ * keep their priority. Returns the number of builds completed this call.
  */
-export function drainChunkQueue<T>(
+export function drainSlicedQueue<T extends { key: string }>(
   queue: T[],
+  state: SlicedDrainState<T>,
   budgetMs: number,
   now: () => number,
-  build: (job: T) => void,
+  begin: (job: T) => SliceBuild | null,
+  complete: (job: T, build: SliceBuild) => void,
+  urgent: (job: T) => boolean,
 ): number {
-  if (queue.length === 0) return 0
-  const start = now()
-  let built = 0
-  while (queue.length > 0) {
-    build(queue.shift() as T)
-    built += 1
-    if (now() - start >= budgetMs) break
+  if (state.current === null && queue.length === 0) return 0
+  const deadline = now() + budgetMs
+  let completed = 0
+  for (;;) {
+    const cur = state.current
+    if (cur !== null && queue.length > 0 && queue[0].key !== cur.job.key && urgent(queue[0]) && !urgent(cur.job)) {
+      state.parked.delete(cur.job.key)
+      state.parked.set(cur.job.key, cur.build)
+      if (state.parked.size > MAX_PARKED_BUILDS) state.parked.delete(state.parked.keys().next().value as string)
+      state.current = null
+    }
+    if (state.current === null) {
+      const job = queue.shift()
+      if (job === undefined) break
+      const parked = state.parked.get(job.key)
+      state.parked.delete(job.key)
+      const build = parked ?? begin(job)
+      if (build === null) continue
+      state.current = { job, build }
+    }
+    const active = state.current as { job: T; build: SliceBuild }
+    if (active.build.step(deadline)) {
+      state.current = null
+      complete(active.job, active.build)
+      completed += 1
+    }
+    if (now() >= deadline) break
   }
-  return built
+  return completed
 }
 
 /**

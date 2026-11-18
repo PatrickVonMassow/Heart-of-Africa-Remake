@@ -32,6 +32,7 @@ import {
   effectiveShadows,
   effectiveShadowResolution,
   effectiveTerrainRefine,
+  effectiveTerrainBuildBudgetMs,
   effectiveFloraFogFactor,
   effectiveFloraDensity,
   effectiveFloraCastShadow,
@@ -58,7 +59,15 @@ import {
 import { bindTravelSpace } from './travelSpace'
 import { isBlocked, sampleTerrain, type TerrainType } from '../../world/terrain'
 import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments, setTerrainRefine } from './terrainLod'
-import { drainChunkQueue, orderChunkJobs, planChunkWindow, predictedNextCenter, type ChunkJob } from './terrainQueue'
+import {
+  drainSlicedQueue,
+  newSlicedDrainState,
+  orderChunkJobs,
+  planChunkWindow,
+  predictedNextCenter,
+  type ChunkJob,
+  type SliceBuild,
+} from './terrainQueue'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { communicationRockSite, ROCK_DRESSING_CLEARANCE, ROCK_VILLAGE_ID } from '../../world/communicationRock'
 import { LAKES } from '../../world/data/lakes'
@@ -276,29 +285,90 @@ export function buildChunkGeometry(
   segments: number,
   edgeSegs: readonly [number, number, number, number] = [segments, segments, segments, segments],
 ): THREE.BufferGeometry {
-  const n = segments + 1
-  const step = CHUNK_SIZE / segments
-  const x0 = cx * CHUNK_SIZE
-  const z0 = cz * CHUNK_SIZE
+  const build = new ChunkGeometryBuild(cx, cz, seed, segments, edgeSegs)
+  while (!build.step(Infinity)) {
+    // runs to completion: an Infinity deadline never yields
+  }
+  return build.geometry as THREE.BufferGeometry
+}
 
-  const skirtCount = 4 * n
-  const total = n * n + skirtCount
-  const positions = new Float32Array(total * 3)
-  const normals = new Float32Array(total * 3)
-  const colors = new Float32Array(total * 3)
-  const splats = new Float32Array(total * 4)
-  // Planar uv matching the material's top projection (world xz * 0.5): the
-  // normal-map TBN derives from uv screen derivatives, so without a real uv
-  // attribute the tangent basis degenerates (and every material build warns).
-  const uvs = new Float32Array(total * 2)
-  // The season field's texture coordinate (point 151): baked per vertex, so
-  // ground tint/collapse follow THIS spot's climate, not the player's.
-  const seasonUVs = new Float32Array(total * 2)
+/**
+ * The same build, resumable across frames (docs/perf-1543-driving-hitches.md):
+ * a refined 112-seg chunk samples ~13k terrain points (~37 ms headless, the
+ * measured driving hitch), so `step` advances whole rows of the height grid,
+ * then whole vertex rows, then the stitch/index/skirt finish, and yields once
+ * the deadline passes — always doing at least one unit so a build can never
+ * stall. The result is identical to the one-shot build: same samples, same
+ * order, only spread over frames.
+ */
+// eslint-disable-next-line react/only-export-components
+export class ChunkGeometryBuild {
+  geometry: THREE.BufferGeometry | null = null
+  private readonly n: number
+  private readonly m: number
+  private readonly step_: number
+  private readonly x0: number
+  private readonly z0: number
+  private readonly positions: Float32Array
+  private readonly normals: Float32Array
+  private readonly colors: Float32Array
+  private readonly splats: Float32Array
+  private readonly uvs: Float32Array
+  private readonly seasonUVs: Float32Array
+  private readonly heights: Float32Array
+  private readonly seed: number
+  private readonly segments: number
+  private readonly edgeSegs: readonly [number, number, number, number]
+  /** Next height-grid row to sample, then next vertex row (offset by m). */
+  private row = 0
 
-  // Height grid including a margin ring for normal computation.
-  const m = n + 2
-  const heights = new Float32Array(m * m)
-  for (let iz = 0; iz < m; iz++) {
+  constructor(
+    cx: number,
+    cz: number,
+    seed: number,
+    segments: number,
+    edgeSegs: readonly [number, number, number, number],
+  ) {
+    this.seed = seed
+    this.segments = segments
+    this.edgeSegs = edgeSegs
+    this.n = segments + 1
+    this.step_ = CHUNK_SIZE / segments
+    this.x0 = cx * CHUNK_SIZE
+    this.z0 = cz * CHUNK_SIZE
+    const total = this.n * this.n + 4 * this.n // grid + skirt
+    this.positions = new Float32Array(total * 3)
+    this.normals = new Float32Array(total * 3)
+    this.colors = new Float32Array(total * 3)
+    this.splats = new Float32Array(total * 4)
+    // Planar uv matching the material's top projection (world xz * 0.5): the
+    // normal-map TBN derives from uv screen derivatives, so without a real uv
+    // attribute the tangent basis degenerates (and every material build warns).
+    this.uvs = new Float32Array(total * 2)
+    // The season field's texture coordinate (point 151): baked per vertex, so
+    // ground tint/collapse follow THIS spot's climate, not the player's.
+    this.seasonUVs = new Float32Array(total * 2)
+    // Height grid including a margin ring for normal computation.
+    this.m = this.n + 2
+    this.heights = new Float32Array(this.m * this.m)
+  }
+
+  /** Advance until `now()` reaches `deadline` (at least one unit); true once
+   *  `geometry` is ready. */
+  step(deadline: number, now: () => number = () => performance.now()): boolean {
+    const { m, n } = this
+    while (this.geometry === null) {
+      if (this.row < m) this.sampleRow(this.row)
+      else if (this.row < m + n) this.vertexRow(this.row - m)
+      else this.finish()
+      this.row += 1
+      if (this.geometry === null && deadline !== Infinity && now() >= deadline) return false
+    }
+    return true
+  }
+
+  private sampleRow(iz: number): void {
+    const { m, n, step_: step, x0, z0, seed, heights, colors, splats } = this
     for (let ix = 0; ix < m; ix++) {
       const x = x0 + (ix - 1) * step
       const z = z0 + (iz - 1) * step
@@ -318,7 +388,8 @@ export function buildChunkGeometry(
     }
   }
 
-  for (let iz = 0; iz < n; iz++) {
+  private vertexRow(iz: number): void {
+    const { m, n, step_: step, x0, z0, heights, positions, uvs, seasonUVs, normals } = this
     for (let ix = 0; ix < n; ix++) {
       const vi = iz * n + ix
       positions[vi * 3] = x0 + ix * step
@@ -346,114 +417,117 @@ export function buildChunkGeometry(
     }
   }
 
-  // Edge index for edge e (0 north/-z, 1 south/+z, 2 west/-x, 3 east/+x) at
-  // along-edge position i (0..segments). Shared by the seam stitch and the
-  // skirt below.
-  const edgeIndex = (e: number, i: number): number => {
-    switch (e) {
-      case 0: return i // north edge (iz = 0)
-      case 1: return (n - 1) * n + i // south edge
-      case 2: return i * n // west edge
-      default: return i * n + (n - 1) // east edge
-    }
-  }
-
-  // Seam stitch (point 220): where a neighbour meshes coarser than this chunk
-  // (edgeSegs[e] < segments), snap this edge's vertices onto the neighbour's
-  // anchor polyline so both chunks share one identical boundary curve — the
-  // T-junction that the SKIRT_DROP skirt could not always hide once the
-  // point-230 mountain doubling put a 112-seg chunk beside a 28/56-seg one.
-  // Only the FINER side morphs (the coarser side has edgeSeg === segments, an
-  // identity); both compute the same deterministic anchors and meet flush.
-  for (let e = 0; e < 4; e++) {
-    const edgeSeg = edgeSegs[e]
-    if (edgeSeg >= segments) continue
-    const anchorH = new Float32Array(edgeSeg + 1)
-    for (let j = 0; j <= edgeSeg; j++) {
-      const f = (j / edgeSeg) * CHUNK_SIZE
-      let x: number
-      let z: number
+  private finish(): void {
+    const { n, segments, edgeSegs, x0, z0, seed, positions, normals, colors, splats, uvs, seasonUVs } = this
+    // Edge index for edge e (0 north/-z, 1 south/+z, 2 west/-x, 3 east/+x) at
+    // along-edge position i (0..segments). Shared by the seam stitch and the
+    // skirt below.
+    const edgeIndex = (e: number, i: number): number => {
       switch (e) {
-        case 0: x = x0 + f; z = z0; break
-        case 1: x = x0 + f; z = z0 + CHUNK_SIZE; break
-        case 2: x = x0; z = z0 + f; break
-        default: x = x0 + CHUNK_SIZE; z = z0 + f; break
+        case 0: return i // north edge (iz = 0)
+        case 1: return (n - 1) * n + i // south edge
+        case 2: return i * n // west edge
+        default: return i * n + (n - 1) // east edge
       }
-      const { lat, lon } = worldToLatLon(x, z)
-      anchorH[j] = sampleTerrain(lat, lon, seed).height
     }
-    const stitched = stitchedEdgeHeights(anchorH, segments)
-    for (let i = 0; i <= segments; i++) {
-      positions[edgeIndex(e, i) * 3 + 1] = stitched[i]
+
+    // Seam stitch (point 220): where a neighbour meshes coarser than this chunk
+    // (edgeSegs[e] < segments), snap this edge's vertices onto the neighbour's
+    // anchor polyline so both chunks share one identical boundary curve — the
+    // T-junction that the SKIRT_DROP skirt could not always hide once the
+    // point-230 mountain doubling put a 112-seg chunk beside a 28/56-seg one.
+    // Only the FINER side morphs (the coarser side has edgeSeg === segments, an
+    // identity); both compute the same deterministic anchors and meet flush.
+    for (let e = 0; e < 4; e++) {
+      const edgeSeg = edgeSegs[e]
+      if (edgeSeg >= segments) continue
+      const anchorH = new Float32Array(edgeSeg + 1)
+      for (let j = 0; j <= edgeSeg; j++) {
+        const f = (j / edgeSeg) * CHUNK_SIZE
+        let x: number
+        let z: number
+        switch (e) {
+          case 0: x = x0 + f; z = z0; break
+          case 1: x = x0 + f; z = z0 + CHUNK_SIZE; break
+          case 2: x = x0; z = z0 + f; break
+          default: x = x0 + CHUNK_SIZE; z = z0 + f; break
+        }
+        const { lat, lon } = worldToLatLon(x, z)
+        anchorH[j] = sampleTerrain(lat, lon, seed).height
+      }
+      const stitched = stitchedEdgeHeights(anchorH, segments)
+      for (let i = 0; i <= segments; i++) {
+        positions[edgeIndex(e, i) * 3 + 1] = stitched[i]
+      }
+    }
+
+    // Preallocated index buffer (docs/perf-driving-hitches.md): the former
+    // number[] push built ~37k-150k elements of GC garbage per chunk — the
+    // largest single allocation of the crossing burst.
+    const indexArray = new Uint32Array(segments * segments * 6 + 4 * (n - 1) * 6)
+    let ii = 0
+    for (let iz = 0; iz < segments; iz++) {
+      for (let ix = 0; ix < segments; ix++) {
+        const a = iz * n + ix
+        const b = a + 1
+        const c = a + n
+        const d = c + 1
+        indexArray[ii++] = a
+        indexArray[ii++] = c
+        indexArray[ii++] = b
+        indexArray[ii++] = b
+        indexArray[ii++] = c
+        indexArray[ii++] = d
+      }
+    }
+
+    // Skirt: duplicate the (now stitched) border vertices, dropped by SKIRT_DROP.
+    // The terrain material renders double-sided, so winding does not matter here.
+    let sv = n * n
+    for (let e = 0; e < 4; e++) {
+      const base = sv
+      for (let i = 0; i < n; i++) {
+        const src = edgeIndex(e, i)
+        positions[sv * 3] = positions[src * 3]
+        positions[sv * 3 + 1] = positions[src * 3 + 1] - SKIRT_DROP
+        positions[sv * 3 + 2] = positions[src * 3 + 2]
+        normals[sv * 3] = normals[src * 3]
+        normals[sv * 3 + 1] = normals[src * 3 + 1]
+        normals[sv * 3 + 2] = normals[src * 3 + 2]
+        colors[sv * 3] = colors[src * 3]
+        colors[sv * 3 + 1] = colors[src * 3 + 1]
+        colors[sv * 3 + 2] = colors[src * 3 + 2]
+        for (let k = 0; k < 4; k++) splats[sv * 4 + k] = splats[src * 4 + k]
+        uvs[sv * 2] = uvs[src * 2]
+        uvs[sv * 2 + 1] = uvs[src * 2 + 1]
+        seasonUVs[sv * 2] = seasonUVs[src * 2]
+        seasonUVs[sv * 2 + 1] = seasonUVs[src * 2 + 1]
+        sv++
+      }
+      for (let i = 0; i < n - 1; i++) {
+        const a = edgeIndex(e, i)
+        const b = edgeIndex(e, i + 1)
+        indexArray[ii++] = a
+        indexArray[ii++] = b
+        indexArray[ii++] = base + i
+        indexArray[ii++] = b
+        indexArray[ii++] = base + i + 1
+        indexArray[ii++] = base + i
+      }
+    }
+
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    geo.setAttribute('splat', new THREE.BufferAttribute(splats, 4))
+    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+    geo.setAttribute('seasonUV', new THREE.BufferAttribute(seasonUVs, 2))
+    const indices = new THREE.BufferAttribute(indexArray, 1)
+    geo.setIndex(indices)
+    this.geometry = geo
     }
   }
-
-  // Preallocated index buffer (docs/perf-driving-hitches.md): the former
-  // number[] push built ~37k-150k elements of GC garbage per chunk — the
-  // largest single allocation of the crossing burst.
-  const indexArray = new Uint32Array(segments * segments * 6 + 4 * (n - 1) * 6)
-  let ii = 0
-  for (let iz = 0; iz < segments; iz++) {
-    for (let ix = 0; ix < segments; ix++) {
-      const a = iz * n + ix
-      const b = a + 1
-      const c = a + n
-      const d = c + 1
-      indexArray[ii++] = a
-      indexArray[ii++] = c
-      indexArray[ii++] = b
-      indexArray[ii++] = b
-      indexArray[ii++] = c
-      indexArray[ii++] = d
-    }
-  }
-
-  // Skirt: duplicate the (now stitched) border vertices, dropped by SKIRT_DROP.
-  // The terrain material renders double-sided, so winding does not matter here.
-  let sv = n * n
-  for (let e = 0; e < 4; e++) {
-    const base = sv
-    for (let i = 0; i < n; i++) {
-      const src = edgeIndex(e, i)
-      positions[sv * 3] = positions[src * 3]
-      positions[sv * 3 + 1] = positions[src * 3 + 1] - SKIRT_DROP
-      positions[sv * 3 + 2] = positions[src * 3 + 2]
-      normals[sv * 3] = normals[src * 3]
-      normals[sv * 3 + 1] = normals[src * 3 + 1]
-      normals[sv * 3 + 2] = normals[src * 3 + 2]
-      colors[sv * 3] = colors[src * 3]
-      colors[sv * 3 + 1] = colors[src * 3 + 1]
-      colors[sv * 3 + 2] = colors[src * 3 + 2]
-      for (let k = 0; k < 4; k++) splats[sv * 4 + k] = splats[src * 4 + k]
-      uvs[sv * 2] = uvs[src * 2]
-      uvs[sv * 2 + 1] = uvs[src * 2 + 1]
-      seasonUVs[sv * 2] = seasonUVs[src * 2]
-      seasonUVs[sv * 2 + 1] = seasonUVs[src * 2 + 1]
-      sv++
-    }
-    for (let i = 0; i < n - 1; i++) {
-      const a = edgeIndex(e, i)
-      const b = edgeIndex(e, i + 1)
-      indexArray[ii++] = a
-      indexArray[ii++] = b
-      indexArray[ii++] = base + i
-      indexArray[ii++] = b
-      indexArray[ii++] = base + i + 1
-      indexArray[ii++] = base + i
-    }
-  }
-
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-  geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  geo.setAttribute('splat', new THREE.BufferAttribute(splats, 4))
-  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
-  geo.setAttribute('seasonUV', new THREE.BufferAttribute(seasonUVs, 2))
-  const indices = new THREE.BufferAttribute(indexArray, 1)
-  geo.setIndex(indices)
-  return geo
-}
 
 // The season tint curves live in render/seasonTint.ts so the settlement
 // scene shares them (point 143). THIS scene samples the per-position season
@@ -609,11 +683,10 @@ const chunkLatestKey = new Map<string, string>()
 // point-227 grey horizon line on re-entry.
 let committedTerrainChunks: ReadonlySet<string> = new Set()
 
-// Per-frame terrain build budget (ms): the queue drains until the budget is
-// spent, at least one chunk per frame so it always progresses. A refined
-// 112-seg chunk can overshoot on its own — its build is atomic; splitting it
-// into a Web Worker is the documented follow-up (docs/perf-driving-hitches.md).
-const TERRAIN_BUILD_BUDGET_MS = 5
+// The per-frame terrain build budget is a quality-preset value
+// (terrainBuildBudgetMs, src/config/quality.ts): the queue drains sliced builds
+// (ChunkGeometryBuild) until it is spent, so no single chunk overruns a frame
+// (docs/perf-1543-driving-hitches.md).
 // Prefetch lookahead (wu): once the drive heading puts a point this far ahead
 // into the next chunk, that window's builds start early, so the crossing
 // usually finds its chunks already built.
@@ -622,6 +695,7 @@ const PREFETCH_LOOKAHEAD = CHUNK_SIZE / 2
 function TerrainChunks() {
   const seed = useGame((s) => s.seed)
   const terrainRefine = useUi(effectiveTerrainRefine)
+  const buildBudgetMs = useUi(effectiveTerrainBuildBudgetMs)
   const cache = useRef(chunkGeometryCache)
   const [active, setActive] = useState<string[]>([])
   const activeSig = useRef('')
@@ -645,6 +719,7 @@ function TerrainChunks() {
   const desiredRef = useRef<ChunkJob[]>([])
   const prefetchRef = useRef<{ center: string; keys: Set<string>; queue: ChunkJob[] } | null>(null)
   const prevPos = useRef<{ x: number; z: number } | null>(null)
+  const sliced = useRef(newSlicedDrainState<ChunkJob>())
 
   // Reset the cache when a new run (seed) starts — NOT on remount.
   useEffect(() => {
@@ -657,6 +732,7 @@ function TerrainChunks() {
     queueRef.current = []
     desiredRef.current = []
     prefetchRef.current = null
+    sliced.current = newSlicedDrainState<ChunkJob>()
     activeSig.current = ''
     setActive([])
   }, [seed])
@@ -693,6 +769,7 @@ function TerrainChunks() {
     const cz = Math.floor(pos.z / CHUNK_SIZE)
     const center = chunkKey(cx, cz)
     let worked = false
+    let sliceOnly = false
 
     // Plan the window around a centre: segment count per offset, memoized so
     // the seam stitch can read a chunk's four neighbours (some just outside
@@ -722,6 +799,13 @@ function TerrainChunks() {
     const buildJob = (job: ChunkJob): void => {
       if (cache.current.has(job.key)) return
       cache.current.set(job.key, buildChunkGeometry(job.cx, job.cz, seed, job.segments, job.edgeSegs))
+      chunkLatestKey.set(job.chunk, job.key)
+    }
+    const beginJob = (job: ChunkJob): ChunkGeometryBuild | null =>
+      cache.current.has(job.key) ? null : new ChunkGeometryBuild(job.cx, job.cz, seed, job.segments, job.edgeSegs)
+    const completeJob = (job: ChunkJob, build: SliceBuild): void => {
+      if (cache.current.has(job.key)) return
+      cache.current.set(job.key, (build as ChunkGeometryBuild).geometry as THREE.BufferGeometry)
       chunkLatestKey.set(job.chunk, job.key)
     }
 
@@ -766,10 +850,21 @@ function TerrainChunks() {
 
     // Drain under the frame budget: the current window first (it fills real
     // gaps), then the prefetch queue.
-    const q = queueRef.current.length > 0 ? queueRef.current : prefetchRef.current?.queue
-    if (q !== undefined && q.length > 0) {
-      drainChunkQueue(q, TERRAIN_BUILD_BUDGET_MS, () => performance.now(), buildJob)
-      worked = true
+    const q = queueRef.current.length > 0 ? queueRef.current : (prefetchRef.current?.queue ?? [])
+    if (q.length > 0 || sliced.current.current !== null) {
+      const completed = drainSlicedQueue(
+        q,
+        sliced.current,
+        buildBudgetMs,
+        () => performance.now(),
+        beginJob,
+        completeJob,
+        (job) => !hasStandIn(job.chunk),
+      )
+      // Only a landed build can change the drawn set; a sliced step is still
+      // booked as streaming work below.
+      if (completed > 0) worked = true
+      else sliceOnly = true
     }
 
     if (worked) {
@@ -806,11 +901,11 @@ function TerrainChunks() {
         }
         setActive(resolved)
       }
-      if (import.meta.env.DEV) {
-        const ms = performance.now() - t0
-        recordBurst(PERF.terrain, ms)
-        markFrameWork('terrain-stream', ms)
-      }
+    }
+    if (import.meta.env.DEV && (worked || sliceOnly)) {
+      const ms = performance.now() - t0
+      recordBurst(PERF.terrain, ms)
+      markFrameWork('terrain-stream', ms)
     }
   })
 
