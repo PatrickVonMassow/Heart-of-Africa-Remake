@@ -3257,9 +3257,10 @@ describe('the flood swells the drama current (design.md §19.8, point 364)', () 
   })
 
   it('Cairo at low water (a rainless non-flood day) stays at the dry floor', () => {
-    const day = on(4, 15)
-    expect(nileFloodAt(day, START_YEAR)).toBe(0)
-    expect(factorAt(CAIRO.lat, CAIRO.lon, day)).toBeCloseTo(bw.dryFlowFactor, 9)
+    // The low-water stretch of the modelled cycle (spring, before the June rise).
+    const lowDays = Array.from({ length: 365 }, (_, d) => d).filter((d) => nileFloodAt(d, START_YEAR) === 0)
+    expect(lowDays.length).toBeGreaterThan(30)
+    for (const day of lowDays) expect(factorAt(CAIRO.lat, CAIRO.lon, day)).toBeCloseTo(bw.dryFlowFactor, 9)
   })
 
   it('the Okavango in July (Botswana\'s dry season) swells the same way, and lies low in its rains-off months', () => {
