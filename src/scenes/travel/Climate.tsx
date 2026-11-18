@@ -208,6 +208,9 @@ export function Climate() {
         return f ? { near: f.near, far: f.far } : null
       },
       hazeOpacity: () => haze.opacityU.value as number,
+      // The benchmark lever and its effect on the drawn group (point 1542).
+      hazeEnabled: () => hazeEnabled,
+      hazeShown: () => hazeGroup.current?.visible ?? false,
       seasonWetness: () => wetness.current,
       groundWet: () => groundWet.current,
       rainOpacity: () => rain.opacityU.value,
