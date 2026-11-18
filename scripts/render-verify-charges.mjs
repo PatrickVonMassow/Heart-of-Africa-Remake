@@ -2201,4 +2201,17 @@ export const RED_CHARGES = [
       + 'detailReadsPrefix: the measurement is cut at the 200-character bound; what the bound removes is the trailing '
       + 'death, calf and settle fields. The signature sits at character ~150, clear of the bound.',
   })),
+  ...[
+    /^a calf that swims the river ahead of its shield reaches the far bank and the hunt gives up \(calf-in-water\)/i,
+    /^the lion reaches the shielding parent first and takes it, never the calf past it \(calf-at-far-bank\)/i,
+    /^the feeding lion is drawn at the body it reached, without snapping across to it \(calf-at-far-bank\)/i,
+  ].map((match) => ({
+    point: 1539,
+    suite: 'enrichments',
+    kind: 'check',
+    match,
+    why:
+      'MEASURED 18.11.2026 on a quiet WebGPU host: --section=calf-shield-river 5 of 7 green on main d0a27cfc3 and '
+      + '5 of 7 on feat/1063 93502b805, the same checks red on both. The flake is point 1539\'s. The charge dies with it.',
+  })),
 ]

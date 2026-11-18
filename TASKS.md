@@ -14410,3 +14410,32 @@ to land than a mechanism that needs a review.
   Test: Playwright enrichments section crocodile-ambush on both backends, picture-checked.
   Source: boundary picture check of point 336, 18.11.2026.
   Bundle: Tierverhalten.
+
+- [ ] 1538. The limping straggler's heal check goes red on a full WebGPU wildlife run
+  Measured 18.11.2026 08:59 on main after the 364 landing, full wildlife on WebGPU: 25 pass, 1 fail —
+  'the limp heals on its window and the pair is back with its herd (point 363)' with healed/back true,
+  gap 8.1 (gap0 14), parentBeside 1.52. The WebGL 2 full run was then refused by the ladder until
+  --section=straggler goes green, so 364's covering wildlife run on both backends is still owed.
+  Player impact: none directly; an unowned red keeps every full wildlife run from counting as coverage.
+  Final state: the cause is named by measurement (a reunion distance the check reads too strictly, or a
+  pair that really stays apart), the fix is made on that side, and --section=straggler passes on a
+  quiet host over at least six runs on both backends.
+  Test: Playwright wildlife --section=straggler on both backends, then the full wildlife run.
+  Source: finding of the 364 session, 18.11.2026 08:01.
+  Bundle: Tierverhalten.
+
+- [ ] 1539. The calf-shield-river staging flakes on main and on branches alike
+  Measured 18.11.2026 on a quiet WebGPU host, `--section=calf-shield-river` alternated between main
+  d0a27cfc3 and feat/1063 93502b805: 5 of 7 green on each. Reds on main: calf-in-water ('a calf that swims
+  the river ahead of its shield reaches the far bank and the hunt gives up') and calf-at-far-bank ('the
+  lion reaches the shielding parent first …', 'the feeding lion is drawn at the body it reached …');
+  logs local/verify-logs/2026-11-18T09-41-59-263 and 09-44-31-961. The same calf-in-water red stood in the
+  full enrichments run 2026-11-18T09-00-34-933.
+  Player impact: none directly; the section turns roughly every third enrichments run red without an owner.
+  Final state: the cause is named by measurement (an unseeded random draw in the staging, or a chase whose
+  timing depends on frame pacing), the staging is made deterministic or the check reads the outcome it
+  means, and the section passes over at least six quiet runs on both backends. The charges in
+  scripts/render-verify-charges.mjs die with this point.
+  Test: Playwright enrichments --section=calf-shield-river on both backends, six runs each.
+  Source: finding of the 1063 session, 18.11.2026 10:51.
+  Bundle: Tierverhalten.
