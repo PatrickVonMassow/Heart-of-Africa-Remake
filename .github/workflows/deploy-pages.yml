@@ -27,6 +27,11 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+# onnxruntime-node's postinstall fetches a CUDA provider from GitHub releases
+# that intermittently answers 404 (17.11.2026); kokoro-js never uses the CUDA EP.
+env:
+  ONNXRUNTIME_NODE_INSTALL_CUDA: skip
+
 jobs:
   build:
     runs-on: ubuntu-latest
