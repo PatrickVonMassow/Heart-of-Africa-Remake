@@ -11546,6 +11546,7 @@ to land than a mechanism that needs a review.
   the `enrichments` section green over the seeds that produced the mismatch; and a Vitest case
   pinning which region the check asks and why.
   Recurred 18.10.2026: WebGPU full `enrichments` on feat/1378 335c9552e, same cheetah/central mismatch (local/verify-logs/2026-10-18T07-07-21-927-enrichments.log); the section alone was green on rerun.
+  SAME CAUSE AS 1063, measured 18.11.2026 (local/1063-border-probe.log: 8/8 hunts began east, 4/8 read central at the first look): the chase crosses the border. 1063 carries the fix — the hunt records `startRegion`, `pickHuntSpecies` casts for it, and both fit checks in `predator-food-web` ask that start region and log crossings separately. What stays here after 1063 lands is only this point's own verification against that fix.
   Criticality: low - a single mis-scored hunt in sixteen, invisible to the player, but it makes an
   ecology check report a fault it may not have found.
   Bundle: Tierverhalten.
