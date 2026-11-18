@@ -4496,10 +4496,12 @@ if (section('predator-food-web')) {
       preyMismatch, predMismatch, webMismatch, crossings,
     }
   })
+  // "The region" in both fit checks below is the hunt's START region (point
+  // 1063/1013) — the one its cast was picked for; crossings are only logged.
   check('several kinds of predator hunt (lion + others)', preyVar.distinctPredators.length >= 2, JSON.stringify(preyVar))
-  check('every predator fits the region where its hunt began, and the period', preyVar.count >= 6 && preyVar.predMismatch.length === 0, JSON.stringify(preyVar))
+  check('every predator fits the region and period', preyVar.count >= 6 && preyVar.predMismatch.length === 0, JSON.stringify(preyVar))
   check('the predator takes more than one kind of prey', preyVar.distinctPrey.length >= 2, JSON.stringify(preyVar))
-  check('every hunted prey fits the region where its hunt began, and the predator food web',
+  check('every hunted prey fits the region and the predator food web',
     preyVar.count >= 6 && preyVar.preyMismatch.length === 0 && preyVar.webMismatch.length === 0, JSON.stringify(preyVar))
 }
 
