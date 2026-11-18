@@ -750,6 +750,11 @@ if (section('flood-crest-calf')) {
     window.__ui.getState().setTravelZoom(1)
   })
   await page.waitForFunction(() => !!window.__wildlife?.restock, null, { timeout: 60000 })
+  // The crest frame is shot in motion (`settle: false`): on WebGL 2 it caught
+  // the bare haze before the jumped-to terrain streamed in, so the scene
+  // settles once here, as in the walk frames below.
+  const floodGround = await waitForSceneReady(page)
+  check('the lower Nile scene finished drawing before the crest frame (point 364)', !floodGround.timedOut, JSON.stringify(floodGround))
   // In-game days of 1890: 5 October (the crest) and 15 April (low water).
   const CREST_DAY = 277
   const LOW_DAY = 104
