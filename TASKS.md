@@ -14309,3 +14309,17 @@ to land than a mechanism that needs a review.
   Test: Playwright enrichments --section=calf-shield-river on both backends, six runs each.
   Source: finding of the 1063 session, 18.11.2026 10:51.
   Bundle: Tierverhalten.
+
+- [ ] 1540. The painted hut band sits buried inside the mud wall
+  Found 18.11.2026 by the cross-vendor review of 1167 (receipt f52ee17aa9a0db80): VillageHut's painted
+  band is a cylinder at 1.005·r, but the tapered wall's radius across the band's height is
+  1.0093–1.0147·r, so the band (style.bandColor; red on the chief hut) lies inside the wall and does not
+  show. Predates 1167.
+  Player impact: every village hut lacks its regional painted band, the chief hut its red marking.
+  Final state: the band's radii follow the wall taper at its upper and lower edge plus a small outward
+  offset, in the hut's one builder (src/scenes/place/hutDoor.ts / VillageHut), so every hut kind follows.
+  Test: Vitest — the band's radius exceeds the wall radius at both of its edges, at several hut radii,
+  mutation-checked.
+  Picture check: polish-villagers --section=hut-doorway on BOTH backends, the band visible on the wall.
+  Source: finding of the 1167 session, 18.11.2026 15:29.
+  Bundle: Siedlungsgeometrie.
