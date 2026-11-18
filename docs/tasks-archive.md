@@ -37591,3 +37591,16 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   backends, judged by the picture: the same frame must show one ground.
   DOCS in the same commit: the evidence section `docs/acceptance-evidence.md` §31 records
   the pitched-view check beside the existing eye-level one.
+
+- [x] 1536. Switch the cross lane to gpt-6.2-sol at effort medium after a Codex CLI update probe
+  Final state: the cross lane runs on gpt-6.2-sol at reasoning effort medium, IF a probe succeeds; otherwise it stays on gpt-6.1-sol (effort unchanged) and the probe result is recorded.
+  Steps:
+  1. Update the Codex CLI to the newest release (`npm view @openai/codex version` read 0.169.0 on 17.11.2026; installed was 0.163.0).
+  2. Probe: `codex exec --skip-git-repo-check --sandbox read-only -C /tmp -m gpt-6.2-sol -c model_reasoning_effort=medium "Reply with exactly: PONG"` must answer PONG. Also run one real `scripts/cross-review.mjs` pass against a small recent diff with the new model to prove the review path end to end.
+  3. On success, in `scripts/model-lanes.mjs` cross lane: displayName/trailerName `GPT-6.2 Sol`, modelId `gpt-6.2-sol`, reasoningEffort `medium`, move `GPT-6.1 Sol` / `gpt-6.1-sol` into `retired`, update the Codex-version comment (minimum version that served 6.2). Adjust any test fixtures that pin the cross model name/effort; Vitest green.
+  4. On failure (still 400 model_not_found with the newest CLI): change nothing in model-lanes.mjs, record the probe output and CLI version in docs/backlog.md as a retry note.
+  Evidence: probe output (both CLI version and answer), cross-review run receipt, unit suite green.
+  Queue position: FIRST in the work order (user order 17.11.2026) — next point after the in-flight point 428 lands. Do not interrupt 428 mid-verification; switch the CLI/lane only at a clean boundary so no running cross-review changes model underneath.
+  Effort medium applies to the cross lane only after the switch to 6.2 succeeds; if 6.2 fails, the user decides separately whether 6.1 goes to medium.
+  Source: user request 17.11.2026 ("Ja, reihe ihn so ein."; findings carrier, session 6dd36831).
+  Bundle: Chat & Tafel.
