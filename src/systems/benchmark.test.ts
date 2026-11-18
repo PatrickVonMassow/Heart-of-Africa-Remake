@@ -79,6 +79,7 @@ describe('benchmark sweep plan (design.md §21.1)', () => {
       'dpr-1',
       'terrain-refine-off',
       'terrain-cap-84',
+      'climate-haze-off',
       'all-off',
     ]) {
       expect(names).toContain(want)
@@ -91,6 +92,12 @@ describe('benchmark sweep plan (design.md §21.1)', () => {
     const cap = BENCH_CONFIGS.find((c) => c.name === 'terrain-cap-84')
     expect(cap?.terrain).toEqual({ segmentCap: 84 })
     expect(BENCH_CONFIGS.find((c) => c.name === 'dpr-1')?.pixelRatio).toBe(1)
+  })
+
+  it('"climate-haze-off" hides only the ground haze; no other config touches it', () => {
+    const hazeOff = BENCH_CONFIGS.find((c) => c.name === 'climate-haze-off')
+    expect(hazeOff).toEqual({ name: 'climate-haze-off', flags: {}, climateHaze: false })
+    for (const c of BENCH_CONFIGS) if (c !== hazeOff) expect(c.climateHaze).toBeUndefined()
   })
 
   it('"all-off" is every lever at its cheapest — the floor of the sweep', () => {

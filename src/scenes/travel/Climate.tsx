@@ -115,6 +115,12 @@ function getRainGeometry() {
 const TRAVEL_FOG = new THREE.Fog('#cfe0ea', 95, 260)
 const TRAVEL_BACKGROUND = new THREE.Color('#cfe0ea')
 
+/** Benchmark lever (point 1542): false hides the ground haze layers. */
+let hazeEnabled = true
+export function setClimateHazeEnabled(enabled: boolean): void {
+  hazeEnabled = enabled
+}
+
 export function Climate() {
   const scene = useThree((s) => s.scene)
   const hazeGroup = useRef<THREE.Group>(null)
@@ -355,7 +361,7 @@ export function Climate() {
       hazeTarget.set(preset.hazeColor)
       haze.colorU.value.lerp(hazeTarget, k)
       haze.opacityU.value += (preset.haze * (1 - hazeClear) * weatherIntensity - haze.opacityU.value) * k
-      g.visible = haze.opacityU.value > 0.01
+      g.visible = hazeEnabled && haze.opacityU.value > 0.01
       if (g.visible) {
         const t = clock.elapsedTime
         g.position.set(s.pos.x, 0, s.pos.z)

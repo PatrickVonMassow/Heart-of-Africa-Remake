@@ -28,6 +28,7 @@ import { getStrings } from '../i18n'
 import { describeBackend } from '../render/backendInfo'
 import { getRenderContext } from '../render/renderContext'
 import { getTerrainRefine, resetTerrainRefine, setTerrainRefine } from '../scenes/travel/terrainLod'
+import { setClimateHazeEnabled } from '../scenes/travel/Climate'
 import { useGame } from '../state/store'
 import { effectiveDprCap, useUi } from '../state/ui'
 import { mulberry32 } from '../world/noise'
@@ -278,6 +279,7 @@ function applyConfig(config: BenchConfig, defaultPixelRatio: number): void {
   })
   resetTerrainRefine()
   if (config.terrain) setTerrainRefine(config.terrain)
+  setClimateHazeEnabled(config.climateHaze ?? true)
   const ctx = getRenderContext()
   ctx?.gl.setPixelRatio(config.pixelRatio ?? defaultPixelRatio)
 }
@@ -304,6 +306,7 @@ function applyPreset(level: DetailLevel, nativePixelRatio: number): void {
   })
   resetTerrainRefine()
   setTerrainRefine({ enabled: preset.terrainRefine })
+  setClimateHazeEnabled(true)
   const ctx = getRenderContext()
   ctx?.gl.setPixelRatio(effectiveDprCap(useUi.getState()) ?? nativePixelRatio)
 }
@@ -457,6 +460,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     Math.random = originalRandom
     resetTerrainRefine()
     setTerrainRefine(terrainSnapshot)
+    setClimateHazeEnabled(true)
     ctx.gl.setPixelRatio(defaultPixelRatio)
     balance.travelSpeed = balanceSnapshot.travelSpeed
     balance.randomEventsEnabled = balanceSnapshot.randomEventsEnabled
