@@ -4258,6 +4258,13 @@ Build order, chosen so no two parallel agents own the same file:
   `continuous-route` "Three dig initiators lapsed without their invitation" (invitation emitted
   unheard) and the point-121 remnant check again (`deadAfter:2`, calf alive) — both green alone
   on a quiet machine at 487ad8d4f; charged here as rotating-flake entries.
+   OBSERVED 18.11.2026 (full enrichments run, WebGPU, feat/336 5f15007e4, 31 min, log
+   2026-11-18T02-22-27-712): 8 reds that are green in isolation — burning-grass flame/smoke
+   luminance, calf-predation-drama living shield (2), elderly-natural-death giraffes out of
+   frame, calf-crossing-flee arrival variant, bird-flight-escape (flamingo flight, take-off
+   frame, peregrine). burning-grass and calf-predation-drama run before the only changed block,
+   so not the crocodile rebuild. Suspect: state leaking between sections on the shared page, or
+   run-time load (31 instead of 16 min).
 
 - [ ] 309. Serving-model degradation: repair + tripwire (user 25.07.2026). REPAIR: the
   late-evening session of 24.07 ran silently on Haiku 4.5 (proven by the Co-Authored-By

@@ -9,6 +9,7 @@ when their area is touched anyway or a triage says otherwise.
 Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
 
 <!-- entries -->
+- 2026-11-18 enrichments WebGL 2 — frame 130-crocodile-lunge now aims at calfAt after the crocodile staging rebuild, but from the standard camera height the lunge reads only as a tiny object in the water (feat/336 5f15007e4). A closer camera for that frame would make its subject legible; verify staging only, no game impact.
 - 2026-10-23 polish-children WebGL 2 — the 1239 check "a caught child was photographed standing slumped clear of the run" missed its window once in a full branch run of feat/1424 (86a68f5c1, log 2026-10-23T09-47-34-993; caught moments mostly "crowded"), green in the branch's section run (10-39-36-506) and on main (10-30-21-518, 10-51-21-476). Same chaotic class as the meeting count in 1424's commit; watch at the next LARGE.
 - 2026-10-23 polish-children WebGL 2 on main ac714e5cf — "the children are photographed from a standpoint in the open" red (2 of 5 in the clear, maasai-village), owned by no point (log 2026-10-23T10-51-21-476); WebGL-2-only, waits for the next LARGE.
 - 2026-10-23 cloud probe — `parseMarker` in `scripts/cloud-switch.mjs` reads only `hostname: <h>`; the probe of 23.10. wrote `hostname vm` and read NOT PASSED until recorded by hand. Accept both forms when the switch is next touched.
