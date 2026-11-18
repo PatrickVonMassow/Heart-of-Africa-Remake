@@ -14450,3 +14450,4 @@ to land than a mechanism that needs a review.
   (closer camera or a shutter tied to the lunge pose), and a check asserts its projected presence.
   Test: Playwright enrichments section crocodile-ambush on both backends, picture-checked.
   Source: boundary picture check of point 336, 18.11.2026.
+  Bundle: Tierverhalten.
