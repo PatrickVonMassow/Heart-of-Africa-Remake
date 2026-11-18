@@ -67,6 +67,9 @@ export interface BenchConfig {
    *  a lower native ratio); undefined keeps the display's own ratio. */
   pixelRatio?: number
   terrain?: BenchTerrainOverride
+  /** false hides the travel ground-haze layers (src/scenes/travel/Climate.tsx);
+   *  undefined keeps them. Point 1542: the desert's lever-independent pixel cost. */
+  climateHaze?: boolean
 }
 
 /**
@@ -86,6 +89,9 @@ export const BENCH_CONFIGS: readonly BenchConfig[] = [
   { name: 'dpr-1', flags: {}, pixelRatio: 1 },
   { name: 'terrain-refine-off', flags: {}, terrain: { enabled: false } },
   { name: 'terrain-cap-84', flags: {}, terrain: { segmentCap: 84 } },
+  // Not part of 'all-off': that row stays comparable with the reports taken
+  // before this lever existed.
+  { name: 'climate-haze-off', flags: {}, climateHaze: false },
   {
     name: 'all-off',
     flags: { traaEnabled: false, ssaoEnabled: false, shadowsEnabled: false, shadowMapHalf: true },
