@@ -92,3 +92,21 @@ export function phaseDetail(rec, worstN = 8) {
 export function measuredPhases(detail, phase) {
   return (detail ?? []).filter((r) => r.measured && r.phase === phase)
 }
+
+/**
+ * The F8 report's own row for a measured pass: its GPU timestamp-query stats
+ * ({ median, p95 } in ms) and its CPU stats, or null when the report has no
+ * such row or no GPU timing (`row.gpu === null`).
+ */
+export function reportGpu(reportRows, config, phase) {
+  const row = (reportRows ?? []).find((r) => r.config === config && r.phase === phase)
+  if (!row || !row.gpu) return null
+  return { median: +row.gpu.median.toFixed(2), p95: +row.gpu.p95.toFixed(2) }
+}
+
+/** The GPU column for one pass, as printed. */
+export function gpuText(gpu, timing) {
+  if (gpu) return `gpu median ${gpu.median} ms  p95 ${gpu.p95}`
+  return `gpu n/a${timing && timing.available === false && timing.reason ? ` (${timing.reason})` : ''}`
+}
+

@@ -3,7 +3,8 @@
 // DEV probe (window.__perf / window.__f8detail) — then:
 //   BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-f8-detail.mjs [--short] [--phase savanna-driving] [--json out.json]
 // Prints, per measured pass of the phase (sweep configs and the low/medium/high
-// preset passes), the CPU median/p95 and each system's share of the 8 worst
+// preset passes), the CPU median/p95, the report's own GPU timestamp-query
+// median/p95 of that pass and each system's share of the 8 worst
 // frames, and inside render-submit the exclusive renderer.render time by kind
 // and the blocking WebGPU calls (src/render/renderSplitWatch.ts). Env: BENCH_W, BENCH_H, BENCH_DPR (default 1536x960 @ 1.25),
 // BENCH_TIMEOUT_MS (default 30 min).
@@ -11,7 +12,7 @@ import { writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { verifyLaunchOptions } from './verify/launch-args-core.mjs'
 import { findSystemChrome, hasHardwareGlChain } from './verify/system-chrome.mjs'
-import { measuredPhases, phaseDetail } from './perf-f8-detail-core.mjs'
+import { gpuText, measuredPhases, phaseDetail, reportGpu } from './perf-f8-detail-core.mjs'
 
 const argv = process.argv.slice(2)
 const flag = (name) => {
@@ -50,7 +51,7 @@ await page.waitForSelector('canvas', { timeout: 120000 })
 await page.waitForTimeout(15000)
 await page.keyboard.press('F8')
 await page.waitForFunction(() => window.__ui?.getState().benchReport, null, { timeout, polling: 2000 })
-const { detail, env, aborted } = await page.evaluate(() => {
+const { detail, env, aborted, rows, gpuTiming } = await page.evaluate(() => {
   const r = window.__ui.getState().benchReport
   let parsed = {}
   try {
@@ -58,7 +59,13 @@ const { detail, env, aborted } = await page.evaluate(() => {
   } catch {
     // keep {}
   }
-  return { detail: window.__f8detail ?? null, env: parsed.env ?? {}, aborted: !!r.aborted }
+  return {
+    detail: window.__f8detail ?? null,
+    env: parsed.env ?? {},
+    aborted: !!r.aborted,
+    rows: parsed.rows ?? [],
+    gpuTiming: parsed.gpuTiming ?? null,
+  }
 })
 await browser.close()
 
@@ -67,13 +74,14 @@ if (detail === null) {
   console.log('# no window.__f8detail: serve a DEV build (npm run dev) so the probe is present')
   process.exit(1)
 }
-if (jsonOut) writeFileSync(jsonOut, JSON.stringify(detail))
+if (jsonOut) writeFileSync(jsonOut, JSON.stringify({ detail, rows, gpuTiming }))
 const recs = measuredPhases(detail, phase)
 if (recs.length === 0) console.log(`# no measured "${phase}" phase recorded`)
 for (const rec of recs) {
   const d = phaseDetail(rec)
   console.log(
     `${rec.config.padEnd(16)} ${phase}  cpu median ${d.median} ms  p95 ${d.p95} (${d.ratio}x)  max ${d.max}  ` +
+      `${gpuText(reportGpu(rows, rec.config, rec.phase), gpuTiming)}  ` +
       `worst8 [${d.worstFrames.join(', ')}]  gc-in-worst ${d.gcFrames}${d.probe ? '' : '  (no probe split)'}`,
   )
   for (const e of d.worst) console.log(`    ${e.name.padEnd(20)} ${String(e.ms).padStart(7)} ms  ${e.share}`)

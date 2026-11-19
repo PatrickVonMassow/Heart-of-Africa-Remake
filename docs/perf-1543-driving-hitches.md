@@ -353,3 +353,15 @@ Next (owner, real GPU):
    moves the wait elsewhere and needs a fence other than onSubmittedWorkDone.
    OPEN, not implemented here.
 
+
+## Round 7 — GPU column in perf-f8-detail (ready)
+
+`scripts/perf-f8-detail.mjs` now prints, per measured pass, the F8 report's own
+GPU timestamp-query median/p95 of that pass (`rows[].gpu`, read from the
+finished report) next to the CPU numbers; without timestamps it prints
+`gpu n/a (<reason>)`. `--json` now writes `{ detail, rows, gpuTiming }`.
+Ready for the owner's real-GPU run (`npm run dev`, then
+`BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-f8-detail.mjs`),
+which decides the medium GPU-cost cut. The raw outputs of the owner runs at
+c5f2f94, d464d35, f9b5171 and 5bb96c8 exist only on the owner host
+(worktree `local/`); this doc carries their tables.

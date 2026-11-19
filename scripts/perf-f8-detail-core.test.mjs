@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { measuredPhases, phaseDetail, quantile } from './perf-f8-detail-core.mjs'
+import { gpuText, measuredPhases, phaseDetail, quantile, reportGpu } from './perf-f8-detail-core.mjs'
 
 describe('perf-f8-detail core', () => {
   it('uses the F8 quantile rule (floor index)', () => {
@@ -66,4 +66,19 @@ describe('perf-f8-detail core', () => {
     expect(d.gpuDone).toEqual({ worst: 60, all: 26.7 })
     expect(d.worst.find((e) => e.name === 'unbooked').ms).toBe(5)
   })
+
+  it('reads the GPU timestamp stats of a pass from the report rows', () => {
+    const rows = [
+      { config: 'medium-preset', phase: 'savanna-driving', gpu: { median: 31.234, p95: 44.567 } },
+      { config: 'low-preset', phase: 'savanna-driving', gpu: null },
+    ]
+    expect(reportGpu(rows, 'medium-preset', 'savanna-driving')).toEqual({ median: 31.23, p95: 44.57 })
+    expect(reportGpu(rows, 'low-preset', 'savanna-driving')).toBeNull()
+    expect(reportGpu(rows, 'high-preset', 'savanna-driving')).toBeNull()
+    expect(gpuText({ median: 1, p95: 2 }, null)).toBe('gpu median 1 ms  p95 2')
+    expect(gpuText(null, { available: false, reason: 'no GPU timestamps were resolved' })).toBe(
+      'gpu n/a (no GPU timestamps were resolved)',
+    )
+  })
 })
+
