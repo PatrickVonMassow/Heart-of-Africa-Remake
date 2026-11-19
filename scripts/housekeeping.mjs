@@ -584,13 +584,14 @@ export function runHousekeeping({
         // cursor stays before it so the next run sees it again — unless it was
         // this run's first entry, which alone outgrows the budget and would
         // otherwise block every later run.
-        if (budget.exhausted() && !first) {
-          complete = false
-          writeState({ cursor })
-          return 'incomplete'
-        }
+        // A visit that merely used the budget up finished its entry; the loop
+        // head ends the walk with the cursor after it.
         if (scanCut) {
           complete = false
+          if (!first) {
+            writeState({ cursor })
+            return 'incomplete'
+          }
           cut = true
         }
         first = false
