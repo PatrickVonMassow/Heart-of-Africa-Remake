@@ -324,6 +324,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     return
   }
   running = true
+  if (import.meta.env.DEV) (window as unknown as { __f8detail?: unknown[] }).__f8detail = []
   const short = options.short ?? benchShortMode(typeof location === 'undefined' ? '' : location.search)
   const counts = benchFrameCounts(short)
   // The sweep configs PLUS the point-293 low-preset profiling pass — one extra
@@ -401,6 +402,24 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
       gpuSink = measured ? gpuSamples : null
       const samples: FrameSample[] = []
       await runFrames(counts.sample, samples, tick)
+      if (import.meta.env.DEV) {
+        // Per-system split of every measured frame (docs/perf-1543-driving-hitches.md,
+        // scripts/perf-f8-detail.mjs): the travel probe's CPU frames of this
+        // phase, aligned to the samples (the probe's after-effect runs first).
+        const w = window as unknown as {
+          __perf?: { cpuFrames: () => Array<{ work: Record<string, number>; heapDropMb: number }> }
+          __f8detail?: unknown[]
+        }
+        const probe = w.__perf?.cpuFrames().slice(-samples.length) ?? []
+        ;(w.__f8detail ??= []).push({
+          config: config.name,
+          phase: phase.name,
+          measured,
+          cpuMs: samples.map((x) => x.cpuMs),
+          work: probe.length === samples.length ? probe.map((f) => f.work) : null,
+          heapDropMb: probe.length === samples.length ? probe.map((f) => f.heapDropMb) : null,
+        })
+      }
       // Drain the last in-flight resolve so the phase's GPU sample is complete.
       await gpu.flush(gpuSink)
       if (!measured) return
