@@ -747,7 +747,6 @@ export function runHousekeeping({
           if (isReferenced(name, refTexts)) return emit({ path, size: scan.bytes, rule: v.rule, outcome: 'kept', reason: 'referenced' })
           remove(path, st, root, v.rule, scan.bytes)
         })
-        if (stepResults.tmp === 'incomplete') break
         continue
       }
 
@@ -787,7 +786,6 @@ export function runHousekeeping({
           if (scan.hasGit) return emit({ path, size: scan.bytes, rule: v.rule, outcome: 'kept', reason: 'contains .git' })
           remove(path, st, root, v.rule, scan.bytes)
         })
-        if (stepResults.local === 'incomplete') break
         continue
       }
 
@@ -824,7 +822,6 @@ export function runHousekeeping({
             return emit({ path, size: st.size, rule: v.rule, outcome: 'kept', reason: 'git worktree' })
           remove(path, st, root, v.rule, st.size)
         })
-        if (stepResults.logs === 'incomplete') break
         continue
       }
 

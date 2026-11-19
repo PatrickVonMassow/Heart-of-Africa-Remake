@@ -283,6 +283,22 @@ describe('budget and resume', () => {
   })
 })
 
+describe('budget: an incomplete step does not stop later steps', () => {
+  it('runs branches and git after a tmp step that ran out of budget', () => {
+    const a = arena()
+    for (let i = 0; i < 6; i++) {
+      put(join(a.tmp, `hoa-old-${i}.log`))
+      age(join(a.tmp, `hoa-old-${i}.log`))
+    }
+    const { r, gitCalls } = run(a, { steps: ['tmp', 'branches', 'git'], budgetEntries: 2 })
+    expect(r.steps.tmp).toBe('incomplete')
+    expect(r.outcome).toBe('incomplete')
+    expect(r.steps.branches).toBeDefined()
+    expect(r.steps.git).toBeDefined()
+    expect(gitCalls.some((c) => c[0] === 'for-each-ref')).toBe(true)
+  })
+})
+
 describe('budget: an entry larger than the whole budget', () => {
   it('is kept as scan incomplete and passed, so it never blocks later runs', () => {
     const a = arena()
