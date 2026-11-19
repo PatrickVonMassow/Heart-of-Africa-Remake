@@ -160,6 +160,12 @@ describe('per-row aggregation', () => {
     const alone: BenchPassSample[] = [{ pass: 'a', call: 1, ms: 1 }]
     const outside = aggregatePasses([ab('x', 'y'), ab('y', 'z'), ab('z', 'x'), ab('x', 'a'), alone, alone, alone, alone])
     expect(outside.map((p) => p.pass)).toEqual(['x', 'a', 'y', 'z'])
+    // Two cycles joined one way (x→a): the break must happen in x's cycle even
+    // though b, downstream and away from the bridge, has the lowest position.
+    const b: BenchPassSample[] = [{ pass: 'b', call: 1, ms: 1 }]
+    const joined = aggregatePasses([ab('x', 'y'), ab('y', 'z'), ab('z', 'x'), ab('a', 'b'), ab('b', 'c'), ab('c', 'a'), ab('x', 'a'), b, b, b, b])
+    const at = (p: string): number => joined.findIndex((e) => e.pass === p)
+    expect(['x', 'y', 'z'].every((p) => at(p) < at('a') && at(p) < at('b') && at(p) < at('c'))).toBe(true)
   })
 
   it('counts measured frames that resolved no pass at all', () => {
