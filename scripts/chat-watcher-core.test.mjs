@@ -24,6 +24,7 @@ import {
   watcherCodeFingerprint,
   watcherSupervision,
   isWatcherCommand,
+  RESPONDER_PROMPT_HEAD,
 } from './chat-watcher-core.mjs'
 import { holdExclusiveAddress, watcherAddress } from './batch-singleton.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
@@ -894,5 +895,18 @@ describe('the responder spawn carries its own session id', () => {
     expect(r.status).toBe(0)
     const kept = JSON.parse(readFileSync(statePath, 'utf8')).sessions[responderId].review.kept
     expect(Object.keys(kept)).toEqual([title])
+  })
+})
+
+// User decision 18.11.2026: only an explicit order is queued; a discussed
+// problem gets a proposal and waits for an OK the responder can trace.
+describe('the responder prompt separates an order from a discussed problem', () => {
+  it('queues an explicit order and only proposes for a described problem', () => {
+    expect(RESPONDER_PROMPT_HEAD).toMatch(/AUSDRUECKLICHER AUFTRAG[^.]*\(mach X/)
+    expect(RESPONDER_PROMPT_HEAD).toMatch(/schlage in der Antwort nur eine Loesung vor; eingereiht wird erst nach seinem OK/)
+  })
+
+  it('asks back instead of queueing an OK whose proposal it cannot see', () => {
+    expect(RESPONDER_PROMPT_HEAD).toMatch(/Ein OK, dessen Vorschlag nicht in den Nachrichten unten steht, reihst du nicht ein/)
   })
 })

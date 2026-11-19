@@ -119,6 +119,7 @@ describe('the RESPONDER message — the fix for the silent instruction loss', ()
   it('queues an explicit order and only proposes for a discussed problem', () => {
     expect(text).toMatch(/EXPLICIT ORDER/)
     expect(text).toMatch(/DISCUSSED PROBLEM[^.]*is not queued/)
+    expect(text).toMatch(/propose a solution in the reply; it is queued only after the user's OK in a later message/)
   })
 
   it('makes the reply obligatory — it is also the receipt the ack needs', () => {
