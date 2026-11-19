@@ -78,21 +78,6 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 
-- [ ] 1552. Fix the cause of the shadows-off GPU inversion
-  Split from 1549 (main session 19.11.2026, for veto). Observed in the user benchmark "Lenovo
-  GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the GPU
-  median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and triangles
-  fall. The batch host has no WebGPU timestamp query, so the cause can only be read from a fresh F8 run
-  on the user's notebook with the per-pass breakdown of 1549. WAITS FOR that report from the user.
-  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
-  Final state: with the pass the breakdown names, the cause is fixed in the product code, or — if it is
-  a measurement artefact — in the benchmark, so `shadows-off` prices only the shadows and its GPU median
-  is <= baseline in savanna-standing, desert-standing and savanna-driving on the user's notebook.
-  Test: Vitest for the changed logic; Playwright benchmark suite on WebGPU; the user's notebook report.
-  Criticality: high (inherited from priority point 1549).
-  Source: 1549 split, 19.11.2026.
-  Bundle: Steuerung & Performance.
-
 - [ ] 1543. Smooth the CPU hitches while driving on medium and high
   Observed: The user's notebook benchmark shows CPU p95 of 41 ms (medium) and 52 ms (high) during the drive against medians of 9-12 ms: periodic hitches that the player feels as stutter even when the GPU average would be fine. The user requires medium to be clearly smoother on mid-range notebooks.
 
@@ -112,6 +97,15 @@ put it is the mistake this line exists to stop.
   User approval 18.11.2026: "Ja, so als drei Aufträge einreihen"
   Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
   Bundle: Steuerung & Performance.
+  ADDENDUM 19.11.2026 (user request "Remove the CPU stutter while driving", folded in as a duplicate of this point):
+  Placement: at the very front of the work-order queue, right after the desert-haze point (user order 19.11.2026).
+
+  Observed in the user benchmark "hoa-bench-2026-11-18-webgpu-dritter-Durchlauf.json" (webgpu, AMD RDNA-3 notebook, build f24ce38): in savanna-driving the CPU median stays ~8-10 ms but the CPU p95 jumps sporadically — baseline 10.5 ms, yet high-preset (same settings as baseline) 49.9 ms, terrain-cap-84 36.3, climate-haze-off 38.8, medium-preset 31.4, all-off 20.6 (p99 up to 61 ms). Frame p95/p99 follow (e.g. high-preset 51.5 / 65.2 ms). The spikes do not follow the config, so they are intermittent main-thread work while driving — suspected terrain-chunk / dressing streaming, unconfirmed. Player impact: visible stutter in every preset.
+
+  Final state: the cause of the driving CPU spikes is named from a profile and fixed (work spread over frames or moved off the main thread); savanna-driving CPU p95 <= 2x its median in every config of a full benchmark run on the user's notebook.
+  Test: Vitest for changed logic; Playwright benchmark suite on WebGPU; the user's notebook report.
+  Bundle: Steuerung & Performance.
+  Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
 - [ ] 1169. The children shuffle on the spot above the gate on roughly a tenth of the world
   seeds (measured 20.09.2026 while point 1094 moved the teaching checks onto the seed axis;
@@ -14391,3 +14385,13 @@ to land than a mechanism that needs a review.
   Test: Vitest on the guard's core with the scratchpad target (passes) and a main-tree target (refused).
   Source: user request of 19.11.2026 18:49 UTC via the findings carrier (session unknown).
   Bundle: Modell & Wächter.
+
+- [ ] 1556. Make the desert climate haze cheaper on the GPU
+  Placement: at the very front of the work-order queue (user order 19.11.2026).
+
+  Observed in the user benchmark "hoa-bench-2026-11-18-webgpu-dritter-Durchlauf.json" (webgpu, AMD RDNA-3 notebook, 1536x960 @ dpr 1.25, build f24ce38): `climate-haze-off` lowers desert-standing GPU median 32.31 -> 24.71 ms (-7.6 ms); almost all of it in the `output` pass (21.95 -> 16.38 ms). It is the largest single lever measured, larger than GTAO (~4.8 ms) or TRAA. On the medium preset the haze stays on and desert-standing is 17.10 ms GPU (50.8 fps), savanna-driving 16.38 ms (47.8 fps) — below 60 fps.
+
+  Final state: the desert climate haze costs materially less GPU time at an unchanged look (picture check both backends), or medium gets a cheaper haze variant; the medium-preset desert-standing GPU median on the user's notebook is <= 16.7 ms. Estimated values go to src/config/balance.ts, marked calibratable.
+  Test: Vitest for changed logic; Playwright benchmark suite on WebGPU; picture check; the user's notebook report.
+  Bundle: Steuerung & Performance.
+  Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).

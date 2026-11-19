@@ -38025,3 +38025,30 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   its radius; test via `window.__ui.setState({ ssaoEnabled: false })` at the shutter.
   Refs: verification/687-bank-play-rocks.png
   Bundle: Siedlungsgeometrie.
+
+- [x] 1552. Fix the cause of the shadows-off GPU inversion
+  Split from 1549 (main session 19.11.2026, for veto). Observed in the user benchmark "Lenovo
+  GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the GPU
+  median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and triangles
+  fall. The batch host has no WebGPU timestamp query, so the cause can only be read from a fresh F8 run
+  on the user's notebook with the per-pass breakdown of 1549. WAITS FOR that report from the user.
+  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
+  Final state: with the pass the breakdown names, the cause is fixed in the product code, or — if it is
+  a measurement artefact — in the benchmark, so `shadows-off` prices only the shadows and its GPU median
+  is <= baseline in savanna-standing, desert-standing and savanna-driving on the user's notebook.
+  Test: Vitest for the changed logic; Playwright benchmark suite on WebGPU; the user's notebook report.
+  Criticality: high (inherited from priority point 1549).
+  Source: 1549 split, 19.11.2026.
+  Bundle: Steuerung & Performance.
+  CLOSED 19.11.2026 as not reproducible (user request "Close 1552 as not reproducible (shadows-off inversion was a measurement artefact)"):
+  Close work-order point 1552 ("Fix the cause of the shadows-off GPU inversion") as not reproducible: measurement artefact of the earlier run, no product or benchmark change.
+
+  Evidence: user benchmark "hoa-bench-2026-11-18-webgpu-dritter-Durchlauf.json" (run 2026-11-19T18:41Z, webgpu, AMD RDNA-3 notebook, 1536x960 @ dpr 1.25, build f24ce38 — same device and resolution as the reference "Lenovo GIP-Notebook (neu).json", build c8f3995).
+
+  GPU median baseline -> shadows-off:
+  - savanna-standing 26.41 -> 25.17 ms (ShadowMap#2 pass 1.70 ms)
+  - desert-standing 32.31 -> 32.05 ms (ShadowMap#2 pass 0.19 ms)
+  - savanna-driving 31.46 -> 30.34 ms (ShadowMap#2 pass 1.60 ms)
+
+  The point's final-state condition (shadows-off GPU median <= baseline in all three phases, shadows-off prices only the shadows) holds; the saving matches the ShadowMap pass. Between c8f3995 and f24ce38 no travel shadow code changed (only the 1549 per-pass measurement and 1164, which is place-scene only), so the earlier 25.9 -> 36.0 ms inversion is attributed to the old measurement run.
+  Source: user request of 19.11.2026 18:59 UTC via the findings carrier (session unknown).
