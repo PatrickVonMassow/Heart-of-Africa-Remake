@@ -202,17 +202,35 @@ if (report.env.backend === 'webgl2') {
 // Point 1549: the per-pass GPU split follows the same honesty rule — present
 // per row where the pool resolved passes, otherwise flagged with a reason.
 const passRows = report.rows.filter((r) => r.gpuPasses != null)
-if (report.gpuPassTiming?.available === true) {
+if (report.gpuTiming.available === true) {
+  // Real whole-frame timestamps exist, so the split MUST exist too — an
+  // "unavailable" here is a broken capture, not an honest flag.
   check(
-    'WebGPU: every GPU row carries a per-pass breakdown in pass order',
-    passRows.length === gpuRows.length &&
-      passRows.every(
-        (r) =>
-          r.gpuPasses.frames > 0 &&
-          r.gpuPasses.passes.length > 0 &&
-          r.gpuPasses.passes.every((p, i, a) => p.mean >= 0 && p.frames <= r.gpuPasses.frames && (i === 0 || a[i - 1].order <= p.order)),
-      ),
-    `${passRows.length}/${gpuRows.length} rows; baseline ${JSON.stringify(report.rows[0]?.gpuPasses?.passes?.map((p) => p.pass) ?? null)}`,
+    'WebGPU: the per-pass breakdown is measured wherever GPU timestamps are',
+    report.gpuPassTiming?.available === true && passRows.length === gpuRows.length,
+    `${passRows.length}/${gpuRows.length} rows, reason "${report.gpuPassTiming?.reason}"`,
+  )
+  // Totals and passes cover the SAME frames (a stale resolve records neither).
+  check(
+    'WebGPU: every breakdown covers exactly the frames of its GPU series',
+    passRows.every((r) => r.gpu !== null && r.gpuPasses.frames === r.gpu.n && r.gpuPasses.passes.length > 0),
+    passRows.filter((r) => r.gpu === null || r.gpuPasses.frames !== r.gpu.n).slice(0, 3).map((r) => `${r.config}/${r.phase} ${r.gpuPasses.frames} vs ${r.gpu?.n}`).join(' | '),
+  )
+  // Every pass is named after its target, never the generic call fallback.
+  const generic = passRows.flatMap((r) => r.gpuPasses.passes.filter((p) => /^pass \d+$/.test(p.pass)).map((p) => `${r.config}/${r.phase} ${p.pass}`))
+  check('WebGPU: every pass carries its render-target label', generic.length === 0, generic.slice(0, 3).join(' | '))
+  // The real order: with sun shadows on, a shadow map is submitted before the
+  // scene pass that samples it (the call index once reversed this).
+  const baseRows = passRows.filter((r) => r.config === 'baseline')
+  const shadowFirst = (r) => {
+    const shadow = r.gpuPasses.passes.find((p) => p.pass.startsWith('ShadowMap'))
+    const scene = r.gpuPasses.passes.find((p) => p.pass === 'output')
+    return !!shadow && (!scene || shadow.order < scene.order)
+  }
+  check(
+    'WebGPU: the baseline rows submit a shadow map before the scene pass',
+    baseRows.length === phases.length && baseRows.every(shadowFirst),
+    baseRows.map((r) => `${r.phase}: ${r.gpuPasses.passes.map((p) => p.pass).join(' > ')}`).join(' | '),
   )
 } else {
   check(
