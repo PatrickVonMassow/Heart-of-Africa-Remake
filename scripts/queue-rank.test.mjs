@@ -229,6 +229,8 @@ describe('`--ranked` refuses a split of a priority point (point 1551)', () => {
     expect(out.stdout).toMatch(/SPLIT OF A PRIORITY POINT: point 1549 is split from priority point 1542/)
     expect(out.stdout).toMatch(/--ahead 1549/)
     expect(out.stdout).toMatch(/ {2}1550 stand last because/)
+    expect(out.stdout).toMatch(/MOVE the point’s block inside TASKS\.md/)
+    expect(out.stdout).toMatch(/record that last is right: node scripts\/queue-rank\.mjs --ranked <N>/)
     expect(out.stdout).not.toMatch(/1549, 1550 stand last because|1549 stand last because/)
   })
 
