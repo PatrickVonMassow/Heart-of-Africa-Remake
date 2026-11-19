@@ -162,6 +162,8 @@ export interface BankChild extends TagChild {
    *  off-game ROCK utterance, and how long it has been in that stage. */
   climb: ClimbStage
   climbFor: number
+  /** Walking back to the group's quarter after the boulder took it outside. */
+  homing: boolean
   /** How high the child's feet stand above the settlement's ground, in metres.
    *  Zero for everybody who is not on a stone; the scene adds it to the gait's
    *  own body lift, so the game owns the height and the view only draws it. */
@@ -751,6 +753,7 @@ export function createBankGame(
       goalFor: 0,
       climb: 'none' as ClimbStage,
       climbFor: 0,
+      homing: false,
       lift: 0,
       footX: p.x,
       footZ: p.z,
@@ -1560,7 +1563,10 @@ function stepRoam(
     // and when it steps off it takes a fresh heading like any other child that
     // has just finished something.
     if (onStone(c)) {
-      if (stepClimb(s, i, dt, cfg, stage, world)) roamGoal(c, rand)
+      if (stepClimb(s, i, dt, cfg, stage, world)) {
+        roamGoal(c, rand)
+        c.homing = true
+      }
       continue
     }
     const approaching = i === s.climber && !s.namedBoulder
@@ -1595,6 +1601,7 @@ function stepRoam(
         s.abandonedBoulder = s.failedClimbers.length === s.children.length
         clearPath(c)
         roamGoal(c, rand)
+        c.homing = true
       } else {
         // Steered straight at it, deliberately: the boulder is an ORDINARY
         // village stone a few paces off the group's own quarter, not a place the
@@ -1627,8 +1634,14 @@ function stepRoam(
     // It walks that way straight, steering round its playmates as round a hut —
     // an eased turn left it probing the walls of the sliver — and where the way
     // lies behind it, it first turns on the spot rather than walk backwards.
+    // ONLY THE CHILD THE BOULDER TOOK OUT. The separation also leaves ordinary
+    // roamers a hand's breadth past the rim, and sending them home round each
+    // other's bodies froze two of them there while a third walked into them
+    // (measured: bambara seed 35, 1.36 % of a roamer's minute); the reflection
+    // below brings those back on its own.
     const out = Math.hypot(c.x - stage.roam.x, c.z - stage.roam.z)
-    if (out > stage.roam.radius) {
+    if (out <= stage.roam.radius) c.homing = false
+    if (c.homing) {
       const way = wayTo(c, stage.roam, dt, world)
       const toWay = Math.atan2(way.x - c.x, way.z - c.z)
       if (Math.abs(Math.atan2(Math.sin(toWay - c.facing), Math.cos(toWay - c.facing))) > cfg.setOffTurn) {
