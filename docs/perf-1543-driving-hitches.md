@@ -147,6 +147,14 @@ F8 samples next to the probe's per-system split of the same frames
 (`window.__f8detail`), and the F8 run is driven headless (WebGPU) with
 `?bench=short` first, then full.
 
+Harness findings (01:55): headless WebGPU in this container emits ~100
+`OperationError: Instance dropped in popErrorScope` page errors per second;
+Vite 8's dev server forwards client console output and stalls under that flood
+(page loads time out after one run). F8 with `?bench=short` started this way
+returns a report within 15 s with no measured phase recorded (report flagged
+`aborted` key present; contents not yet read). Next: a development-mode build
+served by `vite preview` (no console forwarding), same DEV probe hook.
+
 Status: blocked on the headless F8 harness so far — a full headless F8 run did
 not finish within 28 min (the dev server choked on forwarded console warnings,
 ~9.6 MB log); restarted with `--logLevel error`, short run in progress. No
