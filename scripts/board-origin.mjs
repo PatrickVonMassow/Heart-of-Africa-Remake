@@ -26,7 +26,7 @@ function shallowRoots() {
 /** Map<n, { sha, date, subject }> of the commit that first added each point header. */
 export function readAdditions() {
   try {
-    const log = git(['log', '--reverse', '--format=@@C %H %cs %s', '-U0', '--no-color', '--no-ext-diff', '--', 'TASKS.md'])
+    const log = git(['log', '--reverse', '--topo-order', '--diff-merges=first-parent', '--format=@@C %H %cs %s', '-U0', '--no-color', '--no-ext-diff', '--', 'TASKS.md'])
     return firstAdditions(log, { skip: shallowRoots() })
   } catch {
     return new Map()

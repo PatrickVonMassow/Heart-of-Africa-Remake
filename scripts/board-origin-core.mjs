@@ -45,7 +45,7 @@ export const BOARD_LANG = 'de'
 export function sourceLines(text) {
   const out = new Map()
   for (const block of parsePointBlocks(String(text ?? '').replace(/\r\n/g, '\n'))) {
-    const m = /^\s*Source:\s*(.+)$/m.exec(block.body)
+    const m = /^[ \t]*Source:[ \t]*(\S.*)$/m.exec(block.body)
     if (m && !out.has(block.n)) out.set(block.n, m[1].trim())
   }
   return out
@@ -88,7 +88,9 @@ export function classifySource(text) {
     at(/\b(\d{2,})(?: landing)? session\b/i, 'working') ||
     at(/\bfeat\/(\d+)-/i, 'working') ||
     at(/\bpoint (\d+)/i, 'working')
-  return { by: 'agent', context }
+  // An agent only when the text says so; an unrecognised provenance stays unknown.
+  if (context || /\b(?:agent|finding|found|review|split|session|closing|covering|owner|LARGE|picture check)\b/i.test(s)) return { by: 'agent', context }
+  return { by: null, context: null }
 }
 
 /**
@@ -108,19 +110,26 @@ export function classifyCommit(subject) {
  * Parse `git log --reverse --format='@@C %H %cs %s' -U0 -- TASKS.md` into the
  * FIRST commit adding each point header: Map<n, { sha, date, subject }>.
  * `skip` holds commits whose additions are not real (a shallow clone's
- * grafted root shows the whole file as added).
+ * grafted root shows the whole file as added): headers there predate the
+ * visible history, so a later rewrite of them is never taken as the filing.
  */
 export function firstAdditions(logText, { skip = new Set() } = {}) {
   const out = new Map()
+  const predating = new Set()
   let commit = null
+  let skipping = false
   for (const line of String(logText ?? '').split('\n')) {
     const c = /^@@C ([0-9a-f]+) (\d{4}-\d{2}-\d{2}) ?(.*)$/.exec(line)
     if (c) {
-      commit = skip.has(c[1]) ? null : { sha: c[1], date: c[2], subject: c[3] }
+      skipping = skip.has(c[1])
+      commit = skipping ? null : { sha: c[1], date: c[2], subject: c[3] }
       continue
     }
     const p = /^\+- \[[ x]\] (\d+)\./.exec(line)
-    if (p && commit && !out.has(Number(p[1]))) out.set(Number(p[1]), commit)
+    if (!p) continue
+    const n = Number(p[1])
+    if (skipping) predating.add(n)
+    else if (commit && !out.has(n) && !predating.has(n)) out.set(n, commit)
   }
   return out
 }
@@ -187,6 +196,6 @@ export function sourceLineFor({ kind, at = new Date(), session = '' } = {}) {
 /** A spec with a `Source:` line appended — unless it already carries one. */
 export function withSourceLine(spec, line) {
   const s = String(spec ?? '')
-  if (/^\s*Source:/m.test(s)) return s
+  if (/^[ \t]*Source:[ \t]*\S/m.test(s)) return s
   return `${s.replace(/\s+$/, '')}\n${line}\n`
 }

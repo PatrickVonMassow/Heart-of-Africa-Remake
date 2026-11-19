@@ -64,6 +64,12 @@ describe('origin derivation', () => {
     expect(classifySource('picture check of the 1234 landing session, 01.10.2026').context).toEqual({ type: 'working', point: 1234 })
     expect(classifySource('findings carrier, found on feat/1310-natural-village').context).toEqual({ type: 'working', point: 1310 })
     expect(classifySource('agent finding of 19.11.2026 via the findings carrier')).toEqual({ by: 'agent', context: null })
+    expect(classifySource('imported from the old tracker')).toEqual({ by: null, context: null })
+  })
+
+  it('reads a Source: line only with a value on the same line', () => {
+    expect(sourceLines('- [ ] 7. Seven\n  Source:\n  some prose\n').has(7)).toBe(false)
+    expect(withSourceLine('spec\nSource:\n', 'Source: stamped.')).toContain('Source: stamped.')
   })
 
   it('reads a commit subject as user, agent split, or unknown — never guessed', () => {
@@ -76,7 +82,7 @@ describe('origin derivation', () => {
     const all = firstAdditions(LOG)
     expect(all.get(1549).sha).toBe('aaaa')
     const real = firstAdditions(LOG, { skip: new Set(['aaaa']) })
-    expect(real.get(1549).sha).toBe('bbbb')
+    expect(real.has(1549)).toBe(false)
     expect(real.has(1547)).toBe(false)
   })
 
@@ -87,7 +93,8 @@ describe('origin derivation', () => {
     expect(line(1547)).toBe('Eingestellt: 18.11.26 durch Benutzeranfrage')
     expect(line(1548)).toBe('Eingestellt: 12.11.26 durch Agenten, abgespalten von 1302')
     expect(line(900)).toBe('Eingestellt: 03.10.26 durch Agenten, der beim Abarbeiten von 1234 auf das Problem gestoßen ist')
-    expect(line(1549)).toBe('Eingestellt: 17.11.26 durch Benutzeranfrage')
+    expect(line(1549)).toBe('Herkunft unbekannt')
+    expect(originLine(originOf(1549, { additions: new Map([[1549, { sha: 'bbbb', date: '2026-11-17', subject: 'Queue the two user orders of 17.11.2026' }]]) }))).toBe('Eingestellt: 17.11.26 durch Benutzeranfrage')
     expect(line(1551)).toBe('Eingestellt: 18.11.26 durch Agenten, abgespalten von 1302')
     expect(line(1552)).toBe('Eingestellt: 18.11.26, Urheber unbekannt')
     expect(line(1)).toBe('Herkunft unbekannt')
