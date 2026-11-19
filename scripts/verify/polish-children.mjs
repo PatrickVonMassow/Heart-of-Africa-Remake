@@ -5,7 +5,7 @@
 // helpers live in ./_polish.mjs, and every section below owns its staging.
 import { rmSync } from 'node:fs'
 import { assertBackend } from './_browser.mjs'
-import { frameShutter, waitForSceneReady } from './frameSubject.mjs'
+import { waitForSceneReady } from './frameSubject.mjs'
 import { AXIS_SAMPLES, CONFIRMED_RATIO, KID_HEIGHT, MIN_CHILD_PIXELS, OCCLUDED_RATIO, armMinZ, armSweep, describeReading, judgeChildFigure, judgePrepareArms, judgeRunnerArms, judgeTagStandpoint, ARM_ACQUISITION, recordArmFrame } from './tagFrameReading.mjs'
 import { CHILD_MOTION, holdsAGame, judgedEnough, rescueRate, shuffleWindows, traceLiveness } from './childMotionMetric.mjs'
 import { section, check, page, frame, nextFrames, stepUntil, goToPlace, finishPolishSuite, OUT } from './_polish.mjs'
@@ -1591,75 +1591,6 @@ if (section('children-bank-game')) {
           `both detailed play rocks resting on broad bases, seen from a quarter of the stretch back of the upstream rock and ` +
           `an eighth of it aside (stretch ${stood.stretch.toFixed(1)} m)`,
       })
-      // DIAG 1164 (temporary): what projects into the sand right of the far rock
-      const diag = await page.evaluate(() => {
-        const cam = window.__placeCamera, scene = window.__placeScene
-        const W = window.innerWidth, H = window.innerHeight
-        const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
-        const px = (x, y, z) => {
-          const eye = apply(cam.matrixWorldInverse.elements, [x, y, z, 1])
-          const c = apply(cam.projectionMatrix.elements, eye)
-          if (!(c[3] > 0)) return null
-          return { sx: Math.round((c[0] / c[3] + 1) / 2 * W), sy: Math.round((1 - c[1] / c[3]) / 2 * H), d: Math.hypot(x - cam.position.x, z - cam.position.z) }
-        }
-        const out = []
-        scene.updateMatrixWorld(true)
-        scene.traverse((o) => {
-          if (!o.isMesh || !o.visible) return
-          let vis = true; for (let q = o; q; q = q.parent) if (!q.visible) vis = false
-          if (!vis) return
-          const name = (o.name || '') + '<' + (o.parent?.name || '') + '<' + (o.parent?.parent?.name || '')
-          const mat = Array.isArray(o.material) ? o.material[0] : o.material
-          const info = { name, mat: (mat?.name || mat?.type) + ' #' + (mat?.color ? mat.color.getHexString() : ''), cast: o.castShadow }
-          const m = o.matrixWorld.elements
-          if (o.isInstancedMesh) {
-            const e = new Float32Array(16)
-            for (let i = 0; i < o.count; i++) {
-              const im = o.instanceMatrix.array.slice(i * 16, i * 16 + 16)
-              // world = matrixWorld * instance
-              const local = [im[12], im[13], im[14], 1]
-              const w = apply(m, local)
-              const sc = Math.hypot(im[0], im[1], im[2])
-              const p = px(w[0], w[1], w[2])
-              if (p && p.sx > 820 && p.sx < 1440 && p.sy > 440 && p.sy < 540) out.push({ ...info, i, w: w.slice(0, 3).map((v) => +v.toFixed(2)), sc: +sc.toFixed(2), ...p })
-            }
-          } else {
-            const p = px(m[12], m[13], m[14])
-            if (p && p.sx > 820 && p.sx < 1440 && p.sy > 440 && p.sy < 540) out.push({ ...info, w: [m[12], m[13], m[14]].map((v) => +v.toFixed(2)), ...p })
-          }
-        })
-        return { W, H, cam: [cam.position.x, cam.position.y, cam.position.z].map((v) => +v.toFixed(2)), out }
-      })
-      ;(await import('node:fs')).writeFileSync('/tmp/claude-1000/-workspace-hoa/3e7cea92-b879-4878-9cd0-182bd8775601/scratchpad/diag1164-' + Date.now() + '.json', JSON.stringify(diag))
-      {
-        const S = '/tmp/claude-1000/-workspace-hoa/3e7cea92-b879-4878-9cd0-182bd8775601/scratchpad/'
-        const flip = (step) => page.evaluate((step) => {
-          let hit = null
-          window.__placeScene.traverse((o) => {
-            if (!o.isInstancedMesh || hit) return
-            const a = o.instanceMatrix.array
-            for (let k = 0; k < o.count; k++) if (Math.abs(a[k * 16 + 12] + 12.83) < 0.05 && Math.abs(a[k * 16 + 14] + 18.77) < 0.05) hit = o
-          })
-          if (!hit) return 'no rock mesh'
-          if (step === 'norecv') hit.receiveShadow = false
-          if (step === 'nocast') hit.castShadow = false
-          if (step === 'hidden') hit.visible = false
-          if (step === 'noao') { window.__ui.setState({ ssaoEnabled: false }); return 'ao off' }
-          if (step === 'plain') { hit.userData.m0 = hit.material; hit.material = new hit.material.constructor(); hit.material.color.set('#8a8178'); hit.material.roughness = 0.95 }
-          if (step === 'probe') { const n = hit.geometry.attributes.normal; const c = hit.geometry.attributes.color; return `normal ${n ? n.count : 'NONE'} first ${n ? [n.getX(0), n.getY(0), n.getZ(0)].map((v) => v.toFixed(2)) : ''} color ${c ? [c.getX(0), c.getY(0), c.getZ(0)].map((v) => v.toFixed(2)) : 'NONE'} attrs ${Object.keys(hit.geometry.attributes)}` }
-          if (step === 'restore') { if (hit.userData.m0) hit.material = hit.userData.m0; window.__ui.setState({ ssaoEnabled: true }); hit.visible = true; hit.castShadow = true; hit.receiveShadow = true }
-          const m = hit.material; m.needsUpdate = true
-          return `${hit.geometry.attributes.position.count} verts, count ${hit.count}, recv ${hit.receiveShadow}, cast ${hit.castShadow}, vis ${hit.visible}`
-        }, step)
-        const log = []
-        for (const step of ['probe', 'base', 'plain', 'restore', 'noao', 'hidden']) {
-          log.push(step + ': ' + (await flip(step)))
-          await nextFrames(30)
-          await frameShutter(page, S)('exp-' + step, { general: 'temporary bank-play sand projection probe' })
-        }
-        log.push('restore: ' + (await flip('restore')))
-        ;(await import('node:fs')).writeFileSync(S + 'exp-log.txt', log.join('\n'))
-      }
 
       // THE CALL REACHES THE STAND THE GAME IS PHOTOGRAPHED FROM (work-order
       // 1073). The defect this exists for: the runner announces the direction
