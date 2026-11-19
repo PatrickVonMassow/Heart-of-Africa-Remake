@@ -37885,3 +37885,22 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   User approval 18.11.2026: "Auftrag an die Owner-Session"
   Source: user request of 18.11.2026 17:24 (spec cut from b08561942).
   Bundle: Chat & Tafel.
+
+- [x] 1546. Implement the recommended option of the board card "Chat: Problem besprechen ohne Einreihen – Regel in Anweisungstexte?" and remove the card
+
+  Problem: in chat, a described problem immediately becomes a new work-order point because the fixed instruction texts for chat sessions (hook/guard texts such as the stand-down carrier hint, decision-card and request-approval guard messages, batch-resume context) say so; the user's rule "a solution needs approval first" lives only in memory (solutions-need-user-approval.md, a-question-is-only-a-question.md).
+
+  Final state:
+  - The chat instruction texts distinguish two cases explicitly:
+    1. An explicit user order (do X / close Y / delete Z) is queued / deposited as a request.
+    2. A discussed problem (the user describes or asks about something): the session only proposes a solution in the reply; it is queued only after the user's OK in a later message.
+  - CLAUDE.md §6 (Working Method) gains the same rule in one or two lines (user decision 18.11.2026), so it no longer lives only in memory.
+  - Text change only; no new guard, ledger field or mechanism (infrastructure freeze 01.09.2026). Adjust the tests that pin the changed texts.
+  - Board: drop the card; record the closure in the decision log (what, why: user decision 18.11.2026 "deinen Vorschlag umsetzen", veto effect).
+
+  Queue position (user order 18.11.2026: "Alle drei Aufträge vorne einreihen, aber nach den drei neu anstehenden Aufträgen zur Performance-Steigerung"): at the front of the work order, directly after the three performance requests of 18.11.2026, together with the skirt-branch deletion and the 1163 WONTFIX request.
+
+  Note: settings/hook edits are attended-only (memory protected-paths-always-prompt).
+  User approval 18.11.2026: "Ja. Alle drei Aufträge vorne einreihen, aber nach den drei neu anstehenden Aufträgen zur Performance-Steigerung."
+  Source: user request of 18.11.2026 17:27 (spec cut from 04642a868).
+  Bundle: Chat & Tafel.
