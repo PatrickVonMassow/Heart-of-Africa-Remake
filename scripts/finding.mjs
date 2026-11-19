@@ -43,6 +43,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { execFileSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { blockedCardBody, blockedCardTitle } from './board-queue-core.mjs'
+import { sourceLineFor, withSourceLine } from './board-origin-core.mjs'
 import { carrierEntry, malformedEntries, markDrained, parseCarrier } from './findings-core.mjs'
 import { carrierPath, memoryIndexPath } from './findings-paths.mjs'
 import {
@@ -277,9 +278,11 @@ if (has('--request')) {
   // The spec is the deposit. Without it the entry is the very note this
   // mechanism exists to replace — "the user wants something", unusable.
   if (!spec.trim()) fail('--request needs the finished spec: --spec-file <path|->, or a "--- spec ---" part on --stdin (a TASKS-ready final state)')
+  // THE ORIGIN TRAVELS WITH THE SPEC: the owner appends it verbatim, so the
+  // point carries its `Source:` line and the board's origin line needs no git.
   const fields = {
     why: field('why'),
-    spec,
+    spec: withSourceLine(spec, sourceLineFor({ kind: 'request', at: new Date(), session: sessionTag() })),
     constraints: field('constraints'),
     userQuotes: withApproval(field('quotes'), flag('--approved')),
     docImpact: field('doc-impact'),
@@ -435,8 +438,10 @@ if (has('--record')) {
   if (!title) fail('--record needs a title: --record "<title>" --detail "<…>"')
   if (!detail) fail('a finding without detail is a note, not a finding — add --detail "<…>"')
   ensureCarrier()
-  const body = target ? `${detail}\nZiel: ${target}` : detail
-  appendEntry(carrierEntry({ at: new Date().toISOString(), session: sessionTag(), title, detail: body }))
+  const at = new Date()
+  const source = sourceLineFor({ kind: 'finding', at, session: sessionTag() })
+  const body = withSourceLine(target ? `${detail}\nZiel: ${target}` : detail, source).trimEnd()
+  appendEntry(carrierEntry({ at: at.toISOString(), session: sessionTag(), title, detail: body }))
   ensureIndexed()
   const pending = parseCarrier(readCarrier()).pending.length
   console.log(`finding recorded (${pending} waiting): ${title}`)
