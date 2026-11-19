@@ -78,19 +78,6 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 
-- [ ] 1550. Switch the scarce (Fable) lane from Fable 5.1 to Fable 5.2
-  Observed (measured 19.11.2026 10:21): a new model Fable 5.2 (model id `claude-fable-5-2`) exists. The installed Claude Code 2.1.280 refuses it: `API Error: 400 Claude Code 2.1.280 does not support this model; version 2.1.290 or newer is required`. The scarce lane in `scripts/model-lanes.mjs` still names Fable 5.1 (`claude-fable-5-1`), and so do the serving-chain texts the session hooks print.
-
-  Final state:
-  - Claude Code in the container is at >= 2.1.290 by the project's own install/update path (no manual container work for the user), and `claude -p … --model claude-fable-5-2` answers.
-  - `scripts/model-lanes.mjs` is the only place naming the model: the scarce lane reads displayName `Fable 5.2`, trailerName `Claude Fable 5.2`, modelId `claude-fable-5-2`; `Fable 5.1` / `Claude Fable 5.1` / `claude-fable-5-1` move into its `retired` list, so earlier trailers stay valid for the model guard.
-  - The serving chain (Opus 5.5, then Fable 5.2, then Opus 4.8), the lane-switch status and every hook text derived from the lanes name Fable 5.2; no live rule text still names 5.1 as the current lane (historical docs and archives stay untouched).
-  - The model-guard baseline accepts a `Co-Authored-By: Claude Fable 5.2` trailer and still accepts the retired 5.1 trailers on existing commits.
-
-  Test: Vitest for the lane record, the trailer allowlist (5.2 accepted, 5.1 retired-but-valid) and the serving-chain text; a live probe of `claude-fable-5-2` recorded in the point's evidence.
-  Source: user request of 19.11.2026 09:27 UTC via the findings carrier (session 9a5eca75); queued at the front of the work order by user order.
-  Bundle: Modell & Wächter.
-
 - [ ] 1551. Refuse the back of the order for a split of a priority point
   Observed: 18.11.2026 the batch split Part B of the user's high-priority performance order 1542 into 1549 and ranked it `last` (machine, position 445 of 445) with a reason about WHEN it can run (the batch host lacks WebGPU timestamp queries), not WHERE it belongs. `--ranked` accepts any nonempty reason, `appendGateState` clears on any `last` entry, and standing before one remembered point counts as a deliberate move. The 1549 block carries no `Criticality:` tag. Corrected by user order 19.11.2026 (1549 now before 1543).
 
