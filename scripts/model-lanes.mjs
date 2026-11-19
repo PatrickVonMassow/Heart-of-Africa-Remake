@@ -73,12 +73,12 @@ const RAW_LANES = [
     role: 'scarce',
     vendor: 'anthropic',
     // The NEWEST released model of this lane, never a pinned older one (user, 01.09.2026).
-    // Needs Claude Code >= 2.1.251.
-    displayName: 'Fable 5.1',
-    trailerName: 'Claude Fable 5.1',
-    modelId: 'claude-fable-5-1',
+    // Needs Claude Code >= 2.1.290 (refusal measured 19.11.2026 on 2.1.280).
+    displayName: 'Fable 5.2',
+    trailerName: 'Claude Fable 5.2',
+    modelId: 'claude-fable-5-2',
     familyWords: ['fable'],
-    retired: ['Fable 5', 'Claude Fable 5', 'claude-fable-5'],
+    retired: ['Fable 5', 'Claude Fable 5', 'claude-fable-5', 'Fable 5.1', 'Claude Fable 5.1', 'claude-fable-5-1'],
     runtime: 'claude',
     reasoningEffort: 'medium',
     scarce: true,
