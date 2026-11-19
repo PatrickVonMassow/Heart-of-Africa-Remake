@@ -216,6 +216,16 @@ if (report.gpuTiming.available === true) {
     passRows.every((r) => r.gpu !== null && r.gpuPasses.frames === r.gpu.n && r.gpuPasses.passes.length > 0),
     passRows.filter((r) => r.gpu === null || r.gpuPasses.frames !== r.gpu.n).slice(0, 3).map((r) => `${r.config}/${r.phase} ${r.gpuPasses.frames} vs ${r.gpu?.n}`).join(' | '),
   )
+  // Matching counts alone pass a capture whose frames resolved a total but no
+  // pass; every measured frame must carry its passes, and the scene pass must
+  // run in every one of them.
+  const sceneFrames = (r) => r.gpuPasses.passes.find((p) => p.pass === 'output')?.frames ?? 0
+  const holes = passRows.filter((r) => r.gpuPasses.emptyFrames !== 0 || sceneFrames(r) !== r.gpuPasses.frames)
+  check(
+    'WebGPU: every measured frame resolved its passes, the scene pass included',
+    holes.length === 0,
+    holes.slice(0, 3).map((r) => `${r.config}/${r.phase} empty ${r.gpuPasses.emptyFrames}, output ${sceneFrames(r)}/${r.gpuPasses.frames}`).join(' | '),
+  )
   // Every pass is named after its target, never the generic call fallback.
   const generic = passRows.flatMap((r) => r.gpuPasses.passes.filter((p) => /^pass \d+$/.test(p.pass)).map((p) => `${r.config}/${r.phase} ${p.pass}`))
   check('WebGPU: every pass carries its render-target label', generic.length === 0, generic.slice(0, 3).join(' | '))
@@ -225,7 +235,7 @@ if (report.gpuTiming.available === true) {
   const shadowFirst = (r) => {
     const shadow = r.gpuPasses.passes.find((p) => p.pass.startsWith('ShadowMap'))
     const scene = r.gpuPasses.passes.find((p) => p.pass === 'output')
-    return !!shadow && (!scene || shadow.order < scene.order)
+    return !!shadow && !!scene && shadow.order < scene.order
   }
   check(
     'WebGPU: the baseline rows submit a shadow map before the scene pass',
