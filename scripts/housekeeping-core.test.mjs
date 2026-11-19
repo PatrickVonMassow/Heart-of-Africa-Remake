@@ -1,7 +1,8 @@
 // Pure housekeeping rules (point 1509): every verdict fails closed.
 import { describe, expect, it } from 'vitest'
 import {
-  BRANCH_MAX_AGE_MS,
+  CLOUD_BRANCH_MAX_AGE_MS,
+  RESCUE_BRANCH_MAX_AGE_MS,
   DAY_MS,
   archivedPointNaming,
   branchKind,
@@ -240,7 +241,7 @@ describe('budget, lock, schedule, failures', () => {
 
 describe('rescue/doctor and claude/* branches (point 1513)', () => {
   const now = Date.UTC(2026, 10, 30)
-  const old = now - BRANCH_MAX_AGE_MS - DAY_MS
+  const old = now - CLOUD_BRANCH_MAX_AGE_MS - DAY_MS
   const archive = ['# Archive', '- [x] 1485. Skirt', '  cloud branch claude/skirt-a ran here', '- [x] 1486. Other', '  text'].join('\n')
   const workOrder = parseWorkOrder('- [ ] 900. Open\n', archive)
 
@@ -274,6 +275,18 @@ describe('rescue/doctor and claude/* branches (point 1513)', () => {
     expect(branchVerdict({ name, tipAtMs: old, now, contained: null }).reason).toBe('containment unknown')
     expect(branchVerdict({ name, tipAtMs: NaN, now, contained: true }).reason).toBe('tip date unknown')
     expect(branchVerdict({ name: 'feat/1-x', tipAtMs: old, now, contained: true }).act).toBe(false)
+  })
+
+  it('ages a rescue branch out after 3 days and a claude/* branch only after 14', () => {
+    expect(RESCUE_BRANCH_MAX_AGE_MS).toBe(3 * DAY_MS)
+    expect(CLOUD_BRANCH_MAX_AGE_MS).toBe(14 * DAY_MS)
+    const fourDays = now - 4 * DAY_MS
+    const rescue = 'rescue/doctor-2026-10-26T18-09-42-184Z-1'
+    expect(branchVerdict({ name: rescue, tipAtMs: fourDays, now, contained: true }).act).toBe(true)
+    expect(branchVerdict({ name: rescue, tipAtMs: now - 2 * DAY_MS, now, contained: true }).reason).toBe('young')
+    const cloud = { name: 'claude/skirt-a', now, contained: true, archiveText: archive, workOrder }
+    expect(branchVerdict({ ...cloud, tipAtMs: fourDays }).reason).toBe('young')
+    expect(branchVerdict({ ...cloud, tipAtMs: old }).act).toBe(true)
   })
 
   it('deletes a claude/* branch only when its archived point is closed', () => {
