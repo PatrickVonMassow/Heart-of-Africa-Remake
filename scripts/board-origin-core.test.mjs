@@ -65,6 +65,7 @@ describe('origin derivation', () => {
     expect(classifySource('findings carrier, found on feat/1310-natural-village').context).toEqual({ type: 'working', point: 1310 })
     expect(classifySource('agent finding of 19.11.2026 via the findings carrier')).toEqual({ by: 'agent', context: null })
     expect(classifySource('imported from the old tracker')).toEqual({ by: null, context: null })
+    expect(classifySource('imported from the old tracker, see point 1302')).toEqual({ by: null, context: null })
   })
 
   it('reads a Source: line only with a value on the same line', () => {
@@ -83,6 +84,8 @@ describe('origin derivation', () => {
     expect(all.get(1549).sha).toBe('aaaa')
     const real = firstAdditions(LOG, { skip: new Set(['aaaa']) })
     expect(real.has(1549)).toBe(false)
+    const rootLast = firstAdditions('@@C cccc 2026-11-02 Other branch\n+- [ ] 1549. No source here\n@@C aaaa 2026-01-01 Graft\n+- [ ] 1549. No source here\n', { skip: new Set(['aaaa']) })
+    expect(rootLast.has(1549)).toBe(false)
     expect(real.has(1547)).toBe(false)
   })
 

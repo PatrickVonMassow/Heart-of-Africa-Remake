@@ -75,12 +75,15 @@ export function shortDate(date) {
  */
 export function classifySource(text) {
   const s = String(text ?? '')
-  if (/\buser bug report\b/i.test(s)) return { by: 'userBug', context: null }
-  if (/\buser(?:-approved)? (?:request|order)\b|\buser request\b|^user\b/i.test(s)) return { by: 'user', context: null }
+  if (/\buser bug report\b|^bug report\b/i.test(s)) return { by: 'userBug', context: null }
+  if (/\buser(?:-approved)? (?:request|order)\b|\buser request\b|^user\b|^request deposited\b/i.test(s)) return { by: 'user', context: null }
   const at = (re, type) => {
     const m = re.exec(s)
     return m ? { type, point: Number(m[1]) } : null
   }
+  // An agent only when the text says so; an unrecognised provenance stays
+  // unknown, and a bare point reference alone names no filer.
+  if (!/\b(?:agent|finding|found|review|split|session|closing|covering|owner|LARGE|picture check|findings carrier|measured|run of|reopened|author|decision card|WebGPU|WebGL)\b|\bfeat\//i.test(s)) return { by: null, context: null }
   const context =
     at(/\bsplit (?:from|of) point (\d+)/i, 'split') ||
     at(/\breview (?:of|on) (?:point )?(\d+)/i, 'review') ||
@@ -88,9 +91,7 @@ export function classifySource(text) {
     at(/\b(\d{2,})(?: landing)? session\b/i, 'working') ||
     at(/\bfeat\/(\d+)-/i, 'working') ||
     at(/\bpoint (\d+)/i, 'working')
-  // An agent only when the text says so; an unrecognised provenance stays unknown.
-  if (context || /\b(?:agent|finding|found|review|split|session|closing|covering|owner|LARGE|picture check)\b/i.test(s)) return { by: 'agent', context }
-  return { by: null, context: null }
+  return { by: 'agent', context }
 }
 
 /**
@@ -116,20 +117,24 @@ export function classifyCommit(subject) {
 export function firstAdditions(logText, { skip = new Set() } = {}) {
   const out = new Map()
   const predating = new Set()
-  let commit = null
+  const lines = String(logText ?? '').split('\n')
+  // First every grafted root, wherever it sits in the order, then the additions.
   let skipping = false
-  for (const line of String(logText ?? '').split('\n')) {
+  for (const line of lines) {
+    const c = /^@@C ([0-9a-f]+) /.exec(line)
+    if (c) skipping = skip.has(c[1])
+    else if (skipping && /^\+- \[[ x]\] (\d+)\./.test(line)) predating.add(Number(/(\d+)/.exec(line)[1]))
+  }
+  let commit = null
+  for (const line of lines) {
     const c = /^@@C ([0-9a-f]+) (\d{4}-\d{2}-\d{2}) ?(.*)$/.exec(line)
     if (c) {
-      skipping = skip.has(c[1])
-      commit = skipping ? null : { sha: c[1], date: c[2], subject: c[3] }
+      commit = skip.has(c[1]) ? null : { sha: c[1], date: c[2], subject: c[3] }
       continue
     }
     const p = /^\+- \[[ x]\] (\d+)\./.exec(line)
-    if (!p) continue
-    const n = Number(p[1])
-    if (skipping) predating.add(n)
-    else if (commit && !out.has(n) && !predating.has(n)) out.set(n, commit)
+    const n = p ? Number(p[1]) : null
+    if (p && commit && !out.has(n) && !predating.has(n)) out.set(n, commit)
   }
   return out
 }
