@@ -38093,3 +38093,13 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Source: user request of 19.11.2026 19:43 UTC via the findings carrier (session unknown).
   Bundle: Session- & Repo-Hygiene.
   Closed 19.11.2026 on main as a queue-only point (precedent 1258): front reordered in b42e20e6d, measurement dispositions split into 1560, 1361 moved to docs/backlog.md.
+
+- [x] 1556. Make the desert climate haze cheaper on the GPU
+  Placement: at the very front of the work-order queue (user order 19.11.2026).
+
+  Observed in the user benchmark "hoa-bench-2026-11-18-webgpu-dritter-Durchlauf.json" (webgpu, AMD RDNA-3 notebook, 1536x960 @ dpr 1.25, build f24ce38): `climate-haze-off` lowers desert-standing GPU median 32.31 -> 24.71 ms (-7.6 ms); almost all of it in the `output` pass (21.95 -> 16.38 ms). It is the largest single lever measured, larger than GTAO (~4.8 ms) or TRAA. On the medium preset the haze stays on and desert-standing is 17.10 ms GPU (50.8 fps), savanna-driving 16.38 ms (47.8 fps) — below 60 fps.
+
+  Final state: the desert climate haze costs materially less GPU time at an unchanged look (picture check both backends), or medium gets a cheaper haze variant; the medium-preset desert-standing GPU median on the user's notebook is <= 16.7 ms. Estimated values go to src/config/balance.ts, marked calibratable.
+  Test: Vitest for changed logic; Playwright benchmark suite on WebGPU; picture check; the user's notebook report.
+  Bundle: Steuerung & Performance.
+  Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
