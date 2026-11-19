@@ -68,22 +68,55 @@ describe('haze noise bake', () => {
     expect(Math.abs(b / data.length - 0.5)).toBeLessThan(1 / 255)
   })
 
-  it('bakes the two channels as uncorrelated fields at every relative shift sampled', () => {
-    const [r, g] = HAZE_NOISE_SLICES.map((z) => bakeHazeNoise(size, period, 3, z).data)
-    for (const [dx, dy] of [[0, 0], [1, 0], [17, 5], [64, 64], [100, 31]]) {
-      let sr = 0, sg = 0, srr = 0, sgg = 0, srg = 0
-      for (let j = 0; j < size; j++) {
-        for (let i = 0; i < size; i++) {
-          const a = r[j * size + i]
-          const c = g[((j + dy) % size) * size + ((i + dx) % size)]
-          sr += a; sg += c; srr += a * a; sgg += c * c; srg += a * c
+  it('keeps the two shipped channels uncorrelated over a full shift sweep', () => {
+    // A finite tile of two independent fields still shows some sample
+    // correlation at some shifts; at the shipped tile the worst stays near the
+    // old noise's own slice-to-slice variance spread (~±7 %). Measured
+    // 19.11.2026: max |r| 0.145, rms 0.046.
+    const { noiseTextureSize: n, noiseTilePeriod: per } = balance.climateHaze
+    const [r, g] = HAZE_NOISE_SLICES.map((z) => bakeHazeNoise(n, per, 3, z).data)
+    let worst = 0
+    let sum2 = 0
+    let shifts = 0
+    for (let dy = 0; dy < n; dy += 12) {
+      for (let dx = 0; dx < n; dx += 12) {
+        let sr = 0, sg = 0, srr = 0, sgg = 0, srg = 0, m = 0
+        for (let j = 0; j < n; j += 4) {
+          for (let i = 0; i < n; i += 4) {
+            const a = r[j * n + i]
+            const c = g[((j + dy) % n) * n + ((i + dx) % n)]
+            sr += a; sg += c; srr += a * a; sgg += c * c; srg += a * c; m++
+          }
         }
+        const cov = srg / m - (sr / m) * (sg / m)
+        const corr = cov / Math.sqrt((srr / m - (sr / m) ** 2) * (sgg / m - (sg / m) ** 2))
+        worst = Math.max(worst, Math.abs(corr))
+        sum2 += corr * corr
+        shifts++
       }
-      const n = size * size
-      const cov = srg / n - (sr / n) * (sg / n)
-      const corr = cov / Math.sqrt((srr / n - (sr / n) ** 2) * (sgg / n - (sg / n) ** 2))
-      expect(Math.abs(corr)).toBeLessThan(0.15)
     }
+    expect(worst).toBeLessThan(0.17)
+    expect(Math.sqrt(sum2 / shifts)).toBeLessThan(0.06)
+  })
+
+  it('packs both independent, centred slices into the shared texture', () => {
+    const size = 24
+    const per = 3
+    const tex = getHazeNoiseTexture(size, per)
+    const packed = tex.image.data as Uint8Array
+    expect(packed.length).toBe(size * size * 2)
+    HAZE_NOISE_SLICES.forEach((z, ch) => {
+      const ref = bakeHazeNoise(size, per, 3, z).data
+      let mean = 0
+      for (let k = 0; k < size * size; k++) {
+        expect(packed[k * 2 + ch]).toBe(ref[k])
+        mean += packed[k * 2 + ch] / 255
+      }
+      expect(Math.abs(mean / (size * size) - 0.5)).toBeLessThan(1 / 255)
+    })
+    let same = 0
+    for (let k = 0; k < size * size; k++) if (packed[k * 2] === packed[k * 2 + 1]) same++
+    expect(same).toBeLessThan(size * size * 0.2)
   })
 
   it('caches the texture per size and period, never a stale calibration', () => {
