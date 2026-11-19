@@ -282,7 +282,7 @@ if (isMainModule(import.meta.url) && wantsHelp(process.argv.slice(2))) {
       // right" is refused, with the remedy, before anything is written.
       if (!ahead) {
         const body = openPointBodies(tasksMd)[point]
-        const kind = splitPriorityOf(body, normaliseRankRecord(record).ranked)
+        const kind = splitPriorityOf(body, normaliseRankRecord(record).ranked, { open })
         if (kind !== SPLIT_NONE) {
           throw new Error(splitPriorityMessage([{ point, kind, parent: splitParentOf(body) }]))
         }
@@ -412,7 +412,7 @@ if (isMainModule(import.meta.url) && wantsHelp(process.argv.slice(2))) {
           `queue-rank: every appended point has been ranked (${state.baseline.length} point(s) in the baseline)`,
         )
       } else {
-        console.log(`queue-rank: ${state.pending.length} appended point(s) still unranked: ${state.pending.join(', ')}`)
+        console.log(`queue-rank: ${state.pending.length} placement decision(s) pending: ${state.pending.join(', ')}`)
         const split = new Set(state.splitHeld.map((h) => h.point))
         const plain = state.pending.filter((n) => !split.has(n))
         if (plain.length) {

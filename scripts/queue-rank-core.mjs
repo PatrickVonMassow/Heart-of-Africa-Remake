@@ -571,7 +571,7 @@ export function appendGateState(open, record, { bodies } = {}) {
   if (bodies && typeof bodies === 'object') {
     for (const [i, n] of list.entries()) {
       if (known.has(n)) continue
-      const kind = splitPriorityOf(bodies[n], ranked)
+      const kind = splitPriorityOf(bodies[n], ranked, { open: list })
       if (kind === SPLIT_NONE) continue
       const leading = list.slice(0, i).every((p) => ranked[p]?.place === PLACE_AHEAD)
       if (kind === SPLIT_UNDECLARED || ranked[n]?.place !== PLACE_AHEAD || !leading) {
@@ -617,12 +617,14 @@ export function splitParentOf(body) {
  * block itself states high urgency (the carrier that survives the parent's
  * landing); `undeclared` where the parent has no entry and the block states no
  * `Criticality:` level; otherwise — and for a block without the citation — `none`.
+ * With `open` given, a closed parent's entry is stale and does not count.
  */
-export function splitPriorityOf(body, ranked = {}) {
+export function splitPriorityOf(body, ranked = {}, { open } = {}) {
   const text = String(body ?? '')
   const parent = splitParentOf(text)
   if (parent === null) return SPLIT_NONE
-  const entry = ranked && typeof ranked === 'object' ? ranked[parent] : undefined
+  const live = !open || open.includes(parent)
+  const entry = live && ranked && typeof ranked === 'object' ? ranked[parent] : undefined
   if ((entry && entry.place === PLACE_AHEAD) || statesHighUrgency(text)) return SPLIT_PRIORITY
   if (!entry && criticalityOf(text).level === null) return SPLIT_UNDECLARED
   return SPLIT_NONE

@@ -949,6 +949,15 @@ describe('a SPLIT of a priority point inherits its place (point 1551)', () => {
     expect(splitPriorityOf(`${child}\nCriticality: low — cosmetic.`, {})).toBe(SPLIT_NONE)
   })
 
+  it('does not let a closed parent’s stale `ahead` entry settle an undeclared split', () => {
+    const ranked = { ...parentAhead, 1549: { at, why: 'split from 1542', place: PLACE_AHEAD } }
+    const open = [1549, 1543, 1544]
+    expect(splitPriorityOf(child, ranked, { open })).toBe(SPLIT_UNDECLARED)
+    const held = appendGateState(open, settledAt([1542, 1543, 1544], ranked), { bodies: bodies() })
+    expect(held.state).toBe('pending')
+    expect(held.splitHeld).toEqual([{ point: 1549, kind: SPLIT_UNDECLARED, parent: 1542 }])
+  })
+
   it('holds an undeclared split until its block states a level', () => {
     const ranked = { 1549: { at, why: 'last is right', place: PLACE_LAST } }
     const open = [1543, 1544, 1549]
