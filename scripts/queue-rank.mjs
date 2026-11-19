@@ -288,13 +288,26 @@ if (isMainModule(import.meta.url) && wantsHelp(process.argv.slice(2))) {
         }
       }
       const place = ahead ? PLACE_AHEAD : PLACE_LAST
-      writeRankRecord(recordRank(record, point, { why, origin, place, at: new Date().toISOString() }), open, tasksMd)
+      const next = writeRankRecord(
+        recordRank(record, point, { why, origin, place, at: new Date().toISOString() }),
+        open,
+        tasksMd,
+      )
       console.log(
         ahead
-          ? `queue-rank: point ${point} stands BEFORE the release, filed by the ${origin} — "${why.trim()}"`
+          ? `queue-rank: recorded that point ${point} belongs BEFORE the release, filed by the ${origin} — ` +
+            `"${why.trim()}" (the record only; the block stays where TASKS.md puts it)`
           : `queue-rank: point ${point} keeps the place the work order gives it, filed by the ${origin} — ` +
             `"${why.trim()}"`,
       )
+      // The record does not move the block: a split still standing outside the
+      // leading run stays held, and the command says so (point 1551).
+      const held = appendGateState(open, next, { bodies: openPointBodies(tasksMd) }).splitHeld.filter(
+        (h) => h.point === point,
+      )
+      if (held.length) {
+        console.log(`  PLACEMENT STILL PENDING: ${splitPriorityMessage(held)}`)
+      }
       console.log(`Recorded in ${RANK_RECORD_PATH}. Rebuild the board's queue: ${QUEUE_REBUILD_CMD}`)
     } else if (action === '--seed-boundary') {
       // THE FRONT OF THE ORDER, FROZEN ONCE (point 789). Everything standing in
@@ -400,12 +413,17 @@ if (isMainModule(import.meta.url) && wantsHelp(process.argv.slice(2))) {
         )
       } else {
         console.log(`queue-rank: ${state.pending.length} appended point(s) still unranked: ${state.pending.join(', ')}`)
-        console.log(
-          '  they stand last because that is where append-and-defer puts them, not because that is where they belong.',
-        )
-        console.log('  Either MOVE the point’s block inside TASKS.md to where it belongs (verbatim, with its number),')
-        console.log(`  or record that last is right: ${RANK_CMD}`)
-        if (state.splitHeld.length) console.log(`  SPLIT OF A PRIORITY POINT: ${splitPriorityMessage(state.splitHeld)}`)
+        const split = new Set(state.splitHeld.map((h) => h.point))
+        const plain = state.pending.filter((n) => !split.has(n))
+        if (plain.length) {
+          console.log(
+            `  ${plain.join(', ')} stand last because that is where append-and-defer puts them, not because that ` +
+              'is where they belong.',
+          )
+          console.log('  Either MOVE the point’s block inside TASKS.md to where it belongs (verbatim, with its number),')
+          console.log(`  or record that last is right: ${RANK_CMD}`)
+        }
+        if (split.size) console.log(`  SPLIT OF A PRIORITY POINT: ${splitPriorityMessage(state.splitHeld)}`)
         process.exitCode = 1
       }
       // The FRONT of the order, asked in the same breath as its end (point 789):

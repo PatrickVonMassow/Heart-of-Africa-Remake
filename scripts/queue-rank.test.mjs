@@ -181,30 +181,33 @@ describe('`--ranked` refuses a split of a priority point (point 1551)', () => {
   const at = '2026-11-19T00:00:00.000Z'
   const cli = resolve(import.meta.dirname, 'queue-rank.mjs')
 
-  function run(tasks, ranked) {
+  /** Run the CLI against a throwaway root; returns the process and the record it left. */
+  function run(tasks, ranked, args, points = [1542, 1543]) {
     const root = mkdtempSync(join(tmpdir(), 'queue-rank-1551-'))
     try {
       mkdirSync(join(root, '.claude'))
-      const before = `${JSON.stringify({ ranked, settled: { at, points: [1542, 1543] } }, null, 2)}\n`
+      const before = `${JSON.stringify({ ranked, settled: { at, points } }, null, 2)}\n`
       writeFileSync(join(root, 'TASKS.md'), tasks)
       writeFileSync(join(root, '.claude', 'queue-rank.json'), before)
-      const out = spawnSync(process.execPath, [cli, '--ranked', '1549', '--why', 'host lacks timestamp queries'], {
+      const out = spawnSync(process.execPath, [cli, ...args], {
         cwd: root,
         encoding: 'utf8',
         env: { ...process.env, HOA_REPO_ROOT: root },
       })
-      return { out, unchanged: readFileSync(join(root, '.claude', 'queue-rank.json'), 'utf8') === before }
+      const after = readFileSync(join(root, '.claude', 'queue-rank.json'), 'utf8')
+      return { out, unchanged: after === before, record: JSON.parse(after) }
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
   }
 
-  const order = (child) => `# Work order\n\n## Open\n\n- [ ] 1542. Parent.\n- [ ] 1543. Backlog.\n${child}\n`
+  const order = (...rest) => `# Work order\n\n## Open\n\n- [ ] 1542. Parent.\n- [ ] 1543. Backlog.\n${rest.join('\n')}\n`
+  const child = '- [ ] 1549. Part B.\nSplit from 1542 Part B.'
+  const parentAhead = { 1542: { at, why: 'user order', origin: 'user', place: 'ahead' } }
+  const rankLast = ['--ranked', '1549', '--why', 'host lacks timestamp queries']
 
   it('exits non-zero with the remedy and writes nothing', () => {
-    const { out, unchanged } = run(order('- [ ] 1549. Part B.\nSplit from 1542 Part B.'), {
-      1542: { at, why: 'user order', origin: 'user', place: 'ahead' },
-    })
+    const { out, unchanged } = run(order(child), parentAhead, rankLast)
     expect(out.status).not.toBe(0)
     expect(out.stderr).toMatch(/split from priority point 1542/)
     expect(out.stderr).toMatch(/--ahead 1549/)
@@ -212,9 +215,37 @@ describe('`--ranked` refuses a split of a priority point (point 1551)', () => {
   })
 
   it('still records `last` for a split of a `last`-ranked parent', () => {
-    const { out } = run(order('- [ ] 1549. Part B.\nSplit from 1542 Part B.'), {
-      1542: { at, why: 'last', place: 'last' },
-    })
-    expect(out.stderr).not.toMatch(/split from/)
+    const { out, record } = run(order(child), { 1542: { at, why: 'last', place: 'last' } }, rankLast)
+    expect(out.status).toBe(0)
+    expect(record.ranked[1549].place).toBe('last')
+  })
+
+  it('`--status` names the split remedy, not the `--ranked` one', () => {
+    const ranked = { ...parentAhead, 1549: { at, why: 'host lacks timestamp queries', place: 'last' } }
+    const { out } = run(order(child), ranked, ['--status'])
+    expect(out.status).toBe(1)
+    expect(out.stdout).toMatch(/SPLIT OF A PRIORITY POINT: point 1549 is split from priority point 1542/)
+    expect(out.stdout).not.toMatch(/stand last because/)
+  })
+
+  it('ranking another point leaves a held split out of the baseline', () => {
+    const ranked = { ...parentAhead, 1549: { at, why: 'host lacks timestamp queries', place: 'last' } }
+    const { out, record } = run(order(child, '- [ ] 1550. Plain append.'), ranked, [
+      '--ranked',
+      '1550',
+      '--why',
+      'nothing waits on it',
+    ])
+    expect(out.status).toBe(0)
+    expect(record.ranked[1550].place).toBe('last')
+    expect(record.settled.points).not.toContain(1549)
+  })
+
+  it('`--ahead` reports the record, and a placement still pending', () => {
+    const { out, record } = run(order(child), parentAhead, ['--ahead', '1549', '--why', 'split from 1542'])
+    expect(out.status).toBe(0)
+    expect(record.ranked[1549].place).toBe('ahead')
+    expect(out.stdout).toMatch(/recorded that point 1549 belongs BEFORE the release/)
+    expect(out.stdout).toMatch(/PLACEMENT STILL PENDING: point 1549/)
   })
 })
