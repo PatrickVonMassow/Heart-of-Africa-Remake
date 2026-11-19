@@ -199,6 +199,57 @@ if (report.env.backend === 'webgl2') {
     `${gpuRows.length}/${report.rows.length} rows, reason "${report.gpuTiming.reason}"`,
   )
 }
+// Point 1549: the per-pass GPU split follows the same honesty rule — present
+// per row where the pool resolved passes, otherwise flagged with a reason.
+const passRows = report.rows.filter((r) => r.gpuPasses != null)
+if (report.gpuTiming.available === true) {
+  // Real whole-frame timestamps exist, so the split MUST exist too — an
+  // "unavailable" here is a broken capture, not an honest flag.
+  check(
+    'WebGPU: the per-pass breakdown is measured wherever GPU timestamps are',
+    report.gpuPassTiming?.available === true && passRows.length === gpuRows.length,
+    `${passRows.length}/${gpuRows.length} rows, reason "${report.gpuPassTiming?.reason}"`,
+  )
+  // Totals and passes cover the SAME frames (a stale resolve records neither).
+  check(
+    'WebGPU: every breakdown covers exactly the frames of its GPU series',
+    passRows.every((r) => r.gpu !== null && r.gpuPasses.frames === r.gpu.n && r.gpuPasses.passes.length > 0),
+    passRows.filter((r) => r.gpu === null || r.gpuPasses.frames !== r.gpu.n).slice(0, 3).map((r) => `${r.config}/${r.phase} ${r.gpuPasses.frames} vs ${r.gpu?.n}`).join(' | '),
+  )
+  // Matching counts alone pass a capture whose frames resolved a total but no
+  // pass; every measured frame must carry its passes, and the scene pass must
+  // run in every one of them.
+  const sceneFrames = (r) => r.gpuPasses.passes.find((p) => p.pass === 'output')?.frames ?? 0
+  const holes = passRows.filter((r) => r.gpuPasses.emptyFrames !== 0 || sceneFrames(r) !== r.gpuPasses.frames)
+  check(
+    'WebGPU: every measured frame resolved its passes, the scene pass included',
+    holes.length === 0,
+    holes.slice(0, 3).map((r) => `${r.config}/${r.phase} empty ${r.gpuPasses.emptyFrames}, output ${sceneFrames(r)}/${r.gpuPasses.frames}`).join(' | '),
+  )
+  // Every pass is named after its target, never the generic call fallback.
+  const generic = passRows.flatMap((r) => r.gpuPasses.passes.filter((p) => /^pass \d+$/.test(p.pass)).map((p) => `${r.config}/${r.phase} ${p.pass}`))
+  check('WebGPU: every pass carries its render-target label', generic.length === 0, generic.slice(0, 3).join(' | '))
+  // The real order: with sun shadows on, a shadow map is submitted before the
+  // scene pass that samples it (the call index once reversed this).
+  const baseRows = passRows.filter((r) => r.config === 'baseline')
+  const shadowFirst = (r) => {
+    const shadow = r.gpuPasses.passes.find((p) => p.pass.startsWith('ShadowMap'))
+    const scene = r.gpuPasses.passes.find((p) => p.pass === 'output')
+    return !!shadow && !!scene && shadow.order < scene.order
+  }
+  check(
+    'WebGPU: the baseline rows submit a shadow map before the scene pass',
+    baseRows.length === phases.length && baseRows.every(shadowFirst),
+    baseRows.map((r) => `${r.phase}: ${r.gpuPasses.passes.map((p) => p.pass).join(' > ')}`).join(' | '),
+  )
+} else {
+  check(
+    'the per-pass GPU breakdown is flagged unavailable with a reason, and no row fakes one',
+    report.gpuPassTiming?.available === false && report.gpuPassTiming.reason.length > 0 && passRows.length === 0 &&
+      report.summary.some((l) => l.startsWith('GPU PASS BREAKDOWN: unavailable')),
+    `${report.gpuPassTiming?.reason} / ${passRows.length} rows with passes`,
+  )
+}
 // The levers must BITE, judged by the real signal (the rendered geometry), not
 // by the config object agreeing with itself: a mis-named override key once left
 // point 209's refinement fully on while the report claimed it off.
