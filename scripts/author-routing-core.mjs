@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@740d83c2
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@0c63d429
 //
 // CLAUDE.md §6 names three lanes as role records (scripts/model-lanes.mjs): the main
 // chain authors by routing default and runs the batch, the cross-vendor lane reviews,
