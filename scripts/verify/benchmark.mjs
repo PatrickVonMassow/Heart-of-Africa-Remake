@@ -199,6 +199,29 @@ if (report.env.backend === 'webgl2') {
     `${gpuRows.length}/${report.rows.length} rows, reason "${report.gpuTiming.reason}"`,
   )
 }
+// Point 1549: the per-pass GPU split follows the same honesty rule — present
+// per row where the pool resolved passes, otherwise flagged with a reason.
+const passRows = report.rows.filter((r) => r.gpuPasses != null)
+if (report.gpuPassTiming?.available === true) {
+  check(
+    'WebGPU: every GPU row carries a per-pass breakdown in pass order',
+    passRows.length === gpuRows.length &&
+      passRows.every(
+        (r) =>
+          r.gpuPasses.frames > 0 &&
+          r.gpuPasses.passes.length > 0 &&
+          r.gpuPasses.passes.every((p, i, a) => p.mean >= 0 && p.frames <= r.gpuPasses.frames && (i === 0 || a[i - 1].order <= p.order)),
+      ),
+    `${passRows.length}/${gpuRows.length} rows; baseline ${JSON.stringify(report.rows[0]?.gpuPasses?.passes?.map((p) => p.pass) ?? null)}`,
+  )
+} else {
+  check(
+    'the per-pass GPU breakdown is flagged unavailable with a reason, and no row fakes one',
+    report.gpuPassTiming?.available === false && report.gpuPassTiming.reason.length > 0 && passRows.length === 0 &&
+      report.summary.some((l) => l.startsWith('GPU PASS BREAKDOWN: unavailable')),
+    `${report.gpuPassTiming?.reason} / ${passRows.length} rows with passes`,
+  )
+}
 // The levers must BITE, judged by the real signal (the rendered geometry), not
 // by the config object agreeing with itself: a mis-named override key once left
 // point 209's refinement fully on while the report claimed it off.
