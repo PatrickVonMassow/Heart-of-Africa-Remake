@@ -223,10 +223,13 @@ describe('`--ranked` refuses a split of a priority point (point 1551)', () => {
 
   it('`--status` names the split remedy, not the `--ranked` one', () => {
     const ranked = { ...parentAhead, 1549: { at, why: 'host lacks timestamp queries', place: 'last' } }
-    const { out } = run(order(child), ranked, ['--status'])
+    const { out } = run(order(child, '- [ ] 1550. Plain append.'), ranked, ['--status'])
     expect(out.status).toBe(1)
+    expect(out.stdout).toMatch(/2 placement decision\(s\) pending: 1549, 1550/)
     expect(out.stdout).toMatch(/SPLIT OF A PRIORITY POINT: point 1549 is split from priority point 1542/)
-    expect(out.stdout).not.toMatch(/stand last because/)
+    expect(out.stdout).toMatch(/--ahead 1549/)
+    expect(out.stdout).toMatch(/ {2}1550 stand last because/)
+    expect(out.stdout).not.toMatch(/1549, 1550 stand last because|1549 stand last because/)
   })
 
   it('ranking another point leaves a held split out of the baseline', () => {
@@ -239,7 +242,8 @@ describe('`--ranked` refuses a split of a priority point (point 1551)', () => {
     ])
     expect(out.status).toBe(0)
     expect(record.ranked[1550].place).toBe('last')
-    expect(record.settled.points).not.toContain(1549)
+    // The baseline never grows while a question stands (settleRecord).
+    expect(record.settled.points).toEqual([1542, 1543])
   })
 
   it('`--ahead` reports the record, and a placement still pending', () => {
