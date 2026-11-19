@@ -7,6 +7,7 @@ import {
   handVigilToRemains,
   listIndexOf,
   remnantDrawable,
+  genericFeedEnds,
   victimFeedEnds,
   killFlockLands,
   killFlockRemnant,
@@ -263,6 +264,27 @@ describe('a predator feeding never stands over nothing', () => {
       frames++
     }
     expect(frames).toBeGreaterThan(0)
+  })
+
+  it('the feed on a scripted carcass ends once its timer runs out (point 1205)', () => {
+    expect(genericFeedEnds(0.4)).toBe(false)
+    expect(genericFeedEnds(0)).toBe(true)
+    expect(genericFeedEnds(-0.05)).toBe(true)
+    // A broken timer never parks the predator at a spent carcass.
+    expect(genericFeedEnds(Number.NaN)).toBe(true)
+  })
+
+  it('simulated scripted feed: the staged 0.4 s feed leaves within the clamped-dt frames', () => {
+    // The elephant-trampling check stages timer 0.4; the hunt clamps dt to
+    // 0.1 s, so the lion leaves on the 4th or 5th frame (float rounding).
+    let timer = 0.4
+    let frames = 0
+    while (!genericFeedEnds(timer)) {
+      timer -= 0.1
+      frames++
+      expect(frames).toBeLessThanOrEqual(5)
+    }
+    expect(frames).toBeGreaterThanOrEqual(4)
   })
 
   it('a remnant that keeps vultures on station is itself drawn', () => {
