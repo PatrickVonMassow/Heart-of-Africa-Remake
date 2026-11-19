@@ -903,10 +903,10 @@ describe('the responder spawn carries its own session id', () => {
 describe('the responder prompt separates an order from a discussed problem', () => {
   it('queues an explicit order and only proposes for a described problem', () => {
     expect(RESPONDER_PROMPT_HEAD).toMatch(/AUSDRUECKLICHER AUFTRAG[^.]*\(mach X/)
-    expect(RESPONDER_PROMPT_HEAD).toMatch(/schlage in der Antwort nur eine Loesung vor; eingereiht wird erst nach seinem OK/)
+    expect(RESPONDER_PROMPT_HEAD).toMatch(/schlage in der Antwort nur eine Loesung vor; eingereiht wird erst nach seinem OK in einer spaeteren Nachricht/)
   })
 
   it('asks back instead of queueing an OK whose proposal it cannot see', () => {
-    expect(RESPONDER_PROMPT_HEAD).toMatch(/Ein OK, dessen Vorschlag nicht in den Nachrichten unten steht, reihst du nicht ein/)
+    expect(RESPONDER_PROMPT_HEAD).toMatch(/Ein OK, dessen Vorschlag nicht in den Nachrichten unten steht, reihst du nicht ein: frage in der Antwort nach, welcher Vorschlag gemeint ist/)
   })
 })
