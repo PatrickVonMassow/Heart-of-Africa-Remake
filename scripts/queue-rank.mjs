@@ -38,7 +38,7 @@ import { USAGE, wantsHelp } from './cli-usage.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
 import { QUEUE_REBUILD_CMD, RELEASE_TAG_POINT, closedPointsOf, openPointsOf } from './board-queue-core.mjs'
-import { releaseBoundaryProblemFrom } from './queue-order-guard-core.mjs'
+import { openPointBodies, releaseBoundaryProblemFrom } from './queue-order-guard-core.mjs'
 import {
   ORIGIN_MACHINE,
   PLACE_AHEAD,
@@ -46,9 +46,14 @@ import {
   RANK_CMD,
   RANK_RECORD_PATH,
   SEED_CMD,
+  SPLIT_NONE,
   tornRecordMessage,
   appendGateState,
+  normaliseRankRecord,
   parseRankRecord,
+  splitParentOf,
+  splitPriorityMessage,
+  splitPriorityOf,
   pruneRankRecord,
   recordProvenanceFrom,
   recordRank,
@@ -89,7 +94,12 @@ function writeRankRecord(record, open, tasksMd) {
   // (point 789), applied HERE as well as in the guard because this command
   // writes the record too.
   const blocked = releaseBoundaryProblemFrom(tasksMd, record).breaches.map((b) => b.point)
-  const settled = settleRecord(open, record, { at: new Date().toISOString(), closed, blocked })
+  const settled = settleRecord(open, record, {
+    at: new Date().toISOString(),
+    closed,
+    blocked,
+    bodies: openPointBodies(tasksMd),
+  })
   const next = settled.changed ? settled.record : pruneRankRecord(record, open)
   writeTextAtomic(RECORD, `${JSON.stringify(next, null, 2)}\n`)
   return next
@@ -268,14 +278,36 @@ if (isMainModule(import.meta.url) && wantsHelp(process.argv.slice(2))) {
       const ahead = action === '--ahead'
       const point = Number(flagValue(argv, action))
       if (!open.includes(point)) throw new Error(`point ${point} is not open in the work order`)
+      // A SPLIT OF A PRIORITY POINT inherits its place (point 1551): "last is
+      // right" is refused, with the remedy, before anything is written.
+      if (!ahead) {
+        const body = openPointBodies(tasksMd)[point]
+        const kind = splitPriorityOf(body, normaliseRankRecord(record).ranked, { open })
+        if (kind !== SPLIT_NONE) {
+          throw new Error(splitPriorityMessage([{ point, kind, parent: splitParentOf(body) }]))
+        }
+      }
       const place = ahead ? PLACE_AHEAD : PLACE_LAST
-      writeRankRecord(recordRank(record, point, { why, origin, place, at: new Date().toISOString() }), open, tasksMd)
+      const next = writeRankRecord(
+        recordRank(record, point, { why, origin, place, at: new Date().toISOString() }),
+        open,
+        tasksMd,
+      )
       console.log(
         ahead
-          ? `queue-rank: point ${point} stands BEFORE the release, filed by the ${origin} — "${why.trim()}"`
+          ? `queue-rank: recorded that point ${point} belongs BEFORE the release, filed by the ${origin} — ` +
+            `"${why.trim()}" (the record only; the block stays where TASKS.md puts it)`
           : `queue-rank: point ${point} keeps the place the work order gives it, filed by the ${origin} — ` +
             `"${why.trim()}"`,
       )
+      // The record does not move the block: a split still standing outside the
+      // leading run stays held, and the command says so (point 1551).
+      const held = appendGateState(open, next, { bodies: openPointBodies(tasksMd) }).splitHeld.filter(
+        (h) => h.point === point,
+      )
+      if (held.length) {
+        console.log(`  PLACEMENT STILL PENDING: ${splitPriorityMessage(held)}`)
+      }
       console.log(`Recorded in ${RANK_RECORD_PATH}. Rebuild the board's queue: ${QUEUE_REBUILD_CMD}`)
     } else if (action === '--seed-boundary') {
       // THE FRONT OF THE ORDER, FROZEN ONCE (point 789). Everything standing in
@@ -370,7 +402,7 @@ if (isMainModule(import.meta.url) && wantsHelp(process.argv.slice(2))) {
         )
       }
     } else {
-      const state = appendGateState(open, record)
+      const state = appendGateState(open, record, { bodies: openPointBodies(tasksMd) })
       if (state.state === 'unarmed') {
         console.log(`queue-rank: no baseline recorded — nothing says which of the ${open.length} open point(s) are new.`)
         console.log(`  Arm it once, for the whole order at once: ${SEED_CMD}`)
@@ -380,12 +412,18 @@ if (isMainModule(import.meta.url) && wantsHelp(process.argv.slice(2))) {
           `queue-rank: every appended point has been ranked (${state.baseline.length} point(s) in the baseline)`,
         )
       } else {
-        console.log(`queue-rank: ${state.pending.length} appended point(s) still unranked: ${state.pending.join(', ')}`)
-        console.log(
-          '  they stand last because that is where append-and-defer puts them, not because that is where they belong.',
-        )
-        console.log('  Either MOVE the point’s block inside TASKS.md to where it belongs (verbatim, with its number),')
-        console.log(`  or record that last is right: ${RANK_CMD}`)
+        console.log(`queue-rank: ${state.pending.length} placement decision(s) pending: ${state.pending.join(', ')}`)
+        const split = new Set(state.splitHeld.map((h) => h.point))
+        const plain = state.pending.filter((n) => !split.has(n))
+        if (plain.length) {
+          console.log(
+            `  ${plain.join(', ')} stand last because that is where append-and-defer puts them, not because that ` +
+              'is where they belong.',
+          )
+          console.log('  Either MOVE the point’s block inside TASKS.md to where it belongs (verbatim, with its number),')
+          console.log(`  or record that last is right: ${RANK_CMD}`)
+        }
+        if (split.size) console.log(`  SPLIT OF A PRIORITY POINT: ${splitPriorityMessage(state.splitHeld)}`)
         process.exitCode = 1
       }
       // The FRONT of the order, asked in the same breath as its end (point 789):

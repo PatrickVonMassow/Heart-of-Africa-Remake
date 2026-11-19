@@ -547,21 +547,104 @@ export function parseRankRecord(text) {
  *   - `settled`  every point in the order is either remembered or decided.
  * `appended` names the new points standing at the append default, `inside` the
  * new ones somebody placed deliberately before a remembered point (already a
- * judgment, so never asked about).
+ * judgment, so never asked about). `splitHeld` (`[{ point, kind, parent }]`)
+ * names the new points held as splits of a priority point; it is read only
+ * where `bodies` (`{ <n>: '<block>' }`) is supplied.
  */
-export function appendGateState(open, record) {
+export function appendGateState(open, record, { bodies } = {}) {
   const list = pointList(open)
   const { ranked, settled, torn } = normaliseRankRecord(record)
-  if (torn) return { state: 'torn', pending: [], appended: [], inside: [], baseline: [] }
-  if (!settled) return { state: 'unarmed', pending: [], appended: [], inside: [], baseline: [] }
+  const none = { pending: [], appended: [], inside: [], baseline: [], splitHeld: [] }
+  if (torn) return { state: 'torn', ...none }
+  if (!settled) return { state: 'unarmed', ...none }
   const known = new Set(settled.points)
   const appended = appendsSinceSettled(list, known)
   const inside = list.filter((n) => !known.has(n) && !appended.includes(n))
   // A FRONT reason does not answer the append question once the point has
   // dropped back to the end of the order — the mirror of releaseBoundaryState,
   // where a "last" reason answers nothing about the front.
-  const pending = appended.filter((n) => !ranked[n] || ranked[n].place === PLACE_AHEAD)
-  return { state: pending.length ? 'pending' : 'settled', pending, appended, inside, baseline: settled.points }
+  const asked = new Set(appended.filter((n) => !ranked[n] || ranked[n].place === PLACE_AHEAD))
+  // A SPLIT OF A PRIORITY POINT (point 1551) inherits its parent's place: it is
+  // held until it stands in the leading run with an `ahead` entry, and an
+  // undeclared split until its block states a level. Without bodies: unchanged.
+  const splitHeld = []
+  if (bodies && typeof bodies === 'object') {
+    for (const [i, n] of list.entries()) {
+      if (known.has(n)) continue
+      const kind = splitPriorityOf(bodies[n], ranked, { open: list })
+      if (kind === SPLIT_NONE) continue
+      const leading = list.slice(0, i).every((p) => ranked[p]?.place === PLACE_AHEAD)
+      if (kind === SPLIT_UNDECLARED || ranked[n]?.place !== PLACE_AHEAD || !leading) {
+        splitHeld.push({ point: n, kind, parent: splitParentOf(bodies[n]) })
+        asked.add(n)
+      } else {
+        // Placed as the split rule demands: its `ahead` entry answers the append
+        // question too, even where no remembered point stands behind it.
+        asked.delete(n)
+      }
+    }
+  }
+  const pending = list.filter((n) => asked.has(n))
+  return {
+    state: pending.length ? 'pending' : 'settled',
+    pending,
+    appended,
+    inside,
+    baseline: settled.points,
+    splitHeld,
+  }
+}
+
+/** A split of a priority point that the append gate holds (point 1551). */
+export const SPLIT_PRIORITY = 'priority'
+/** A split whose parent left no entry and whose block states no level. */
+export const SPLIT_UNDECLARED = 'undeclared'
+/** Not a split, or a split of an ordinary point. */
+export const SPLIT_NONE = 'none'
+
+/** `Split from <N>` in a point's own block — the parent it was cut from. */
+const SPLIT_CITATION = /\bsplit from (?:point )?(\d+)\b/i
+
+/** The parent number a block cites, or null. */
+export function splitParentOf(body) {
+  const m = SPLIT_CITATION.exec(String(body ?? ''))
+  return m ? Number(m[1]) : null
+}
+
+/**
+ * Does this point inherit a priority place from the point it was split from
+ * (point 1551)? `priority` where the cited parent's live entry is `ahead` or the
+ * block itself states high urgency (the carrier that survives the parent's
+ * landing); `undeclared` where the parent has no entry and the block states no
+ * `Criticality:` level; otherwise — and for a block without the citation — `none`.
+ * With `open` given, a closed parent's entry is stale and does not count.
+ */
+export function splitPriorityOf(body, ranked = {}, { open } = {}) {
+  const text = String(body ?? '')
+  const parent = splitParentOf(text)
+  if (parent === null) return SPLIT_NONE
+  const live = !open || open.includes(parent)
+  const entry = live && ranked && typeof ranked === 'object' ? ranked[parent] : undefined
+  if ((entry && entry.place === PLACE_AHEAD) || statesHighUrgency(text)) return SPLIT_PRIORITY
+  if (!entry && criticalityOf(text).level === null) return SPLIT_UNDECLARED
+  return SPLIT_NONE
+}
+
+/** The remedy for a held split, as one line per point — for the guard, the
+ *  status read and the `--ranked` refusal alike. */
+export function splitPriorityMessage(held = []) {
+  return held
+    .map(({ point, kind, parent }) =>
+      kind === SPLIT_UNDECLARED
+        ? `point ${point} is split from ${parent}, which has no rank entry any more, and its block states no ` +
+          '`Criticality:` level — write one into the block (`Criticality: high` carries the parent’s priority); ' +
+          '`--ranked` does not answer it.'
+        : `point ${point} is split from priority point ${parent} and inherits its place — MOVE its block to the ` +
+          'front of TASKS.md (no point without an `ahead` entry before it), write `Criticality: high` into the ' +
+          `block, then node scripts/queue-rank.mjs --ahead ${point} --why "<its true origin: split from ` +
+          `${parent}>". When it can run is stated in the block and is never a rank reason; \`--ranked\` is refused.`,
+    )
+    .join(' ')
 }
 
 /**
@@ -775,7 +858,7 @@ export function releaseBoundaryMessage(breaches, releasePoint) {
  * always taken the read at face value — and a read of ZERO open points, where
  * absence would erase everything, shrinks on the TICK instead, see below.)
  */
-export function settleRecord(open, record, { at = '', closed = [], blocked = [] } = {}) {
+export function settleRecord(open, record, { at = '', closed = [], blocked = [], bodies } = {}) {
   const list = pointList(open)
   const { ranked, settled, boundary, torn } = normaliseRankRecord(record)
   if (torn || !settled) return { changed: false, record: null }
@@ -828,7 +911,7 @@ export function settleRecord(open, record, { at = '', closed = [], blocked = [] 
     for (const [key, value] of Object.entries(ranked)) if (!finished.has(Number(key))) live[key] = value
     return storedChange({ ranked: live, settled: { ...settled, points: kept }, boundary: front })
   }
-  const state = appendGateState(list, record)
+  const state = appendGateState(list, record, { bodies })
   // A RELEASE-BOUNDARY BREACH FREEZES THE BASELINE EXACTLY AS AN UNRANKED APPEND
   // DOES (point 789). The boundary itself judges against the frozen front, not
   // the baseline; the freeze keeps the append question open beside it. The

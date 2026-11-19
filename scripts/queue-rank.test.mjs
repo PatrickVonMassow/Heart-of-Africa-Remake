@@ -9,6 +9,10 @@
 // git runner is injected, so those output SHAPES are driven here without a
 // repository, and the answers are asserted against what the CLI would do.
 import { describe, it, expect } from 'vitest'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { ACTION_FLAGS, chosenAction, recordProvenance } from './queue-rank.mjs'
 
 const PATH = '.claude/queue-rank.json'
@@ -170,5 +174,85 @@ describe('which action an invocation is', () => {
     expect(() => chosenAction(['--ranked', '60', '--origin', 'user', '--origin', 'machine'])).toThrow(
       /--origin was given 2 times/,
     )
+  })
+})
+
+describe('`--ranked` refuses a split of a priority point (point 1551)', () => {
+  const at = '2026-11-19T00:00:00.000Z'
+  const cli = resolve(import.meta.dirname, 'queue-rank.mjs')
+
+  /** Run the CLI against a throwaway root; returns the process and the record it left. */
+  function run(tasks, ranked, args, points = [1542, 1543]) {
+    const root = mkdtempSync(join(tmpdir(), 'queue-rank-1551-'))
+    try {
+      mkdirSync(join(root, '.claude'))
+      const before = `${JSON.stringify({ ranked, settled: { at, points } }, null, 2)}\n`
+      writeFileSync(join(root, 'TASKS.md'), tasks)
+      writeFileSync(join(root, '.claude', 'queue-rank.json'), before)
+      const out = spawnSync(process.execPath, [cli, ...args], {
+        cwd: root,
+        encoding: 'utf8',
+        windowsHide: true,
+        env: { ...process.env, HOA_REPO_ROOT: root },
+      })
+      const after = readFileSync(join(root, '.claude', 'queue-rank.json'), 'utf8')
+      return { out, unchanged: after === before, record: JSON.parse(after) }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+
+  const order = (...rest) => `# Work order\n\n## Open\n\n- [ ] 1542. Parent.\n- [ ] 1543. Backlog.\n${rest.join('\n')}\n`
+  const child = '- [ ] 1549. Part B.\nSplit from 1542 Part B.'
+  const parentAhead = { 1542: { at, why: 'user order', origin: 'user', place: 'ahead' } }
+  const rankLast = ['--ranked', '1549', '--why', 'host lacks timestamp queries']
+
+  it('exits non-zero with the remedy and writes nothing', () => {
+    const { out, unchanged } = run(order(child), parentAhead, rankLast)
+    expect(out.status).not.toBe(0)
+    expect(out.stderr).toMatch(/split from priority point 1542/)
+    expect(out.stderr).toMatch(/--ahead 1549/)
+    expect(unchanged).toBe(true)
+  })
+
+  it('still records `last` for a split of a `last`-ranked parent', () => {
+    const { out, record } = run(order(child), { 1542: { at, why: 'last', place: 'last' } }, rankLast)
+    expect(out.status).toBe(0)
+    expect(record.ranked[1549].place).toBe('last')
+  })
+
+  it('`--status` names the split remedy, not the `--ranked` one', () => {
+    const ranked = { ...parentAhead, 1549: { at, why: 'host lacks timestamp queries', place: 'last' } }
+    const { out } = run(order(child, '- [ ] 1550. Plain append.'), ranked, ['--status'])
+    expect(out.status).toBe(1)
+    expect(out.stdout).toMatch(/2 placement decision\(s\) pending: 1549, 1550/)
+    expect(out.stdout).toMatch(/SPLIT OF A PRIORITY POINT: point 1549 is split from priority point 1542/)
+    expect(out.stdout).toMatch(/--ahead 1549/)
+    expect(out.stdout).toMatch(/ {2}1550 stand last because/)
+    expect(out.stdout).toMatch(/MOVE the point’s block inside TASKS\.md/)
+    expect(out.stdout).toMatch(/record that last is right: node scripts\/queue-rank\.mjs --ranked <N>/)
+    expect(out.stdout).not.toMatch(/1549, 1550 stand last because|1549 stand last because/)
+  })
+
+  it('ranking another point leaves a held split out of the baseline', () => {
+    const ranked = { ...parentAhead, 1549: { at, why: 'host lacks timestamp queries', place: 'last' } }
+    const { out, record } = run(order(child, '- [ ] 1550. Plain append.'), ranked, [
+      '--ranked',
+      '1550',
+      '--why',
+      'nothing waits on it',
+    ])
+    expect(out.status).toBe(0)
+    expect(record.ranked[1550].place).toBe('last')
+    // The baseline never grows while a question stands (settleRecord).
+    expect(record.settled.points).toEqual([1542, 1543])
+  })
+
+  it('`--ahead` reports the record, and a placement still pending', () => {
+    const { out, record } = run(order(child), parentAhead, ['--ahead', '1549', '--why', 'split from 1542'])
+    expect(out.status).toBe(0)
+    expect(record.ranked[1549].place).toBe('ahead')
+    expect(out.stdout).toMatch(/recorded that point 1549 belongs BEFORE the release/)
+    expect(out.stdout).toMatch(/PLACEMENT STILL PENDING: point 1549/)
   })
 })

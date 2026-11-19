@@ -51,6 +51,7 @@ import {
   parseRankRecord,
   releaseBoundaryMessage,
   releaseBoundaryState,
+  splitPriorityMessage,
 } from './queue-rank-core.mjs'
 import { parsePointBlocks } from './criticality-review-guard-core.mjs'
 
@@ -311,7 +312,9 @@ export function falseDoneClaims(cards, tasksOpenSet) {
  * a guard may draw no verdict from state it cannot read.
  */
 export function unrankedAppendProblem(tasksMd, rankRecordJson) {
-  const state = appendGateState(openPointsOf(tasksMd), parseRankRecord(rankRecordJson))
+  const state = appendGateState(openPointsOf(tasksMd), parseRankRecord(rankRecordJson), {
+    bodies: openPointBodies(tasksMd),
+  })
   if (state.state === 'unarmed') {
     return (
       'QUEUE RANK BASELINE MISSING: nothing records which points the work order was last settled with, so no ' +
@@ -320,12 +323,19 @@ export function unrankedAppendProblem(tasksMd, rankRecordJson) {
     )
   }
   if (!state.pending.length) return ''
-  return (
-    `APPENDED POINT NOT RANKED: point(s) ${state.pending.join(', ')} were appended behind everything the work ` +
-    'order was last settled with, which is where append-and-defer puts them rather than where they belong — and ' +
-    'the board renders that order. Decide it once, while the content is fresh: MOVE the point’s block inside ' +
-    `TASKS.md to where it belongs (verbatim, with its number), or record that last is right — ${RANK_CMD}.`
-  )
+  const split = new Set(state.splitHeld.map((h) => h.point))
+  const plain = state.pending.filter((n) => !split.has(n))
+  const parts = []
+  if (plain.length) {
+    parts.push(
+      `APPENDED POINT NOT RANKED: point(s) ${plain.join(', ')} were appended behind everything the work ` +
+        'order was last settled with, which is where append-and-defer puts them rather than where they belong — ' +
+        'and the board renders that order. Decide it once, while the content is fresh: MOVE the point’s block ' +
+        `inside TASKS.md to where it belongs (verbatim, with its number), or record that last is right — ${RANK_CMD}.`,
+    )
+  }
+  if (split.size) parts.push(`SPLIT OF A PRIORITY POINT NOT PLACED: ${splitPriorityMessage(state.splitHeld)}`)
+  return parts.join('\n')
 }
 
 /**

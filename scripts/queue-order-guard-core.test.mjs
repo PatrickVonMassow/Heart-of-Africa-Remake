@@ -737,3 +737,42 @@ describe('rule 1d — the release boundary (point 789)', () => {
     expect(bodies[900]).toContain('Criticality: high')
   })
 })
+
+describe('a split of a priority point is held at turn end (point 1551)', () => {
+  const at = '2026-11-19T00:00:00.000Z'
+  const order = ['- [ ] 1542. Parent.', '- [ ] 1543. Backlog.', '- [ ] 1549. Part B.\nSplit from 1542 Part B.'].join('\n')
+  const record = (ranked) =>
+    JSON.stringify({ ranked, settled: { at, points: [1542, 1543] }, boundary: { at, points: [1542, 1543] } })
+
+  it('names the remedy where a `last` entry would otherwise have settled it', () => {
+    const ranked = {
+      1542: { at, why: 'user order', origin: 'user', place: 'ahead' },
+      1549: { at, why: 'host lacks timestamp queries', place: 'last' },
+    }
+    const problem = unrankedAppendProblem(order, record(ranked))
+    expect(problem).toMatch(/SPLIT OF A PRIORITY POINT NOT PLACED: point 1549 is split from priority point 1542/)
+    expect(problem).toMatch(/Criticality: high/)
+    expect(problem).not.toMatch(/APPENDED POINT NOT RANKED/)
+  })
+
+  it('stays quiet for a split of a `last`-ranked parent', () => {
+    const ranked = {
+      1542: { at, why: 'last', place: 'last' },
+      1549: { at, why: 'last', place: 'last' },
+    }
+    expect(unrankedAppendProblem(order, record(ranked))).toBe('')
+  })
+
+  it('is quiet once the split leads with `ahead` and its own high tag, baseline closed', () => {
+    const placed = [
+      '- [ ] 1549. Part B.\nSplit from 1542 Part B.\nCriticality: high — Part B of 1542.',
+      '- [ ] 1560. Plain append.',
+    ].join('\n')
+    const ranked = {
+      1549: { at, why: 'split from 1542', place: 'ahead' },
+      1560: { at, why: 'last is right', place: 'last' },
+    }
+    expect(unrankedAppendProblem(placed, record(ranked))).toBe('')
+  })
+})
+
