@@ -208,8 +208,9 @@ function median(values: number[]): number {
  * that always ran in the same order together. So a pass precedes another when
  * it came first in most frames both ran in; passes are emitted in that
  * precedence (Kahn's order), ties and passes that never met by mean position,
- * then name. A precedence cycle (unequal frame orders) is broken at the pass
- * with the lowest mean position. Empty input → empty list.
+ * then name. A precedence cycle (unequal frame orders) is broken inside a
+ * source cycle at its pass with the lowest mean position, so no precedence
+ * from outside the cycle is reversed. Empty input → empty list.
  */
 export function aggregatePasses(frames: readonly (readonly BenchPassSample[])[]): BenchGpuPass[] {
   const byPass = new Map<string, { ms: number[]; calls: number[] }>()
@@ -239,10 +240,26 @@ export function aggregatePasses(frames: readonly (readonly BenchPassSample[])[])
   const byPosition = (a: string, b: string): number => meanPos(a) - meanPos(b) || a.localeCompare(b)
   const remaining = new Set(byPass.keys())
   const ordered: string[] = []
+  // Passes reachable from `from` along precedence edges within `pool`.
+  const reach = (from: string, pool: readonly string[]): Set<string> => {
+    const seen = new Set<string>([from])
+    const stack = [from]
+    while (stack.length > 0) {
+      const a = stack.pop()!
+      for (const b of pool) if (!seen.has(b) && wins(a, b)) (seen.add(b), stack.push(b))
+    }
+    return seen
+  }
   while (remaining.size > 0) {
     const pool = [...remaining]
     const free = pool.filter((p) => !pool.some((q) => q !== p && wins(q, p)))
-    const next = (free.length > 0 ? free : pool).sort(byPosition)[0]
+    // Stuck on a cycle: break it inside a SOURCE cycle — a pass whose every
+    // predecessor it can itself reach — so no edge from outside is reversed.
+    const inSourceCycle = (p: string): boolean => {
+      const r = reach(p, pool)
+      return pool.every((q) => q === p || !wins(q, p) || r.has(q))
+    }
+    const next = (free.length > 0 ? free : pool.filter(inSourceCycle)).sort(byPosition)[0]
     ordered.push(next)
     remaining.delete(next)
   }

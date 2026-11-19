@@ -149,10 +149,17 @@ describe('per-row aggregation', () => {
       { pass: b, call: 2, ms: 1 },
     ]
     expect(aggregatePasses([ab('x', 'y'), ab('x', 'y'), ab('y', 'x')]).map((p) => p.pass)).toEqual(['x', 'y'])
-    // x<y, y<z, z<x: no pass is free, the cycle breaks at the lowest mean position.
+    // x<y, y<z, z<x: no pass is free; the cycle breaks at the lowest mean
+    // position (x 1.5, y 1.5, z 1.5 → by name), then follows its edges.
     const cycle = aggregatePasses([ab('x', 'y'), ab('y', 'z'), ab('z', 'x')])
-    expect(cycle.map((p) => p.pass).sort()).toEqual(['x', 'y', 'z'])
+    expect(cycle.map((p) => p.pass)).toEqual(['x', 'y', 'z'])
     expect(cycle.map((p) => p.order)).toEqual([1, 2, 3])
+    // The reviewer's case: a pass outside the cycle that x always preceded
+    // must not jump ahead of it on a lower mean position (a ran alone often,
+    // mean 1.2). The cycle breaks at x, its own source; a is bound only to x.
+    const alone: BenchPassSample[] = [{ pass: 'a', call: 1, ms: 1 }]
+    const outside = aggregatePasses([ab('x', 'y'), ab('y', 'z'), ab('z', 'x'), ab('x', 'a'), alone, alone, alone, alone])
+    expect(outside.map((p) => p.pass)).toEqual(['x', 'a', 'y', 'z'])
   })
 
   it('counts measured frames that resolved no pass at all', () => {
