@@ -14347,3 +14347,21 @@ to land than a mechanism that needs a review.
   Picture check: polish-villagers --section=hut-doorway on BOTH backends, the band visible on the wall.
   Source: finding of the 1167 session, 18.11.2026 15:29.
   Bundle: Siedlungsgeometrie.
+
+- [ ] 1553. A bank-game catcher is not back in line when the charge starts
+  Measured 19.11.2026: WebGPU `polish-children --section=children-bank-game` on feat/1164 7ba7344cc
+  (only change a scatter-rock material; log local/verify-logs/2026-11-19T15-11-36-540-polish-children.log)
+  red "the charge starts with every catcher back in one line before its rock": child 4 at -45.65/-7.19
+  against its station -50.07/-1.24 (about 7.5 m off). The same section on main bb81bc0a9 ran green
+  (log 2026-11-19T15-47-17-013), so the red is intermittent and owned by no point.
+  Player impact: a child can still be running back across the bank while the others already charge
+  the rock, which breaks the line the game is about.
+  Final state: the charge waits until every catcher stands within its station tolerance (or the
+  intermittent cause — fixture timing or product — is named and fixed); its charge in
+  scripts/render-verify-charges.mjs dies with this point.
+  Test: Vitest for the charge-start condition (no charge while a catcher is outside its station
+  tolerance), mutation-checked.
+  Picture check: polish-children --section=children-bank-game on WebGPU, green, the line frame showing
+  every catcher in line.
+  Source: finding of the 1164 session, 19.11.2026 16:30.
+  Bundle: Dorfleben.

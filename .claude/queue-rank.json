@@ -1928,17 +1928,17 @@
       "origin": "user",
       "place": "ahead"
     },
-    "1549": {
-      "at": "2026-11-19T09:21:12.645Z",
-      "why": "User order 19.11.2026 10:17: 1549 directly before 1543",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1552": {
       "at": "2026-11-19T13:48:35.588Z",
       "why": "split from priority point 1549: its cause fix, waiting for the user's notebook F8 report",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1553": {
+      "at": "2026-11-19T16:06:51.652Z",
+      "why": "Intermittent village-life red, low player impact; behind the ready Dorfleben points",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -1966,7 +1966,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-19T13:48:35.596Z",
+    "at": "2026-11-19T16:06:51.660Z",
     "points": [
       184,
       200,
@@ -2412,8 +2412,8 @@
       1539,
       1540,
       1543,
-      1549,
-      1552
+      1552,
+      1553
     ]
   }
 }
