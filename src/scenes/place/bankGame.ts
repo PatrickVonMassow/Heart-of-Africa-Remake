@@ -1911,7 +1911,11 @@ function stepStations(
       clearPath(c)
       drive(s, i, null, false, dt, cfg, world)
     } else {
-      drive(s, i, wayTo(c, to, dt, world), running, dt, cfg, world, tapping || c.role === 'catcher', running && c.role !== 'catcher')
+      // A runner walks round its playmates' bodies on the shuffle between two
+      // runs too, not only on the run down: walking straight at a station past
+      // a settled playmate, it shoved that child backwards at walking pace
+      // (measured: bambara seed 2694999956, 0.56 m).
+      drive(s, i, wayTo(c, to, dt, world), running, dt, cfg, world, tapping || c.role === 'catcher', c.role !== 'catcher')
     }
   }
 }
