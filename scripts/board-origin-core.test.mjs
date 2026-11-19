@@ -66,6 +66,8 @@ describe('origin derivation', () => {
     expect(classifySource('agent finding of 19.11.2026 via the findings carrier')).toEqual({ by: 'agent', context: null })
     expect(classifySource('imported from the old tracker')).toEqual({ by: null, context: null })
     expect(classifySource('imported from the old tracker, see point 1302')).toEqual({ by: null, context: null })
+    expect(classifySource('imported from the old tracker, WebGL issue, see point 1302')).toEqual({ by: null, context: null })
+    expect(classifySource('first measured 02.10.2026 in the theme run of point 1129').context).toEqual({ type: 'working', point: 1129 })
   })
 
   it('reads a Source: line only with a value on the same line', () => {

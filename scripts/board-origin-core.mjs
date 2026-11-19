@@ -83,7 +83,7 @@ export function classifySource(text) {
   }
   // An agent only when the text says so; an unrecognised provenance stays
   // unknown, and a bare point reference alone names no filer.
-  if (!/\b(?:agent|finding|found|review|split|session|closing|covering|owner|LARGE|picture check|findings carrier|measured|run of|reopened|author|decision card|WebGPU|WebGL)\b|\bfeat\//i.test(s)) return { by: null, context: null }
+  if (!/\b(?:agent|finding|found|review|split|session|closing|covering|owner|LARGE|picture check|findings carrier|measured|run of|reopened|author|decision card)\b|\bfeat\//i.test(s)) return { by: null, context: null }
   const context =
     at(/\bsplit (?:from|of) point (\d+)/i, 'split') ||
     at(/\breview (?:of|on) (?:point )?(\d+)/i, 'review') ||
