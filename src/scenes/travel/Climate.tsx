@@ -8,8 +8,9 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { float, hash, instanceIndex, max, mix, mx_fractal_noise_float, positionLocal, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
-import { demElevation, demInlandWater } from '../../render/demElevation'
+import { float, hash, instanceIndex, max, mix, positionLocal, positionWorld, smoothstep, texture, time, uniform, uv, vec2, vec3 } from 'three/tsl'
+import { demTexel } from '../../render/demElevation'
+import { getHazeNoiseTexture } from '../../render/hazeNoise'
 import { balance, START_YEAR } from '../../config/balance'
 import { useGame } from '../../state/store'
 import { useUi, effectiveWeatherIntensity } from '../../state/ui'
@@ -156,12 +157,20 @@ export function Climate() {
     m.fog = false
     // Fine-grained dust streaks: a lower frequency turns the noise features
     // into ~20-unit patches that read as gray cloud blobs over the terrain.
-    const n = mx_fractal_noise_float(
-      vec3(positionWorld.xz.mul(0.13).add(time.mul(0.03)), time.mul(0.05)),
-      3,
-    )
-      .mul(0.5)
-      .add(0.5)
+    // Point 1556: the former per-fragment 3-octave 3D MaterialX fractal noise
+    // (x/y scroll +0.03, z sweep 0.05 cells/s) is baked once into a tiling
+    // texture of the same noise (render/hazeNoise.ts). Two reads drift against
+    // each other in place of the z sweep; their centred sum is scaled by
+    // 1/sqrt(2) so the noise variance — and with it n*n, the opacity — stays.
+    const cfg = balance.climateHaze
+    const noiseTex = getHazeNoiseTexture(cfg.noiseTextureSize, cfg.noiseTilePeriod)
+    const p = positionWorld.xz.mul(0.13)
+    const a = texture(noiseTex, p.add(time.mul(0.03)).div(cfg.noiseTilePeriod)).r
+    const b = texture(
+      noiseTex,
+      p.add(vec2(time.mul(cfg.crossDriftX), time.mul(cfg.crossDriftY))).add(vec2(5.3, 2.9)).div(cfg.noiseTilePeriod),
+    ).r
+    const n = a.add(b).sub(1).mul(Math.SQRT1_2).add(0.5)
     // Square (Chebyshev) fade toward the quad edges, wide enough that no rotated-square
     // silhouette of the layer quad ever shows.
     const edge = max(uv().x.sub(0.5).abs(), uv().y.sub(0.5).abs())
@@ -174,9 +183,9 @@ export function Climate() {
     // channel of the shared DEM texture.
     const lon = positionWorld.x.div(10)
     const lat = positionWorld.z.negate().div(10)
-    const overLand = smoothstep(float(-6), float(6), demElevation(lon, lat)).mul(
-      demInlandWater(lon, lat).oneMinus(),
-    )
+    // One fetch serves both channels (R elevation, G inland water).
+    const dem = demTexel(lon, lat)
+    const overLand = smoothstep(float(-6), float(6), dem.r).mul(dem.g.oneMinus())
     m.colorNode = colorU
     m.opacityNode = n.mul(n).mul(opacityU).mul(HAZE_LAYER_GAIN).mul(edgeFade).mul(overLand)
     return { material: m, opacityU, colorU }
