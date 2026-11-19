@@ -38061,3 +38061,35 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Also (findings carrier 16.10.2026 22:14, session 7850716a): the bare `node scripts/board.mjs vdzk-keep …` passes the stand-down (isVdzkKeepSegment); only a wrapped call (`cd … && … 2>&1 | tail`) is refused, so the deadlock is avoidable in practice.
   Bundle: Session- & Repo-Hygiene.
   Closed 19.11.2026 by the user-approved reorder 1557: moved to docs/backlog.md (the bare command is a working path; no real blockade).
+
+- [x] 1557. Reorder the work-order front: render stops and leaks forward, HUD/Cairo/plausibility behind the game front, 1013/1361 out
+  Reorder the front of the work order (user-approved 19.11.2026, 20:42; proposal reviewed by GPT-6.2 Sol and re-checked by Opus 5.5).
+
+  Final state of the work order (open points, top to bottom):
+
+  1-3. 1556, 1554, 1543 — unchanged (user-placed 19.11.2026).
+  4. 1555 — scratchpad write for non-owner sessions. Sol's caveat: allow the session's OWN scratchpad, do not widen to every path outside the main tree without evidence.
+  5. 1495 — continent zoom stops drawing, TypeError every frame (from position 24).
+  6. 1520 — render targets leak across rebuilds (alone, NOT coupled with 1447; no shared cause proven).
+  7. 507 — lost WebGPU device ends the run quietly and black.
+  8. 1290 — WebGL 2 lion feeding scene shows neither lion nor prey (from position 11).
+  9. 1447 — settlement visit leaks pipelines/heap; first step: reproduce under normal travel (so far only measured in the dress harness at 6e1622764).
+  10. 1144 — MEASUREMENT HALF ONLY first (does a walker-radius player actually get shut in?). The fix moves forward only if entrapment is confirmed; otherwise it keeps its criticality "medium".
+  11-31. The existing game front (1169, 1205, 1227, 1229, 1269, 1264, 1265, 1309, 1395, 1396, 1422, 1423, 1425, 1427, 1457, 1458, 1473, 1492, 1494, 1496, 1499) in its current relative order.
+  32. 1215, then 1516 + 551 consolidated into one point (duplicate symptom: canoe hint colliding with status-bar text; resolve their conflicting remedies against criterion 9). 1215 stays separate.
+  33. 1488 — user clothing order of 05.11.2026 (still live: d94fe7672 on 08.11 closed another point because of it). First check whether 1482's frozen defect list is still open.
+  34. 1221 + 1220 — one shared Cairo start verification pass, separate disposition (1221 may be a 1 FPS shutter artefact).
+  35. 519 — handwriting fonts (downgraded from the player-blocking group: measured on one Linux host, falls back to plain text).
+  36-38. 1521, 1526, 415 — 1890 plausibility, in this order.
+  39+. Everything else in its current relative order (205, 1436, ...).
+
+  Dispositions outside the front:
+  - 1013 (cheetah in central Africa): close as delivered by archived point 1063 (d0a27cfc3 notes 1063 carries the start-region fix) after one confirming run; otherwise keep as a verification-only item.
+  - 1062: stays where it is (user rank of 07.09.2026: behind 174, end of the order).
+  - 1361: move to docs/backlog.md (bare command is a working path; no real blockade).
+  - 1059, 1328, 1289: stay in place; re-check reproduction once; whatever still reproduces as a real blockade moves directly behind 1555. 1328 and 1289 partly overlap (post-release Stop failure) — consolidate that shared part if reproduced.
+
+  Open and NOT part of this order (needs a separate user decision): point 1463 has no line in TASKS.md or the archive (stale branch since 01.11.2026, holds a pool slot); 1474 is its orphaned amendment. Sol also notes the pre-freeze infrastructure block from position ~27 holds its rank only by age and should be reviewed against the CLAUDE.md §2 freeze — that review is tied to the 1463 decision.
+  Source: user request of 19.11.2026 19:43 UTC via the findings carrier (session unknown).
+  Bundle: Session- & Repo-Hygiene.
+  Closed 19.11.2026 on main as a queue-only point (precedent 1258): front reordered in b42e20e6d, measurement dispositions split into 1560, 1361 moved to docs/backlog.md.
