@@ -71,17 +71,25 @@ import { mulberry32 } from '../../world/noise'
 //  - and 46, which is NOT a comfortable third: swept over bambara seeds 1-60 it
 //    is the WORST layout still inside the gate (0.226 % against 0.25 %), so the
 //    sample's third case is the hardest clean one rather than a lucky one.
-// WHAT THE SWEEP ALSO FOUND, and what this file does NOT hide: six of those
-// sixty seeds read ABOVE the shipped gate — 27 (0.367 %), 30 (1.299 %), 33
-// (0.282 %), 35 (0.311 %), 40 (0.254 %) and 50 (0.254 %). That is the user's own
-// complaint, alive on roughly a tenth of the worlds he can be dealt, and it was
-// invisible for exactly as long as the sample varied the village instead of the
-// seed. It is filed as its own work-order point rather than folded in here: this
-// point deletes test breadth and builds nothing.
+// WHAT THE SWEEP ALSO FOUND: six of those sixty seeds read ABOVE the shipped
+// gate — 27 (0.367 %), 30 (1.299 %), 33 (0.282 %), 35 (0.311 %), 40 (0.254 %)
+// and 50 (0.254 %), the user's own complaint alive on roughly a tenth of the
+// worlds he can be dealt. All six are judged here since work-order 1169, so the
+// repair cannot be read off a lucky layout. Seed 35 is the one that stayed red
+// longest: on the bank round as it stood it read 0.452 %, and once the boulder
+// climber walked home round its playmates, 1.356 % — every roamer the
+// separation had left past the quarter's rim was sent home too, and two froze
+// there while a third walked into them. Only the boulder's child walks home now.
 const PLACES: Array<[string, number]> = [
   ['bambara-village', 2972259115],
   ['bambara-village', 42],
   ['bambara-village', 46],
+  ['bambara-village', 27],
+  ['bambara-village', 30],
+  ['bambara-village', 33],
+  ['bambara-village', 35],
+  ['bambara-village', 40],
+  ['bambara-village', 50],
   // AND THE TWO SETTLEMENTS THE SILENT GAME NOW RUNS IN (work-order 690). The
   // seed spread above stays what 1094 made it — one village, three seeds — and
   // these two add the axis that spread never had a reason to cover: the tag
