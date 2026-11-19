@@ -98,16 +98,6 @@ put it is the mistake this line exists to stop.
   Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
   Bundle: Steuerung & Performance.
 
-- [ ] 1545. Close parked work-order point 1163 (red band at the leftmost Giza pyramid) as WONTFIX and remove its board card "Gizeh: roter Granitsockel der kleinsten Pyramide"
-
-  - docs/backlog.md: mark the 2026-11-18 entry for point 1163 as closed WONTFIX (user decision 18.11.2026: the red band is Menkaure's Aswan-granite skirt required by design.md §4.4; no action needed).
-  - Board: drop the card; record the closure in the decision log (what: 1163 WONTFIX; why: design-mandated granite skirt; veto: reopen only with a design.md §4.4 change).
-  - No code change.
-  - Queue position (user order 18.11.2026: "Alle drei Aufträge vorne einreihen, aber nach den drei neu anstehenden Aufträgen zur Performance-Steigerung"): front of the work order, directly after the three performance requests of 18.11.2026.
-  User approval 18.11.2026: "Auftrag an die Owner-Session"
-  Source: user request of 18.11.2026 17:24 (spec cut from b08561942).
-  Bundle: Chat & Tafel.
-
 - [ ] 1546. Implement the recommended option of the board card "Chat: Problem besprechen ohne Einreihen – Regel in Anweisungstexte?" and remove the card
 
   Problem: in chat, a described problem immediately becomes a new work-order point because the fixed instruction texts for chat sessions (hook/guard texts such as the stand-down carrier hint, decision-card and request-approval guard messages, batch-resume context) say so; the user's rule "a solution needs approval first" lives only in memory (solutions-need-user-approval.md, a-question-is-only-a-question.md).
