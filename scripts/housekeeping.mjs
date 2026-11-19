@@ -56,6 +56,7 @@ import {
   parseWorktreeList,
   spawnDecision,
   summaryLine,
+  tmpCandidateRule,
   tmpShapeVerdict,
   tmpVerdict,
   toolLogVerdict,
@@ -551,6 +552,14 @@ export function runHousekeeping({
       }
     }
 
+    // Set when a visit's tree scan ran out of budget (not merely used it up).
+    let scanCut = false
+    const scanBudgeted = (path) => {
+      const scan = scanTree(path, budget)
+      if (!scan.complete && budget.exhausted()) scanCut = true
+      return scan
+    }
+
     /** Iterate a directory's names after the step's cursor, under the budget. */
     const walk = (step, dir, visit) => {
       let names
@@ -562,28 +571,35 @@ export function runHousekeeping({
         return 'unreadable'
       }
       let first = true
+      let cut = false
       for (const name of names) {
         if (budget.exhausted()) {
           complete = false
           writeState({ cursor })
           return 'incomplete'
         }
+        scanCut = false
         visit(name)
         // A visit the budget cut short kept its entry as "scan incomplete": the
         // cursor stays before it so the next run sees it again — unless it was
         // this run's first entry, which alone outgrows the budget and would
         // otherwise block every later run.
-        if (budget.exhausted() && !first) {
+        // A visit that merely used the budget up finished its entry; the loop
+        // head ends the walk with the cursor after it.
+        if (scanCut) {
           complete = false
-          writeState({ cursor })
-          return 'incomplete'
+          if (!first) {
+            writeState({ cursor })
+            return 'incomplete'
+          }
+          cut = true
         }
         first = false
         cursor[step] = name
       }
       cursor[step] = null
       writeState({ cursor })
-      return 'done'
+      return cut ? 'incomplete' : 'done'
     }
 
     // Shared facts for local/ and tool-output-logs (rules 1, 2, 6).
@@ -726,17 +742,21 @@ export function runHousekeeping({
           } catch {
             return
           }
-          budget.spend(1)
           const isSymlink = st.isSymbolicLink()
           const isFile = st.isFile()
-          const shape = !isSymlink && st.isDirectory() && !/^(hoa|point)-/.test(name) ? describeShape(path, name) : null
+          // Name and lstat alone reject most of /tmp (measured 19.11.2026: ~100k
+          // hoa-* test dirs); such an entry spends no budget, else they exhaust
+          // it every run and the step never completes. The time budget still bounds.
+          const rule = tmpCandidateRule(name)
+          if (!isSymlink && rule && !(rule === 'tmp-hoa-log' && !isFile)) budget.spend(1)
+          const shape = !isSymlink && st.isDirectory() && rule === 'tmp-vite-cache' ? describeShape(path, name) : null
           const pre = tmpShapeVerdict({ name, isSymlink, isFile, shape })
           if (!pre.ok) {
             if (!SILENT.has(pre.reason)) emit({ path, size: st.size, rule: 'tmp', outcome: 'kept', reason: pre.reason })
             return
           }
           if (touchesWorktree(path, wts)) return emit({ path, size: null, rule: pre.rule, outcome: 'kept', reason: 'git worktree' })
-          const scan = scanTree(path, budget)
+          const scan = scanBudgeted(path)
           const facts = { name, isSymlink, isFile, shape, complete: scan.complete, newestMtimeMs: scan.newestMtimeMs, canonical: path }
           const v = tmpVerdict(facts, { now: clock(), liveness: live })
           if (!v.act) {
@@ -747,7 +767,6 @@ export function runHousekeeping({
           if (isReferenced(name, refTexts)) return emit({ path, size: scan.bytes, rule: v.rule, outcome: 'kept', reason: 'referenced' })
           remove(path, st, root, v.rule, scan.bytes)
         })
-        if (stepResults.tmp === 'incomplete') break
         continue
       }
 
@@ -782,12 +801,11 @@ export function runHousekeeping({
           }
           if (touchesWorktree(path, worktrees))
             return emit({ path, size: null, rule: v.rule, outcome: 'kept', reason: 'git worktree' })
-          const scan = scanTree(path, budget)
+          const scan = scanBudgeted(path)
           if (!scan.complete) return emit({ path, size: scan.bytes, rule: v.rule, outcome: 'kept', reason: 'scan incomplete' })
           if (scan.hasGit) return emit({ path, size: scan.bytes, rule: v.rule, outcome: 'kept', reason: 'contains .git' })
           remove(path, st, root, v.rule, scan.bytes)
         })
-        if (stepResults.local === 'incomplete') break
         continue
       }
 
@@ -824,7 +842,6 @@ export function runHousekeeping({
             return emit({ path, size: st.size, rule: v.rule, outcome: 'kept', reason: 'git worktree' })
           remove(path, st, root, v.rule, st.size)
         })
-        if (stepResults.logs === 'incomplete') break
         continue
       }
 

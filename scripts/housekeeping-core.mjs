@@ -17,8 +17,10 @@ export const DEFAULT_BUDGET_MS = 10 * 60 * 1000
 /** A lock whose content cannot be parsed is treated as held until it is this old. */
 export const UNREADABLE_LOCK_STALE_MS = DAY_MS
 export const PID_START_TOLERANCE_MS = 2000
-/** A rescue/doctor-* or claude/* branch tip younger than this is kept (point 1513, calibratable). */
-export const BRANCH_MAX_AGE_MS = 14 * DAY_MS
+/** A rescue/doctor-* branch tip younger than this is kept (calibratable; 3 days by user order 18.11.2026). */
+export const RESCUE_BRANCH_MAX_AGE_MS = 3 * DAY_MS
+/** A claude/* branch tip younger than this is kept (point 1513, calibratable). */
+export const CLOUD_BRANCH_MAX_AGE_MS = 14 * DAY_MS
 
 // ---------------------------------------------------------------------------
 // Work order: which points are closed, which are open, and the open text.
@@ -117,9 +119,10 @@ export function archivedPointNaming(branch, archiveText) {
  * only when merging the tip into main adds nothing), and — for a claude/*
  * branch — the one archived point naming it is closed. Unknown = keep.
  */
-export function branchVerdict({ name, tipAtMs, now, contained, archiveText, workOrder, maxAgeMs = BRANCH_MAX_AGE_MS }) {
+export function branchVerdict({ name, tipAtMs, now, contained, archiveText, workOrder, maxAgeMs }) {
   const kind = branchKind(name)
   if (!kind) return { act: false, reason: 'not a rescue or cloud branch' }
+  maxAgeMs ??= kind === 'cloud' ? CLOUD_BRANCH_MAX_AGE_MS : RESCUE_BRANCH_MAX_AGE_MS
   if (!Number.isFinite(tipAtMs) || !Number.isFinite(now)) return { act: false, reason: 'tip date unknown' }
   if (now - tipAtMs <= maxAgeMs) return { act: false, reason: 'young' }
   if (contained !== true) return { act: false, reason: contained === false ? 'content missing from main' : 'containment unknown' }

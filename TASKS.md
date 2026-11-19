@@ -118,25 +118,6 @@ put it is the mistake this line exists to stop.
   Source: user request of 18.11.2026 17:44 (spec cut from 04642a868).
   Bundle: Chat & Tafel.
 
-- [ ] 1548. Housekeeping: let the branches step run despite an incomplete earlier step, fix the incomplete tmp step, shorten the rescue-branch age to 3 days
-
-  Measured 18.11.2026 18:53 (this session, read-only):
-  - 13 rescue/doctor-* branches locally, 11 on origin, created 13.11.–18.11.2026 (about 2 per day by batch-doctor).
-  - Point 1513 (closed 13.11.2026) added the 'branches' housekeeping step (scripts/housekeeping-branches.mjs, branchVerdict in scripts/housekeeping-core.mjs:120, BRANCH_MAX_AGE_MS = 14 days).
-  - scripts/housekeeping.mjs breaks out of the step loop on the first incomplete step (lines 750 tmp, 790 local, 827 logs). Daily logs local/housekeeping/2026-11-14..18.jsonl: steps {"tmp":"incomplete"} on 14., 15., 17., 18.; on 16. tmp+local done, logs incomplete. The 'branches' step has therefore never run since 1513 landed.
-  - Each of those runs reports foreignUnreadable: 3 (likely cause of the incomplete tmp step; not yet measured).
-
-  Final state:
-  1. An incomplete step no longer stops later independent steps (smallest change; the run stays marked incomplete). Real-git/Vitest test: an incomplete tmp step still runs branches.
-  2. Measure and fix why the tmp step ends incomplete daily (foreignUnreadable or scan budget); test.
-  3. BRANCH_MAX_AGE_MS for rescue/doctor-* lowered to 3 days (calibratable, user order 18.11.2026); claude/* keep their existing rule unless the same constant serves both — then split the constant per kind. Containment-in-main and unknown-=-keep stay unchanged.
-  4. Run housekeeping once against the real repo and report before/after rescue-branch counts (local and origin) to the user.
-  Infrastructure freeze 01.09.2026: fix of an existing mechanism, no new one.
-  Queue position (user order 18.11.2026: "nach dem Herkunftszeilen-Task"): directly after "Board: every point's description ends with an origin line — when it was filed and by whom".
-  User approval 18.11.2026: "ja"
-  Source: user request of 18.11.2026 17:56 (spec cut from 658af1aa7).
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1164. A shadow lies on the river sand with nothing above it to cast it (seen
   18.09.2026 in the covering polish frame `verification/687-bank-play-rocks.png`, WebGPU
   run 2026-09-18T22:17:33 and the WebGL 2 run after it, both GREEN).
