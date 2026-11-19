@@ -289,7 +289,7 @@ GPU-bound frames show up as CPU wait.
   shares, upload absence) is therefore without value; main-thread JS numbers
   (terrain, wildlife) stand.
 
-## Hand-over (state at 5bb96c8)
+## Hand-over (state at 5bb96c8) — superseded by the final hand-over below
 
 Branch `feat/1543-driving-cpu-hitches`, head 5bb96c8 (plus this doc commit).
 Gates on 5bb96c8: typecheck:test green, build green, lint green, test:unit
@@ -460,4 +460,29 @@ CPU median/p95, the GPU median/p95 from the F8 report's timestamp queries, and
 the per-system split of the 8 worst frames. It decides: medium GPU median near
 or above the CPU p95 → medium is over GPU budget, cut its GPU cost (shadow /
 post passes); GPU fine but CPU p95 > 2x median → the split names the CPU system.
+
+## Final hand-over (state at 2edf04a)
+
+Branch `feat/1543-driving-cpu-hitches`, code head 2edf04a (this section is the
+following doc-only commit). Gates on 2edf04a: typecheck:test green, build
+green, lint green, test:unit 19565 passed / 2 failed — only
+`scripts/batch-doctor-protected.test.mjs` (git push of a rescue branch), which
+fails in this container in isolation as well and is untouched by this branch.
+
+Open:
+- Target NOT met or not yet measurable: CPU p95 <= 2x median on medium and high
+  has no native measurement after the changes. All owner runs measured the WSL2
+  compat-GLES/D3D12 stack (Correction above).
+- Deciding step: the user's notebook run (command in "The deciding measurement
+  — on the USER's notebook"). From its GPU and CPU columns: cut medium's GPU cost
+  if it is over GPU budget, else fix the CPU system the split names.
+- Sliced terrain builds on medium/high: kept on a backend-neutral main-thread
+  justification; revert if the notebook run shows a raised median without a
+  p95/max gain.
+- The GPU latency column (onSubmittedWorkDone) is not queue depth (Round 6);
+  read it as callback delivery, not as evidence.
+- Not run here: browser suites, picture check of a driving frame, native F8,
+  the cross-vendor review the point requires.
+- Headless WebGPU in this container (SwiftShader) is unusable for render-side
+  numbers: the device floods "Instance dropped" errors and never completes work.
 
