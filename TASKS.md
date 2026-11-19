@@ -78,20 +78,60 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 
-- [ ] 1552. Fix the cause of the shadows-off GPU inversion
-  Split from 1549 (main session 19.11.2026, for veto). Observed in the user benchmark "Lenovo
-  GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the GPU
-  median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and triangles
-  fall. The batch host has no WebGPU timestamp query, so the cause can only be read from a fresh F8 run
-  on the user's notebook with the per-pass breakdown of 1549. WAITS FOR that report from the user.
-  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
-  Final state: with the pass the breakdown names, the cause is fixed in the product code, or — if it is
-  a measurement artefact — in the benchmark, so `shadows-off` prices only the shadows and its GPU median
-  is <= baseline in savanna-standing, desert-standing and savanna-driving on the user's notebook.
-  Test: Vitest for the changed logic; Playwright benchmark suite on WebGPU; the user's notebook report.
-  Criticality: high (inherited from priority point 1549).
-  Source: 1549 split, 19.11.2026.
+- [ ] 1556. Make the desert climate haze cheaper on the GPU
+  Placement: at the very front of the work-order queue (user order 19.11.2026).
+
+  Observed in the user benchmark "hoa-bench-2026-11-18-webgpu-dritter-Durchlauf.json" (webgpu, AMD RDNA-3 notebook, 1536x960 @ dpr 1.25, build f24ce38): `climate-haze-off` lowers desert-standing GPU median 32.31 -> 24.71 ms (-7.6 ms); almost all of it in the `output` pass (21.95 -> 16.38 ms). It is the largest single lever measured, larger than GTAO (~4.8 ms) or TRAA. On the medium preset the haze stays on and desert-standing is 17.10 ms GPU (50.8 fps), savanna-driving 16.38 ms (47.8 fps) — below 60 fps.
+
+  Final state: the desert climate haze costs materially less GPU time at an unchanged look (picture check both backends), or medium gets a cheaper haze variant; the medium-preset desert-standing GPU median on the user's notebook is <= 16.7 ms. Estimated values go to src/config/balance.ts, marked calibratable.
+  Test: Vitest for changed logic; Playwright benchmark suite on WebGPU; picture check; the user's notebook report.
   Bundle: Steuerung & Performance.
+  Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
+
+- [ ] 1554. Derive user-wait cards on the board from a typed user-input gate, with a text fallback
+  Queue position: FIRST in the work order (user order 19.11.2026: "Ja, so vorne in der Queue einreichen").
+
+  Immediate measure (before the mechanism): put ONE "Von dir zu klären" card on the board for the user's
+  notebook run that points 1552 and 1543 wait for (F8 benchmark, WebGPU, current build, per-pass breakdown of
+  1549; what to hand back and where). Then set the gate below on both points once it exists.
+
+  Mechanism, three layers, none of them refuses anything:
+  1. Typed gate. Add a fourth act `user-input` to CONFIRMATION_ACTS in scripts/user-gate-core.mjs ("the user
+     must run, measure or hand in something only they can"), set via the existing
+     `defer-for-user.mjs <N> --act user-input --detail … --prepared …`. defer-for-user validates at write time:
+     the detail names the action, the result to hand back and where to submit it. USER-ANSWERED on user-input
+     only re-queues the point; it never counts as approval for release-tag/public-release/board-contract.
+  2. Derived card. scripts/board-queue.mjs (already parses the gates on every build, gateSets(tasks)) renders
+     one VDZK card per open AWAITING-CONFIRMATION gate, all four acts, from the same parsed TASKS.md snapshot,
+     keyed by point number, existing rendering/escaping, derived anew each build (no duplicates; cleared gate =
+     card gone). The point leaves the queue section only after its card is assembled. The manual vdzk-add step
+     for gates is dropped from the procedure (vdzk-add stays for non-gate cards); remove existing manual cards
+     for gated points once. A gate carrying the marker token that does not parse renders a fallback card
+     ("Punkt N wartet auf dich – Marker fehlerhaft", raw text) and the board still publishes.
+  3a. Text fallback (user's addition 19.11.2026). The board build scans OPEN, UNGATED points for a small phrase
+     set (`WAITS FOR`, "waits for/on the user", "WAITING ON", "from the user.") and renders a visibly distinct
+     VDZK card "Punkt N wartet vielleicht auf dich (nur aus dem Text erkannt, nicht bestätigt)". Setting the
+     gate replaces it with the real card; closing the point removes it. Never a refusal, never a demand on the
+     LLM to rewrite prose. Measured 19.11.2026: one hit among open points (1552), zero false hits; 1543 is
+     NOT caught by text although it waits too.
+  3b. Structural advisory. When the queue head is ungated and is not the in-flight focus
+     (.claude/batch-in-flight.json focusPoint/evidence), the build prints an advisory line "head point N skipped
+     without gate: work it or defer-for-user --act user-input". Stateless (no new ledger field); advisory only.
+  Rule text: one sentence in the existing instructions — a blocker needing the user is gated when the point is
+  created, split or the blocker is discovered.
+
+  Final state: every open point with a user-input (or other) gate has a VDZK card on the published board
+  without a manual step; a text-matched ungated point shows the "vielleicht" card; 1552 and 1543 are gated and
+  carded.
+  Test: Vitest for the new act/validation in user-gate-core, the derived and fallback cards and the text
+  fallback in board-queue-core (incl. a point that quotes the phrase only in a gated state, and a closed point),
+  the advisory condition.
+  Residual risk (stated): a gate never set and no phrase in the text is only advised (layer 3b) and can be
+  ignored; the advisory fires on legitimate skips (noise, not a block).
+  Design: own proposal + GPT-6.2 Sol blind proposal, merged by Fable 5.2 (19.11.2026); text fallback added by the user.
+   Bundle: Chat & Tafel (board/batch infrastructure, not Steuerung & Performance; owner choice 19.11.2026).
+  Source: user request of 19.11.2026 18:49 UTC via the findings carrier (session unknown).
+  Bundle: Chat & Tafel.
 
 - [ ] 1543. Smooth the CPU hitches while driving on medium and high
   Observed: The user's notebook benchmark shows CPU p95 of 41 ms (medium) and 52 ms (high) during the drive against medians of 9-12 ms: periodic hitches that the player feels as stutter even when the GPU average would be fine. The user requires medium to be clearly smoother on mid-range notebooks.
@@ -112,6 +152,178 @@ put it is the mistake this line exists to stop.
   User approval 18.11.2026: "Ja, so als drei Aufträge einreihen"
   Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
   Bundle: Steuerung & Performance.
+  ADDENDUM 19.11.2026 (user request "Remove the CPU stutter while driving", folded in as a duplicate of this point):
+  Placement: at the very front of the work-order queue, right after the desert-haze point (user order 19.11.2026).
+
+  Observed in the user benchmark "hoa-bench-2026-11-18-webgpu-dritter-Durchlauf.json" (webgpu, AMD RDNA-3 notebook, build f24ce38): in savanna-driving the CPU median stays ~8-10 ms but the CPU p95 jumps sporadically — baseline 10.5 ms, yet high-preset (same settings as baseline) 49.9 ms, terrain-cap-84 36.3, climate-haze-off 38.8, medium-preset 31.4, all-off 20.6 (p99 up to 61 ms). Frame p95/p99 follow (e.g. high-preset 51.5 / 65.2 ms). The spikes do not follow the config, so they are intermittent main-thread work while driving — suspected terrain-chunk / dressing streaming, unconfirmed. Player impact: visible stutter in every preset.
+
+  Final state: the cause of the driving CPU spikes is named from a profile and fixed (work spread over frames or moved off the main thread); savanna-driving CPU p95 <= 2x its median in every config of a full benchmark run on the user's notebook.
+  Test: Vitest for changed logic; Playwright benchmark suite on WebGPU; the user's notebook report.
+  Bundle: Steuerung & Performance.
+  Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
+
+- [ ] 1558. Apply the 1463 plan's obsolete verdicts to the open infrastructure points (part 1 only), ranked directly after 1543
+  Apply part 1 of the parked zero-based infrastructure simplification (backlog entry 1463, decision 1505): the obsolete verdicts on open infrastructure points. Queue cleanup only — no code change, no pillar removal.
+
+  RANK: directly after 1543 (user order 19.11.2026), i.e. ahead of 1555 and everything the reorder request of the same evening places behind 1543.
+
+  Input: the approved plan on the parked branch feat/1463-infra-simplification (tip 796a58f32, 855 behind main), docs/four-eyes/1463-union-opus-v3.md (latest merged plan; check against 1463-union-fable-v2.md and the Sol final check / rechecks 1463-final-check-sol.md, 1463-recheck-sol.md, 1463-recheck-o1-sol.md for the approved revision) — read via `git show feat/1463-infra-simplification:<path>`, do not rebase or unpark the branch.
+
+  Final state:
+  1. Re-validation: every point the plan judges obsolete/deletable is checked against today's state (still open? fixed meanwhile? still matches the plan's reason?). The plan is three weeks old; a verdict that no longer holds is dropped, with one line why.
+  2. Amendment 1474 is applied: the verdicts also cover the infrastructure findings in docs/backlog.md (and the closed findings-carrier entries as record). 1474 is then closed as delivered by this point.
+  3. Each confirmed verdict is executed: the point is archived as obsolete (with the plan's reason and a pointer to the plan) or moved to docs/backlog.md; backlog findings judged obsolete are deleted from the backlog.
+  4. Result line: how many open points and backlog entries were removed, how many verdicts were dropped on re-validation, and the new position of the first infrastructure point behind the game work.
+
+  Out of scope (stays parked until an explicit user order): part 2 of the plan — removing whole pillars (daemon, doctor, etc.) and any code or hook change. The branch, its worktree and the park stay as they are.
+
+  Correction to the reorder request deposited 19.11.2026 20:43: its note "1463 has no line in TASKS.md or the archive" is wrong — 1463 is parked in docs/backlog.md by user order of 11.11.2026 (decision 1505).
+  Source: user request of 19.11.2026 19:51 UTC via the findings carrier (session unknown).
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1559. Board: a collapsed Backlog section below Erledigt with the newest entries and a link to the full backlog, ranked after the 1463 part-1 request
+  Board: a collapsed "Backlog" section below "Erledigt" (user order 19.11.2026).
+
+  RANK: directly after the 1463 part-1 request of the same evening (which itself ranks directly after 1543) — its result changes what the backlog holds.
+
+  Final state:
+  1. The board gets a new section "Backlog" directly below "Erledigt", collapsed by default (same <details class="sect"> pattern as the other sections; the Erledigt anchor ERLEDIGT_ANCHOR and board-archive-rotate.mjs keep working).
+  2. It shows the total count of open backlog entries and the NEWEST ~10 entries (one line each: title and date), like the other sections show only a part.
+  3. Entries already marked as resolved or queued (FIXED, ERLEDIGT, EINGEREIHT as point N, closed) are not shown and not counted.
+  4. A link below the list leads to the full docs/backlog.md (repository view), as the Erledigt section links to its archive.
+  5. The entries come from docs/backlog.md through one reader in the board generator; docs/backlog.md mixes "## " headed entries and "- " bullet entries (measured 19.11.2026: 109 headings, 171 bullets), so the reader handles both forms and fails soft (section shows count "unknown" plus the link) rather than breaking the board.
+  6. Player-visible-text rule does not apply (board is tooling); section heading in German like its neighbours.
+  7. A Vitest case covers the reader (both entry forms, resolved entries skipped, newest-first cut) and the section placement/collapsed default.
+
+  Out of scope: restructuring docs/backlog.md itself, new ledger fields or guards (infrastructure freeze).
+  Source: user request of 19.11.2026 19:58 UTC via the findings carrier (session unknown).
+  Bundle: Chat & Tafel.
+
+- [ ] 1555. Let a non-owner session write into its own scratchpad past the main-write guard
+  The main-write guard (PreToolUse, "MAIN WRITE REFUSED — this session holds no batch lock") refuses a Bash
+  redirection into the session's own scratchpad under /tmp/claude-1000/… for a non-owner session, e.g.
+  `sed -n 1,90p scripts/user-gate-core.mjs > /tmp/claude-1000/<…>/scratchpad/vdzk/m1.txt` (reproduced
+  19.11.2026 three times, literal path and variable path). A write outside the repository is not a main write.
+  Final state: a redirection whose target resolves outside the main working tree (scratchpad, /tmp) passes for
+  a non-owner session; writes into the main tree stay refused.
+  Test: Vitest on the guard's core with the scratchpad target (passes) and a main-tree target (refused).
+  Source: user request of 19.11.2026 18:49 UTC via the findings carrier (session unknown).
+  Bundle: Modell & Wächter.
+
+- [ ] 1560. Finish the reorder dispositions: confirm 1013, re-check 1059/1328/1289, consolidate 1516 with 551
+  Split off point 1557 (the user-approved work-order reorder of 19.11.2026) because these parts need measurement runs, not queue edits.
+
+  Final state:
+  1. 1013 (cheetah in central Africa): one confirming run shows the start-region fix of archived point 1063 (d0a27cfc3) delivers it; then 1013 closes as delivered by 1063. Otherwise it stays open as a verification-only item.
+  2. 1059, 1328, 1289: each reproduction re-checked once. Whatever still reproduces as a real blockade moves directly behind 1555; the post-release Stop failure shared by 1328 and 1289 is consolidated into one point if reproduced. Non-reproducing ones stay in place with the re-check result noted.
+  3. 1516 and 551 (duplicate symptom: canoe hint colliding with status-bar text) become one point; their conflicting remedies are resolved against acceptance criterion 9. 1215 stays separate.
+  Test: the 1013 run as a screenshot/scene check on WebGPU; reproduction notes for 1059/1328/1289; unit tests for any TASKS consumer touched.
+  Bundle: Session- & Repo-Hygiene.
+  Source: split from 1557 on 19.11.2026 (user approval of the reorder, 20:42).
+  Criticality: high.
+
+- [ ] 1495. The continent zoom stops drawing — a TypeError fires every frame
+  Final state: `npm test -- enrichments --section=seasons` is green on both backends: frame 87-continent-zoom is drawn at the unlocked wide zoom, and the page logs no "TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))".
+  Observed problem: at the continent zoom the scene draws nothing ("no frame has been drawn yet (0 draw calls)") and the TypeError repeats every frame. Measured 09.11.2026 on main ca908ee7d (`--section=seasons`, WebGPU, 277 errors, log local/verify-logs/2026-11-09T19-49-07-979-enrichments.log) and on feat/565-buried-drinking-calf 313289975 (full enrichments, WebGPU 5600 and WebGL 2 406 errors). No enrichments run up to 31.10.2026 logged it. Point 565's diff only moves wildlife body heights, so the red is owned by no point. The suite logs only the message text, so the first step is the stack (pageerror `e.stack`).
+  Player impact: zooming out to the whole continent shows a frozen or empty scene.
+  Test: the section above green on both backends; a Vitest case if the cause sits in browserless logic.
+  Source: picture check of the 565 landing session, 09.11.2026.
+  Also: on the same coverage run (main 9afb575, 09.11.2026 23:32, WebGL 2, log local/main-enrichments-webgl.log) frame 86-berber-backdrop shows only floating roofs, doors and palms before haze — mud walls, ground and all villagers are missing (evidence local/1495-evidence/86-berber-backdrop-webgl2-main-9afb575.png; the 18.10. frame at 85bfcab78 shows the whole village), while its check stayed green; the same run logged the 1495 TypeError 7300x (WebGPU 7304x), causal link unproven. Final state extended: frame 86 shows walls, ground and villagers on both backends.
+  Also (14.11.2026): --section=seasons alone takes ~14 min on WebGPU (main 15c896340 14m 21s, Congo swing 12.2 vs savanna 9.3; feat/344 14m 39s) and pushes the full enrichments suite past its 45 min wall timeout (killed at 64 frames); a covering run needs VERIFY_SUITE_TIMEOUT_MS=5400000 until this is fixed.
+  Bundle: Steuerung & Performance.
+
+- [ ] 1520. Render targets leak across rebuilds at travel|medium since the solar sun landed
+  Measured 14.11.2026 (full WebGPU enrichments on main 33db311fd, log local/verify-logs/2026-11-14T06-43-15-751-enrichments.log): 8x [ASSERT] render-resource-leak at travel|medium|traa/-/bloom/sun/fire/band, renderTargets 45 -> 58/68/72/365/370, then place:cairo 365 -> 395. The same leak shows on feat/344 b9082f151 (log 2026-11-14T05-34-10-777, 46 -> 397). Absent in the last full main run f7f328b10 (13.11.2026, before point 343 landed); every section involved is green alone.
+  Player impact: GPU memory grows across pipeline rebuilds in a long session.
+  Final state: a rebuild at travel|medium disposes what it replaces; renderTargets stay within the +2 allowance across the full enrichments run.
+  Test: a full WebGPU enrichments run (VERIFY_SUITE_TIMEOUT_MS=5400000) without render-resource-leak asserts, plus a Vitest case for the disposal if the cause lies in browserless pipeline code.
+  Source: finding of the 344 session, 14.11.2026 07:35.
+  Remeasured 15.11.2026: `npm test -- settings --section=render-leak-watch` reds identically on main dcf4949c7 and feat/357 6a1071735 (travel|medium|traa/-/bloom/sun/fire/band 25 -> 29, +4, allowed +2), so the settings leak watch shows the same leak.
+  Bundle: Sonne & Himmel.
+
+- [ ] 507. A lost WebGPU device ends the run quietly and the picture black
+  (measured 05.08.2026, both quiet runs of `invariants` on the software WebGPU
+  lane). The suite ends `2 pass, 0 fail` with 9 and 2 console errors —
+  `AbortError: Failed to execute 'mapAsync' on 'GPUBuffer': A valid external
+  Instance reference no longer exists`, `THREE.WebGPURenderer: WebGPU Device
+  Lost: Reason: unknown`, `OperationError: Instance dropped in popErrorScope`.
+  The checks after the loss never run at all; only the console-error gate turns
+  the suite red, so the count reads like a partial pass and the loss itself is
+  named nowhere. The same loss in the shipped game is what point 493 photographed
+  on the mispinned lane: a black canvas behind a live HUD.
+  FINAL STATE:
+  1. The renderer NOTICES a lost device: `device.lost` is awaited, and the loss
+     goes to the dev-mode assert channel with its reason, so every test run and
+     every manual session detects it at the moment it happens.
+  2. A suite whose device dies FAILS AT THE LOSS, naming it, instead of reporting
+     the checks it managed before — a check count that stops early may never read
+     as a pass.
+  3. The player is told rather than left with a black picture: a lost device
+     raises the same localized, dismissible notice path as the WebGL 2 fallback
+     (both languages, from the language files), naming that the picture stopped
+     and what to do — never a silent black canvas behind a live HUD.
+  4. Whether the loss is the software lane's device giving up under a long run or
+     a teardown racing an in-flight readback is decided BY THE EVIDENCE the first
+     step now produces, and the answer is written into
+     `docs/host-environment.md`'s lane section.
+  "THE SOFTWARE WEBGPU LANE" IN THIS POINT'S HEADING IS DEAD (carried 20.08.2026 from the
+  10.08.2026 four-eyes work-order analysis, whose one premise to re-measure this was, and it
+  was measured that day at `622f5113`): `node scripts/verify/backend-lane-check.mjs` reports
+  BOTH lanes drawing the game on the card — `ANGLE (Microsoft, D3D12 (NVIDIA GeForce RTX
+  4070 Ti))` — with the WebGPU chain at `level=compatibility`. The device loss recorded here
+  therefore cannot be charged to a software device giving up under a long run, which removes
+  one of item 4's two candidates before the work starts: what is left to decide between is
+  the compatibility chain itself and a teardown racing an in-flight readback.
+  VERIFIABLE: a Vitest case proves the loss handler fires the assert and the
+  localized notice from a simulated `device.lost` in both languages; a browser
+  case proves a suite that loses its device reports the loss as its failure
+  rather than a truncated pass; and `VERIFY_GL=webgpu npm test -- invariants`
+  either completes on this host or names the device loss as its verdict.
+
+- [ ] 1290. On WebGL 2 the lion feeding scene shows neither the lion nor its prey, only a shadow and the blood stain
+  Measured 04.10.2026 on feat/1283 (base a13dcae0e), `settings --section=lion-feeding`, VERIFY_GL=webgl: frame 68-lion-feeding without a wait shows only grey haze with place labels (no terrain); with a 4 s wait it shows terrain, the blood stain and one predator shadow, but neither the lion mesh nor the prey mesh. WebGPU shows lion, lying prey and stain in the same section. The section's checks read poses only, so they stay green while the animals are invisible.
+  Done when: the cause is measured on WebGL 2 (mesh visibility/material compile vs. staging timing), the lion and its prey render on WebGL 2 as on WebGPU, and the section asserts the rendered animals, not only their poses; frame picture-checked on both backends.
+  Bundle: Tierverhalten.
+  Criticality: medium — a player on the fallback backend sees a feeding scene without animals.
+
+- [ ] 1447. Every settlement visit leaves its render pipelines and heap behind
+  Final state: leaving a place releases what it built: after entering and leaving N different villages the renderer's cached pipeline count (`renderer._pipelines.caches.size`), the JS heap and Chrome's GPU-process memory return to a bounded level instead of growing with N (the cause named: which materials/objects outlive their place); a dev invariant or browser check pins the bound; the villager-dress fresh-page staging of point 1446 (`DRESS_REBOOT_EVERY`) may then be lifted.
+  Observed problem: `polish-villagers --section=villager-dress` on feat/1446 6e1622764, 25.10.2026 05:51-05:58 UTC, 22 villages visited in turn (`gpu-load` rows in local/verify-measure/villager-dress.jsonl): pipelines 64 -> 993 (~40 per village, never falling), JS heap 286 -> 1709 MB, renderer-tracked textures 56 -> 156; Chrome's `--type=gpu-process` RSS 0.4 -> 9.7 GB at ~1.35 GB per minute (host has 15 GB). In the full suite the earlier sections add to it and the GPU process was lost around the 16th village (point 1446). A player who travels village to village grows the same load without bound.
+  Source: measurement of point 1446, 25.10.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 285 (accumulation and leak hunt).
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1144. Three of six probed village layouts leave no way out of the settlement,
+  and the dev assertion that says so has been firing unread (measured 17.09.2026 while
+  reviewing point 1045). `buildLayout` ends with
+  `const wayOut = pickWayOut(colliders, radius, bank)` and a `devAssert(wayOut !== null,
+  'way-out-missing', …)` at `layout.ts` ~1794. That assertion fires, and the same three
+  layouts fail IDENTICALLY on `main` and on `feat/1045-village-water-path`, so the gate
+  work is not the cause and the defect is older than it:
+  `bambara-village@2861293141`, `mandinka-village@1716508768` and
+  `mandinka-village@3170420543` all return `wayOut === null`, against three that return a
+  bearing (`bambara-village` at 2987912600, 7 and 1337). Point 1045 saw this ONCE over its
+  124-seed sweep and filed it verbatim as "recorded here, not diagnosed"; the six-pair
+  probe says the share is far larger than one in 124, and it is not confined to one people.
+  WHAT IS NOT YET KNOWN, and is the first half of this point: what the player actually
+  loses. `wayOut` is read twice further down — the flora and the loose rocks standing ON
+  the crossing are cleared with `onWayOut(...)` — so a null bearing may mean only that no
+  lane is swept clear, or it may mean the built fabric really does ring the place with no
+  gap a walker fits through. Measure that against the collider set at `WALKER_RADIUS`
+  before choosing a repair; the assertion's own text ("the built fabric leaves no crossing
+  of the boundary free") claims the second, and has never been checked.
+  Final state:
+  - Either every village layout carries a way out, or the cases that cannot are named with
+    a measured reason and the assertion stops claiming more than it knows.
+  - The dev assertion no longer fires in a green suite run: today `layout.test.ts` prints
+    it five times and passes anyway, which is exactly how it stayed unread.
+  Test: Vitest over the layout — sweep the river villages and assert `wayOut !== null`
+  (or the named, measured exception), plus a walker-radius check that the crossing the
+  bearing names is really free. No picture check unless the repair moves the fabric.
+  Criticality: medium until the player impact is measured; high if the second reading holds
+  and the player can be shut inside a settlement.
+  Refs: src/scenes/place/layout.ts (`pickWayOut`, the `way-out-missing` devAssert, `onWayOut`),
+  src/scenes/place/layout.test.ts
+  Bundle: Dorfleben
 
 - [ ] 1169. The children shuffle on the spot above the gate on roughly a tenth of the world
   seeds (measured 20.09.2026 while point 1094 moved the teaching checks onto the seed axis;
@@ -246,12 +458,6 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
   Criticality: medium — the mute shore's lesson starts with the boatman's call.
 
-- [ ] 1290. On WebGL 2 the lion feeding scene shows neither the lion nor its prey, only a shadow and the blood stain
-  Measured 04.10.2026 on feat/1283 (base a13dcae0e), `settings --section=lion-feeding`, VERIFY_GL=webgl: frame 68-lion-feeding without a wait shows only grey haze with place labels (no terrain); with a 4 s wait it shows terrain, the blood stain and one predator shadow, but neither the lion mesh nor the prey mesh. WebGPU shows lion, lying prey and stain in the same section. The section's checks read poses only, so they stay green while the animals are invisible.
-  Done when: the cause is measured on WebGL 2 (mesh visibility/material compile vs. staging timing), the lion and its prey render on WebGL 2 as on WebGPU, and the section asserts the rendered animals, not only their poses; frame picture-checked on both backends.
-  Bundle: Tierverhalten.
-  Criticality: medium — a player on the fallback backend sees a feeding scene without animals.
-
 - [ ] 1309. A hard-edged dark rectangle shows in the burning-grass travel frame
   Source: findings carrier 05.10.2026 16:35, found on the picture check of point 1287.
   verification/131-burning-grass.png shows a straight-edged dark rectangle (with horizontal bars) in the lower right of the bird's-eye view, on main (d8a093e50, WebGL 2) and on WebGPU and WebGL 2 at point 1287 alike; not caused by the camera shift. Looks like a shadow or overlay with a rectangular footprint.
@@ -375,16 +581,6 @@ put it is the mistake this line exists to stop.
   Source: picture check of the 453 landing session, 09.11.2026.
   Bundle: Tierverhalten.
 
-- [ ] 1495. The continent zoom stops drawing — a TypeError fires every frame
-  Final state: `npm test -- enrichments --section=seasons` is green on both backends: frame 87-continent-zoom is drawn at the unlocked wide zoom, and the page logs no "TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))".
-  Observed problem: at the continent zoom the scene draws nothing ("no frame has been drawn yet (0 draw calls)") and the TypeError repeats every frame. Measured 09.11.2026 on main ca908ee7d (`--section=seasons`, WebGPU, 277 errors, log local/verify-logs/2026-11-09T19-49-07-979-enrichments.log) and on feat/565-buried-drinking-calf 313289975 (full enrichments, WebGPU 5600 and WebGL 2 406 errors). No enrichments run up to 31.10.2026 logged it. Point 565's diff only moves wildlife body heights, so the red is owned by no point. The suite logs only the message text, so the first step is the stack (pageerror `e.stack`).
-  Player impact: zooming out to the whole continent shows a frozen or empty scene.
-  Test: the section above green on both backends; a Vitest case if the cause sits in browserless logic.
-  Source: picture check of the 565 landing session, 09.11.2026.
-  Also: on the same coverage run (main 9afb575, 09.11.2026 23:32, WebGL 2, log local/main-enrichments-webgl.log) frame 86-berber-backdrop shows only floating roofs, doors and palms before haze — mud walls, ground and all villagers are missing (evidence local/1495-evidence/86-berber-backdrop-webgl2-main-9afb575.png; the 18.10. frame at 85bfcab78 shows the whole village), while its check stayed green; the same run logged the 1495 TypeError 7300x (WebGPU 7304x), causal link unproven. Final state extended: frame 86 shows walls, ground and villagers on both backends.
-  Also (14.11.2026): --section=seasons alone takes ~14 min on WebGPU (main 15c896340 14m 21s, Congo swing 12.2 vs savanna 9.3; feat/344 14m 39s) and pushes the full enrichments suite past its 45 min wall timeout (killed at 64 frames); a covering run needs VERIFY_SUITE_TIMEOUT_MS=5400000 until this is fixed.
-  Bundle: Steuerung & Performance.
-
 - [ ] 1496. Grass fire: close the four cross-vendor review objections point 321 landed without
   Final state: the four objections of the GPT-6.1 Sol review of feat/321 b2023ba (passes 2/6/7, verdict merge-with-fixes) are fixed on main and `npm test -- enrichments --section=burning-grass` is green on both backends with the frame judged: (1) `src/scenes/travel/burnScarNode.ts` uses `1 - smoothstep(0, depth, dFront)` instead of the reversed-edge `smoothstep(depth, 0, dFront)`, which is undefined in GLSL; (2) the scar width derives from the swept curved front, so the flank ground the front passed is sooted too, pinned by a Vitest flank-coverage case; (3) the negative control in `scripts/verify/enrichments.mjs` reuses the positive crop boxes and requires valid on-screen captures instead of accepting off-screen crops after the sim advanced; (4) `src/scenes/travel/Wildlife.tsx` reuses one preallocated record instead of allocating a `setBurnScar` options object every frame.
   Observed problem: point 321 was landed on 10.11.2026 before these objections were fixed; the review had asked for the fixes and a both-backend rerun before landing.
@@ -400,6 +596,171 @@ put it is the mistake this line exists to stop.
   Final state: a feeder at any carcass, the trample/crush death included, has walked there on screen from where it was; no predator is placed or teleported onto a body.
   Test: Vitest on the crush-death carcass path (no feeder spawned at the body); picture on both backends at the evidence spot.
   Bundle: Tierverhalten.
+
+- [ ] 1215. Top-centre HUD notices overlap and become unreadable.
+  PROBLEM, seen 25.09.2026 in the point-659 route evidence (both backends green, picture-judged):
+  on the WebGL 2 fallback the dismissible graphics notice, a toast and the place-title card share
+  the same top-centre slot, so the toast text is drawn across the notice text and the title
+  (`communication-webgl-1790356605654-09-after-fit.png`: "Dummy message: the puzzle ... is solved."
+  over "Graphics notice: WebGPU is unavailable ..."; also `-07-answer-sounding.png`). On WebGPU the
+  "Chief" title card covers the start of the toast (`communication-webgpu-1790355374457-05-chief-walks-out.png`)
+  and the "Bandiagara" title covers the talus block's crown (`-08-impression-and-socket.png`).
+  FINAL STATE: notices in the top slot stack or queue without overlapping, every one readable in
+  full; a place title never covers toast text. Both languages, desktop and phone portrait.
+  Criticality: medium — the puzzle-success toast and the fallback notice are unreadable while both show.
+  Test: a Playwright layout check that the notice, toast and title boxes do not intersect when all
+  three are shown, on WebGL 2 (where the notice appears) and WebGPU; picture check on both backends.
+  Refs: src/ui/Hud.tsx, the graphics-notice and place-title components.
+  Bundle: Kommunikation.
+
+- [ ] 1516. The hint toast sits inside the status bar over the heading text during play
+  Measured 13.11.2026 in the covering enrichments run (both backends, feat/1508-covering-enrichments 18d2abc41): verification/131-burning-grass.png and verification/327-vulture-cluster-one-flock.png show the canoe hint toast at y≈16 inside the status bar, drawn over the compass heading text so it reads 'Westcanoe…' / 'Eastcanoe…'. docs/backlog.md (20.10.2026, victory frame) held this until an in-play frame showed it; these two do.
+  Player impact: while the toast stands, neither the heading nor the hint is readable.
+  Final state: an in-play hint toast never overlaps the status bar's text; it sits below the bar as on verification/04-chief-hut-meeting.png.
+  Test: a Playwright layout check that the toast's box does not intersect the status bar's box with a hint raised in play, picture-checked on both backends.
+  Source: finding of the 1508 session, 13.11.2026 15:34.
+  Bundle: Steuerung & Performance.
+
+- [ ] 551. The transient status hint is drawn on top of the region name (seen
+  07.08.2026 in the verification frames `121-harmattan-pall-january.png` and
+  `122-atlas-snow-february.png`, WebGL 2, and reproducible in every frame the
+  enrichments suite writes while the canoe hint stands). The centred hint "The canoe is
+  dead weight on land and slows me — better left in a camp for long overland stretches."
+  and the region name occupy the SAME strip of the status bar, and both are drawn: the
+  frames read "Westcanoe is dead weight …" and "Northanoe is dead weight …", the region
+  word running into the hint's first word. It is not a clipping artefact — the hint's
+  own bordered box sits over an unhidden label.
+  Acceptance criterion 9 (`CLAUDE.md` §7.1) puts BOTH there on purpose: the region is a
+  permanent stat and the hint renders "CENTRED inside the status bar itself, not in a
+  separate floating panel". So the collision is by construction, and the fix belongs on
+  the hint's side, not by moving it back out into a panel.
+  FINAL STATE: while a transient hint stands, the status bar YIELDS the strip it needs —
+  whatever permanent element the hint would overlap is hidden for its lifetime (not
+  faded, not shifted under it) and comes back unchanged when the hint expires. The hint
+  keeps its centred position and its box. Which elements can be yielded is decided by
+  measured overlap, not by a hard-coded guess about which stat sits where.
+  VERIFIABLE: a Vitest case on the HUD component — with a hint active, the overlapped
+  permanent element is not rendered, and after the hint expires it is back; plus a
+  browser frame showing the hint over a status bar with no text behind it. Both
+  languages, since the German hint has a different width.
+  Criticality: medium — nothing breaks, but it is the first thing in the picture a reader
+  sees as sloppy, and it is in every screenshot the suites write.
+
+- [ ] 1488. Villager clothing: one fix per listed defect, one final picture check (user order 05.11.2026; amends the working method of 1482 under 1487)
+  The 24-hour budget of 1487 did not limit precision: since 04.11 17:00, 34 of 57 main commits were bookkeeping ("Record the picture judgement / delegation / withdraw verdict ..."); the child hip cloth alone took nine commits on 05.11 morning. A time box cuts the list, it does not cut the per-candidate ritual. Replace the method of 1482:
+  1. Each defect on 1482's frozen list gets exactly ONE fix. All fixes land on the one branch; no picture judgement between them.
+  2. ONE final picture check at game distance, by eye, both backends: does it look right to a player, and is coverage met (see the companion request "No sensitive body part exposed from any view or pose" - its views and poses are part of this check).
+  3. A fix that fails that check is not iterated: it is reverted, the old state stays, the defect goes to docs/backlog.md. Exception: any coverage/exposure failure is never reverted to an exposing state; it keeps getting fixed until it holds.
+  4. No intermediate status/record commits on main; one closing commit with the result per defect.
+  5. 1341 is dropped (closed as cancelled). After 1482 clothing is done; 1379 stays only as its own later point.
+  Add as the FIRST item of 1482's frozen list: the kneeling Bambara woman whose white breast cloth stands off the torso as a stiff ring, so the overhead camera looks into it and the breast is bare. Evidence: /backup/hoa/local/BlosseBrueste.zip (seed 1768195175, place bambara-village, x/z -59.45/-130.99, webgpu, build 39e8ab8; user text "Man kann Frauen in den BH schauen.").
+  Bundle: Dorfleben.
+
+- [ ] 1221. The Cairo place ground is no longer flat white at the start.
+  PROBLEM, measured 26.09.2026 on main 96f8c1e: in flow frame `verification/06-start-journal.png`
+  (WebGL 2, 1 FPS at the shutter) the whole foreground floor of the Cairo place is untextured
+  near-white; the frame committed 8–9 days earlier shows the same.
+  FINAL STATE: the cause is found — the shutter fires before the ground material is ready (a
+  check that does not reach its state) or a player really sees a white floor — and fixed; the
+  frame shows the textured place ground on both backends.
+  Criticality: medium — possibly the first view of the game has no ground texture.
+  Test: flow picture check of 06-start-journal on WebGL 2 and WebGPU.
+  Refs: the place scene ground material, scripts/verify/flow.mjs start-journal shutter.
+  Bundle: Siedlungsgeometrie.
+
+- [ ] 1220. The WebGL 2 notice no longer covers the start journal's title.
+  PROBLEM, measured 26.09.2026 on main 96f8c1e: flow frame `verification/06-start-journal.png`
+  (WebGL 2) shows the dismissible compatibility notice drawn OVER the open journal panel, its
+  "Verstanden" button on the "Tagebuch" heading. The frame committed 8 days earlier shows the
+  notice behind the panel and the title readable.
+  FINAL STATE: at a WebGL 2 start with the journal open, the notice and the journal title are
+  both readable (neither covers the other); the notice stays dismissible.
+  Criticality: low — the journal title is hidden at every WebGL 2 start until dismissal.
+  Test: a Playwright layout check in the flow or layout suite asserting the notice's box does
+  not intersect the journal header on WebGL 2; picture check of 06-start-journal.
+  Also measured 01.10.2026 on feat/1219 (local/1219-no-context.png, mobile emulation): the
+  no-backend notice added by point 1219 sits over the journal heading and its tabs the same
+  way; the fix covers both notices.
+  Refs: the compatibility notice component, the journal panel, verification/06-start-journal.png.
+  Bundle: Steuerung & Performance.
+
+- [ ] 519. The journal's handwriting exists only on the author's own machine
+  (measured 05.08.2026 while verifying point 394 in this Linux container). The
+  journal's handwritten look (§16/§16.3, acceptance criterion 29) is asked for by
+  NAME alone: `font-family: 'Segoe Script', 'Bradley Hand', 'Comic Sans MS',
+  cursive` (`src/index.css:700`, and the observation input at :885). All three are
+  HOST fonts — Segoe Script ships with Windows, Bradley Hand with macOS, Comic Sans
+  with neither Linux nor Android. Where none is installed the browser falls back to
+  the generic `cursive`, which on this host resolves to DejaVu Sans: an upright
+  sans-serif. The chronicle then reads as plain text, the stroke-by-stroke reveal
+  writes in that plain text, and the whole conceit of a hand-written journal is gone
+  — for every player not on Windows or macOS, and for every verification frame
+  captured off such a host (which is why frames 81/82/83 regenerated in a container
+  are weaker evidence than the Windows-captured originals).
+  FINAL STATE: the handwriting SHIPS WITH THE GAME instead of being borrowed from
+  the host. One open-licence handwriting face is self-hosted as an `@font-face`
+  from a repository-local woff2 (subset to the characters the two language files
+  actually use, German umlauts and ß included), declared FIRST in both stacks with
+  today's host fonts kept behind it and generic `cursive` last. It loads from the
+  bundle like every other asset — never from a CDN, so the game's own look never
+  needs a network — and the licence text travels with the file. Its size is stated
+  in the commit that adds it, per the dependency-justification rule.
+  VERIFIABLE: pure Vitest that both stacks name the bundled family first and that an
+  `@font-face` rule defines it from a repository-local path (no `http(s):` source);
+  and a browser check on this container — which has none of the three system fonts —
+  that the journal's rendered text is actually drawn in the bundled face
+  (`document.fonts.check`) and measures a different width from the generic fallback,
+  so a silent fallback fails loudly instead of quietly producing plain text.
+  Screenshot 81 refreshed on the bundled face.
+
+- [ ] 1521. The San village is built of Zulu-style beehive huts
+  Seen 14.11.2026 on the point-348 fire-rain frame 348-san-flame-on-hearth-rain (WebGPU, feat/348 d1805cbbb): the San village shows large thatched beehive huts with doorways and a Market Hut and Chief's Hut in a ring like the Zulu village, while design.md §2.6/§4.5 give each people its own period organising principle (dispersed camps without lanes) and the San journal entry itself speaks of "shelters of bent grass".
+  Player impact: a people's settlement shows another people's architecture.
+  Final state: the San village is built from the dwellings and arrangement docs/peoples-1890.md records for the San around 1890; if that record is silent, it gains the evidence first.
+  Test: a Vitest sweep that the San layout uses its own dwelling type and plan, plus one first-person frame of the San village.
+  Source: finding of the 348 session, 14.11.2026 18:43.
+  Bundle: Siedlungsgeometrie.
+
+- [ ] 1526. Kraal cattle read as antelope
+  Seen 15.11.2026 on the point-359 frames 359-zulu-kraal-1890/1893 (WebGPU and WebGL 2, main e56c8f28c): several cattle carry long, straight, upright horns and a narrow head; they read as oryx or eland rather than Sanga/Nguni cattle (lyre-curved horns, broad head, hump). The Zulu pen's east side also shows an open stretch where a cow stands at the edge.
+  Player impact: a village herd looks like wild antelope standing in a pen.
+  Final state: the cattle in `src/render/cattle.ts` show curved horns, a broad head and a hump per the breeds docs/peoples-1890.md names; the pen reads closed or shows a deliberate gate.
+  Test: a Vitest case on the cattle geometry parameters, plus the kraal-cattle frames of polish-settlement on both backends.
+  Source: picture check of the 359 session, 15.11.2026 21:34.
+  Bundle: Dorfleben.
+
+- [ ] 415. The Tuareg tent reads as a heap of sand (29.07.2026, user in the Tuareg
+  village, North: "what are these cones supposed to be? Sand piles? They look more like
+  mini tents"). They ARE tents — `Tent` in `PlaceScene.tsx` is a single
+  `coneGeometry(r·1.25, h)` in the cloth material, a 0.45-unit pole and a small dark
+  entrance flap. Standing on pale sand in the pale cloth colour, a smooth tall cone
+  reads as a dune, and the flap is far too small to say otherwise. The user's reaction
+  is the correct one: nothing in the shape says "someone lives here".
+  THE REAL FORM IS ALMOST THE OPPOSITE, and it is what makes it readable: a Tuareg tent
+  (ehen) of that period is LOW and WIDE, not tall and pointed — mats or hides stretched
+  over an arched wooden frame, dark against the sand, with the long side open toward the
+  lee and the frame's poles and guy lines visible. Height well under a standing person,
+  width several times the height. RESEARCH IT FIRST against `docs/peoples-1890.md`
+  (Tuareg material is in §2.4 and §7.2) and record what the sources support before
+  modelling; where the evidence is thin, say so in the point rather than inventing
+  detail — the accuracy principle of this project applies to dwellings as much as to
+  clothing, and the guide's own rule is that a real system is never faked.
+  WHAT TO BUILD: replace the cone for the NORTH dwelling kind with the arched form —
+  a low curved shell, dark mat/hide colouring against the light ground, an open side,
+  and the frame legible at eye height (design.md §2.6 asks for structure and weathering
+  at eye height, which a smooth cone cannot carry). Keep it cheap: this is a village
+  dressing element and appears many times.
+  CHECK THE OTHER PEOPLES' TENTS at the same time: the `tent` kind is also used to dress
+  the market in other regions. Those are trade awnings, not dwellings, and must not
+  inherit the desert form — say which shape each use gets.
+  VERIFIABLE: pure Vitest on the geometry description (the north dwelling is wider than
+  it is tall, and the market awning is not the same part), plus the existing layout
+  tests. Live (`scripts/verify/polish.mjs`, BOTH backends, screenshot): the Tuareg
+  village photographed at eye height — the tents must be distinguishable from the ground
+  by colour as well as by shape, which is exactly what fails today.
+  DOCS in the same commit: `docs/peoples-1890.md` §8 (the research-to-game table) gains
+  the dwelling row for the Tuareg, per the standing rule that the implementation
+  sections move with the rendering.
 
 - [ ] 205. A world & functionality plausibility audit — a third audit kind beyond
   code bugs (Pillar 2) and visual/behaviour bugs (203): does the world and its
@@ -3479,99 +3840,6 @@ Build order, chosen so no two parallel agents own the same file:
   `main`) and on the two residuals of item 4, plus the one real deploy run of
   item 1 with its run id recorded.
 
-- [ ] 507. A lost WebGPU device ends the run quietly and the picture black
-  (measured 05.08.2026, both quiet runs of `invariants` on the software WebGPU
-  lane). The suite ends `2 pass, 0 fail` with 9 and 2 console errors —
-  `AbortError: Failed to execute 'mapAsync' on 'GPUBuffer': A valid external
-  Instance reference no longer exists`, `THREE.WebGPURenderer: WebGPU Device
-  Lost: Reason: unknown`, `OperationError: Instance dropped in popErrorScope`.
-  The checks after the loss never run at all; only the console-error gate turns
-  the suite red, so the count reads like a partial pass and the loss itself is
-  named nowhere. The same loss in the shipped game is what point 493 photographed
-  on the mispinned lane: a black canvas behind a live HUD.
-  FINAL STATE:
-  1. The renderer NOTICES a lost device: `device.lost` is awaited, and the loss
-     goes to the dev-mode assert channel with its reason, so every test run and
-     every manual session detects it at the moment it happens.
-  2. A suite whose device dies FAILS AT THE LOSS, naming it, instead of reporting
-     the checks it managed before — a check count that stops early may never read
-     as a pass.
-  3. The player is told rather than left with a black picture: a lost device
-     raises the same localized, dismissible notice path as the WebGL 2 fallback
-     (both languages, from the language files), naming that the picture stopped
-     and what to do — never a silent black canvas behind a live HUD.
-  4. Whether the loss is the software lane's device giving up under a long run or
-     a teardown racing an in-flight readback is decided BY THE EVIDENCE the first
-     step now produces, and the answer is written into
-     `docs/host-environment.md`'s lane section.
-  "THE SOFTWARE WEBGPU LANE" IN THIS POINT'S HEADING IS DEAD (carried 20.08.2026 from the
-  10.08.2026 four-eyes work-order analysis, whose one premise to re-measure this was, and it
-  was measured that day at `622f5113`): `node scripts/verify/backend-lane-check.mjs` reports
-  BOTH lanes drawing the game on the card — `ANGLE (Microsoft, D3D12 (NVIDIA GeForce RTX
-  4070 Ti))` — with the WebGPU chain at `level=compatibility`. The device loss recorded here
-  therefore cannot be charged to a software device giving up under a long run, which removes
-  one of item 4's two candidates before the work starts: what is left to decide between is
-  the compatibility chain itself and a teardown racing an in-flight readback.
-  VERIFIABLE: a Vitest case proves the loss handler fires the assert and the
-  localized notice from a simulated `device.lost` in both languages; a browser
-  case proves a suite that loses its device reports the loss as its failure
-  rather than a truncated pass; and `VERIFY_GL=webgpu npm test -- invariants`
-  either completes on this host or names the device loss as its verdict.
-
-- [ ] 519. The journal's handwriting exists only on the author's own machine
-  (measured 05.08.2026 while verifying point 394 in this Linux container). The
-  journal's handwritten look (§16/§16.3, acceptance criterion 29) is asked for by
-  NAME alone: `font-family: 'Segoe Script', 'Bradley Hand', 'Comic Sans MS',
-  cursive` (`src/index.css:700`, and the observation input at :885). All three are
-  HOST fonts — Segoe Script ships with Windows, Bradley Hand with macOS, Comic Sans
-  with neither Linux nor Android. Where none is installed the browser falls back to
-  the generic `cursive`, which on this host resolves to DejaVu Sans: an upright
-  sans-serif. The chronicle then reads as plain text, the stroke-by-stroke reveal
-  writes in that plain text, and the whole conceit of a hand-written journal is gone
-  — for every player not on Windows or macOS, and for every verification frame
-  captured off such a host (which is why frames 81/82/83 regenerated in a container
-  are weaker evidence than the Windows-captured originals).
-  FINAL STATE: the handwriting SHIPS WITH THE GAME instead of being borrowed from
-  the host. One open-licence handwriting face is self-hosted as an `@font-face`
-  from a repository-local woff2 (subset to the characters the two language files
-  actually use, German umlauts and ß included), declared FIRST in both stacks with
-  today's host fonts kept behind it and generic `cursive` last. It loads from the
-  bundle like every other asset — never from a CDN, so the game's own look never
-  needs a network — and the licence text travels with the file. Its size is stated
-  in the commit that adds it, per the dependency-justification rule.
-  VERIFIABLE: pure Vitest that both stacks name the bundled family first and that an
-  `@font-face` rule defines it from a repository-local path (no `http(s):` source);
-  and a browser check on this container — which has none of the three system fonts —
-  that the journal's rendered text is actually drawn in the bundled face
-  (`document.fonts.check`) and measures a different width from the generic fallback,
-  so a silent fallback fails loudly instead of quietly producing plain text.
-  Screenshot 81 refreshed on the bundled face.
-
-- [ ] 551. The transient status hint is drawn on top of the region name (seen
-  07.08.2026 in the verification frames `121-harmattan-pall-january.png` and
-  `122-atlas-snow-february.png`, WebGL 2, and reproducible in every frame the
-  enrichments suite writes while the canoe hint stands). The centred hint "The canoe is
-  dead weight on land and slows me — better left in a camp for long overland stretches."
-  and the region name occupy the SAME strip of the status bar, and both are drawn: the
-  frames read "Westcanoe is dead weight …" and "Northanoe is dead weight …", the region
-  word running into the hint's first word. It is not a clipping artefact — the hint's
-  own bordered box sits over an unhidden label.
-  Acceptance criterion 9 (`CLAUDE.md` §7.1) puts BOTH there on purpose: the region is a
-  permanent stat and the hint renders "CENTRED inside the status bar itself, not in a
-  separate floating panel". So the collision is by construction, and the fix belongs on
-  the hint's side, not by moving it back out into a panel.
-  FINAL STATE: while a transient hint stands, the status bar YIELDS the strip it needs —
-  whatever permanent element the hint would overlap is hidden for its lifetime (not
-  faded, not shifted under it) and comes back unchanged when the hint expires. The hint
-  keeps its centred position and its box. Which elements can be yielded is decided by
-  measured overlap, not by a hard-coded guess about which stat sits where.
-  VERIFIABLE: a Vitest case on the HUD component — with a hint active, the overlapped
-  permanent element is not rendered, and after the hint expires it is back; plus a
-  browser frame showing the hint over a status bar with no text behind it. Both
-  languages, since the German hint has a different width.
-  Criticality: medium — nothing breaks, but it is the first thing in the picture a reader
-  sees as sloppy, and it is in every screenshot the suites write.
-
 - [ ] 464. A red unit layer reached `main` through the pre-push gate (user 30.07.2026:
   "Sorge dafür, dass das sicher nicht mehr passiert."; bundle Testinfrastruktur). CI run 30555562185 on
   `main`, commit `4d580957`, failed at step `npm run test:unit` — the guide-brevity audit,
@@ -5264,39 +5532,6 @@ Build order, chosen so no two parallel agents own the same file:
   outcome→message mapping (every stageable event has success AND failure text in
   both languages, no silent path); settings.mjs live-checks the banner on an unmet
   precondition and a successful stage; both languages.
-
-- [ ] 415. The Tuareg tent reads as a heap of sand (29.07.2026, user in the Tuareg
-  village, North: "what are these cones supposed to be? Sand piles? They look more like
-  mini tents"). They ARE tents — `Tent` in `PlaceScene.tsx` is a single
-  `coneGeometry(r·1.25, h)` in the cloth material, a 0.45-unit pole and a small dark
-  entrance flap. Standing on pale sand in the pale cloth colour, a smooth tall cone
-  reads as a dune, and the flap is far too small to say otherwise. The user's reaction
-  is the correct one: nothing in the shape says "someone lives here".
-  THE REAL FORM IS ALMOST THE OPPOSITE, and it is what makes it readable: a Tuareg tent
-  (ehen) of that period is LOW and WIDE, not tall and pointed — mats or hides stretched
-  over an arched wooden frame, dark against the sand, with the long side open toward the
-  lee and the frame's poles and guy lines visible. Height well under a standing person,
-  width several times the height. RESEARCH IT FIRST against `docs/peoples-1890.md`
-  (Tuareg material is in §2.4 and §7.2) and record what the sources support before
-  modelling; where the evidence is thin, say so in the point rather than inventing
-  detail — the accuracy principle of this project applies to dwellings as much as to
-  clothing, and the guide's own rule is that a real system is never faked.
-  WHAT TO BUILD: replace the cone for the NORTH dwelling kind with the arched form —
-  a low curved shell, dark mat/hide colouring against the light ground, an open side,
-  and the frame legible at eye height (design.md §2.6 asks for structure and weathering
-  at eye height, which a smooth cone cannot carry). Keep it cheap: this is a village
-  dressing element and appears many times.
-  CHECK THE OTHER PEOPLES' TENTS at the same time: the `tent` kind is also used to dress
-  the market in other regions. Those are trade awnings, not dwellings, and must not
-  inherit the desert form — say which shape each use gets.
-  VERIFIABLE: pure Vitest on the geometry description (the north dwelling is wider than
-  it is tall, and the market awning is not the same part), plus the existing layout
-  tests. Live (`scripts/verify/polish.mjs`, BOTH backends, screenshot): the Tuareg
-  village photographed at eye height — the tents must be distinguishable from the ground
-  by colour as well as by shape, which is exactly what fails today.
-  DOCS in the same commit: `docs/peoples-1890.md` §8 (the research-to-game table) gains
-  the dwelling row for the Tuareg, per the standing rule that the implementation
-  sections move with the rendering.
 
 - [ ] 591. Does the project still obey its own rules? A full adherence audit (user
   09.08.2026: "Wir scheinen so einige unserer eigenen Projektregeln zu verletzen. Lege
@@ -13006,39 +13241,6 @@ to land than a mechanism that needs a review.
   scripts/verify/run-all.mjs, scripts/verify/run-logged.mjs
   Bundle: Session- & Repo-Hygiene
 
-- [ ] 1144. Three of six probed village layouts leave no way out of the settlement,
-  and the dev assertion that says so has been firing unread (measured 17.09.2026 while
-  reviewing point 1045). `buildLayout` ends with
-  `const wayOut = pickWayOut(colliders, radius, bank)` and a `devAssert(wayOut !== null,
-  'way-out-missing', …)` at `layout.ts` ~1794. That assertion fires, and the same three
-  layouts fail IDENTICALLY on `main` and on `feat/1045-village-water-path`, so the gate
-  work is not the cause and the defect is older than it:
-  `bambara-village@2861293141`, `mandinka-village@1716508768` and
-  `mandinka-village@3170420543` all return `wayOut === null`, against three that return a
-  bearing (`bambara-village` at 2987912600, 7 and 1337). Point 1045 saw this ONCE over its
-  124-seed sweep and filed it verbatim as "recorded here, not diagnosed"; the six-pair
-  probe says the share is far larger than one in 124, and it is not confined to one people.
-  WHAT IS NOT YET KNOWN, and is the first half of this point: what the player actually
-  loses. `wayOut` is read twice further down — the flora and the loose rocks standing ON
-  the crossing are cleared with `onWayOut(...)` — so a null bearing may mean only that no
-  lane is swept clear, or it may mean the built fabric really does ring the place with no
-  gap a walker fits through. Measure that against the collider set at `WALKER_RADIUS`
-  before choosing a repair; the assertion's own text ("the built fabric leaves no crossing
-  of the boundary free") claims the second, and has never been checked.
-  Final state:
-  - Either every village layout carries a way out, or the cases that cannot are named with
-    a measured reason and the assertion stops claiming more than it knows.
-  - The dev assertion no longer fires in a green suite run: today `layout.test.ts` prints
-    it five times and passes anyway, which is exactly how it stayed unread.
-  Test: Vitest over the layout — sweep the river villages and assert `wayOut !== null`
-  (or the named, measured exception), plus a walker-radius check that the crossing the
-  bearing names is really free. No picture check unless the repair moves the fabric.
-  Criticality: medium until the player impact is measured; high if the second reading holds
-  and the player can be shut inside a settlement.
-  Refs: src/scenes/place/layout.ts (`pickWayOut`, the `way-out-missing` devAssert, `onWayOut`),
-  src/scenes/place/layout.test.ts
-  Bundle: Dorfleben
-
 - [ ] 1153. A landed point's board bookkeeping has a door that locks behind it, and the
   running proof for its closing work cannot be declared (two findings, both measured
   18.09.2026 on point 1136; filed as one because they are the same attribution question).
@@ -13437,22 +13639,6 @@ to land than a mechanism that needs a review.
   Criticality: low — deletions and wording fixes; item 3 needs an attended session.
   Bundle: Modell & Wächter.
 
-- [ ] 1215. Top-centre HUD notices overlap and become unreadable.
-  PROBLEM, seen 25.09.2026 in the point-659 route evidence (both backends green, picture-judged):
-  on the WebGL 2 fallback the dismissible graphics notice, a toast and the place-title card share
-  the same top-centre slot, so the toast text is drawn across the notice text and the title
-  (`communication-webgl-1790356605654-09-after-fit.png`: "Dummy message: the puzzle ... is solved."
-  over "Graphics notice: WebGPU is unavailable ..."; also `-07-answer-sounding.png`). On WebGPU the
-  "Chief" title card covers the start of the toast (`communication-webgpu-1790355374457-05-chief-walks-out.png`)
-  and the "Bandiagara" title covers the talus block's crown (`-08-impression-and-socket.png`).
-  FINAL STATE: notices in the top slot stack or queue without overlapping, every one readable in
-  full; a place title never covers toast text. Both languages, desktop and phone portrait.
-  Criticality: medium — the puzzle-success toast and the fallback notice are unreadable while both show.
-  Test: a Playwright layout check that the notice, toast and title boxes do not intersect when all
-  three are shown, on WebGL 2 (where the notice appears) and WebGPU; picture check on both backends.
-  Refs: src/ui/Hud.tsx, the graphics-notice and place-title components.
-  Bundle: Kommunikation.
-
 - [ ] 1217. The gamepad and touch suites still call the Nubian chief out of his hut.
   PROBLEM, measured 26.09.2026 in the closing LARGE on main 5dff420 (WebGL 2 lane):
   gamepad `interact-chief` and touch `prompt-tap` red — the prompt shows, but
@@ -13466,34 +13652,6 @@ to land than a mechanism that needs a review.
   Test: gamepad --section=interact-chief and touch --section=prompt-tap green.
   Refs: scripts/verify/gamepad.mjs, scripts/verify/touch.mjs, scripts/render-verify-charges.mjs.
   Bundle: Kommunikation.
-
-- [ ] 1220. The WebGL 2 notice no longer covers the start journal's title.
-  PROBLEM, measured 26.09.2026 on main 96f8c1e: flow frame `verification/06-start-journal.png`
-  (WebGL 2) shows the dismissible compatibility notice drawn OVER the open journal panel, its
-  "Verstanden" button on the "Tagebuch" heading. The frame committed 8 days earlier shows the
-  notice behind the panel and the title readable.
-  FINAL STATE: at a WebGL 2 start with the journal open, the notice and the journal title are
-  both readable (neither covers the other); the notice stays dismissible.
-  Criticality: low — the journal title is hidden at every WebGL 2 start until dismissal.
-  Test: a Playwright layout check in the flow or layout suite asserting the notice's box does
-  not intersect the journal header on WebGL 2; picture check of 06-start-journal.
-  Also measured 01.10.2026 on feat/1219 (local/1219-no-context.png, mobile emulation): the
-  no-backend notice added by point 1219 sits over the journal heading and its tabs the same
-  way; the fix covers both notices.
-  Refs: the compatibility notice component, the journal panel, verification/06-start-journal.png.
-  Bundle: Steuerung & Performance.
-
-- [ ] 1221. The Cairo place ground is no longer flat white at the start.
-  PROBLEM, measured 26.09.2026 on main 96f8c1e: in flow frame `verification/06-start-journal.png`
-  (WebGL 2, 1 FPS at the shutter) the whole foreground floor of the Cairo place is untextured
-  near-white; the frame committed 8–9 days earlier shows the same.
-  FINAL STATE: the cause is found — the shutter fires before the ground material is ready (a
-  check that does not reach its state) or a player really sees a white floor — and fixed; the
-  frame shows the textured place ground on both backends.
-  Criticality: medium — possibly the first view of the game has no ground texture.
-  Test: flow picture check of 06-start-journal on WebGL 2 and WebGPU.
-  Refs: the place scene ground material, scripts/verify/flow.mjs start-journal shutter.
-  Bundle: Siedlungsgeometrie.
 
 - [ ] 1222. The WebGPU world suite no longer aborts on a click the dialog backdrop intercepts.
   PROBLEM, measured 27.09.2026 in the closing LARGE on main 4f6c83e (WebGPU pass, log
@@ -13825,14 +13983,6 @@ to land than a mechanism that needs a review.
   Also (findings carrier 07.10.2026 23:20): session 9696d681 released its claim to 06667ad0 via the hand-back bound while .claude/batch-lock.json was absent, so heldByOtherLiveOwner() read false and dashboard-guard (focus reconcile) and retro-currency-guard kept blocking the released session's Stop, demanding batch mutations its hand-back forbids; and a session that took the batch only to edit the work order re-acquired the lock through its heartbeat after `batch-singleton.mjs release`, so it could not hand back without a ticked point or the context watermark. Stand-down honours a claim this session released, and a manual release stays released.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 1361. decision-card-guard deadlocks a non-owner session's Stop by demanding a vdzk-keep the ownership guard refuses
-  Queue position: end of Session- & Repo-Hygiene.
-  Source: findings carrier 16.10.2026 09:02: session 1624ee5d (not batch owner; owner 36861bc0): Stop hook decision-card-guard demanded 'board.mjs vdzk-keep "Batchelor: Batch-Infrastruktur als eigenes Projekt abspalten"' for user message 29bbe2bf (a board-chat test log, no decision); the PreToolUse batch-ownership stand-down refused that command, and the guard fired twice in a row. scripts/decision-card-guard.mjs computes heldByOtherLiveOwner but still demands the keep (the carry path of e65219245).
-  Final state: for a session not holding the batch lock, decision-card-guard never demands an action the ownership stand-down refuses (it stands down, or carries the answer to the owner without a keep demand); the card stays open.
-  Verifiable: Vitest reproducing a non-owner Stop with an open card and a non-decision user message: no blocking demand.
-  Also (findings carrier 16.10.2026 22:14, session 7850716a): the bare `node scripts/board.mjs vdzk-keep …` passes the stand-down (isVdzkKeepSegment); only a wrapped call (`cd … && … 2>&1 | tail`) is refused, so the deadlock is avoidable in practice.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1369. Astra routing sends a point the share switch then refuses to commission
   Queue position: end of Modell & Wächter.
   Source: findings carrier 17.10.2026 00:59: `node scripts/author-astra.mjs --routing --point 1367` answered astra (HIGH criticality), the SessionStart hook said hard and critical work goes straight to Astra, yet `author-astra.mjs --point 1367` exited 3 because astra-share at `default` keeps authoring with Claude. Every session pays one futile commission before falling back to Opus.
@@ -13932,12 +14082,6 @@ to land than a mechanism that needs a review.
   Also on WebGPU (measured 26.10.2026): "the empty jar is taken up from the plank" reds with a third cause — the jar is lifted 0.24-0.28 m off the plank before it is in his hand (plank-to-hand gap <= 0.009 m) — in the full runs on feat/1415 d3201e61c (logs local/verify-logs/2026-10-26T05-52-03-752 and 06-39-00-663) and on its merge-base d034d5550 (local/verify-baseline-logs/polish-villagers-baseline-d034d55502aa-run1.log); the same lift (0.24 m) and "his report points at the water he set down" with the aim 0.102 m off (14 held frames) reddened the full WebGL 2 run on feat/1415 (log local/verify-logs/2026-10-26T09-01-27-566). Charged to this point on both backends.
   Also on WebGPU (measured 26.10.2026): "his report points at the water he set down" red with 9 held frames and the aim 0.137 m off (bound 0.1) in the section run on feat/1417 9bb6e1736, whose diff touches only the fishery (log local/verify-logs/2026-10-26T17-10-17-924-polish-villagers.log); the aim charge now covers both backends.
   Bundle: Dorfleben.
-
-- [ ] 1447. Every settlement visit leaves its render pipelines and heap behind
-  Final state: leaving a place releases what it built: after entering and leaving N different villages the renderer's cached pipeline count (`renderer._pipelines.caches.size`), the JS heap and Chrome's GPU-process memory return to a bounded level instead of growing with N (the cause named: which materials/objects outlive their place); a dev invariant or browser check pins the bound; the villager-dress fresh-page staging of point 1446 (`DRESS_REBOOT_EVERY`) may then be lifted.
-  Observed problem: `polish-villagers --section=villager-dress` on feat/1446 6e1622764, 25.10.2026 05:51-05:58 UTC, 22 villages visited in turn (`gpu-load` rows in local/verify-measure/villager-dress.jsonl): pipelines 64 -> 993 (~40 per village, never falling), JS heap 286 -> 1709 MB, renderer-tracked textures 56 -> 156; Chrome's `--type=gpu-process` RSS 0.4 -> 9.7 GB at ~1.35 GB per minute (host has 15 GB). In the full suite the earlier sections add to it and the GPU process was lost around the 16th village (point 1446). A player who travels village to village grows the same load without bound.
-  Source: measurement of point 1446, 25.10.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 285 (accumulation and leak hunt).
-  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1449. Two unowned calf-in-river reds in the enrichments suite on WebGPU
   Final state: `npm test -- enrichments --section=calf-crossing-flee` and `--section=calf-shield-river` are green on WebGPU on a quiet machine, or each red is charged to its owning open point with the cause named: "the calf inside the traveller shy ring flees, into the river where its escape leads, its swim never taken for a fall-in" (measured `fallIn: true` at t 5.05 s, `chaseSwim: false`, `bouted: false`) and "a calf that swims the river ahead of its shield reaches the far bank and the hunt gives up (calf-in-water)" (measured: parent killed in the water at frame 34, the lion feeds and leaves, the calf alive on the savanna bank — the shield-ahead swim never staged). The stale charge of "every predator fits the region and period" to point 1013 is removed (it passed). The WebGL 2 run of both sections is recorded.
@@ -14110,16 +14254,6 @@ to land than a mechanism that needs a review.
   Criticality: high - a possible false approval to replace a working agent (CLAUDE.md §2 intake).
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 1488. Villager clothing: one fix per listed defect, one final picture check (user order 05.11.2026; amends the working method of 1482 under 1487)
-  The 24-hour budget of 1487 did not limit precision: since 04.11 17:00, 34 of 57 main commits were bookkeeping ("Record the picture judgement / delegation / withdraw verdict ..."); the child hip cloth alone took nine commits on 05.11 morning. A time box cuts the list, it does not cut the per-candidate ritual. Replace the method of 1482:
-  1. Each defect on 1482's frozen list gets exactly ONE fix. All fixes land on the one branch; no picture judgement between them.
-  2. ONE final picture check at game distance, by eye, both backends: does it look right to a player, and is coverage met (see the companion request "No sensitive body part exposed from any view or pose" - its views and poses are part of this check).
-  3. A fix that fails that check is not iterated: it is reverted, the old state stays, the defect goes to docs/backlog.md. Exception: any coverage/exposure failure is never reverted to an exposing state; it keeps getting fixed until it holds.
-  4. No intermediate status/record commits on main; one closing commit with the result per defect.
-  5. 1341 is dropped (closed as cancelled). After 1482 clothing is done; 1379 stays only as its own later point.
-  Add as the FIRST item of 1482's frozen list: the kneeling Bambara woman whose white breast cloth stands off the torso as a stiff ring, so the overhead camera looks into it and the breast is bare. Evidence: /backup/hoa/local/BlosseBrueste.zip (seed 1768195175, place bambara-village, x/z -59.45/-130.99, webgpu, build 39e8ab8; user text "Man kann Frauen in den BH schauen.").
-  Bundle: Dorfleben.
-
 - [ ] 1493. The tag catcher's hand misses the caught child in the full WebGPU polish-children run under load
   Final state: the full WebGPU polish-children run is free of the tag-catch red "at the catch frame the catcher's drawn hand is ON the caught child" (hand-right 9.0 cm off the trunk, hand radius 3.2 cm, catcher 1 -> caught 3) on a quiet machine, or it is traced to a named cause (fixture timing or product) and fixed. Its charge in scripts/render-verify-charges.mjs dies with this point. It also owns the tag-catch red "inside the prepare window one of the catcher's hands is held readied in front while the other keeps swinging" (WebGPU, a17e2f8e1, 09.11.2026 06:38; readied left sweep 0.074 / free right sweep 0.208, NOT HELD in a window from 2.30 m), charged there too.
   Observed problem: full WebGPU polish-children+report run on feat/680-place-life-dump a75df90ca, 09.11.2026 (log local/verify-logs/2026-11-09T12-08-14-648-polish-children-report.log), quiet-machine check "MACHINE NOT QUIET (busy)". The same head ran --section=tag-catch alone (log 2026-11-09T12-53-10-287), GREEN. Point 680 only adds a read-on-dump callback, so the red is owned by no point. The run's two bank-game reds belong to 1268 and 1470.
@@ -14171,14 +14305,6 @@ to land than a mechanism that needs a review.
   Measured again 13.11.2026: the whole enrichments pass on feat/1508-covering-enrichments 18d2abc41 ran all three checks green on WebGPU (log 2026-11-13T14-07-33-209) and WebGL 2 (log 2026-11-13T14-34-07-098); their charge was struck. The section run above stays the open evidence.
   Bundle: Tierverhalten.
 
-- [ ] 1516. The hint toast sits inside the status bar over the heading text during play
-  Measured 13.11.2026 in the covering enrichments run (both backends, feat/1508-covering-enrichments 18d2abc41): verification/131-burning-grass.png and verification/327-vulture-cluster-one-flock.png show the canoe hint toast at y≈16 inside the status bar, drawn over the compass heading text so it reads 'Westcanoe…' / 'Eastcanoe…'. docs/backlog.md (20.10.2026, victory frame) held this until an in-play frame showed it; these two do.
-  Player impact: while the toast stands, neither the heading nor the hint is readable.
-  Final state: an in-play hint toast never overlaps the status bar's text; it sits below the bar as on verification/04-chief-hut-meeting.png.
-  Test: a Playwright layout check that the toast's box does not intersect the status bar's box with a hint raised in play, picture-checked on both backends.
-  Source: finding of the 1508 session, 13.11.2026 15:34.
-  Bundle: Steuerung & Performance.
-
 - [ ] 1517. The fleeing adult at the reported Niger bank sometimes flips its heading once
   Measured 13.11.2026 (covering enrichments run for point 328 on main 2876db78a, WebGPU, log local/verify-logs/2026-11-13T19-18-53-221-enrichments.log): 'at the reported bank the fleeing adult enters the water once, flees once, never as a fall-in, and never flips or zigzags its heading' failed with flips 1, restarts 1, entries 1, the flip at d 1.84 around t 5.3 s with the lion idle. The section alone on the same sha passed 5/5 directly after — intermittent.
   Player impact: a fleeing animal at a river bank visibly turns back once mid-flight.
@@ -14196,23 +14322,6 @@ to land than a mechanism that needs a review.
   Source: user request f7555192, 14.11.2026.
   Bundle: unbundled.
 
-- [ ] 1520. Render targets leak across rebuilds at travel|medium since the solar sun landed
-  Measured 14.11.2026 (full WebGPU enrichments on main 33db311fd, log local/verify-logs/2026-11-14T06-43-15-751-enrichments.log): 8x [ASSERT] render-resource-leak at travel|medium|traa/-/bloom/sun/fire/band, renderTargets 45 -> 58/68/72/365/370, then place:cairo 365 -> 395. The same leak shows on feat/344 b9082f151 (log 2026-11-14T05-34-10-777, 46 -> 397). Absent in the last full main run f7f328b10 (13.11.2026, before point 343 landed); every section involved is green alone.
-  Player impact: GPU memory grows across pipeline rebuilds in a long session.
-  Final state: a rebuild at travel|medium disposes what it replaces; renderTargets stay within the +2 allowance across the full enrichments run.
-  Test: a full WebGPU enrichments run (VERIFY_SUITE_TIMEOUT_MS=5400000) without render-resource-leak asserts, plus a Vitest case for the disposal if the cause lies in browserless pipeline code.
-  Source: finding of the 344 session, 14.11.2026 07:35.
-  Remeasured 15.11.2026: `npm test -- settings --section=render-leak-watch` reds identically on main dcf4949c7 and feat/357 6a1071735 (travel|medium|traa/-/bloom/sun/fire/band 25 -> 29, +4, allowed +2), so the settings leak watch shows the same leak.
-  Bundle: Sonne & Himmel.
-
-- [ ] 1521. The San village is built of Zulu-style beehive huts
-  Seen 14.11.2026 on the point-348 fire-rain frame 348-san-flame-on-hearth-rain (WebGPU, feat/348 d1805cbbb): the San village shows large thatched beehive huts with doorways and a Market Hut and Chief's Hut in a ring like the Zulu village, while design.md §2.6/§4.5 give each people its own period organising principle (dispersed camps without lanes) and the San journal entry itself speaks of "shelters of bent grass".
-  Player impact: a people's settlement shows another people's architecture.
-  Final state: the San village is built from the dwellings and arrangement docs/peoples-1890.md records for the San around 1890; if that record is silent, it gains the evidence first.
-  Test: a Vitest sweep that the San layout uses its own dwelling type and plan, plus one first-person frame of the San village.
-  Source: finding of the 348 session, 14.11.2026 18:43.
-  Bundle: Siedlungsgeometrie.
-
 - [ ] 1522. Settings suite: animal proximity call stays silent and ?quality=HIGH never builds the scene
   Measured 15.11.2026 on a quiet machine, WebGPU, identically on main dcf4949c7 and feat/357 6a1071735: `npm test -- settings --section=animal-calls` fails "a nearby animal raises its proximity call" with every level 0 ({"started":true,"baseline":0,"near":0,"prox":0,...}); `--section=quality-url` fails "?quality=HIGH opens at high on the first frame" because the scene reports triangles 0 / built false after 120 s, although level and shadows read high.
   Player impact: a nearby animal may make no sound; a session opened with ?quality=HIGH may never show its world.
@@ -14220,7 +14329,6 @@ to land than a mechanism that needs a review.
   Test: the two named settings sections green on WebGPU, plus a Vitest case for the cause if it lies in browserless code.
   Source: classification of the settings reds of the 357 session, 15.11.2026.
   Bundle: unbundled.
-
 
 - [ ] 1525. The full polish-settlement suite hangs on WebGPU
   Measured 15.11.2026: `VERIFY_GL=webgpu node scripts/verify/run-all.mjs polish-settlement` on main 7e60e49 (21:31-22:16) was killed by the 45-min wall timeout; it was started bare, so the hanging section is unknown. The preceding WebGL 2 run on feat/358 da7219770 lost its device (0 draw calls in 8 frames). Points 358 and 359 therefore landed on section runs only (359: `--section=kraal-cattle` green on both backends at fecd77446); the render-verify guard has no covering full run since.
@@ -14230,14 +14338,6 @@ to land than a mechanism that needs a review.
   Source: finding of the 358 session, 15.11.2026 21:16; restated at the 359 landing.
   Measured 16.11.2026 on feat/384 9e30eb37d (WebGPU, logged): one run KILLED at 45m07s with 35 frames while still writing (kraal-cattle: 359-zulu-kraal-1890 at 21:06, -1893 at 21:16); the re-run with VERIFY_SUITE_TIMEOUT_MS=7200000 wrote its last frame 356-inhabitant-glance at 21:43 and then nothing for 35 min with a 4 GB Chrome renderer — the hang sits at the start of `fire-smoke` (after `inhabitants-glance`); killed by hand. Logs local/verify-logs/2026-11-16T19-31-52-913- and 2026-11-16T20-18-07-151-polish-settlement.log.
   Bundle: Testinfrastruktur.
-
-- [ ] 1526. Kraal cattle read as antelope
-  Seen 15.11.2026 on the point-359 frames 359-zulu-kraal-1890/1893 (WebGPU and WebGL 2, main e56c8f28c): several cattle carry long, straight, upright horns and a narrow head; they read as oryx or eland rather than Sanga/Nguni cattle (lyre-curved horns, broad head, hump). The Zulu pen's east side also shows an open stretch where a cow stands at the edge.
-  Player impact: a village herd looks like wild antelope standing in a pen.
-  Final state: the cattle in `src/render/cattle.ts` show curved horns, a broad head and a hump per the breeds docs/peoples-1890.md names; the pen reads closed or shows a deliberate gate.
-  Test: a Vitest case on the cattle geometry parameters, plus the kraal-cattle frames of polish-settlement on both backends.
-  Source: picture check of the 359 session, 15.11.2026 21:34.
-  Bundle: Dorfleben.
 
 - [ ] 1528. WebGL 2: a driven-off crossing pair is not on a bank at the crossing deadline
   Measured 16.11.2026: `VERIFY_GL=webgl npm test -- wildlife` on main 36e83d5: 5 pass, 2 fail — "every ending resolves on a bank within the crossing deadline" and "the forced drive-off leaves parent and calf alive, both on a bank" fail with survivorsOnBank=false, survivors=2, parentAlive=true; WebGPU at the same HEAD 7/7 green. Likely a frame-rate dependent return or landing in point 362's channel return.
@@ -14263,6 +14363,7 @@ to land than a mechanism that needs a review.
   Also: where the near backdrop hill crosses the far hill, the overlap edge reads as a stair-stepped dark silhouette line (verification/1532-backdrop-backlit.png, x~720-850 y~400-465, both backends); geometry/silhouette aliasing, not rock noise. Measure and fix it in the same pass.
   Source: point 1532 side finding, user report 16.11.2026.
   Bundle: Siedlungsgeometrie.
+
 - [ ] 1537. Frame 130-crocodile-lunge shows no crocodile on either backend
   Defect: after the crocodile staging rebuild (point 336) the enrichments frame `130-crocodile-lunge`
   aims at calfAt, but at the shutter no crocodile is visible: canoe and two giraffes on the bank, no

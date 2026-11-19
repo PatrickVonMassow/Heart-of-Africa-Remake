@@ -38025,3 +38025,71 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   its radius; test via `window.__ui.setState({ ssaoEnabled: false })` at the shutter.
   Refs: verification/687-bank-play-rocks.png
   Bundle: Siedlungsgeometrie.
+
+- [x] 1552. Fix the cause of the shadows-off GPU inversion
+  Split from 1549 (main session 19.11.2026, for veto). Observed in the user benchmark "Lenovo
+  GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the GPU
+  median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and triangles
+  fall. The batch host has no WebGPU timestamp query, so the cause can only be read from a fresh F8 run
+  on the user's notebook with the per-pass breakdown of 1549. WAITS FOR that report from the user.
+  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
+  Final state: with the pass the breakdown names, the cause is fixed in the product code, or — if it is
+  a measurement artefact — in the benchmark, so `shadows-off` prices only the shadows and its GPU median
+  is <= baseline in savanna-standing, desert-standing and savanna-driving on the user's notebook.
+  Test: Vitest for the changed logic; Playwright benchmark suite on WebGPU; the user's notebook report.
+  Criticality: high (inherited from priority point 1549).
+  Source: 1549 split, 19.11.2026.
+  Bundle: Steuerung & Performance.
+  CLOSED 19.11.2026 as not reproducible (user request "Close 1552 as not reproducible (shadows-off inversion was a measurement artefact)"):
+  Close work-order point 1552 ("Fix the cause of the shadows-off GPU inversion") as not reproducible: measurement artefact of the earlier run, no product or benchmark change.
+
+  Evidence: user benchmark "hoa-bench-2026-11-18-webgpu-dritter-Durchlauf.json" (run 2026-11-19T18:41Z, webgpu, AMD RDNA-3 notebook, 1536x960 @ dpr 1.25, build f24ce38 — same device and resolution as the reference "Lenovo GIP-Notebook (neu).json", build c8f3995).
+
+  GPU median baseline -> shadows-off:
+  - savanna-standing 26.41 -> 25.17 ms (ShadowMap#2 pass 1.70 ms)
+  - desert-standing 32.31 -> 32.05 ms (ShadowMap#2 pass 0.19 ms)
+  - savanna-driving 31.46 -> 30.34 ms (ShadowMap#2 pass 1.60 ms)
+
+  The point's final-state condition (shadows-off GPU median <= baseline in all three phases, shadows-off prices only the shadows) holds; the saving matches the ShadowMap pass. Between c8f3995 and f24ce38 no travel shadow code changed (only the 1549 per-pass measurement and 1164, which is place-scene only), so the earlier 25.9 -> 36.0 ms inversion is attributed to the old measurement run.
+  Source: user request of 19.11.2026 18:59 UTC via the findings carrier (session unknown).
+
+- [x] 1361. decision-card-guard deadlocks a non-owner session's Stop by demanding a vdzk-keep the ownership guard refuses
+  Queue position: end of Session- & Repo-Hygiene.
+  Source: findings carrier 16.10.2026 09:02: session 1624ee5d (not batch owner; owner 36861bc0): Stop hook decision-card-guard demanded 'board.mjs vdzk-keep "Batchelor: Batch-Infrastruktur als eigenes Projekt abspalten"' for user message 29bbe2bf (a board-chat test log, no decision); the PreToolUse batch-ownership stand-down refused that command, and the guard fired twice in a row. scripts/decision-card-guard.mjs computes heldByOtherLiveOwner but still demands the keep (the carry path of e65219245).
+  Final state: for a session not holding the batch lock, decision-card-guard never demands an action the ownership stand-down refuses (it stands down, or carries the answer to the owner without a keep demand); the card stays open.
+  Verifiable: Vitest reproducing a non-owner Stop with an open card and a non-decision user message: no blocking demand.
+  Also (findings carrier 16.10.2026 22:14, session 7850716a): the bare `node scripts/board.mjs vdzk-keep …` passes the stand-down (isVdzkKeepSegment); only a wrapped call (`cd … && … 2>&1 | tail`) is refused, so the deadlock is avoidable in practice.
+  Bundle: Session- & Repo-Hygiene.
+  Closed 19.11.2026 by the user-approved reorder 1557: moved to docs/backlog.md (the bare command is a working path; no real blockade).
+
+- [x] 1557. Reorder the work-order front: render stops and leaks forward, HUD/Cairo/plausibility behind the game front, 1013/1361 out
+  Reorder the front of the work order (user-approved 19.11.2026, 20:42; proposal reviewed by GPT-6.2 Sol and re-checked by Opus 5.5).
+
+  Final state of the work order (open points, top to bottom):
+
+  1-3. 1556, 1554, 1543 — unchanged (user-placed 19.11.2026).
+  4. 1555 — scratchpad write for non-owner sessions. Sol's caveat: allow the session's OWN scratchpad, do not widen to every path outside the main tree without evidence.
+  5. 1495 — continent zoom stops drawing, TypeError every frame (from position 24).
+  6. 1520 — render targets leak across rebuilds (alone, NOT coupled with 1447; no shared cause proven).
+  7. 507 — lost WebGPU device ends the run quietly and black.
+  8. 1290 — WebGL 2 lion feeding scene shows neither lion nor prey (from position 11).
+  9. 1447 — settlement visit leaks pipelines/heap; first step: reproduce under normal travel (so far only measured in the dress harness at 6e1622764).
+  10. 1144 — MEASUREMENT HALF ONLY first (does a walker-radius player actually get shut in?). The fix moves forward only if entrapment is confirmed; otherwise it keeps its criticality "medium".
+  11-31. The existing game front (1169, 1205, 1227, 1229, 1269, 1264, 1265, 1309, 1395, 1396, 1422, 1423, 1425, 1427, 1457, 1458, 1473, 1492, 1494, 1496, 1499) in its current relative order.
+  32. 1215, then 1516 + 551 consolidated into one point (duplicate symptom: canoe hint colliding with status-bar text; resolve their conflicting remedies against criterion 9). 1215 stays separate.
+  33. 1488 — user clothing order of 05.11.2026 (still live: d94fe7672 on 08.11 closed another point because of it). First check whether 1482's frozen defect list is still open.
+  34. 1221 + 1220 — one shared Cairo start verification pass, separate disposition (1221 may be a 1 FPS shutter artefact).
+  35. 519 — handwriting fonts (downgraded from the player-blocking group: measured on one Linux host, falls back to plain text).
+  36-38. 1521, 1526, 415 — 1890 plausibility, in this order.
+  39+. Everything else in its current relative order (205, 1436, ...).
+
+  Dispositions outside the front:
+  - 1013 (cheetah in central Africa): close as delivered by archived point 1063 (d0a27cfc3 notes 1063 carries the start-region fix) after one confirming run; otherwise keep as a verification-only item.
+  - 1062: stays where it is (user rank of 07.09.2026: behind 174, end of the order).
+  - 1361: move to docs/backlog.md (bare command is a working path; no real blockade).
+  - 1059, 1328, 1289: stay in place; re-check reproduction once; whatever still reproduces as a real blockade moves directly behind 1555. 1328 and 1289 partly overlap (post-release Stop failure) — consolidate that shared part if reproduced.
+
+  Open and NOT part of this order (needs a separate user decision): point 1463 has no line in TASKS.md or the archive (stale branch since 01.11.2026, holds a pool slot); 1474 is its orphaned amendment. Sol also notes the pre-freeze infrastructure block from position ~27 holds its rank only by age and should be reviewed against the CLAUDE.md §2 freeze — that review is tied to the 1463 decision.
+  Source: user request of 19.11.2026 19:43 UTC via the findings carrier (session unknown).
+  Bundle: Session- & Repo-Hygiene.
+  Closed 19.11.2026 on main as a queue-only point (precedent 1258): front reordered in b42e20e6d, measurement dispositions split into 1560, 1361 moved to docs/backlog.md.
