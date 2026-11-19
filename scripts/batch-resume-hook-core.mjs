@@ -209,9 +209,11 @@ export function standDownMessage({
         '(scripts/chat-watcher.mjs) woke you for ONE message from the user and holds a bounded claim on ' +
         'the batch for your lifetime, which is why you do not and must not own .claude/batch-lock.json. ' +
         'YOU MAY: answer the message with `node scripts/chat-reply.mjs "…"` — always answer, even if only ' +
-        'to confirm — and, if the message is an INSTRUCTION rather than a question, append it as one new ' +
+        'to confirm — and, if the message is an EXPLICIT ORDER (do X / close Y / delete Z), append it as one new ' +
         'implementation-ready point at the END of TASKS.md on main (append-and-defer, one atomic commit, ' +
-        'then push) and name its number in the reply. That edit of TASKS.md is your duty here, not a ' +
+        'then push) and name its number in the reply. A DISCUSSED PROBLEM (the user describes or asks about ' +
+        'something) is not queued: propose a solution in the reply; it is queued only after the user\'s OK in a ' +
+        'later message. That edit of TASKS.md is your duty here, not a ' +
         'violation of the main-only rule: appending on main IS the rule. ' +
         'YOU MAY NOT: work the queue, start or continue a point, merge anything, run a regression, ' +
         'delegate, touch the dashboard, or take the batch lock. Do not read the work order, design.md or ' +

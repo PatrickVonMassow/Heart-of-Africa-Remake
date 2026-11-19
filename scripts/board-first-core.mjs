@@ -289,6 +289,9 @@ export function ownershipStandDownDecision({
         'reads remain available so you can inspect and report the state. The current owner continues the batch.\n' +
         `ONE WRITE PATH STAYS OPEN: your session scratchpad ${pad} — the Write tool with an absolute path there, ` +
         "or one `cd <scratchpad> && cat > <file> <<'EOF'` call; the repository stays refused.\n" +
+        'An explicit user order (do X / close Y / delete Z) is deposited; a problem the user only describes or ' +
+        'asks about gets a proposed solution in your reply and is deposited only after the user\'s OK in a ' +
+        'later message.\n' +
         'To hand the user\'s request or a finding to the owner, use the carrier: write the spec and why into ' +
         'scratchpad files with the Write tool, then run ONE plain line ' +
         '`node scripts/finding.mjs --request "<title>" --spec-file <spec path> --why-file <why path> --session <this session id> --approved "<user words>"` ' +

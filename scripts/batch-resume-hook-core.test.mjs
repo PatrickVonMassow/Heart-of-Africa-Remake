@@ -114,6 +114,13 @@ describe('the RESPONDER message — the fix for the silent instruction loss', ()
     expect(text).not.toMatch(/do NOT edit TASKS\.md/)
   })
 
+  // User decision 18.11.2026: only an explicit order is queued; a discussed
+  // problem is proposed and waits for the user's OK.
+  it('queues an explicit order and only proposes for a discussed problem', () => {
+    expect(text).toMatch(/EXPLICIT ORDER/)
+    expect(text).toMatch(/DISCUSSED PROBLEM[^.]*is not queued/)
+  })
+
   it('makes the reply obligatory — it is also the receipt the ack needs', () => {
     expect(text).toContain('chat-reply.mjs')
     expect(text).toMatch(/always answer/)

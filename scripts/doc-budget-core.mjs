@@ -105,8 +105,11 @@ export const DOC_BUDGETS = [
     // point may be.
     // LOWERED to the 29.09.2026 four-eyes cut list (docs/context-cut-list-1209.md):
     // 205 / 1468 became 197 / 1328; no rule dropped, §7.1 titles stay (tests pin them).
-    maxLines: 197,
-    maxWords: 1328,
+    // RAISED by the 2 lines / 27 measured words of the §6 chat rule (user decision
+    // 18.11.2026): queue an explicit order, only propose for a discussed problem;
+    // the user asked for it in CLAUDE.md so it no longer lives only in memory.
+    maxLines: 199,
+    maxWords: 1355,
     // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
     // every session and every subagent, so twenty words is the whole licence between
     // one cut and the next. A larger edit than that lowers the ceiling with it.
