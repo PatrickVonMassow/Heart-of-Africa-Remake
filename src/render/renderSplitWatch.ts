@@ -60,7 +60,8 @@ interface AttrLike {
 export function uploadBytes(attr: AttrLike): number {
   const a = attr.data ?? attr
   const arr = a.array
-  const bpe = arr && 'BYTES_PER_ELEMENT' in arr ? (arr as unknown as { BYTES_PER_ELEMENT: number }).BYTES_PER_ELEMENT : 4
+  const bpe =
+    arr && 'BYTES_PER_ELEMENT' in arr ? (arr as unknown as { BYTES_PER_ELEMENT: number }).BYTES_PER_ELEMENT : 4
   const ranges = a.updateRanges ?? []
   if (ranges.length > 0) return ranges.reduce((n, r) => n + r.count * bpe, 0)
   return arr?.byteLength ?? 0
@@ -100,8 +101,45 @@ export function watchRenderSplit(renderer: unknown): () => void {
   // Exclusive timing: each frame on the stack subtracts its children.
   const childMs: number[] = []
   let mainScene: Obj3 | null = null
+  // Attribute uploads by owner and size (round 4: the real-GPU plateau is
+  // writeBuffer time). Large ones are named: 'gpu:upload <owner> <MB>'.
+  let uploadsArmed = false
+  const armUploads = (): void => {
+    const utils = (
+      renderer as {
+        backend?: {
+          attributeUtils?: { updateAttribute?: (a: AttrLike) => void }
+        }
+      }
+    ).backend?.attributeUtils
+    const update = utils?.updateAttribute
+    if (!utils || typeof update !== 'function') return
+    uploadsArmed = true
+    {
+      const wrappedUpdate = function (this: unknown, attr: AttrLike): void {
+        const bytes = uploadBytes(attr)
+        const t0 = performance.now()
+        try {
+          update.call(this, attr)
+        } finally {
+          const ms = performance.now() - t0
+          const key =
+            bytes >= NAMED_UPLOAD_BYTES
+              ? `gpu:upload ${uploadOwner(mainScene, (attr.data ?? attr).array)} ${(bytes / 1e6).toFixed(2)}MB`
+              : 'gpu:upload small'
+          markFrameWork(key as FrameSystem, ms)
+        }
+      }
+      utils.updateAttribute = wrappedUpdate
+      restore.push(() => {
+        if (utils.updateAttribute === wrappedUpdate) utils.updateAttribute = update
+      })
+    }
+  }
   const wrapped = function (this: RendererLike, scene: unknown, camera: unknown): unknown {
     if ((scene as { isScene?: boolean }).isScene) mainScene = scene as Obj3
+    // The backend's attribute utils exist only after its async init.
+    if (!uploadsArmed) armUploads()
     const t0 = performance.now()
     childMs.push(0)
     try {
@@ -117,31 +155,6 @@ export function watchRenderSplit(renderer: unknown): () => void {
   restore.push(() => {
     if (r.render === wrapped) r.render = original
   })
-  // Attribute uploads by owner and size (round 4: the real-GPU plateau is
-  // writeBuffer time). Large ones are named: 'gpu:upload <owner> <MB>'.
-  const utils = (renderer as { backend?: { attributeUtils?: { updateAttribute?: (a: AttrLike) => void } } }).backend
-    ?.attributeUtils
-  const update = utils?.updateAttribute
-  if (utils && typeof update === 'function') {
-    const wrappedUpdate = function (this: unknown, attr: AttrLike): void {
-      const bytes = uploadBytes(attr)
-      const t0 = performance.now()
-      try {
-        update.call(this, attr)
-      } finally {
-        const ms = performance.now() - t0
-        const key =
-          bytes >= NAMED_UPLOAD_BYTES
-            ? `gpu:upload ${uploadOwner(mainScene, (attr.data ?? attr).array)} ${(bytes / 1e6).toFixed(2)}MB`
-            : 'gpu:upload small'
-        markFrameWork(key as FrameSystem, ms)
-      }
-    }
-    utils.updateAttribute = wrappedUpdate
-    restore.push(() => {
-      if (utils.updateAttribute === wrappedUpdate) utils.updateAttribute = update
-    })
-  }
   const g = globalThis as unknown as Record<string, { prototype?: Proto } | undefined>
   wrapProto(g.GPUCanvasContext?.prototype, 'getCurrentTexture', 'gpu:get-texture', restore)
   wrapProto(g.GPUQueue?.prototype, 'submit', 'gpu:submit', restore)
