@@ -35,7 +35,9 @@ export interface BenchPassSample {
 /** One pass aggregated over a row's measured frames. */
 export interface BenchGpuPass {
   pass: string
-  /** Mean pass order over the frames it ran in (the report sorts by it). */
+  /** 1-based rank in the row's consensus submission order (the report sorts
+   *  by it): a pass precedes another when it was submitted first in most of
+   *  the frames both ran in; see aggregatePasses. */
   order: number
   /** Measured frames the pass ran in (an intermittent pass runs in fewer). */
   frames: number
@@ -200,11 +202,19 @@ function median(values: number[]): number {
 }
 
 /**
- * Aggregate a row's measured frames into one entry per pass, sorted by the
- * mean pass order (ties by name). Empty input → empty list.
+ * Aggregate a row's measured frames into one entry per pass, in CONSENSUS
+ * submission order. Positions are only comparable within one frame: averaging
+ * them over frames where an intermittent pass is missing can invert two passes
+ * that always ran in the same order together. So a pass precedes another when
+ * it came first in most frames both ran in; passes are emitted in that
+ * precedence (Kahn's order), ties and passes that never met by mean position,
+ * then name. A precedence cycle (unequal frame orders) is broken at the pass
+ * with the lowest mean position. Empty input → empty list.
  */
 export function aggregatePasses(frames: readonly (readonly BenchPassSample[])[]): BenchGpuPass[] {
   const byPass = new Map<string, { ms: number[]; calls: number[] }>()
+  // before.get(a).get(b): frames in which a was submitted before b.
+  const before = new Map<string, Map<string, number>>()
   for (const frame of frames) {
     for (const s of frame) {
       const e = byPass.get(s.pass) ?? { ms: [], calls: [] }
@@ -212,29 +222,57 @@ export function aggregatePasses(frames: readonly (readonly BenchPassSample[])[])
       e.calls.push(s.call)
       byPass.set(s.pass, e)
     }
+    for (const a of frame) {
+      for (const b of frame) {
+        if (a.call >= b.call) continue
+        const m = before.get(a.pass) ?? new Map<string, number>()
+        m.set(b.pass, (m.get(b.pass) ?? 0) + 1)
+        before.set(a.pass, m)
+      }
+    }
+  }
+  const meanPos = (pass: string): number => {
+    const calls = byPass.get(pass)!.calls
+    return calls.reduce((a, b) => a + b, 0) / calls.length
+  }
+  const wins = (a: string, b: string): boolean => (before.get(a)?.get(b) ?? 0) > (before.get(b)?.get(a) ?? 0)
+  const byPosition = (a: string, b: string): number => meanPos(a) - meanPos(b) || a.localeCompare(b)
+  const remaining = new Set(byPass.keys())
+  const ordered: string[] = []
+  while (remaining.size > 0) {
+    const pool = [...remaining]
+    const free = pool.filter((p) => !pool.some((q) => q !== p && wins(q, p)))
+    const next = (free.length > 0 ? free : pool).sort(byPosition)[0]
+    ordered.push(next)
+    remaining.delete(next)
   }
   const n = frames.length
-  return [...byPass.entries()]
-    .map(([pass, e]) => ({
+  return ordered.map((pass, i) => {
+    const e = byPass.get(pass)!
+    return {
       pass,
-      order: e.calls.reduce((a, b) => a + b, 0) / e.calls.length,
+      order: i + 1,
       frames: e.ms.length,
       median: median(e.ms),
       mean: n > 0 ? e.ms.reduce((a, b) => a + b, 0) / n : 0,
-    }))
-    .sort((a, b) => a.order - b.order || a.pass.localeCompare(b.pass))
+    }
+  })
 }
 
 /** A row's breakdown: the measured frames it covers and its passes. */
 export interface BenchGpuPassBreakdown {
   /** Measured frames whose passes were resolved (the mean's denominator). */
   frames: number
+  /** Measured frames that resolved a GPU total but no single pass — a broken
+   *  capture, kept visible instead of silently lowering every mean. */
+  emptyFrames: number
   passes: BenchGpuPass[]
 }
 
 /** Build a row's breakdown from its measured frames; null without frames. */
 export function passBreakdown(frames: readonly (readonly BenchPassSample[])[]): BenchGpuPassBreakdown | null {
-  return frames.length === 0 ? null : { frames: frames.length, passes: aggregatePasses(frames) }
+  if (frames.length === 0) return null
+  return { frames: frames.length, emptyFrames: frames.filter((f) => f.length === 0).length, passes: aggregatePasses(frames) }
 }
 
 /** Report-level availability of the breakdown — flagged, never faked. */
@@ -269,7 +307,8 @@ export function gpuPassSummaryLines(timing: BenchGpuPassTiming | undefined, rows
   for (const r of rows) {
     const b = r.gpuPasses
     const body = b && b.passes.length > 0 ? b.passes.map((p) => formatPass(p, b.frames)).join(' | ') : 'n/a'
-    lines.push(`  ${r.config} / ${r.phase}: ${body}`)
+    const empty = b && b.emptyFrames > 0 ? ` — ${b.emptyFrames}/${b.frames} frames without passes` : ''
+    lines.push(`  ${r.config} / ${r.phase}: ${body}${empty}`)
   }
   return lines
 }

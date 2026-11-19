@@ -124,11 +124,52 @@ describe('per-row aggregation', () => {
     expect(shadow.mean + output.mean).toBeCloseTo(frameMeans)
   })
 
+  it('keeps the order two passes always ran in, however often one of them skipped', () => {
+    // The reviewer's case: the shadow at position 3 before output at 4 in one
+    // frame, output alone at position 1 in three more. A mean position would
+    // put output (1.75) before the shadow (3).
+    const passes = aggregatePasses([
+      [
+        { pass: 'TRAANode.resolve', call: 1, ms: 1 },
+        { pass: 'GTAONode.AO', call: 2, ms: 1 },
+        { pass: 'ShadowMap', call: 3, ms: 2 },
+        { pass: 'output', call: 4, ms: 10 },
+      ],
+      [{ pass: 'output', call: 1, ms: 10 }],
+      [{ pass: 'output', call: 1, ms: 10 }],
+      [{ pass: 'output', call: 1, ms: 10 }],
+    ])
+    expect(passes.map((p) => p.pass)).toEqual(['TRAANode.resolve', 'GTAONode.AO', 'ShadowMap', 'output'])
+    expect(passes.map((p) => p.order)).toEqual([1, 2, 3, 4])
+  })
+
+  it('follows the majority of the frames two passes shared and survives a precedence cycle', () => {
+    const ab = (a: string, b: string): BenchPassSample[] => [
+      { pass: a, call: 1, ms: 1 },
+      { pass: b, call: 2, ms: 1 },
+    ]
+    expect(aggregatePasses([ab('x', 'y'), ab('x', 'y'), ab('y', 'x')]).map((p) => p.pass)).toEqual(['x', 'y'])
+    // x<y, y<z, z<x: no pass is free, the cycle breaks at the lowest mean position.
+    const cycle = aggregatePasses([ab('x', 'y'), ab('y', 'z'), ab('z', 'x')])
+    expect(cycle.map((p) => p.pass).sort()).toEqual(['x', 'y', 'z'])
+    expect(cycle.map((p) => p.order)).toEqual([1, 2, 3])
+  })
+
+  it('counts measured frames that resolved no pass at all', () => {
+    const b = passBreakdown([frame(2, 10), [], frame(null, 11)])
+    expect(b?.frames).toBe(3)
+    expect(b?.emptyFrames).toBe(1)
+    expect(gpuPassSummaryLines({ available: true, reason: '' }, [{ config: 'baseline', phase: 'desert-standing', gpuPasses: b }])[2]).toBe(
+      '  baseline / desert-standing: ShadowMap 0.67 (1/3) | output 7.00 (2/3) — 1/3 frames without passes',
+    )
+  })
+
   it('builds no breakdown without measured frames', () => {
     expect(aggregatePasses([])).toEqual([])
     expect(passBreakdown([])).toBeNull()
     expect(passBreakdown([frame(2, 10)])).toEqual({
       frames: 1,
+      emptyFrames: 0,
       passes: [
         { pass: 'ShadowMap', order: 1, frames: 1, median: 2, mean: 2 },
         { pass: 'output', order: 2, frames: 1, median: 10, mean: 10 },

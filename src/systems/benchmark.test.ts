@@ -559,6 +559,7 @@ describe('report shaping', () => {
     r.gpuPassTiming = { available: true, reason: '' }
     r.rows[0].gpuPasses = {
       frames: 2,
+      emptyFrames: 0,
       passes: [
         { pass: 'ShadowMap', order: 1, frames: 2, median: 2, mean: 2 },
         { pass: 'output', order: 2, frames: 2, median: 4.5, mean: 4.5 },
