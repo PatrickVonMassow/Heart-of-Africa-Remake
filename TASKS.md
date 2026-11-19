@@ -78,20 +78,6 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 
-- [ ] 1549. Record a per-pass GPU breakdown in the F8 benchmark report
-  Split from 1542 Part B (main-session decision 18.11.2026 21:47, for veto). Observed in the user benchmark
-  "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the
-  GPU median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and
-  triangles fall. Not reproducible on the batch host: it offers no WebGPU timestamp query.
-  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
-  Final state: the F8 benchmark report carries a per-pass GPU breakdown of the measured frame (the
-  WebGPUTimestampQueryPool timestamps per pass, in pass order), so a run on the user's notebook names the
-  pass that grows when shadows are off. Split 19.11.2026 (main session, for veto): the cause fix needs
-  that notebook run and moved to point 1552.
-  Test: Vitest for the breakdown's formatting and report rows; Playwright benchmark suite on WebGPU.
-  Source: 1542 session, 18.11.2026 21:47.
-  Bundle: Steuerung & Performance.
-
 - [ ] 1552. Fix the cause of the shadows-off GPU inversion
   Split from 1549 (main session 19.11.2026, for veto). Observed in the user benchmark "Lenovo
   GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the GPU

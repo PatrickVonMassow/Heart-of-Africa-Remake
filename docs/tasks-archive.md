@@ -37981,3 +37981,17 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Still open (record, do not build): a split without the `Split from <N>` line escapes; a settled child moved back later is not re-asked; `Criticality: high` also arms the four-eyes tick gate for the child; "front" = leading run is a stand-in while no release point is open; a torn record still fails open.
   Source: user request of 19.11.2026 10:02 UTC via the findings carrier (session 9a5eca75); queued at the front of the work order by user order 19.11.2026 11:02, directly behind 1550 which was already being landed.
   Bundle: Modell & Wächter.
+
+- [x] 1549. Record a per-pass GPU breakdown in the F8 benchmark report
+  Split from 1542 Part B (main-session decision 18.11.2026 21:47, for veto). Observed in the user benchmark
+  "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the
+  GPU median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and
+  triangles fall. Not reproducible on the batch host: it offers no WebGPU timestamp query.
+  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
+  Final state: the F8 benchmark report carries a per-pass GPU breakdown of the measured frame (the
+  WebGPUTimestampQueryPool timestamps per pass, in pass order), so a run on the user's notebook names the
+  pass that grows when shadows are off. Split 19.11.2026 (main session, for veto): the cause fix needs
+  that notebook run and moved to point 1552.
+  Test: Vitest for the breakdown's formatting and report rows; Playwright benchmark suite on WebGPU.
+  Source: 1542 session, 18.11.2026 21:47.
+  Bundle: Steuerung & Performance.
