@@ -124,3 +124,30 @@ Only max improved (142 → 63 ms). Conclusion: the headless drive above does not
 describe the F8 `cpu` number. Next step: attribute the F8 savanna-driving phase
 itself (fixed timestep, its own route) with the per-system probe running inside
 the F8 run, and make low not worse than before.
+
+## Round 2 — F8-phase attribution (in progress)
+
+What the F8 `cpu` number is (src/systems/benchmarkRun.ts, src/systems/benchmark.ts):
+per phase `resetWorld` (fixed seed/day, `debugJumpTo` the anchor), 80 settle
+frames (discarded) and 150 measured frames on the fixed 1/60 s clock at travel
+speed 5.6 — the measured drive covers only ~14 wu (less than one 24-wu chunk),
+and every config/preset pass repeats the same route from the same anchor after
+a jump from the desert phase. `cpuMs` = R3F before-effect → after-effect of each
+frame. p95 over 150 frames is the 8th-worst frame, so a handful of slow frames
+per phase decide it.
+
+Consequence: the headless free drive of round 1 (20 s, fresh ground, several
+crossings) measured a different workload. In the F8 phase the terrain window
+is largely cached from the earlier passes, so chunk building is unlikely to be
+the p95 owner there; the sliced builds instead add up to 3 ms to many frames
+while the prefetch queue drains, which fits the raised low median.
+
+Method now: a temporary DEV hook in `runPhase` stores, per measured phase, the
+F8 samples next to the probe's per-system split of the same frames
+(`window.__f8detail`), and the F8 run is driven headless (WebGPU) with
+`?bench=short` first, then full.
+
+Status: blocked on the headless F8 harness so far — a full headless F8 run did
+not finish within 28 min (the dev server choked on forwarded console warnings,
+~9.6 MB log); restarted with `--logLevel error`, short run in progress. No
+per-system split of the F8 phase yet.
