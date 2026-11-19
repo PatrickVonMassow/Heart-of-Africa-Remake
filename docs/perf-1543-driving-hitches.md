@@ -17,9 +17,9 @@ each frame carries its JS-heap drop (> 0: a GC ran inside it).
 selects the level): a spike is a frame above 2x the CPU median, owned by the
 system with the most booked ms in it.
 
-## Before — owner reference (real GPU)
+## Before — owner reference (owner WSL2 host — see Correction)
 
-F8 benchmark, WebGPU, 1536x960 @ dpr 1.25, build 7050a53, savanna-driving,
+F8 benchmark, owner WSL2 host, RTX 4070 Ti, WebGPU compat over GLES/D3D12 (relabelled, see Correction), 1536x960 @ dpr 1.25, build 7050a53, savanna-driving,
 CPU median / p95 (ms):
 
 | Preset | Median | p95 | p95 / median | Max |
@@ -108,10 +108,10 @@ frame instead of bursts); p95 and max fall.
 Caveat: headless numbers only. The acceptance number is the owner's F8
 benchmark on the real notebook (WebGPU, medium and high, savanna-driving).
 
-## Owner rejection (19.11.2026, real GPU)
+## Owner rejection (19.11.2026, owner WSL2 host — see Correction)
 
-F8 benchmark (`node scripts/perf-f8-bench.mjs`, WebGPU, 1536x960 @ dpr 1.25,
-real AMD GPU), savanna-driving CPU median / p95 (ratio), before 7050a53 →
+F8 benchmark (`node scripts/perf-f8-bench.mjs`, owner WSL2 host, RTX 4070 Ti, WebGPU compat over GLES/D3D12,
+1536x960 @ dpr 1.25; first labelled "real AMD GPU", wrongly), savanna-driving CPU median / p95 (ratio), before 7050a53 →
 after 7935956:
 
 | Preset | Before | After |
@@ -183,9 +183,9 @@ exists yet — the F8 attribution is OPEN.
   refinements": that would still slice the window queue on low, and low's
   regression came from spreading work, not from refinements (low has none).
 
-## Round 3 — owner F8 split on the real GPU (19.11.2026)
+## Round 3 — owner F8 split (owner WSL2 host, RTX 4070 Ti, WebGPU compat over GLES/D3D12)
 
-`scripts/perf-f8-detail.mjs` at db8673c, WebGPU, AMD notebook GPU,
+`scripts/perf-f8-detail.mjs` at db8673c, owner WSL2 host, RTX 4070 Ti, WebGPU compat over GLES/D3D12 (first labelled AMD notebook, wrongly),
 1536x960 @ dpr 1.25, dev server, savanna-driving:
 
 | Pass | CPU median | p95 | p95 / median | Worst 8 frames |
@@ -201,9 +201,9 @@ the same pattern. Conclusion: the p95 owner on the real GPU is inside
 Next: split render-submit (shadow cascades, main pass, post/TRAA; new
 pipelines/programs per frame; any readback/query that waits on the GPU).
 
-## Round 4 — owner F8 split inside render-submit (c5f2f94, real GPU)
+## Round 4 — owner F8 split inside render-submit (c5f2f94, owner WSL2 host, RTX 4070 Ti, WebGPU compat over GLES/D3D12)
 
-WebGPU, AMD notebook, 1536x960 @ dpr 1.25, dev server, full mode,
+1536x960 @ dpr 1.25, dev server, full mode (first labelled AMD notebook, wrongly),
 savanna-driving. CPU median / p95 (ratio); shares of the worst-8 CPU time:
 
 | Pass | Median / p95 (ratio) | Inside render-submit (worst 8) |
@@ -244,9 +244,9 @@ recurring every few frames.
   fill (every 16 wu), which fits "recurring every few frames" only partly; the
   named upload booking decides.
 
-## Round 5 — owner F8 detail at d464d35 and f9b5171 (real GPU)
+## Round 5 — owner F8 detail at d464d35 and f9b5171 (owner WSL2 host, RTX 4070 Ti, WebGPU compat over GLES/D3D12)
 
-Same setup (WebGPU, AMD notebook, 1536x960 @ 1.25, dev server, full mode,
+Same setup (owner WSL2 host, RTX 4070 Ti, WebGPU compat over GLES/D3D12, 1536x960 @ 1.25, dev server, full mode,
 savanna-driving). CPU median / p95 (ratio); shares of worst-8 CPU time inside
 render-submit:
 
@@ -318,7 +318,7 @@ Open:
 - Not run here: browser suites, picture check, real-GPU F8 (owner), the
   cross-vendor review the point requires.
 
-## Round 6 — owner F8 detail at 5bb96c8 (real GPU, medium-preset)
+## Round 6 — owner F8 detail at 5bb96c8 (owner WSL2 host, RTX 4070 Ti, WebGPU compat over GLES/D3D12, medium-preset)
 
 CPU 13.3 / 44.3 (3.33x), worst 8 44-61 ms. Inside render-submit (worst-8
 shares): write-buffer 0.50, render:shadow 0.40, render:quad 0.33,
@@ -368,7 +368,7 @@ c5f2f94, d464d35, f9b5171 and 5bb96c8 exist only on the owner host
 
 ## Round 8 — owner run at 014b9c8 and the timestamp switch
 
-Owner real-GPU run at 014b9c8: every pass printed `gpu n/a (adapter without
+Owner run at 014b9c8 (owner WSL2 host, RTX 4070 Ti, WebGPU compat over GLES/D3D12): every pass printed `gpu n/a (adapter without
 the timestamp-query feature)`. CPU median / p95 (ratio), savanna-driving:
 medium 12.8 / 46.0 (3.59), high 19.7 / 31.4 (1.59), low 5.0 / 13.7 (2.74),
 baseline 20.6 / 32.4, shadows-off 13.6 / 37.1, post-off 16.7 / 29.3.
@@ -385,7 +385,7 @@ owner's AMD adapter shows in that first line of the next owner run.
 
 ## Round 9 — owner run at fa1b774 and the pre-run diagnosis
 
-Owner real-GPU run at fa1b774: still `gpu n/a (adapter without the
+Owner run at fa1b774 (owner WSL2 host, RTX 4070 Ti, WebGPU compat over GLES/D3D12): still `gpu n/a (adapter without the
 timestamp-query feature)` on every pass. CPU median / p95: medium 12.4 / 44.3
 (3.57), high 21.6 / 36.5 (1.69), low 4.8 / 12.3, shadows-off 14.0 / 29.5,
 post-off 16.5 / 36.2.
@@ -402,3 +402,62 @@ timestamp-query true). The stop branch is not exercised here because this
 adapter always offers the feature. The next owner run shows which link fails:
 args missing in the printed list, adapter without the feature despite the
 args, or adapter with it but app device without.
+
+## Correction (19.11.2026) — every owner run measured a translation stack
+
+The pre-run diagnosis at c2422a6 showed: the owner host is WSL2 with an NVIDIA
+RTX 4070 Ti, and WebGPU there runs as the COMPAT adapter over OpenGL ES (ANGLE →
+Mesa 25 → D3D12; args `--use-webgpu-adapter=opengles --force-webgpu-compat`),
+with `timestamp-query` false. The owner runs labelled "real GPU" or "AMD
+notebook" in rounds 3-7 (and, from the same setup, the "before" reference, the
+rejection table and rounds 8-9) all measured that stack, not the user's
+notebook; they are relabelled above. The writeBuffer / getCurrentTexture
+blocking plateau of rounds 4-6 may be an artefact of GLES-on-D3D12 buffer
+mapping and does not justify a product change on its own. The only native
+measurement remains the point's reference, the user's notebook benchmark
+"Lenovo GIP-Notebook (neu).json" (medium 8.8 / 41.2, high 12.2 / 52.4 ms CPU
+median / p95). The headless numbers of this container are SwiftShader and say
+nothing about rendering either; their main-thread JS numbers stand.
+
+### Product changes on the branch, re-justified
+
+| Change | Kept? | Justification independent of the GPU backend |
+| --- | --- | --- |
+| Flora swap uploads only the live instances (`markInstancesForUpload`) | kept | A pure saving: the same pixels, fewer bytes uploaded on every backend. |
+| Sliced terrain builds, medium/high, 3 ms (`ChunkGeometryBuild`, `drainSlicedQueue`) | kept, owner decides | Main-thread JS, independent of the backend: an atomic refined 112-seg build costs 37 ms mean / 80 ms max (headless main thread), so driving onto new ground produced 40-85 ms frames. Slicing removes them (max 142 → 63 ms on the owner host). It does NOT explain the F8 p95, because the F8 driving phase runs over cached ground, and it costs up to 3 ms in frames while new ground streams. Revert if the notebook numbers show a raised median without a p95/max gain. |
+| Low builds whole chunks under 5 ms (`terrainBuildSliced` false) | kept | Restores low's behaviour from before this point exactly. |
+| DEV instrumentation (probe, render split, F8 detail hook, perf-f8-detail, perf-bench split) | kept | DEV only: `useTimedFrame` returns the bare callback in production, every hook is behind `import.meta.env.DEV`. |
+
+### The deciding measurement — on the USER's notebook
+
+Native Windows Chrome with real D3D12 WebGPU, NOT WSL. In PowerShell, in a
+checkout of this branch:
+
+```
+git fetch origin feat/1543-driving-cpu-hitches
+git checkout feat/1543-driving-cpu-hitches
+npm ci
+npm run dev
+```
+
+In a second PowerShell, same folder:
+
+```
+$env:BASE_URL = 'http://localhost:5173/'
+$env:VERIFY_GL = 'webgpu'
+$env:BENCH_HEADED = '1'
+$env:BENCH_W = '1536'; $env:BENCH_H = '960'; $env:BENCH_DPR = '1.25'
+node scripts/perf-f8-detail.mjs --json local/f8-detail-notebook.json
+```
+
+Check the first lines before trusting the numbers: `# chrome args` must NOT
+contain `--use-webgpu-adapter=opengles` or `--force-webgpu-compat`; `# adapter`
+must name the notebook GPU (not SwiftShader / not "compat"); `# adapter
+timestamp-query: true` and `# app device timestamp-query: true`. Without
+timestamp-query the script stops (exit 2) before the run. The output then gives,
+per pass of savanna-driving (low/medium/high presets and the sweep configs),
+CPU median/p95, the GPU median/p95 from the F8 report's timestamp queries, and
+the per-system split of the 8 worst frames. It decides: medium GPU median near
+or above the CPU p95 → medium is over GPU budget, cut its GPU cost (shadow /
+post passes); GPU fine but CPU p95 > 2x median → the split names the CPU system.
+

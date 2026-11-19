@@ -9,7 +9,8 @@
 // and the blocking WebGPU calls (src/render/renderSplitWatch.ts). Env: BENCH_W, BENCH_H, BENCH_DPR (default 1536x960 @ 1.25),
 // BENCH_TIMEOUT_MS (default 30 min), BENCH_GPU_TIMESTAMPS=0 (do not add the
 // Chrome switches that expose timestamp-query), BENCH_REQUIRE_GPU_TIMESTAMPS=0
-// (run even when the adapter lacks timestamp-query; default: stop, exit 2).
+// (run even when the adapter lacks timestamp-query; default: stop, exit 2),
+// BENCH_HEADED=1 (visible window instead of headless).
 import { writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { verifyLaunchOptions } from './verify/launch-args-core.mjs'
@@ -46,6 +47,12 @@ opts.args = [...opts.args, '--disable-gpu-vsync', '--disable-frame-rate-limit']
 // report carries its GPU column. BENCH_GPU_TIMESTAMPS=0 leaves it off.
 if (backend === 'webgpu' && process.env.BENCH_GPU_TIMESTAMPS !== '0')
   opts.args = [...opts.args, '--enable-dawn-features=allow_unsafe_apis', '--enable-webgpu-developer-features']
+// BENCH_HEADED=1: a visible window (a native notebook measures as the player
+// plays; headless may pick another GPU path).
+if (process.env.BENCH_HEADED === '1') {
+  opts.args = opts.args.filter((a) => !a.startsWith('--headless'))
+  opts.headless = false
+}
 const browser = await chromium.launch(opts)
 // Diagnosis before the run (owner rounds 7-8: the report showed no GPU column):
 // the Chrome actually launched, its args, the adapter's features and the
