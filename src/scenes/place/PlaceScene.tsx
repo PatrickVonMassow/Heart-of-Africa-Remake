@@ -1380,6 +1380,7 @@ function GroundScatter({
     return m
   }, [])
   const rockMaterial = useMemo(() => createScatterRockMaterial(), [])
+  useEffect(() => () => rockMaterial.dispose(), [rockMaterial])
   const tuftMesh = useRef<THREE.InstancedMesh>(null)
   const rockMesh = useRef<THREE.InstancedMesh>(null)
 
