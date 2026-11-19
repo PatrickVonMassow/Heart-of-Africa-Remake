@@ -178,8 +178,9 @@ function cpuSpikeReport(cpuFrames) {
       work['render-submit'] = Math.max(0, work['render-submit'] - work['shader-programs'])
     let owner = null
     let best = 0
-    for (const [k, v] of Object.entries(work)) if (v > best) [owner, best] = [k, v]
-    const booked = Object.values(work).reduce((a, v) => a + v, 0)
+    // 'render:*' / 'gpu:*' are nested inside render-submit: listed, never owners.
+    for (const [k, v] of Object.entries(work)) if (!k.includes(':') && v > best) [owner, best] = [k, v]
+    const booked = Object.entries(work).reduce((a, [k, v]) => (k.includes(':') ? a : a + v), 0)
     if (owner === null || best < 0.3 * f.cpu) owner = f.heapDropMb > 0 ? 'gc' : 'unattributed'
     for (const [k, v] of Object.entries(work)) bump(k, v, k === owner)
     bump('unbooked', Math.max(0, f.cpu - booked), false)

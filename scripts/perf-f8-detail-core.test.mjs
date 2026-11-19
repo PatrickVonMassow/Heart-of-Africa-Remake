@@ -33,4 +33,16 @@ describe('perf-f8-detail core', () => {
     ]
     expect(measuredPhases(det, 'savanna-driving').map((r) => r.config)).toEqual(['a'])
   })
+
+  it('lists render:/gpu: bookings as nested, outside the booked sum', () => {
+    const rec = {
+      cpuMs: [1, 40],
+      work: [{}, { 'render-submit': 36, 'render:main': 20, 'gpu:get-texture': 15 }],
+      heapDropMb: null,
+    }
+    const d = phaseDetail(rec, 1)
+    expect(d.worst.map((e) => e.name)).toEqual(['render-submit', 'unbooked'])
+    expect(d.worst.find((e) => e.name === 'unbooked').ms).toBe(4)
+    expect(d.nested.map((e) => [e.name, e.ms])).toEqual([['render:main', 20], ['gpu:get-texture', 15]])
+  })
 })

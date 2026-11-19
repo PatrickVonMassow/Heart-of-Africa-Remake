@@ -3,6 +3,11 @@
 // and the per-system share of the WORST frames' CPU time, from the DEV
 // `window.__f8detail` records written by src/systems/benchmarkRun.ts.
 
+/** Nested bookings inside render-submit (src/render/renderSplitWatch.ts). */
+export function isNested(system) {
+  return system.includes(':')
+}
+
 /** Quantile by the F8 report's rule: sorted index floor(q * n), clamped. */
 export function quantile(xs, q) {
   const s = [...xs].sort((a, b) => a - b)
@@ -31,14 +36,18 @@ export function phaseDetail(rec, worstN = 8) {
       work['render-submit'] = Math.max(0, work['render-submit'] - work['shader-programs'])
     for (const [k, v] of Object.entries(work)) {
       sums[k] = (sums[k] ?? 0) + v
-      booked += v
+      // 'render:*' / 'gpu:*' are nested inside render-submit: listed, not summed.
+      if (!isNested(k)) booked += v
     }
     if ((rec.heapDropMb?.[f.i] ?? 0) > 0) gcFrames += 1
   }
   sums.unbooked = Math.max(0, total - booked)
   const worst = Object.entries(sums)
+    .filter(([k]) => !isNested(k))
     .map(([name, ms]) => ({ name, ms: +ms.toFixed(1), share: total > 0 ? +(ms / total).toFixed(2) : 0 }))
     .sort((a, b) => b.ms - a.ms)
+  const entry = ([name, ms]) => ({ name, ms: +ms.toFixed(1), share: total > 0 ? +(ms / total).toFixed(2) : 0 })
+  const nested = Object.entries(sums).filter(([k]) => isNested(k)).map(entry).sort((a, b) => b.ms - a.ms)
   return {
     median: +median.toFixed(2),
     p95: +p95.toFixed(2),
@@ -48,6 +57,7 @@ export function phaseDetail(rec, worstN = 8) {
     gcFrames,
     probe: rec.work !== null && rec.work !== undefined,
     worst,
+    nested,
   }
 }
 

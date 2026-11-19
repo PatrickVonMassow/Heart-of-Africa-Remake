@@ -29,6 +29,18 @@ export type FrameSystem =
   | 'climate'
   | 'rivers'
   | 'scene-misc'
+  // Nested inside 'render-submit' (src/render/renderSplitWatch.ts): exclusive
+  // renderer.render time by kind, and the WebGPU calls that can block or build.
+  | 'render:main'
+  | 'render:quad'
+  | 'render:shadow'
+  | 'gpu:get-texture'
+  | 'gpu:submit'
+  | 'gpu:write-buffer'
+  | 'gpu:create-pipeline'
+  | 'gpu:create-shader'
+  | 'gpu:create-bindgroup'
+  | 'gpu:create-buffer'
 
 export interface LongFrameReport {
   /** Length of the closed frame window (ms). */

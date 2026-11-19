@@ -4,7 +4,8 @@
 //   BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-f8-detail.mjs [--short] [--phase savanna-driving] [--json out.json]
 // Prints, per measured pass of the phase (sweep configs and the low/medium/high
 // preset passes), the CPU median/p95 and each system's share of the 8 worst
-// frames. Env: BENCH_W, BENCH_H, BENCH_DPR (default 1536x960 @ 1.25),
+// frames, and inside render-submit the exclusive renderer.render time by kind
+// and the blocking WebGPU calls (src/render/renderSplitWatch.ts). Env: BENCH_W, BENCH_H, BENCH_DPR (default 1536x960 @ 1.25),
 // BENCH_TIMEOUT_MS (default 30 min).
 import { writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
@@ -76,4 +77,6 @@ for (const rec of recs) {
       `worst8 [${d.worstFrames.join(', ')}]  gc-in-worst ${d.gcFrames}${d.probe ? '' : '  (no probe split)'}`,
   )
   for (const e of d.worst) console.log(`    ${e.name.padEnd(20)} ${String(e.ms).padStart(7)} ms  ${e.share}`)
+  if (d.nested.length) console.log('    inside render-submit:')
+  for (const e of d.nested) console.log(`      ${e.name.padEnd(20)} ${String(e.ms).padStart(7)} ms  ${e.share}`)
 }

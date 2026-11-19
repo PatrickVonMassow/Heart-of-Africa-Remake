@@ -125,6 +125,8 @@ export default function App() {
               // Long-frame attribution (docs/perf-1523-findings.md): node-program
               // builds are booked as 'shader-programs' frame work.
               void import('./render/programBuildWatch').then((m) => m.watchProgramBuilds(renderer))
+              // render-submit split (docs/perf-1543-driving-hitches.md).
+              void import('./render/renderSplitWatch').then((m) => m.watchRenderSplit(renderer))
             }
             // Filmic look: soft shadows + ACES tone mapping.
             renderer.shadowMap.enabled = true
