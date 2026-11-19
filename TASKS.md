@@ -78,6 +78,21 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 
+- [ ] 1549. Find the cause of the shadows-off GPU inversion
+  Split from 1542 Part B (main-session decision 18.11.2026 21:47, for veto). Observed in the user benchmark
+  "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the
+  GPU median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and
+  triangles fall. Not reproducible on the batch host: it offers no WebGPU timestamp query.
+  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
+  Final state: the F8 benchmark report carries a per-pass GPU breakdown of the measured frame (the
+  WebGPUTimestampQueryPool timestamps per pass, in pass order), so a run on the user's notebook names the
+  pass that grows when shadows are off; with that number the cause is fixed in the product code, or — if
+  it is a measurement artefact — in the benchmark, so `shadows-off` prices only the shadows and its GPU
+  median is <= baseline in savanna-standing, desert-standing and savanna-driving.
+  Test: Vitest for the breakdown's formatting and report rows; Playwright benchmark suite on WebGPU.
+  Source: 1542 session, 18.11.2026 21:47.
+  Bundle: Steuerung & Performance.
+
 - [ ] 1543. Smooth the CPU hitches while driving on medium and high
   Observed: The user's notebook benchmark shows CPU p95 of 41 ms (medium) and 52 ms (high) during the drive against medians of 9-12 ms: periodic hitches that the player feels as stutter even when the GPU average would be fine. The user requires medium to be clearly smoother on mid-range notebooks.
 
@@ -14329,18 +14344,3 @@ to land than a mechanism that needs a review.
   Picture check: polish-villagers --section=hut-doorway on BOTH backends, the band visible on the wall.
   Source: finding of the 1167 session, 18.11.2026 15:29.
   Bundle: Siedlungsgeometrie.
-
-- [ ] 1549. Find the cause of the shadows-off GPU inversion
-  Split from 1542 Part B (main-session decision 18.11.2026 21:47, for veto). Observed in the user benchmark
-  "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the
-  GPU median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and
-  triangles fall. Not reproducible on the batch host: it offers no WebGPU timestamp query.
-  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
-  Final state: the F8 benchmark report carries a per-pass GPU breakdown of the measured frame (the
-  WebGPUTimestampQueryPool timestamps per pass, in pass order), so a run on the user's notebook names the
-  pass that grows when shadows are off; with that number the cause is fixed in the product code, or — if
-  it is a measurement artefact — in the benchmark, so `shadows-off` prices only the shadows and its GPU
-  median is <= baseline in savanna-standing, desert-standing and savanna-driving.
-  Test: Vitest for the breakdown's formatting and report rows; Playwright benchmark suite on WebGPU.
-  Source: 1542 session, 18.11.2026 21:47.
-  Bundle: Steuerung & Performance.
