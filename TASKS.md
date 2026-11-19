@@ -78,6 +78,21 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 
+- [ ] 1552. Fix the cause of the shadows-off GPU inversion
+  Split from 1549 (main session 19.11.2026, for veto). Observed in the user benchmark "Lenovo
+  GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the GPU
+  median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and triangles
+  fall. The batch host has no WebGPU timestamp query, so the cause can only be read from a fresh F8 run
+  on the user's notebook with the per-pass breakdown of 1549. WAITS FOR that report from the user.
+  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
+  Final state: with the pass the breakdown names, the cause is fixed in the product code, or — if it is
+  a measurement artefact — in the benchmark, so `shadows-off` prices only the shadows and its GPU median
+  is <= baseline in savanna-standing, desert-standing and savanna-driving on the user's notebook.
+  Test: Vitest for the changed logic; Playwright benchmark suite on WebGPU; the user's notebook report.
+  Criticality: high (inherited from priority point 1549).
+  Source: 1549 split, 19.11.2026.
+  Bundle: Steuerung & Performance.
+
 - [ ] 1543. Smooth the CPU hitches while driving on medium and high
   Observed: The user's notebook benchmark shows CPU p95 of 41 ms (medium) and 52 ms (high) during the drive against medians of 9-12 ms: periodic hitches that the player feels as stutter even when the GPU average would be fine. The user requires medium to be clearly smoother on mid-range notebooks.
 
@@ -97,36 +112,6 @@ put it is the mistake this line exists to stop.
   User approval 18.11.2026: "Ja, so als drei Aufträge einreihen"
   Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
   Bundle: Steuerung & Performance.
-
-- [ ] 1164. A shadow lies on the river sand with nothing above it to cast it (seen
-  18.09.2026 in the covering polish frame `verification/687-bank-play-rocks.png`, WebGPU
-  run 2026-09-18T22:17:33 and the WebGL 2 run after it, both GREEN).
-  MEASURED STATE: on the open sand right of the near boulder, roughly mid-frame, sits a
-  small dark ellipse with clean edges. Nothing stands over it — no rock, no villager, no
-  animal — so it reads either as a contact shadow whose caster is culled or never drawn,
-  or as a ground decal placed without its object. The same spot on the WebGL 2 pass shows
-  it too, so it is not a backend artefact.
-  Final state:
-  - Either the caster is drawn where its shadow claims it is, or the shadow is gone; no
-    frame of the bank shows a shadow without its object.
-  - Which of the two it was is named in the commit, because a culled caster and a stray
-    decal are different defects and the second one probably has siblings.
-  Test: `polish --section=children-bank-game` on both backends with the frame
-  `687-bank-play-rocks` INSPECTED.
-  Criticality: low — a small wrong thing in a picture the player stands in front of.
-  MEASURED 18.11.2026 (branch feat/1164-shadow-without-caster, temporary probe commit to revert):
-  the dark ellipses on that sand are the SCATTER BOULDERS THEMSELVES (GroundScatter rock
-  instances, scale 0.33-0.68, i.e. 17-36 cm high, 30-58 m off; e.g. instance 4 at
-  -12.83/-18.77 projects to px 1122/482 of the 09.11 frame), neither a culled caster nor a
-  decal (the place scene has none). On the 09.11 frame they read #050300-#0a0502, darker
-  than the big rock's shaded side (#181106) and its cast shadow (#31290f), top faces
-  included. Switching their shadow receive, shadow cast or both changes their pixels by
-  under 3 %, so shadow-map acne is ruled out. Under the frontlit sun of 18.11 they read
-  #413321-#54432b against sand #786138, still far below their #8a8178 albedo. Next
-  suspect: GTAO (`src/render/Effects.tsx`, AO_FLOOR 0.4) occluding a stone smaller than
-  its radius; test via `window.__ui.setState({ ssaoEnabled: false })` at the shutter.
-  Refs: verification/687-bank-play-rocks.png
-  Bundle: Siedlungsgeometrie.
 
 - [ ] 1169. The children shuffle on the spot above the gate on roughly a tenth of the world
   seeds (measured 20.09.2026 while point 1094 moved the teaching checks onto the seed axis;
@@ -11294,6 +11279,9 @@ to land than a mechanism that needs a review.
   so the next one cannot be forgotten the same way.
   Criticality: medium — it loses no code and no save, but it silently changes the world and the
   random source of any session that measured itself, and it has stood unowned in every LARGE run.
+  ALSO MEASURED 19.11.2026 (main ae28726, WebGL 2): the world behind the finished benchmark dialog
+  renders black in `verification/136-benchmark-report.png` (WebGPU shows the street); likely the same
+  unreturned world — the fix's WebGL 2 frame must show the scene again, else file it separately.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1010. The Ctrl-label fusion check names a point that is closed, so its red has no owner
@@ -14330,17 +14318,20 @@ to land than a mechanism that needs a review.
   Source: finding of the 1167 session, 18.11.2026 15:29.
   Bundle: Siedlungsgeometrie.
 
-- [ ] 1549. Find the cause of the shadows-off GPU inversion
-  Split from 1542 Part B (main-session decision 18.11.2026 21:47, for veto). Observed in the user benchmark
-  "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the
-  GPU median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and
-  triangles fall. Not reproducible on the batch host: it offers no WebGPU timestamp query.
-  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
-  Final state: the F8 benchmark report carries a per-pass GPU breakdown of the measured frame (the
-  WebGPUTimestampQueryPool timestamps per pass, in pass order), so a run on the user's notebook names the
-  pass that grows when shadows are off; with that number the cause is fixed in the product code, or — if
-  it is a measurement artefact — in the benchmark, so `shadows-off` prices only the shadows and its GPU
-  median is <= baseline in savanna-standing, desert-standing and savanna-driving.
-  Test: Vitest for the breakdown's formatting and report rows; Playwright benchmark suite on WebGPU.
-  Source: 1542 session, 18.11.2026 21:47.
-  Bundle: Steuerung & Performance.
+- [ ] 1553. A bank-game catcher is not back in line when the charge starts
+  Measured 19.11.2026: WebGPU `polish-children --section=children-bank-game` on feat/1164 7ba7344cc
+  (only change a scatter-rock material; log local/verify-logs/2026-11-19T15-11-36-540-polish-children.log)
+  red "the charge starts with every catcher back in one line before its rock": child 4 at -45.65/-7.19
+  against its station -50.07/-1.24 (about 7.5 m off). The same section on main bb81bc0a9 ran green
+  (log 2026-11-19T15-47-17-013), so the red is intermittent and owned by no point.
+  Player impact: a child can still be running back across the bank while the others already charge
+  the rock, which breaks the line the game is about.
+  Final state: the charge waits until every catcher stands within its station tolerance (or the
+  intermittent cause — fixture timing or product — is named and fixed); its charge in
+  scripts/render-verify-charges.mjs dies with this point.
+  Test: Vitest for the charge-start condition (no charge while a catcher is outside its station
+  tolerance), mutation-checked.
+  Picture check: polish-children --section=children-bank-game on WebGPU, green, the line frame showing
+  every catcher in line.
+  Source: finding of the 1164 session, 19.11.2026 16:30.
+  Bundle: Dorfleben.

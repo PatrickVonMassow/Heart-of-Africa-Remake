@@ -19,6 +19,7 @@
 // to run, though not config to config within a sweep.
 
 import { QUALITY_PRESETS, type DetailLevel, type QualityPreset } from '../config/quality'
+import { gpuPassSummaryLines, type BenchGpuPassBreakdown, type BenchGpuPassTiming } from './benchmarkPasses'
 
 /** Simulation timestep every benchmark frame is stepped with (seconds). */
 export const BENCH_DT = 1 / 60
@@ -386,6 +387,9 @@ export interface BenchRow {
    *  that answers the geometry question. null where unavailable (WebGL 2, or
    *  an adapter without `timestamp-query`); never fabricated. */
   gpu: FrameStats | null
+  /** Per-pass split of the measured GPU frames, in pass order (point 1549).
+   *  null where the breakdown is unavailable; absent in older reports. */
+  gpuPasses?: BenchGpuPassBreakdown | null
   vsyncLikely: boolean
   drawCalls: number
   triangles: number
@@ -409,6 +413,9 @@ export interface BenchReport {
   /** Whether real GPU timestamps were measured, and why not when they were
    *  not — an unavailable series is FLAGGED, never faked. */
   gpuTiming: { available: boolean; reason: string }
+  /** Whether the per-pass GPU breakdown was measured, and why not (point
+   *  1549). Absent in reports from older builds. */
+  gpuPassTiming?: BenchGpuPassTiming
   /** The series to read as the result (see `headlineSeries`). */
   headline: BenchHeadline
   rows: BenchRow[]
@@ -583,6 +590,7 @@ export function benchSummaryLines(report: BenchReport): string[] {
         (r.vsyncLikely ? '  [vsync-capped]' : ''),
     )
   }
+  lines.push(...gpuPassSummaryLines(report.gpuPassTiming, report.rows))
   if (report.lowProfile) lines.push(...lowProfileSummaryLines(report.lowProfile))
   return lines
 }

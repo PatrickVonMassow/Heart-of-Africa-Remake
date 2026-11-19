@@ -37945,3 +37945,83 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   User approval 18.11.2026: "Sofern mit vertretbarem Aufwand möglich, auch für alle erledigten Tasks nachholen. Einreihung nach dem Task mit den Chat-Anweisungstexten."
   Source: user request of 18.11.2026 17:44 (spec cut from 04642a868).
   Bundle: Chat & Tafel.
+
+- [x] 1550. Switch the scarce (Fable) lane from Fable 5.1 to Fable 5.2
+  Observed (measured 19.11.2026 10:21): a new model Fable 5.2 (model id `claude-fable-5-2`) exists. The installed Claude Code 2.1.280 refuses it: `API Error: 400 Claude Code 2.1.280 does not support this model; version 2.1.290 or newer is required`. The scarce lane in `scripts/model-lanes.mjs` still names Fable 5.1 (`claude-fable-5-1`), and so do the serving-chain texts the session hooks print.
+
+  Final state:
+  - Claude Code in the container is at >= 2.1.290 by the project's own install/update path (no manual container work for the user), and `claude -p … --model claude-fable-5-2` answers.
+  - `scripts/model-lanes.mjs` is the only place naming the model: the scarce lane reads displayName `Fable 5.2`, trailerName `Claude Fable 5.2`, modelId `claude-fable-5-2`; `Fable 5.1` / `Claude Fable 5.1` / `claude-fable-5-1` move into its `retired` list, so earlier trailers stay valid for the model guard.
+  - The serving chain (Opus 5.5, then Fable 5.2, then Opus 4.8), the lane-switch status and every hook text derived from the lanes name Fable 5.2; no live rule text still names 5.1 as the current lane (historical docs and archives stay untouched).
+  - The model-guard baseline accepts a `Co-Authored-By: Claude Fable 5.2` trailer and still accepts the retired 5.1 trailers on existing commits.
+
+  Test: Vitest for the lane record, the trailer allowlist (5.2 accepted, 5.1 retired-but-valid) and the serving-chain text; a live probe of `claude-fable-5-2` recorded in the point's evidence.
+  Source: user request of 19.11.2026 09:27 UTC via the findings carrier (session 9a5eca75); queued at the front of the work order by user order.
+  Bundle: Modell & Wächter.
+
+- [x] 1551. Refuse the back of the order for a split of a priority point
+  Observed: 18.11.2026 the batch split Part B of the user's high-priority performance order 1542 into 1549 and ranked it `last` (machine, position 445 of 445) with a reason about WHEN it can run (the batch host lacks WebGPU timestamp queries), not WHERE it belongs. `--ranked` accepts any nonempty reason, `appendGateState` clears on any `last` entry, and standing before one remembered point counts as a deliberate move. The 1549 block carries no `Criticality:` tag. Corrected by user order 19.11.2026 (1549 now before 1543).
+
+  Origin: blind four-eyes stage — A Claude Opus 5.5, B GPT-6.2 Sol, merged by Claude Fable 5.2 (19.11.2026). Hybrid verdict: the live parent rank entry is the detector; the child's own `Criticality: high` tag is the carrier that survives the parent's landing; no retention of closed entries (that would be a new ledger part, forbidden by the freeze).
+
+  Final state (no new guard, no new record field; `.claude/queue-rank.json` keeps its shape):
+  1. `scripts/queue-rank-core.mjs`: new pure `splitPriorityOf(body, ranked)` reads `Split from <N>` in the point's own block. `priority` when `ranked[N].place` is `ahead` or `statesHighUrgency(body)`; `undeclared` when the cited parent has no entry and the block states no `Criticality:` level; else `none`. A block without the citation is `none`.
+  2. `appendGateState(open, record, { bodies })`: a new `priority` point stays pending unless it has an `ahead` entry AND stands in the leading run (no open point without an `ahead` entry before it). An `undeclared` new point stays pending until its block states a level. Without `bodies` behaviour is unchanged.
+  3. `scripts/queue-order-guard-core.mjs` passes `openPointBodies(tasksMd)`; `scripts/queue-rank.mjs` status and `writeRankRecord` use the same call, so settlement cannot absorb a refused placement.
+  4. CLI: `--ranked <N>` is refused for `priority` and `undeclared`; the message names the remedy (move the block to the front, write `Criticality: high` into the child, then `--ahead <N> --why …` with the true origin).
+  5. TASKS.md preamble, one sentence: a point split from a priority point inherits its place; when it can run is stated in the block and is never a rank reason.
+  6. File the three blind-stage halves under `docs/four-eyes/` (A, B with model fields, union by Fable 5.2) in one commit and run the `scripts/blind-merge.mjs` count (manual count: 21/21 entries, each exactly once). The halves were preserved on 19.11.2026 from the filing session's scratchpad into `local/four-eyes-1551/` (A.json, B.json, U.json; untracked); the Fable 5.2 full text stands in session transcript ae3584ec-83cc-4c8a-8edc-06056cb3d591.
+
+  Test (Vitest, core + CLI):
+  - 1542->1549: `ranked[1542] = {user, ahead}`, 1549 appended with "Split from 1542 Part B" and no tag -> pending; a hand-written `last` entry -> still pending.
+  - Child moved before one remembered backlog point -> still pending; moved before 1543 with an `ahead` entry -> settled.
+  - Parent closed and pruned: child with `Criticality: high` -> `priority`; child without any level -> `undeclared`.
+  - A non-split appended point and a split of a `last`-ranked parent -> unchanged; `--ranked 1549` exits non-zero with the remedy text.
+
+  Still open (record, do not build): a split without the `Split from <N>` line escapes; a settled child moved back later is not re-asked; `Criticality: high` also arms the four-eyes tick gate for the child; "front" = leading run is a stand-in while no release point is open; a torn record still fails open.
+  Source: user request of 19.11.2026 10:02 UTC via the findings carrier (session 9a5eca75); queued at the front of the work order by user order 19.11.2026 11:02, directly behind 1550 which was already being landed.
+  Bundle: Modell & Wächter.
+
+- [x] 1549. Record a per-pass GPU breakdown in the F8 benchmark report
+  Split from 1542 Part B (main-session decision 18.11.2026 21:47, for veto). Observed in the user benchmark
+  "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the
+  GPU median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and
+  triangles fall. Not reproducible on the batch host: it offers no WebGPU timestamp query.
+  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
+  Final state: the F8 benchmark report carries a per-pass GPU breakdown of the measured frame (the
+  WebGPUTimestampQueryPool timestamps per pass, in pass order), so a run on the user's notebook names the
+  pass that grows when shadows are off. Split 19.11.2026 (main session, for veto): the cause fix needs
+  that notebook run and moved to point 1552.
+  Test: Vitest for the breakdown's formatting and report rows; Playwright benchmark suite on WebGPU.
+  Source: 1542 session, 18.11.2026 21:47.
+  Bundle: Steuerung & Performance.
+
+- [x] 1164. A shadow lies on the river sand with nothing above it to cast it (seen
+  18.09.2026 in the covering polish frame `verification/687-bank-play-rocks.png`, WebGPU
+  run 2026-09-18T22:17:33 and the WebGL 2 run after it, both GREEN).
+  MEASURED STATE: on the open sand right of the near boulder, roughly mid-frame, sits a
+  small dark ellipse with clean edges. Nothing stands over it — no rock, no villager, no
+  animal — so it reads either as a contact shadow whose caster is culled or never drawn,
+  or as a ground decal placed without its object. The same spot on the WebGL 2 pass shows
+  it too, so it is not a backend artefact.
+  Final state:
+  - Either the caster is drawn where its shadow claims it is, or the shadow is gone; no
+    frame of the bank shows a shadow without its object.
+  - Which of the two it was is named in the commit, because a culled caster and a stray
+    decal are different defects and the second one probably has siblings.
+  Test: `polish --section=children-bank-game` on both backends with the frame
+  `687-bank-play-rocks` INSPECTED.
+  Criticality: low — a small wrong thing in a picture the player stands in front of.
+  MEASURED 18.11.2026 (branch feat/1164-shadow-without-caster, temporary probe commit to revert):
+  the dark ellipses on that sand are the SCATTER BOULDERS THEMSELVES (GroundScatter rock
+  instances, scale 0.33-0.68, i.e. 17-36 cm high, 30-58 m off; e.g. instance 4 at
+  -12.83/-18.77 projects to px 1122/482 of the 09.11 frame), neither a culled caster nor a
+  decal (the place scene has none). On the 09.11 frame they read #050300-#0a0502, darker
+  than the big rock's shaded side (#181106) and its cast shadow (#31290f), top faces
+  included. Switching their shadow receive, shadow cast or both changes their pixels by
+  under 3 %, so shadow-map acne is ruled out. Under the frontlit sun of 18.11 they read
+  #413321-#54432b against sand #786138, still far below their #8a8178 albedo. Next
+  suspect: GTAO (`src/render/Effects.tsx`, AO_FLOOR 0.4) occluding a stone smaller than
+  its radius; test via `window.__ui.setState({ ssaoEnabled: false })` at the shutter.
+  Refs: verification/687-bank-play-rocks.png
+  Bundle: Siedlungsgeometrie.

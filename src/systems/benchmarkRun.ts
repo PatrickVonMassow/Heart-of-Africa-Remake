@@ -62,6 +62,13 @@ import {
   type BenchRow,
   type BenchSceneNode,
 } from './benchmark'
+import {
+  createPassRecorder,
+  passBreakdown,
+  type BenchPassSample,
+  type BenchPassTarget,
+  type BenchTimestampPool,
+} from './benchmarkPasses'
 
 /** One rendered frame's two measurements. */
 interface FrameSample {
@@ -87,21 +94,42 @@ function pressKey(code: string, down: boolean): void {
 
 // --- GPU timing (the series the geometry question actually needs) ------------
 
+/** The renderer inspector's per-pass hook (three 0.185 InspectorBase). */
+type BeginRender = (uid: string, scene: unknown, camera: unknown, target: BenchPassTarget | null) => void
+
 /** Minimal structural view of the renderer's timestamp plumbing (three 0.185). */
 interface TimestampRenderer {
-  backend?: { isWebGPUBackend?: boolean; trackTimestamp?: boolean }
+  backend?: {
+    isWebGPUBackend?: boolean
+    trackTimestamp?: boolean
+    timestampQueryPool?: Record<string, BenchTimestampPool | null | undefined>
+    /** Submits a render pass's commands — the GPU order of the passes. */
+    finishRender?: (renderContext: unknown) => unknown
+    getTimestampUID?: (renderContext: unknown) => string
+  }
   hasFeature?: (name: string) => boolean
   resolveTimestampsAsync?: (type?: string) => Promise<number | undefined>
+  inspector?: { beginRender?: BeginRender }
+}
+
+/** Where a resolve delivers: the frame totals and, per frame, its passes. */
+interface GpuSink {
+  totals: number[]
+  passes: BenchPassSample[][]
 }
 
 interface GpuTimer {
   available: boolean
   /** Why GPU time is missing — carried into the report, never a fake number. */
   reason: string
+  /** Whether the per-pass breakdown is being recorded (point 1549). */
+  passesAvailable: boolean
+  /** Why the breakdown is missing while totals may still exist. */
+  passesReason: string
   /** Kick a resolve if none is in flight; a settled one appends to `sink`. */
-  poll(sink: number[] | null): void
+  poll(sink: GpuSink | null): void
   /** Await the in-flight resolve (and one more) so a phase's samples are in. */
-  flush(sink: number[] | null): Promise<void>
+  flush(sink: GpuSink | null): Promise<void>
   restore(): void
 }
 
@@ -128,43 +156,111 @@ function createGpuTimer(gl: unknown): GpuTimer {
   const off: GpuTimer = {
     available: false,
     reason: '',
+    passesAvailable: false,
+    passesReason: '',
     poll: () => {},
     flush: () => Promise.resolve(),
     restore: () => {},
   }
   if (!backend || backend.isWebGPUBackend !== true) {
-    return { ...off, reason: 'WebGL 2 backend has no timestamp queries' }
+    return { ...off, reason: 'WebGL 2 backend has no timestamp queries', passesReason: 'WebGL 2 backend has no timestamp queries' }
   }
   if (typeof renderer.resolveTimestampsAsync !== 'function') {
-    return { ...off, reason: 'renderer exposes no timestamp resolve' }
+    return { ...off, reason: 'renderer exposes no timestamp resolve', passesReason: 'renderer exposes no timestamp resolve' }
   }
   try {
     if (renderer.hasFeature?.('timestamp-query') !== true) {
-      return { ...off, reason: 'adapter without the timestamp-query feature' }
+      return { ...off, reason: 'adapter without the timestamp-query feature', passesReason: 'adapter without the timestamp-query feature' }
     }
   } catch {
-    return { ...off, reason: 'timestamp-query feature check failed' }
+    return { ...off, reason: 'timestamp-query feature check failed', passesReason: 'timestamp-query feature check failed' }
   }
   const originalTrack = backend.trackTimestamp === true
   backend.trackTimestamp = true
 
+  // Per-pass capture (point 1549), wrapped for the run only and restored in
+  // `restore`: the inspector's beginRender sees every pass's UID with its
+  // target (the identity), the backend's finishRender submits it (the GPU
+  // order). Without both hooks the breakdown is flagged unavailable.
+  const recorder = createPassRecorder()
+  type Hooked = Record<string, unknown>
+  const hooks: Array<() => void> = []
+  const wrap = (owner: Hooked, key: string, make: (orig: (...a: unknown[]) => unknown) => (...a: unknown[]) => unknown): boolean => {
+    const orig = owner[key]
+    if (typeof orig !== 'function') return false
+    const own = Object.prototype.hasOwnProperty.call(owner, key)
+    owner[key] = make(orig as (...a: unknown[]) => unknown)
+    hooks.push(() => {
+      if (own) owner[key] = orig
+      else delete owner[key]
+    })
+    return true
+  }
+  const inspector = renderer.inspector as Hooked | undefined
+  const getUid = backend.getTimestampUID
+  let passesAvailable = false
+  let passesReason = 'renderer exposes no per-pass hooks (inspector.beginRender, backend.finishRender)'
+  if (inspector && typeof inspector.beginRender === 'function' && typeof backend.finishRender === 'function' && typeof getUid === 'function') {
+    wrap(inspector, 'beginRender', (orig) =>
+      function benchBeginRender(this: unknown, ...a: unknown[]) {
+        if (typeof a[0] === 'string') recorder.begin(a[0], a[3] as BenchPassTarget | null)
+        return orig.apply(this, a)
+      },
+    )
+    wrap(backend as Hooked, 'finishRender', (orig) =>
+      function benchFinishRender(this: unknown, ...a: unknown[]) {
+        const result = orig.apply(this, a)
+        try {
+          const uid = getUid.call(backend, a[0])
+          if (typeof uid === 'string') recorder.submit(uid)
+        } catch {
+          // A context without a UID is simply not ordered.
+        }
+        return result
+      },
+    )
+    passesAvailable = true
+    passesReason = ''
+  }
+
   const timer: GpuTimer = {
     available: true,
     reason: '',
+    passesAvailable,
+    passesReason,
     poll: () => {},
     flush: () => Promise.resolve(),
     restore: () => {
       backend.trackTimestamp = originalTrack
+      for (const undo of hooks.splice(0)) undo()
     },
   }
   let inFlight: Promise<void> | null = null
-  const resolveOnce = (sink: number[] | null): Promise<void> => {
+  const resolveOnce = (sink: GpuSink | null): Promise<void> => {
     // One resolve at a time: three returns the SAME promise for a concurrent
     // call, which would record one duration twice.
     if (inFlight) return inFlight
     inFlight = (renderer.resolveTimestampsAsync as (type?: string) => Promise<number | undefined>)('render')
       .then((ms) => {
-        if (typeof ms === 'number' && ms > 0 && sink !== null) sink.push(ms)
+        if (!timer.passesAvailable) {
+          if (typeof ms === 'number' && ms > 0 && sink !== null) sink.totals.push(ms)
+          return
+        }
+        const take = recorder.take(backend.timestampQueryPool?.render)
+        if (!take.fresh) {
+          // three handed back its cached last value: no new frame was
+          // resolved, so neither the total nor the passes are recorded (the
+          // old code counted that duration twice).
+          if (take.reason === 'no-pool') {
+            timer.passesAvailable = false
+            timer.passesReason = 'timestamp pool exposes no per-pass durations'
+          }
+          return
+        }
+        if (typeof ms === 'number' && ms > 0 && sink !== null) {
+          sink.totals.push(ms)
+          sink.passes.push(take.passes)
+        }
       })
       .catch(() => {
         timer.available = false
@@ -385,8 +481,8 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     let sinceUpdate = 0
     // GPU durations of the measured frames. During the settle the queries are
     // still resolved but DISCARDED (an unresolved pool overflows at 2048).
-    const gpuSamples: number[] = []
-    let gpuSink: number[] | null = null
+    const gpuSamples: GpuSink = { totals: [], passes: [] }
+    let gpuSink: GpuSink | null = null
     const tick = (): void => {
       framesDone++
       gpu.poll(gpuSink)
@@ -412,7 +508,9 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
         frame,
         cpu: frameStats(samples.map((s) => s.cpuMs)),
         // Never fabricated: no timestamps, no number.
-        gpu: gpu.available && gpuSamples.length > 0 ? frameStats(gpuSamples) : null,
+        gpu: gpu.available && gpuSamples.totals.length > 0 ? frameStats(gpuSamples.totals) : null,
+        // The per-pass split of those same frames (point 1549).
+        gpuPasses: gpu.available && gpu.passesAvailable ? passBreakdown(gpuSamples.passes) : null,
         vsyncLikely: vsyncLikely(frame),
         drawCalls: render?.drawCalls ?? 0,
         pixelRatio: ctx.gl.getPixelRatio(),
@@ -476,6 +574,10 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   // The GPU series counts as measured only if rows actually carry it.
   const gpuMeasured = gpu.available && rows.some((r) => r.gpu !== null)
   const gpuReason = gpuMeasured ? '' : gpu.reason || 'no GPU timestamps were resolved'
+  const passesMeasured = gpuMeasured && gpu.passesAvailable && rows.some((r) => r.gpuPasses != null)
+  const passesReason = passesMeasured
+    ? ''
+    : gpuReason || gpu.passesReason || 'no per-pass GPU timestamps were resolved'
   // "Capped" if the wall clock sat at a refresh period in most rows — then it
   // cannot be the headline, whatever it reads.
   const capped = rows.length > 0 && rows.filter((r) => r.vsyncLikely).length * 2 >= rows.length
@@ -498,6 +600,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
       startedAt: startedAt.toISOString(),
     },
     gpuTiming: { available: gpuMeasured, reason: gpuReason },
+    gpuPassTiming: { available: passesMeasured, reason: passesReason },
     headline: headlineSeries(gpuMeasured, capped),
     rows,
     // The low-preset cost ranking (point 293): where the frame cost still sits

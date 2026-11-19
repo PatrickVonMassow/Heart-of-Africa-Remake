@@ -554,6 +554,40 @@ describe('report shaping', () => {
     expect(none.rows[0].gpu).toBeNull()
   })
 
+  it('carries the per-pass GPU breakdown per row and in the digest (point 1549)', () => {
+    const r = report()
+    r.gpuPassTiming = { available: true, reason: '' }
+    r.rows[0].gpuPasses = {
+      frames: 2,
+      emptyFrames: 0,
+      passes: [
+        { pass: 'ShadowMap', order: 1, frames: 2, median: 2, mean: 2 },
+        { pass: 'output', order: 2, frames: 2, median: 4.5, mean: 4.5 },
+      ],
+    }
+    const lines = benchSummaryLines(r)
+    const head = lines.findIndex((l) => l.startsWith('GPU PASS BREAKDOWN'))
+    // After the sweep table, one line per row.
+    expect(head).toBe(7)
+    expect(lines[head + 1]).toBe('  baseline / savanna-standing: ShadowMap 2.00 | output 4.50')
+    const parsed = JSON.parse(benchReportJson(r)) as {
+      gpuPassTiming: { available: boolean }
+      rows: Array<{ gpuPasses: { frames: number; passes: Array<{ pass: string }> } }>
+    }
+    expect(parsed.gpuPassTiming.available).toBe(true)
+    expect(parsed.rows[0].gpuPasses.frames).toBe(2)
+    expect(parsed.rows[0].gpuPasses.passes.map((p) => p.pass)).toEqual(['ShadowMap', 'output'])
+  })
+
+  it('states an unavailable breakdown with its reason and no row fakes one', () => {
+    const r = report(false)
+    r.gpuPassTiming = { available: false, reason: 'WebGL 2 backend has no timestamp queries' }
+    r.rows[0].gpuPasses = null
+    expect(benchSummaryLines(r).at(-1)).toBe('GPU PASS BREAKDOWN: unavailable — WebGL 2 backend has no timestamp queries')
+    const parsed = JSON.parse(benchReportJson(r)) as { rows: Array<{ gpuPasses: unknown }> }
+    expect(parsed.rows[0].gpuPasses).toBeNull()
+  })
+
   it('estimates the remaining time from the pace so far', () => {
     expect(benchRemainingMs(100, 300, 1000)).toBe(2000)
     expect(benchRemainingMs(0, 300, 0)).toBe(0)

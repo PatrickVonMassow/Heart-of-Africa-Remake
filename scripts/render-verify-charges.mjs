@@ -236,6 +236,15 @@ export const RED_CHARGES = [
     why: 'Same crashed WebGPU polish-children --section=tag-catch run on feat/680-place-life-dump a17e2f8e1, 09.11.2026 06:38; the catch beat of the same tag-catch section 1493 owns, unfixed since. The charge dies with it.',
   },
   {
+    point: 1553,
+    suite: 'polish-children',
+    kind: 'check',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /the charge starts with every catcher back in one line before its rock/i,
+    why: 'WebGPU polish-children --section=children-bank-game on feat/1164 7ba7344cc (rock material only), 19.11.2026 (log 15-11-36-540); the same section on main bb81bc0a9 ran green (15-47-17-013). Owned by no point until filed as 1553. The charge dies with it.',
+  },
+  {
     point: 1236,
     suite: 'enrichments',
     kind: 'check',

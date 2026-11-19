@@ -12,7 +12,7 @@
 // fail-OPEN: any internal error → allow, so a guard bug never traps the session.
 import { readFileSync, existsSync } from 'node:fs'
 import { writeTextAtomic } from './atomic-write.mjs'
-import { evaluate, releaseBoundaryProblem } from './queue-order-guard-core.mjs'
+import { evaluate, openPointBodies, releaseBoundaryProblem } from './queue-order-guard-core.mjs'
 import { closedPointsOf, openPointsOf } from './board-queue-core.mjs'
 import { ARCHIVE_PATH } from './tasks-source.mjs'
 import { RANK_RECORD_PATH, parseRankRecord, settleRecord } from './queue-rank-core.mjs'
@@ -105,7 +105,12 @@ function settleBaseline({ tasksMd, rankRecordJson }, path = RANKS) {
     // order at the turn end that first saw the breach would answer the question
     // by forgetting it. `settleRecord` shrinks either way; it only stops growing.
     const blocked = releaseBoundaryProblem(tasksMd, rankRecordJson).breaches.map((b) => b.point)
-    const settled = settleRecord(open, record, { at: new Date().toISOString(), closed, blocked })
+    const settled = settleRecord(open, record, {
+      at: new Date().toISOString(),
+      closed,
+      blocked,
+      bodies: openPointBodies(tasksMd),
+    })
     if (settled.changed) writeTextAtomic(path, `${JSON.stringify(settled.record, null, 2)}\n`)
   } catch (e) {
     console.error(`queue-order-guard: could not settle the rank baseline (continuing): ${e && e.message}`)

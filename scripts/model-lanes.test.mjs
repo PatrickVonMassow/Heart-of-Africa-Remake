@@ -87,6 +87,16 @@ describe('resolving designations', () => {
     }
   })
 
+  it('serves the scarce lane as Fable 5.2 and still reads the retired Fable 5.1 trailers', () => {
+    expect(SCARCE.displayName).toBe('Fable 5.2')
+    expect(SCARCE.trailerName).toBe('Claude Fable 5.2')
+    expect(SCARCE.modelId).toBe('claude-fable-5-2')
+    expect(trailerFor('scarce')).toContain('Claude Fable 5.2')
+    for (const s of ['Fable 5.1', 'Claude Fable 5.1', 'claude-fable-5-1', 'Claude Fable 5']) {
+      expect(resolveModel(s)?.lane.role, s).toBe('scarce')
+    }
+  })
+
   it('holds the cross aliases that historic fixtures read by position at their index', () => {
     // cross-review-core and four-eyes-artefacts tests read GPT-5.6 Sol by position;
     // new retired spellings are appended, never prepended.
