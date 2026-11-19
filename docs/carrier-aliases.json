@@ -24,6 +24,10 @@
     "1490": {
       "status": "absorbed",
       "why": "Still open: extended with the Tangier wall-grinding defect and retitled by user order 11.11.2026 (\"Ja, so erweitern und 1490 nach vorne ziehen.\"); the earlier carrier tick anchors its 05.11.2026 title. Retitled in b68331f5f."
+    },
+    "1549": {
+      "status": "absorbed",
+      "why": "Split in 5f13e6484: 1549 kept the per-pass GPU breakdown (landed a7d62076f) and its shadows-off cause fix moved to point 1552; the 19.11.2026 move-before-1543 order was carried out on 1549 and anchors its pre-split title."
     }
   }
 }
