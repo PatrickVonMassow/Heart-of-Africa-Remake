@@ -382,3 +382,23 @@ Container check: the script's launch reports `timestamp-query: true`. The check
 proves little here, because this container's SwiftShader adapter offers the
 feature even without the switches. Whether the switches unlock it on the
 owner's AMD adapter shows in that first line of the next owner run.
+
+## Round 9 — owner run at fa1b774 and the pre-run diagnosis
+
+Owner real-GPU run at fa1b774: still `gpu n/a (adapter without the
+timestamp-query feature)` on every pass. CPU median / p95: medium 12.4 / 44.3
+(3.57), high 21.6 / 36.5 (1.69), low 4.8 / 12.3, shadows-off 14.0 / 29.5,
+post-off 16.5 / 36.2.
+
+`scripts/perf-f8-detail.mjs` now prints before the run: the launched Chrome
+(executable/channel and version), the full Chrome args, `navigator.userAgent`,
+the adapter info and its feature list, `adapter timestamp-query`, and after
+the app has loaded `app device timestamp-query` (`renderer.hasFeature`, the
+same check the F8 report uses). Without timestamp-query on the adapter it
+stops with exit 2 and that diagnosis instead of a full run
+(`BENCH_REQUIRE_GPU_TIMESTAMPS=0` runs anyway). Container check: all lines
+print (headless SwiftShader: adapter and app device both report
+timestamp-query true). The stop branch is not exercised here because this
+adapter always offers the feature. The next owner run shows which link fails:
+args missing in the printed list, adapter without the feature despite the
+args, or adapter with it but app device without.

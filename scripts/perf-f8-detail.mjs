@@ -8,7 +8,8 @@
 // frames, and inside render-submit the exclusive renderer.render time by kind
 // and the blocking WebGPU calls (src/render/renderSplitWatch.ts). Env: BENCH_W, BENCH_H, BENCH_DPR (default 1536x960 @ 1.25),
 // BENCH_TIMEOUT_MS (default 30 min), BENCH_GPU_TIMESTAMPS=0 (do not add the
-// Chrome switches that expose timestamp-query).
+// Chrome switches that expose timestamp-query), BENCH_REQUIRE_GPU_TIMESTAMPS=0
+// (run even when the adapter lacks timestamp-query; default: stop, exit 2).
 import { writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { verifyLaunchOptions } from './verify/launch-args-core.mjs'
@@ -46,14 +47,40 @@ opts.args = [...opts.args, '--disable-gpu-vsync', '--disable-frame-rate-limit']
 if (backend === 'webgpu' && process.env.BENCH_GPU_TIMESTAMPS !== '0')
   opts.args = [...opts.args, '--enable-dawn-features=allow_unsafe_apis', '--enable-webgpu-developer-features']
 const browser = await chromium.launch(opts)
+// Diagnosis before the run (owner rounds 7-8: the report showed no GPU column):
+// the Chrome actually launched, its args, the adapter's features and the
+// app's device. Without timestamp-query the run stops here instead of
+// spending minutes on a report without GPU times (BENCH_REQUIRE_GPU_TIMESTAMPS=0
+// runs anyway).
+console.log(`# chrome: ${opts.executablePath ?? opts.channel ?? 'playwright chromium'} ${browser.version()}`)
+console.log(`# chrome args: ${opts.args.join(' ')}`)
 const page0 = await browser.newPage()
 await page0.goto(BASE, { waitUntil: 'commit', timeout: 120000 })
-const tsq = await page0.evaluate(async () => {
+const probe = await page0.evaluate(async () => {
+  const out = { userAgent: navigator.userAgent, adapter: null, features: [], info: null }
   const a = await navigator.gpu?.requestAdapter()
-  return a ? a.features.has('timestamp-query') : null
+  if (!a) return out
+  out.adapter = true
+  out.features = [...a.features].sort()
+  const i = a.info ?? {}
+  out.info = { vendor: i.vendor, architecture: i.architecture, device: i.device, description: i.description }
+  return out
 })
 await page0.close()
-console.log(`# adapter timestamp-query: ${tsq === null ? 'no WebGPU adapter' : tsq}`)
+const tsq = probe.features.includes('timestamp-query')
+console.log(`# userAgent: ${probe.userAgent}`)
+console.log(`# adapter: ${probe.adapter ? JSON.stringify(probe.info) : 'none'}`)
+console.log(`# adapter features: ${probe.features.join(', ') || '(none)'}`)
+console.log(`# adapter timestamp-query: ${probe.adapter ? tsq : 'no WebGPU adapter'}`)
+if (backend === 'webgpu' && !tsq && process.env.BENCH_REQUIRE_GPU_TIMESTAMPS !== '0') {
+  console.log(
+    '# STOP: the adapter offers no timestamp-query, so the F8 report would carry no GPU column. ' +
+      'Check that the args above reached this Chrome (a system Chrome launched through another ' +
+      'host may drop them) or set BENCH_REQUIRE_GPU_TIMESTAMPS=0 to run anyway.',
+  )
+  await browser.close()
+  process.exit(2)
+}
 const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: dpr })
 const url = new URL(BASE)
 if (short) url.searchParams.set('bench', 'short')
@@ -63,6 +90,9 @@ await page.reload({ waitUntil: 'load' })
 await page.waitForSelector('canvas', { timeout: 120000 })
 // Let the start scene stream in before the run; the runner discards a warm-up pass too.
 await page.waitForTimeout(15000)
+console.log(
+  `# app device timestamp-query: ${await page.evaluate(() => window.__renderer?.hasFeature?.('timestamp-query') ?? 'no renderer hook')}`,
+)
 await page.keyboard.press('F8')
 await page.waitForFunction(() => window.__ui?.getState().benchReport, null, { timeout, polling: 2000 })
 const { detail, env, aborted, rows, gpuTiming } = await page.evaluate(() => {
