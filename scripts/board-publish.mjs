@@ -43,6 +43,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { withDerivedState } from './board-state.mjs'
+import { readOrigins } from './board-origin.mjs'
+import { renderCardOrigins } from './board-origin-core.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
 import {
   normaliseLineEndings,
@@ -167,6 +169,20 @@ if (args.includes('--url')) {
 const state = readJson(STATE_PATH) ?? {}
 const boardFile = resolve(REPO_ROOT, state.dashboardPath ?? '.batch-dashboard.html')
 const archiveFile = resolve(REPO_ROOT, '.batch-dashboard-archive.html')
+
+// THE ORIGIN LINE (when a point was filed, by whom) under every numbered card's
+// description, on the board and the archive alike. Derived once per publish and
+// fail-soft: a publish is never blocked by it.
+let originsCache = null
+function withOrigins(html) {
+  try {
+    originsCache ??= readOrigins()
+    return renderCardOrigins(html, originsCache.originFor)
+  } catch (e) {
+    console.error(`board-publish: origin lines not rendered (${e.message})`)
+    return html
+  }
+}
 const tasksPath = resolve(REPO_ROOT, 'TASKS.md')
 
 /** The fingerprint the live page is expected to carry (null when unreadable). */
@@ -360,12 +376,12 @@ try {
   // anybody remembering to remove it. Deriving on the last write before the bytes
   // go out is what makes that true for the page the user actually reads.
   const refreshed = normaliseLineEndings(
-    renderCardCriticalities(
+    withOrigins(renderCardCriticalities(
       withDerivedState(
         upgradeNowCards(applyFooterNote(refreshFooter(repoBytes, { openCount: open.length }), share)),
       ),
       readTasksAll(),
-    ),
+    )),
   )
   repoBytes = refreshed
   footerRefreshed = true
@@ -512,7 +528,7 @@ try {
   console.error(`board-publish: liveness line not measured (${e.message})`)
 }
 const archive = existsSync(archiveFile)
-  ? withDistributions(renderCardCriticalities(readFileSync(archiveFile, 'utf8'), readTasksAll()))
+  ? withOrigins(withDistributions(renderCardCriticalities(readFileSync(archiveFile, 'utf8'), readTasksAll())))
   : null
 
 // A tree built with plumbing: no checkout, no index, no branch switch. This

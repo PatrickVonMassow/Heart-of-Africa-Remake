@@ -117,7 +117,7 @@ describe('--drained names where the finding went', () => {
     repo.git('commit', '-qam', 'append 1406')
     repo.git('push', '-q', 'origin', 'main')
     expect(run(['--drained', 'Ein Befund', '--point', '1406']).ok).toBe(true)
-    expect(carrier()).toMatch(/- \[x\] .* · Ein Befund\n {6}d\n {6}drained into point 1406 @[0-9a-f]{12} ~[0-9a-f]{8}/)
+    expect(carrier()).toMatch(/- \[x\] .* · Ein Befund\n {6}d\n {6}Source: agent finding of [^\n]+\n {6}drained into point 1406 @[0-9a-f]{12} ~[0-9a-f]{8}/)
   })
 
   it('keeps the reason of a drain into no point', () => {
