@@ -97,6 +97,8 @@ screenshots, and end-to-end. Strategy and suite map: `scripts/verify/README.md`.
   (`docs/tts-architecture.md`).
 - Answer repository questions with small command output. A blocked action means
   find the project command; never route the user through manual container work.
+- In chat, queue an explicit user order; for a discussed problem only propose a
+  solution and queue it after the user's OK in a later message.
 - Act on settled judgment. Confirm outward-facing or hard-to-reverse steps
   unless durably authorized: a stated recommendation on a “Von dir zu klären”
   card authorizes its decision, execution, and recorded closure (what, why,

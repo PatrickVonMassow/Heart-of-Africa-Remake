@@ -104,8 +104,8 @@ export function cardStats(bodyHtml) {
  * own), the heading and placeholder lines not counted; any other body whole.
  */
 export function cardSections(bodyHtml) {
-  // The derived "Verteilung" paragraphs are never the author's words, divider or not.
-  const body = String(bodyHtml ?? '').replace(/<p class="(?:dist-head|dist)">[\s\S]*?<\/p>/g, ' ')
+  // The derived "Verteilung" and origin paragraphs are never the author's words, divider or not.
+  const body = String(bodyHtml ?? '').replace(/<p class="(?:dist-head|dist|origin)">[\s\S]*?<\/p>/g, ' ')
   const at = body.indexOf('<hr class="split">')
   if (at < 0) return [{ label: '', html: body }]
   const drop = (html) => html.replace(/<p class="(?:status-head|desc-missing)">[\s\S]*?<\/p>/g, ' ')

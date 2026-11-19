@@ -23,7 +23,9 @@ const check = (name, ok, detail) => {
 }
 
 const browser = await launchVerifyBrowser()
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// A dpr > 1 viewport (the user's notebook runs at 1.25), so a capped preset
+// row measurably differs from a native one (point 1541).
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1.25 })
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -103,12 +105,50 @@ const routeNeedFps = Math.max(1, Math.ceil(progressNames.total / ((ROUTE_BUDGET_
 // A failed probe leaves the rate unmeasured (null), never the boot reading.
 const routeFps = await page.evaluate(laneFpsProbe, 2000).catch(() => null)
 const routeStarted = Date.now()
-const routeDone = await page
-  .waitForFunction(() => window.__ui.getState().benchReport !== null, null, { timeout: ROUTE_BUDGET_MS })
-  .then(() => true, (err) => {
-    if (!isWallCap(err)) throw err
-    return false
-  })
+// Every wait of the route shares its one deadline, so a slow lane still ends
+// in the UNMEASURED verdict below instead of a throw.
+const routeLeft = () => Math.max(1, routeStarted + ROUTE_BUDGET_MS - Date.now())
+const wallCapToNull = (err) => {
+  if (!isWallCap(err)) throw err
+  return null
+}
+// The climate-haze-off lever, live (point 1542): its desert phase must draw no
+// haze, and the next config ('all-off', haze on) must draw it again. The
+// desert is the only route phase with haze, so both samples are taken there.
+// One poll reads config, phase and haze together, so a sample never comes from
+// a later phase; `want` waits within the phase, `{ missed }` once it has ended.
+const hazeIn = (config, wantShown) =>
+  page
+    .waitForFunction(
+      ({ c, want }) => {
+        const s = window.__ui.getState()
+        const p = s.benchProgress
+        if (p && p.config === c && p.phase === 'desert-standing') {
+          window.__hazePhaseSeen = c
+          const shown = window.__climate.hazeShown()
+          return want === null || shown === want ? { enabled: window.__climate.hazeEnabled(), shown } : null
+        }
+        return window.__hazePhaseSeen === c || s.benchReport !== null ? { missed: true } : null
+      },
+      { c: config, want: wantShown },
+      { timeout: routeLeft(), polling: 50 },
+    )
+    .then((h) => h.jsonValue(), wallCapToNull)
+// Each sample is judged as soon as it returns, so a later timeout cannot
+// suppress an observed failure.
+const hazeOff = await hazeIn('climate-haze-off', null)
+if (hazeOff) {
+  check('climate-haze-off hides the ground haze in its desert phase', hazeOff.enabled === false && hazeOff.shown === false, JSON.stringify(hazeOff))
+}
+const hazeBack = hazeOff ? await hazeIn('all-off', true) : null
+if (hazeBack) {
+  check('the next config draws the ground haze again in its desert phase', hazeBack.shown === true, JSON.stringify(hazeBack))
+}
+const routeDone =
+  hazeBack !== null &&
+  (await page
+    .waitForFunction(() => window.__ui.getState().benchReport !== null, null, { timeout: routeLeft() })
+    .then(() => true, (err) => wallCapToNull(err) ?? false))
 const routeName = 'the fixed-frame benchmark route completes and reports'
 const routeLane = timingVerdict({ ok: routeDone, needFps: routeNeedFps, measuredFps: routeFps })
 if (routeLane.verdict === 'unmeasured') console.log(unmeasuredLine(routeName, routeLane.reason))
@@ -159,6 +199,57 @@ if (report.env.backend === 'webgl2') {
     `${gpuRows.length}/${report.rows.length} rows, reason "${report.gpuTiming.reason}"`,
   )
 }
+// Point 1549: the per-pass GPU split follows the same honesty rule — present
+// per row where the pool resolved passes, otherwise flagged with a reason.
+const passRows = report.rows.filter((r) => r.gpuPasses != null)
+if (report.gpuTiming.available === true) {
+  // Real whole-frame timestamps exist, so the split MUST exist too — an
+  // "unavailable" here is a broken capture, not an honest flag.
+  check(
+    'WebGPU: the per-pass breakdown is measured wherever GPU timestamps are',
+    report.gpuPassTiming?.available === true && passRows.length === gpuRows.length,
+    `${passRows.length}/${gpuRows.length} rows, reason "${report.gpuPassTiming?.reason}"`,
+  )
+  // Totals and passes cover the SAME frames (a stale resolve records neither).
+  check(
+    'WebGPU: every breakdown covers exactly the frames of its GPU series',
+    passRows.every((r) => r.gpu !== null && r.gpuPasses.frames === r.gpu.n && r.gpuPasses.passes.length > 0),
+    passRows.filter((r) => r.gpu === null || r.gpuPasses.frames !== r.gpu.n).slice(0, 3).map((r) => `${r.config}/${r.phase} ${r.gpuPasses.frames} vs ${r.gpu?.n}`).join(' | '),
+  )
+  // Matching counts alone pass a capture whose frames resolved a total but no
+  // pass; every measured frame must carry its passes, and the scene pass must
+  // run in every one of them.
+  const sceneFrames = (r) => r.gpuPasses.passes.find((p) => p.pass === 'output')?.frames ?? 0
+  const holes = passRows.filter((r) => r.gpuPasses.emptyFrames !== 0 || sceneFrames(r) !== r.gpuPasses.frames)
+  check(
+    'WebGPU: every measured frame resolved its passes, the scene pass included',
+    holes.length === 0,
+    holes.slice(0, 3).map((r) => `${r.config}/${r.phase} empty ${r.gpuPasses.emptyFrames}, output ${sceneFrames(r)}/${r.gpuPasses.frames}`).join(' | '),
+  )
+  // Every pass is named after its target, never the generic call fallback.
+  const generic = passRows.flatMap((r) => r.gpuPasses.passes.filter((p) => /^pass \d+$/.test(p.pass)).map((p) => `${r.config}/${r.phase} ${p.pass}`))
+  check('WebGPU: every pass carries its render-target label', generic.length === 0, generic.slice(0, 3).join(' | '))
+  // The real order: with sun shadows on, a shadow map is submitted before the
+  // scene pass that samples it (the call index once reversed this).
+  const baseRows = passRows.filter((r) => r.config === 'baseline')
+  const shadowFirst = (r) => {
+    const shadow = r.gpuPasses.passes.find((p) => p.pass.startsWith('ShadowMap'))
+    const scene = r.gpuPasses.passes.find((p) => p.pass === 'output')
+    return !!shadow && !!scene && shadow.order < scene.order
+  }
+  check(
+    'WebGPU: the baseline rows submit a shadow map before the scene pass',
+    baseRows.length === phases.length && baseRows.every(shadowFirst),
+    baseRows.map((r) => `${r.phase}: ${r.gpuPasses.passes.map((p) => p.pass).join(' > ')}`).join(' | '),
+  )
+} else {
+  check(
+    'the per-pass GPU breakdown is flagged unavailable with a reason, and no row fakes one',
+    report.gpuPassTiming?.available === false && report.gpuPassTiming.reason.length > 0 && passRows.length === 0 &&
+      report.summary.some((l) => l.startsWith('GPU PASS BREAKDOWN: unavailable')),
+    `${report.gpuPassTiming?.reason} / ${passRows.length} rows with passes`,
+  )
+}
 // The levers must BITE, judged by the real signal (the rendered geometry), not
 // by the config object agreeing with itself: a mis-named override key once left
 // point 209's refinement fully on while the report claimed it off.
@@ -206,6 +297,13 @@ for (const name of ['high-preset', 'medium-preset']) {
   const n = report.rows.filter((r) => r.config === name).length
   check(`the sweep includes the ${name} pass (one row per phase)`, n === phases.length, `${n} ${name} rows`)
 }
+// Point 1541: low caps at 0.8, medium at one pixel per CSS pixel, high keeps the native 1.25.
+const presetRatios = (name) => JSON.stringify([...new Set(report.rows.filter((r) => r.config === name).map((r) => r.pixelRatio))])
+check(
+  'the low/medium/high preset rows render at pixel ratio 0.80 / 1.00 / the native 1.25',
+  presetRatios('low-preset') === '[0.8]' && presetRatios('medium-preset') === '[1]' && presetRatios('high-preset') === '[1.25]',
+  `low ${presetRatios('low-preset')}, medium ${presetRatios('medium-preset')}, high ${presetRatios('high-preset')}`,
+)
 check(
   'every row records the pixel ratio it was measured at',
   report.rows.every((r) => typeof r.pixelRatio === 'number' && r.pixelRatio > 0),
@@ -308,6 +406,33 @@ check('the progress state is cleared once the report is up', after.progressClear
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' })))
 await page.waitForTimeout(300)
 check('Esc closes the result panel', (await page.locator('.bench-report').count()) === 0)
+
+// An Esc abort DURING the haze-off pass still restores the lever (point 1542):
+// the cleanup runs in the run's finally block, not after the last config.
+await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F8' })))
+await page.waitForFunction(
+  () => window.__ui.getState().benchProgress?.config === 'climate-haze-off',
+  null,
+  { timeout: ROUTE_BUDGET_MS, polling: 50 },
+)
+// Config, lever and Esc in one browser call, so the abort lands inside the
+// haze-off pass; the report must then say it was aborted, not completed.
+const abortedAt = await page.evaluate(() => {
+  const at = { config: window.__ui.getState().benchProgress?.config, enabled: window.__climate.hazeEnabled() }
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' }))
+  return at
+})
+await page.waitForFunction(() => window.__ui.getState().benchReport !== null, null, { timeout: 60000 })
+const abortedAfter = await page.evaluate(() => ({
+  aborted: window.__ui.getState().benchReport.aborted,
+  enabled: window.__climate.hazeEnabled(),
+}))
+check(
+  'an abort during climate-haze-off re-enables the ground haze',
+  abortedAt.config === 'climate-haze-off' && abortedAt.enabled === false && abortedAfter.aborted === true && abortedAfter.enabled === true,
+  `during ${JSON.stringify(abortedAt)}, after ${JSON.stringify(abortedAfter)}`,
+)
+await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' })))
 
 // The digest itself, so a suite run leaves the actual numbers behind (run-all
 // captures it in the run log; a direct run shows it on the console).

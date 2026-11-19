@@ -78,6 +78,41 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 
+- [ ] 1552. Fix the cause of the shadows-off GPU inversion
+  Split from 1549 (main session 19.11.2026, for veto). Observed in the user benchmark "Lenovo
+  GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the GPU
+  median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and triangles
+  fall. The batch host has no WebGPU timestamp query, so the cause can only be read from a fresh F8 run
+  on the user's notebook with the per-pass breakdown of 1549. WAITS FOR that report from the user.
+  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
+  Final state: with the pass the breakdown names, the cause is fixed in the product code, or — if it is
+  a measurement artefact — in the benchmark, so `shadows-off` prices only the shadows and its GPU median
+  is <= baseline in savanna-standing, desert-standing and savanna-driving on the user's notebook.
+  Test: Vitest for the changed logic; Playwright benchmark suite on WebGPU; the user's notebook report.
+  Criticality: high (inherited from priority point 1549).
+  Source: 1549 split, 19.11.2026.
+  Bundle: Steuerung & Performance.
+
+- [ ] 1543. Smooth the CPU hitches while driving on medium and high
+  Observed: The user's notebook benchmark shows CPU p95 of 41 ms (medium) and 52 ms (high) during the drive against medians of 9-12 ms: periodic hitches that the player feels as stutter even when the GPU average would be fine. The user requires medium to be clearly smoother on mid-range notebooks.
+
+  Final state: while driving (savanna-driving route), the CPU frame time on medium and high has no recurring multi-frame spikes: CPU p95 stays within 2x the CPU median. The responsible systems (streaming of terrain/flora dressing, chunk builds, shader/pipeline compilation, GC — identified by measurement) spread their work across frames, move it off the frame (worker/idle time) or pre-warm it.
+
+  Evidence required:
+  - Per-system attribution of the spikes (profile or timing marks) in the point's evidence.
+  - Benchmark on WebGPU, medium-preset and high-preset savanna-driving: CPU p95 <= 2x median (reference before: medium 8.8 / 41.2 ms, high 12.2 / 52.4 ms on the user's notebook).
+  - Vitest for changed scheduling logic; no visible pop-in regression (picture check of a driving frame).
+
+  Bounds the user named (verbatim):
+  - Queue position: FIRST in the work order, ahead of every open point (user order 18.11.2026: "ganz vorne in der Queue"). The three performance requests of 18.11.2026 run in this order: medium dpr cap, desert pixel cost + shadows-off inversion, driving CPU hitches. A request that does not converge is split (standing rule).
+  - Four eyes (user order 18.11.2026: "als Vier-Augen-Task"): convergent review by a cross-vendor model per scripts/cross-review.mjs before landing; record the reviewer in a Reviewed-By trailer.
+  - Reference measurement: user benchmark "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, AMD RDNA-3 notebook GPU, 1536x960 @ dpr 1.25, build c8f3995). The older "Lenovo GIP-Notebook.json" (without "(neu)") is void by user order and must not be used.
+  - Target for this notebook class: medium below 20 ms GPU median in savanna-standing, desert-standing and savanna-driving (> 50 fps). Low is already playable and must not get worse. High may gain speed only without noticeable loss of picture quality.
+  - All preset values stay in src/config/quality.ts (calibratable marked); no new runtime dependency.
+  User approval 18.11.2026: "Ja, so als drei Aufträge einreihen"
+  Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
+  Bundle: Steuerung & Performance.
+
 - [ ] 1164. A shadow lies on the river sand with nothing above it to cast it (seen
   18.09.2026 in the covering polish frame `verification/687-bank-play-rocks.png`, WebGPU
   run 2026-09-18T22:17:33 and the WebGL 2 run after it, both GREEN).
@@ -94,6 +129,17 @@ put it is the mistake this line exists to stop.
   Test: `polish --section=children-bank-game` on both backends with the frame
   `687-bank-play-rocks` INSPECTED.
   Criticality: low — a small wrong thing in a picture the player stands in front of.
+  MEASURED 18.11.2026 (branch feat/1164-shadow-without-caster, temporary probe commit to revert):
+  the dark ellipses on that sand are the SCATTER BOULDERS THEMSELVES (GroundScatter rock
+  instances, scale 0.33-0.68, i.e. 17-36 cm high, 30-58 m off; e.g. instance 4 at
+  -12.83/-18.77 projects to px 1122/482 of the 09.11 frame), neither a culled caster nor a
+  decal (the place scene has none). On the 09.11 frame they read #050300-#0a0502, darker
+  than the big rock's shaded side (#181106) and its cast shadow (#31290f), top faces
+  included. Switching their shadow receive, shadow cast or both changes their pixels by
+  under 3 %, so shadow-map acne is ruled out. Under the frontlit sun of 18.11 they read
+  #413321-#54432b against sand #786138, still far below their #8a8178 albedo. Next
+  suspect: GTAO (`src/render/Effects.tsx`, AO_FLOOR 0.4) occluding a stone smaller than
+  its radius; test via `window.__ui.setState({ ssaoEnabled: false })` at the shutter.
   Refs: verification/687-bank-play-rocks.png
   Bundle: Siedlungsgeometrie.
 
@@ -11263,6 +11309,9 @@ to land than a mechanism that needs a review.
   so the next one cannot be forgotten the same way.
   Criticality: medium — it loses no code and no save, but it silently changes the world and the
   random source of any session that measured itself, and it has stood unowned in every LARGE run.
+  ALSO MEASURED 19.11.2026 (main ae28726, WebGL 2): the world behind the finished benchmark dialog
+  renders black in `verification/136-benchmark-report.png` (WebGPU shows the street); likely the same
+  unreturned world — the fix's WebGL 2 frame must show the scene again, else file it separately.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1010. The Ctrl-label fusion check names a point that is closed, so its red has no owner

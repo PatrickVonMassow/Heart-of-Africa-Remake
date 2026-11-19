@@ -37813,3 +37813,185 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   the dwelling/roof geometry in src/scenes/place/roofClearance.ts and layout.ts
   (`DwellingKind` 'hut', its door at `d.door`)
   Bundle: Siedlungsgeometrie.
+
+- [x] 1541. Cap the medium preset at device pixel ratio 1.0
+  Observed: In the user's notebook benchmark the medium preset still renders at the full dpr 1.25 (21.2 / 30.5 / 30.3 ms GPU in savanna / desert / driving). The dpr-1 row cuts GPU time by 26-30 % in all three phases — the single largest lever, bigger than SSAO (~4 ms) or TRAA (~1.7 ms). The user requires medium to become clearly faster on mid-range notebooks.
+
+  Final state: the MEDIUM graphics preset caps the device pixel ratio at 1.0 (`dprCap: 1` in src/config/quality.ts, marked calibratable). HIGH keeps the native pixel ratio (`dprCap: null`); LOW keeps 0.8. The low < medium < high climb of the preset tests stays strict.
+
+  Evidence required:
+  - Vitest: quality.test.ts asserts medium.dprCap === 1, high.dprCap === null, and the strict climb.
+  - Benchmark (scripts/verify/benchmark.mjs or the in-game benchmark) on a dpr > 1 viewport: the medium-preset rows show pixelRatio 1.00 and a lower GPU median than before.
+  - Picture check medium vs. previous medium (TRAA still smooths edges; no visible aliasing regression on HUD-free world shots).
+  - docs: design.md §21 preset table (if it lists dpr per level) updated together.
+
+  Bounds the user named (verbatim):
+  - Queue position: FIRST in the work order, ahead of every open point (user order 18.11.2026: "ganz vorne in der Queue"). The three performance requests of 18.11.2026 run in this order: medium dpr cap, desert pixel cost + shadows-off inversion, driving CPU hitches. A request that does not converge is split (standing rule).
+  - Four eyes (user order 18.11.2026: "als Vier-Augen-Task"): convergent review by a cross-vendor model per scripts/cross-review.mjs before landing; record the reviewer in a Reviewed-By trailer.
+  - Reference measurement: user benchmark "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, AMD RDNA-3 notebook GPU, 1536x960 @ dpr 1.25, build c8f3995). The older "Lenovo GIP-Notebook.json" (without "(neu)") is void by user order and must not be used.
+  - Target for this notebook class: medium below 20 ms GPU median in savanna-standing, desert-standing and savanna-driving (> 50 fps). Low is already playable and must not get worse. High may gain speed only without noticeable loss of picture quality.
+  - All preset values stay in src/config/quality.ts (calibratable marked); no new runtime dependency.
+  User approval 18.11.2026: "Ja, so als drei Aufträge einreihen"
+  Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
+  Bundle: Steuerung & Performance.
+
+- [x] 1542. Find and fix the desert pixel cost and the shadows-off inversion
+  Observed: Part A: with every benchmark lever off at dpr 1, the desert still costs 18.1 ms GPU against 10.4 ms in the savanna, although it draws less than half the triangles — a per-pixel cost no lever covers. The suspect is the Sahara ground haze (travel-climate: 5 transparent layer meshes, 10 triangles, visible only in the desert phase; the savanna's 'east' region has haze 0). Desert is the slowest phase on every preset (medium 30.5 ms), so it decides playability.
+
+  Part B: turning shadows off RAISES the GPU median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and triangles fall — a costlier fallback path or a benchmark artefact. LOW runs without sun shadows, and any later shadow lever for medium is unreadable until this is understood.
+
+  Both parts are GPU investigations in the same benchmark phases with the same tooling (new sweep levers, measurement runs, one before/after picture check), so they share one branch, one review and one picture pass (user decision 18.11.2026 to bundle them).
+
+  Two parts, one branch.
+
+  PART A — desert pixel cost. Final state:
+  1. The benchmark sweep (src/systems/benchmark.ts BENCH_CONFIGS) has a `climate-haze-off` config that hides the travel ground-haze layers of src/scenes/travel/Climate.tsx, and the report's desert-standing row prices it. (If a measurement shows the desert's extra cost lies elsewhere, the point names the real cause with numbers and fixes that instead.)
+  2. The desert's always-on per-pixel cost is reduced on ALL presets without visible change: e.g. fewer/merged haze layers, cheaper noise, no full-screen overdraw for layers that cover only near ground, or a lower-cost evaluation — the author chooses by measurement.
+  3. Picture check desert-standing (world subject, Sahara, day 181) before/after on high: no noticeable difference in the dust veils (side-by-side in the point's evidence).
+
+  PART B — moved to point 1549 (main-session decision 18.11.2026 21:47, for veto: not reproducible on this host without timestamp queries). Original text: shadows-off inversion. Final state: switching sun shadows off never makes a frame more expensive. The cause of the measured inversion (benchmark `shadows-off` slower than `baseline`) is identified with numbers and fixed in the product code, or — if it is a benchmark artefact — fixed in the benchmark so the lever prices only the shadows.
+
+  Evidence required:
+  - Benchmark rows on WebGPU: desert-standing all-off GPU median moves clearly toward savanna-standing all-off (reference: 18.1 ms vs 10.4 ms at dpr 1 on the user's notebook); medium and high desert-standing GPU medians drop.
+  - Root cause of the inversion named in the point's evidence (which pass/material/path runs when shadowsEnabled is false); shadows-off GPU median <= baseline in savanna-standing, desert-standing and savanna-driving.
+  - Vitest for any changed config/logic; Playwright picture check (both backends if isBackendSensitivePath applies), including a shadowless frame if that rendering path changes.
+
+  Bounds the user named (verbatim):
+  - Queue position: FIRST in the work order, ahead of every open point (user order 18.11.2026: "ganz vorne in der Queue"). The three performance requests of 18.11.2026 run in this order: medium dpr cap, desert pixel cost + shadows-off inversion, driving CPU hitches. A request that does not converge is split (standing rule).
+  - Four eyes (user order 18.11.2026: "als Vier-Augen-Task"): convergent review by a cross-vendor model per scripts/cross-review.mjs before landing; record the reviewer in a Reviewed-By trailer.
+  - Reference measurement: user benchmark "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, AMD RDNA-3 notebook GPU, 1536x960 @ dpr 1.25, build c8f3995). The older "Lenovo GIP-Notebook.json" (without "(neu)") is void by user order and must not be used.
+  - Target for this notebook class: medium below 20 ms GPU median in savanna-standing, desert-standing and savanna-driving (> 50 fps). Low is already playable and must not get worse. High may gain speed only without noticeable loss of picture quality.
+  - All preset values stay in src/config/quality.ts (calibratable marked); no new runtime dependency.
+  User approval 18.11.2026: "Ja, so als drei Aufträge einreihen"
+  Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
+  Bundle: Steuerung & Performance.
+
+- [x] 1544. Delete the three skirt-calibration cloud branches and remove the board card "Drei Rock-Kalibrier-Branches: behalten oder löschen?"
+
+  - git push origin --delete claude/skirt-containment-calibration-r7-0w798w claude/skirt-containment-calibration-r8-02wjht claude/skirt-containment-sector-envelope-155wyt (last commits 04.11.2026: 024147d5c, 3daae3dcf, aca51bfab); remove any local copies/worktrees of them.
+  - Board: drop the card; record the closure in the decision log (what: branches deleted; why: user decision 18.11.2026; veto: commits stay recoverable by sha while unpruned).
+  - No code change.
+  - Queue position (user order 18.11.2026: "Alle drei Aufträge vorne einreihen, aber nach den drei neu anstehenden Aufträgen zur Performance-Steigerung"): front of the work order, directly after the three performance requests of 18.11.2026.
+  User approval 18.11.2026: "Auftrag an die Owner-Session"
+  Source: user request of 18.11.2026 17:24 (spec cut from b08561942).
+  Bundle: Chat & Tafel.
+
+- [x] 1545. Close parked work-order point 1163 (red band at the leftmost Giza pyramid) as WONTFIX and remove its board card "Gizeh: roter Granitsockel der kleinsten Pyramide"
+
+  - docs/backlog.md: mark the 2026-11-18 entry for point 1163 as closed WONTFIX (user decision 18.11.2026: the red band is Menkaure's Aswan-granite skirt required by design.md §4.4; no action needed).
+  - Board: drop the card; record the closure in the decision log (what: 1163 WONTFIX; why: design-mandated granite skirt; veto: reopen only with a design.md §4.4 change).
+  - No code change.
+  - Queue position (user order 18.11.2026: "Alle drei Aufträge vorne einreihen, aber nach den drei neu anstehenden Aufträgen zur Performance-Steigerung"): front of the work order, directly after the three performance requests of 18.11.2026.
+  User approval 18.11.2026: "Auftrag an die Owner-Session"
+  Source: user request of 18.11.2026 17:24 (spec cut from b08561942).
+  Bundle: Chat & Tafel.
+
+- [x] 1546. Implement the recommended option of the board card "Chat: Problem besprechen ohne Einreihen – Regel in Anweisungstexte?" and remove the card
+
+  Problem: in chat, a described problem immediately becomes a new work-order point because the fixed instruction texts for chat sessions (hook/guard texts such as the stand-down carrier hint, decision-card and request-approval guard messages, batch-resume context) say so; the user's rule "a solution needs approval first" lives only in memory (solutions-need-user-approval.md, a-question-is-only-a-question.md).
+
+  Final state:
+  - The chat instruction texts distinguish two cases explicitly:
+    1. An explicit user order (do X / close Y / delete Z) is queued / deposited as a request.
+    2. A discussed problem (the user describes or asks about something): the session only proposes a solution in the reply; it is queued only after the user's OK in a later message.
+  - CLAUDE.md §6 (Working Method) gains the same rule in one or two lines (user decision 18.11.2026), so it no longer lives only in memory.
+  - Text change only; no new guard, ledger field or mechanism (infrastructure freeze 01.09.2026). Adjust the tests that pin the changed texts.
+  - Board: drop the card; record the closure in the decision log (what, why: user decision 18.11.2026 "deinen Vorschlag umsetzen", veto effect).
+
+  Queue position (user order 18.11.2026: "Alle drei Aufträge vorne einreihen, aber nach den drei neu anstehenden Aufträgen zur Performance-Steigerung"): at the front of the work order, directly after the three performance requests of 18.11.2026, together with the skirt-branch deletion and the 1163 WONTFIX request.
+
+  Note: settings/hook edits are attended-only (memory protected-paths-always-prompt).
+  User approval 18.11.2026: "Ja. Alle drei Aufträge vorne einreihen, aber nach den drei neu anstehenden Aufträgen zur Performance-Steigerung."
+  Source: user request of 18.11.2026 17:27 (spec cut from 04642a868).
+  Bundle: Chat & Tafel.
+
+- [x] 1548. Housekeeping: let the branches step run despite an incomplete earlier step, fix the incomplete tmp step, shorten the rescue-branch age to 3 days
+
+  Measured 18.11.2026 18:53 (this session, read-only):
+  - 13 rescue/doctor-* branches locally, 11 on origin, created 13.11.–18.11.2026 (about 2 per day by batch-doctor).
+  - Point 1513 (closed 13.11.2026) added the 'branches' housekeeping step (scripts/housekeeping-branches.mjs, branchVerdict in scripts/housekeeping-core.mjs:120, BRANCH_MAX_AGE_MS = 14 days).
+  - scripts/housekeeping.mjs breaks out of the step loop on the first incomplete step (lines 750 tmp, 790 local, 827 logs). Daily logs local/housekeeping/2026-11-14..18.jsonl: steps {"tmp":"incomplete"} on 14., 15., 17., 18.; on 16. tmp+local done, logs incomplete. The 'branches' step has therefore never run since 1513 landed.
+  - Each of those runs reports foreignUnreadable: 3 (likely cause of the incomplete tmp step; not yet measured).
+
+  Final state:
+  1. An incomplete step no longer stops later independent steps (smallest change; the run stays marked incomplete). Real-git/Vitest test: an incomplete tmp step still runs branches.
+  2. Measure and fix why the tmp step ends incomplete daily (foreignUnreadable or scan budget); test.
+  3. BRANCH_MAX_AGE_MS for rescue/doctor-* lowered to 3 days (calibratable, user order 18.11.2026); claude/* keep their existing rule unless the same constant serves both — then split the constant per kind. Containment-in-main and unknown-=-keep stay unchanged.
+  4. Run housekeeping once against the real repo and report before/after rescue-branch counts (local and origin) to the user.
+  Infrastructure freeze 01.09.2026: fix of an existing mechanism, no new one.
+  Queue position (user order 18.11.2026: "nach dem Herkunftszeilen-Task"): directly after "Board: every point's description ends with an origin line — when it was filed and by whom".
+  User approval 18.11.2026: "ja"
+  Source: user request of 18.11.2026 17:56 (spec cut from 658af1aa7).
+  Bundle: Session- & Repo-Hygiene.
+  Status 19.11.2026 06:41 (batch session, context watermark): branch feat/1548-housekeeping-branches-step (worktree .claude/worktrees/point-1548), items 1 and 3 committed and pushed (d42815dbf no break after an incomplete step + Vitest that fails without it; 8fdfd1a90 RESCUE_BRANCH_MAX_AGE_MS 3 d / CLOUD_BRANCH_MAX_AGE_MS 14 d), housekeeping Vitest 79 green. Next: item 2 — measured /tmp holds 127,795 top-level entries (50k entry budget); a dry run of the tmp step alone finished 'done' in 1.8 s but filed proc-unreadable (foreignUnreadable 3) — find why the scheduled run ends incomplete (cursor in local/housekeeping state, shared budget), fix, test; then gates, item 4 real run with before/after rescue counts, cross review, landing.
+  Status 19.11.2026 07:09 (batch session, context watermark): item 2 fixed and pushed — cause measured: ~100k leftover hoa-* test dirs in /tmp spent the 50k entry budget daily; name+lstat rejects are now budget-free (3ed6969, test red without fix); backlog entry for the test leak. Cross review GPT-6.2 Sol: 3 rounds merge-with-fixes, rounds 1-2 answered (386498d, 1e2348c), round 3 recorded at 9b630f7 and OPEN: walk reports incomplete when a non-first visit exhausts the budget without cutting its scan (move the !first check onto scanCut — note the existing 'entry larger than the whole budget' test then expects complete, reconcile) and test that edge with two old tool logs at budgetEntries 2. Branch tsc/lint/build green at 3ed6969; full test:unit not yet run on the branch. Item 4 dry run of the branches step against the real repo: would delete 7 local / 6 origin rescue branches (before: 15 local, 13 origin). Then real run, report counts, landing.
+
+- [x] 1547. Board: every point's description ends with an origin line — when it was filed and by whom
+
+  User example (schema only, content illustrative):
+    "Auf dem Ufersand liegt ein kleiner dunkler Schatten, über dem nichts steht. Zu klären: fehlt das Objekt, das ihn wirft, oder ist der Schatten ein verwaistes Bodenbild?
+
+    Eingestellt: 18.11.26 durch Agenten, der beim Abarbeiten von 1234 auf das Problem gestoßen ist"
+
+  Final state:
+  - Each queue/work-order card on the board shows, below its description, one line "Eingestellt: <TT.MM.JJ> <durch wen>" (en: "Filed: <date> <by whom>"; text from the language/board text source, de and en together if the board has both).
+  - "durch wen" distinguishes at least: user request (Benutzeranfrage) vs. agent, and for an agent the context when known (e.g. found while working on point N, review of point N, covering run of point N, split from point N).
+  - Data source, in this order: the point's own `Source:` line in TASKS.md (about 70 of ~443 open points carry one); otherwise the commit that added the point to TASKS.md (git log -S on the point's header line: date, and whether the commit/trailer shows a user-request deposit or an agent finding). If nothing can be determined, the line says so ("Herkunft unbekannt") rather than guessing.
+  - Newly filed points carry a `Source:` line with date and origin from now on (finding.mjs request/record drain path), so the line no longer depends on git archaeology.
+  - Vitest for the origin derivation and the rendered line; picture check of the board at phone width.
+  - Infrastructure freeze 01.09.2026: this is an explicit user order for a board extension; keep it small (no new ledger field beyond the existing `Source:` convention).
+  - Closed points too (user order 18.11.2026: "Sofern mit vertretbarem Aufwand möglich, auch für alle erledigten Tasks nachholen"): the archive view (archive.html / docs/tasks-archive.md entries) shows the same origin line, derived the same way. If the git derivation for the archive proves unreasonably expensive, do the open points first and file the archive part as its own follow-up point with the measured cost.
+  - Queue position (user order 18.11.2026: "Einreihung nach dem Task mit den Chat-Anweisungstexten"): directly after the request "Chat instruction texts: queue explicit orders, only propose for discussed problems; rule into CLAUDE.md".
+  User approval 18.11.2026: "Sofern mit vertretbarem Aufwand möglich, auch für alle erledigten Tasks nachholen. Einreihung nach dem Task mit den Chat-Anweisungstexten."
+  Source: user request of 18.11.2026 17:44 (spec cut from 04642a868).
+  Bundle: Chat & Tafel.
+
+- [x] 1550. Switch the scarce (Fable) lane from Fable 5.1 to Fable 5.2
+  Observed (measured 19.11.2026 10:21): a new model Fable 5.2 (model id `claude-fable-5-2`) exists. The installed Claude Code 2.1.280 refuses it: `API Error: 400 Claude Code 2.1.280 does not support this model; version 2.1.290 or newer is required`. The scarce lane in `scripts/model-lanes.mjs` still names Fable 5.1 (`claude-fable-5-1`), and so do the serving-chain texts the session hooks print.
+
+  Final state:
+  - Claude Code in the container is at >= 2.1.290 by the project's own install/update path (no manual container work for the user), and `claude -p … --model claude-fable-5-2` answers.
+  - `scripts/model-lanes.mjs` is the only place naming the model: the scarce lane reads displayName `Fable 5.2`, trailerName `Claude Fable 5.2`, modelId `claude-fable-5-2`; `Fable 5.1` / `Claude Fable 5.1` / `claude-fable-5-1` move into its `retired` list, so earlier trailers stay valid for the model guard.
+  - The serving chain (Opus 5.5, then Fable 5.2, then Opus 4.8), the lane-switch status and every hook text derived from the lanes name Fable 5.2; no live rule text still names 5.1 as the current lane (historical docs and archives stay untouched).
+  - The model-guard baseline accepts a `Co-Authored-By: Claude Fable 5.2` trailer and still accepts the retired 5.1 trailers on existing commits.
+
+  Test: Vitest for the lane record, the trailer allowlist (5.2 accepted, 5.1 retired-but-valid) and the serving-chain text; a live probe of `claude-fable-5-2` recorded in the point's evidence.
+  Source: user request of 19.11.2026 09:27 UTC via the findings carrier (session 9a5eca75); queued at the front of the work order by user order.
+  Bundle: Modell & Wächter.
+
+- [x] 1551. Refuse the back of the order for a split of a priority point
+  Observed: 18.11.2026 the batch split Part B of the user's high-priority performance order 1542 into 1549 and ranked it `last` (machine, position 445 of 445) with a reason about WHEN it can run (the batch host lacks WebGPU timestamp queries), not WHERE it belongs. `--ranked` accepts any nonempty reason, `appendGateState` clears on any `last` entry, and standing before one remembered point counts as a deliberate move. The 1549 block carries no `Criticality:` tag. Corrected by user order 19.11.2026 (1549 now before 1543).
+
+  Origin: blind four-eyes stage — A Claude Opus 5.5, B GPT-6.2 Sol, merged by Claude Fable 5.2 (19.11.2026). Hybrid verdict: the live parent rank entry is the detector; the child's own `Criticality: high` tag is the carrier that survives the parent's landing; no retention of closed entries (that would be a new ledger part, forbidden by the freeze).
+
+  Final state (no new guard, no new record field; `.claude/queue-rank.json` keeps its shape):
+  1. `scripts/queue-rank-core.mjs`: new pure `splitPriorityOf(body, ranked)` reads `Split from <N>` in the point's own block. `priority` when `ranked[N].place` is `ahead` or `statesHighUrgency(body)`; `undeclared` when the cited parent has no entry and the block states no `Criticality:` level; else `none`. A block without the citation is `none`.
+  2. `appendGateState(open, record, { bodies })`: a new `priority` point stays pending unless it has an `ahead` entry AND stands in the leading run (no open point without an `ahead` entry before it). An `undeclared` new point stays pending until its block states a level. Without `bodies` behaviour is unchanged.
+  3. `scripts/queue-order-guard-core.mjs` passes `openPointBodies(tasksMd)`; `scripts/queue-rank.mjs` status and `writeRankRecord` use the same call, so settlement cannot absorb a refused placement.
+  4. CLI: `--ranked <N>` is refused for `priority` and `undeclared`; the message names the remedy (move the block to the front, write `Criticality: high` into the child, then `--ahead <N> --why …` with the true origin).
+  5. TASKS.md preamble, one sentence: a point split from a priority point inherits its place; when it can run is stated in the block and is never a rank reason.
+  6. File the three blind-stage halves under `docs/four-eyes/` (A, B with model fields, union by Fable 5.2) in one commit and run the `scripts/blind-merge.mjs` count (manual count: 21/21 entries, each exactly once). The halves were preserved on 19.11.2026 from the filing session's scratchpad into `local/four-eyes-1551/` (A.json, B.json, U.json; untracked); the Fable 5.2 full text stands in session transcript ae3584ec-83cc-4c8a-8edc-06056cb3d591.
+
+  Test (Vitest, core + CLI):
+  - 1542->1549: `ranked[1542] = {user, ahead}`, 1549 appended with "Split from 1542 Part B" and no tag -> pending; a hand-written `last` entry -> still pending.
+  - Child moved before one remembered backlog point -> still pending; moved before 1543 with an `ahead` entry -> settled.
+  - Parent closed and pruned: child with `Criticality: high` -> `priority`; child without any level -> `undeclared`.
+  - A non-split appended point and a split of a `last`-ranked parent -> unchanged; `--ranked 1549` exits non-zero with the remedy text.
+
+  Still open (record, do not build): a split without the `Split from <N>` line escapes; a settled child moved back later is not re-asked; `Criticality: high` also arms the four-eyes tick gate for the child; "front" = leading run is a stand-in while no release point is open; a torn record still fails open.
+  Source: user request of 19.11.2026 10:02 UTC via the findings carrier (session 9a5eca75); queued at the front of the work order by user order 19.11.2026 11:02, directly behind 1550 which was already being landed.
+  Bundle: Modell & Wächter.
+
+- [x] 1549. Record a per-pass GPU breakdown in the F8 benchmark report
+  Split from 1542 Part B (main-session decision 18.11.2026 21:47, for veto). Observed in the user benchmark
+  "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the
+  GPU median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and
+  triangles fall. Not reproducible on the batch host: it offers no WebGPU timestamp query.
+  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
+  Final state: the F8 benchmark report carries a per-pass GPU breakdown of the measured frame (the
+  WebGPUTimestampQueryPool timestamps per pass, in pass order), so a run on the user's notebook names the
+  pass that grows when shadows are off. Split 19.11.2026 (main session, for veto): the cause fix needs
+  that notebook run and moved to point 1552.
+  Test: Vitest for the breakdown's formatting and report rows; Playwright benchmark suite on WebGPU.
+  Source: 1542 session, 18.11.2026 21:47.
+  Bundle: Steuerung & Performance.

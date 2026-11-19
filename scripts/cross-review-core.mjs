@@ -1,6 +1,6 @@
 // Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624).
 //
-// rule:model-policy@740d83c2
+// rule:model-policy@0c63d429
 // WHY IT EXISTS: models of one vendor share training and therefore CORRELATED
 // blind spots, which is exactly what the four-eyes rule is bought against
 // (CLAUDE.md §6). A lane of a different vendor is the strongest decorrelation

@@ -266,8 +266,9 @@ const RESUME_BODY =
   '(throttle DOWN if report volume threatens context, never up; tightly-coupled same-file points go ' +
   'TOGETHER on ONE branch sequentially); the main session keeps picture verification (backends per ' +
   'CLAUDE.md §6), the serial merge -> fast-gate -> tick -> deploy -> cleanup, and the board publish. ' +
-  'Every defect the user reports on the deployed build is APPENDED as its own ready TASKS point on ' +
-  'main and delegated (append-and-defer), never fixed ad hoc or dropped. ' +
+  'Every defect the user ORDERS fixed on the deployed build is APPENDED as its own ready TASKS point on ' +
+  'main and delegated (append-and-defer), never fixed ad hoc or dropped; a problem the user only ' +
+  'describes or asks about gets a proposed solution and is queued only after the user\'s OK in a later message. ' +
   'POINT BOUNDARY: once the point you were landing is LANDED (merged and ticked), run ' +
   '`node scripts/batch-boundary.mjs --prepare <point>`, its bookkeeping, then `--commit <point>` as ' +
   'the LAST repository action, and END THE SESSION instead of starting the next point; the context ' +
@@ -315,7 +316,7 @@ try {
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@740d83c2
+      // rule:model-policy@0c63d429
       'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES (role records in scripts/model-lanes.mjs). ' +
       'scripts/author-routing-core.mjs makes that cut from point text and recorded review history; ' +
       'a point\'s `Author lane:` tag stays an operator decision (ordinary-lane tags yield only to a ' +

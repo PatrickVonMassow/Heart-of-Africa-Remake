@@ -283,6 +283,78 @@ describe('budget and resume', () => {
   })
 })
 
+describe('budget: entries rejected by name and lstat alone', () => {
+  it('lets many hoa-* directories pass without spending the scan budget', () => {
+    const a = arena()
+    for (let i = 0; i < 10; i++) mkdirSync(join(a.tmp, `hoa-leftover-${i}`))
+    for (let i = 0; i < 5; i++) put(join(a.tmp, `build.cache-${i}/web/a.js`))
+    symlinkSync(a.outside, join(a.tmp, 'linked'))
+    put(join(a.tmp, 'hoa-z-old.log'))
+    age(join(a.tmp, 'hoa-z-old.log'))
+    const { r } = run(a, { steps: ['tmp'], budgetEntries: 4 })
+    expect(r.steps.tmp).toBe('done')
+    expect(existsSync(join(a.tmp, 'hoa-z-old.log'))).toBe(false)
+    expect(existsSync(join(a.tmp, 'hoa-leftover-0'))).toBe(true)
+  })
+})
+
+describe('budget: an incomplete step does not stop later steps', () => {
+  it('runs branches and git after a tmp step that ran out of budget', () => {
+    const a = arena()
+    for (let i = 0; i < 6; i++) {
+      put(join(a.tmp, `hoa-old-${i}.log`))
+      age(join(a.tmp, `hoa-old-${i}.log`))
+    }
+    put(join(a.local, '659-a-frames/1.png'))
+    put(join(a.local, 'tool-output-logs/old.log'))
+    const { r, gitCalls } = run(a, { steps: ['tmp', 'local', 'logs', 'branches', 'git'], budgetEntries: 2 })
+    expect(r.steps.tmp).toBe('incomplete')
+    expect(r.steps.local).toBe('incomplete')
+    expect(r.steps.logs).toBe('incomplete')
+    expect(r.outcome).toBe('incomplete')
+    expect(r.steps.branches).toBeDefined()
+    expect(gitCalls.some((c) => c[0] === 'for-each-ref')).toBe(true)
+    expect(gitCalls.some((c) => c.includes('gc') && c.includes('--auto'))).toBe(true)
+  })
+
+  it('reports done when the only entry uses the budget up exactly', () => {
+    const a = arena()
+    put(join(a.tmp, 'hoa-only.log'))
+    age(join(a.tmp, 'hoa-only.log'))
+    // One unit for the candidate, one for its scan; spend() fails AT the limit.
+    const { r } = run(a, { steps: ['tmp'], budgetEntries: 3 })
+    expect(r.steps.tmp).toBe('done')
+    expect(r.outcome).toBe('complete')
+    expect(existsSync(join(a.tmp, 'hoa-only.log'))).toBe(false)
+  })
+
+  it('moves the cursor past a later entry that used the budget up without a cut scan', () => {
+    const a = arena()
+    for (const n of ['a', 'b', 'c']) {
+      put(join(a.local, `tool-output-logs/${n}-old.log`))
+      age(join(a.local, `tool-output-logs/${n}-old.log`))
+    }
+    // Each log spends one unit and needs no scan: b exhausts the budget but is
+    // finished, so the cursor stands after it, not before it.
+    const { r } = run(a, { steps: ['logs'], budgetEntries: 2 })
+    expect(r.steps.logs).toBe('incomplete')
+    expect(existsSync(join(a.local, 'tool-output-logs/b-old.log'))).toBe(false)
+    expect(existsSync(join(a.local, 'tool-output-logs/c-old.log'))).toBe(true)
+    expect(JSON.parse(readFileSync(dataPaths(a.local).state, 'utf8')).cursor.logs).toBe('b-old.log')
+  })
+
+  it('marks the run incomplete when its only entry outgrows the budget', () => {
+    const a = arena()
+    put(join(a.tmp, 'hoa-only.log'))
+    age(join(a.tmp, 'hoa-only.log'))
+    const { r, gitCalls } = run(a, { steps: ['tmp', 'branches', 'git'], budgetEntries: 1 })
+    expect(r.steps.tmp).toBe('incomplete')
+    expect(r.outcome).toBe('incomplete')
+    expect(existsSync(join(a.tmp, 'hoa-only.log'))).toBe(true)
+    expect(gitCalls.some((c) => c[0] === 'for-each-ref')).toBe(true)
+  })
+})
+
 describe('budget: an entry larger than the whole budget', () => {
   it('is kept as scan incomplete and passed, so it never blocks later runs', () => {
     const a = arena()
@@ -291,11 +363,11 @@ describe('budget: an entry larger than the whole budget', () => {
     run(a, { steps: ['local'], budgetEntries: 4 })
     expect(existsSync(join(a.local, '659-a-frames'))).toBe(true)
     expect(manifest(a).find((l) => l.path?.endsWith('659-a-frames'))?.reason).toBe('scan incomplete')
-    // The next run starts after it (local/housekeeping/ sorts later and takes
-    // the rest of a 4-entry budget, so a third run finishes the step).
-    run(a, { steps: ['local'], budgetEntries: 4 })
+    // The next run starts after it and finishes the step: local/housekeeping/
+    // uses the budget up, but needs no scan, so it is not visited again.
+    const second = run(a, { steps: ['local'], budgetEntries: 4 })
     expect(existsSync(join(a.local, '659-b-frames'))).toBe(false)
-    expect(run(a, { steps: ['local'], budgetEntries: 4 }).r.outcome).toBe('complete')
+    expect(second.r.outcome).toBe('complete')
   })
 })
 

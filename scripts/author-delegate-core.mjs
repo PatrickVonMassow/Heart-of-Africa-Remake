@@ -1,4 +1,4 @@
-// THE AUTHORING LANES' WRAPPER, decided (point 667). Pure half. rule:model-policy@740d83c2
+// THE AUTHORING LANES' WRAPPER, decided (point 667). Pure half. rule:model-policy@0c63d429
 //
 // One command for every lane with an authoring path (`--lane <role>`): the lane record
 // (scripts/model-lanes.mjs) supplies the model, the id, the runtime and the trailer, and
