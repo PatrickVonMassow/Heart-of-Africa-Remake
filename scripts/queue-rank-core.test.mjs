@@ -39,6 +39,7 @@ import {
   statesHighUrgency,
 } from './queue-rank-core.mjs'
 import { RELEASE_TAG_POINT } from './board-queue-core.mjs'
+import { SPLIT_NONE, SPLIT_PRIORITY, SPLIT_UNDECLARED, splitPriorityOf } from './queue-rank-core.mjs'
 
 /** The appended points whose rank nobody has settled yet. */
 const unrankedAppends = (open, record) => appendGateState(open, record).pending
@@ -904,5 +905,83 @@ describe('the FROZEN front survives every write, and only ever shrinks', () => {
   it('is TORN when it is present but unreadable, never read as never-armed', () => {
     expect(parseRankRecord('{"settled":{"at":"t","points":[1]},"boundary":42}').torn).toBe(true)
     expect(parseRankRecord('{"settled":{"at":"t","points":[1]},"boundary":{"points":"no"}}').torn).toBe(true)
+  })
+})
+
+describe('a SPLIT of a priority point inherits its place (point 1551)', () => {
+  // 18.11.2026: Part B of the user's priority order 1542 was split into 1549 and
+  // ranked `last` with a reason about WHEN it can run, not WHERE it belongs.
+  const at = '2026-11-19T00:00:00.000Z'
+  const parentAhead = { 1542: { at, why: 'user order', origin: ORIGIN_USER, place: PLACE_AHEAD } }
+  const child = '- [ ] 1549. Part B.\nSplit from 1542 Part B — runs on a host with timestamp queries.'
+  const bodies = (extra = {}) => ({ 1542: '- [ ] 1542. Parent.', 1543: '- [ ] 1543. Backlog.', 1544: '- [ ] 1544. Backlog.', 1549: child, ...extra })
+  const base = [1542, 1543, 1544]
+
+  it('holds the appended split of an `ahead` parent, untagged', () => {
+    const state = appendGateState([1542, 1543, 1544, 1549], settledAt(base, parentAhead), { bodies: bodies() })
+    expect(state.pending).toEqual([1549])
+    expect(state.splitHeld).toEqual([{ point: 1549, kind: SPLIT_PRIORITY, parent: 1542 }])
+  })
+
+  it('keeps it pending under a hand-written `last` entry', () => {
+    const ranked = { ...parentAhead, 1549: { at, why: 'host lacks timestamp queries', place: PLACE_LAST } }
+    const state = appendGateState([1542, 1543, 1544, 1549], settledAt(base, ranked), { bodies: bodies() })
+    expect(state.state).toBe('pending')
+    expect(state.pending).toEqual([1549])
+  })
+
+  it('keeps it pending when moved before one remembered backlog point only', () => {
+    const ranked = { ...parentAhead, 1549: { at, why: 'split from 1542', place: PLACE_AHEAD } }
+    const state = appendGateState([1542, 1543, 1549, 1544], settledAt(base, ranked), { bodies: bodies() })
+    expect(state.pending).toEqual([1549])
+  })
+
+  it('clears once it stands in the leading run with an `ahead` entry', () => {
+    const ranked = { ...parentAhead, 1549: { at, why: 'split from 1542', place: PLACE_AHEAD } }
+    const state = appendGateState([1542, 1549, 1543, 1544], settledAt(base, ranked), { bodies: bodies() })
+    expect(state.state).toBe('settled')
+    expect(state.splitHeld).toEqual([])
+  })
+
+  it('reads the child’s own `Criticality: high` once the parent landed and was pruned', () => {
+    expect(splitPriorityOf(`${child}\nCriticality: high — Part B of 1542.`, {})).toBe(SPLIT_PRIORITY)
+    expect(splitPriorityOf(child, {})).toBe(SPLIT_UNDECLARED)
+    expect(splitPriorityOf(`${child}\nCriticality: low — cosmetic.`, {})).toBe(SPLIT_NONE)
+  })
+
+  it('holds an undeclared split until its block states a level', () => {
+    const ranked = { 1549: { at, why: 'last is right', place: PLACE_LAST } }
+    const open = [1543, 1544, 1549]
+    const held = appendGateState(open, settledAt([1543, 1544], ranked), { bodies: bodies() })
+    expect(held.splitHeld).toEqual([{ point: 1549, kind: SPLIT_UNDECLARED, parent: 1542 }])
+    const stated = bodies({ 1549: `${child}\nCriticality: med — can wait.` })
+    expect(appendGateState(open, settledAt([1543, 1544], ranked), { bodies: stated }).state).toBe('settled')
+  })
+
+  it('leaves a non-split point and a split of a `last`-ranked parent unchanged', () => {
+    const ranked = {
+      1542: { at, why: 'last is right', place: PLACE_LAST },
+      1549: { at, why: 'last is right', place: PLACE_LAST },
+      1550: { at, why: 'last is right', place: PLACE_LAST },
+    }
+    const open = [1542, 1543, 1544, 1549, 1550]
+    const b = bodies({ 1550: '- [ ] 1550. Plain append.' })
+    expect(splitPriorityOf(child, ranked)).toBe(SPLIT_NONE)
+    expect(splitPriorityOf(b[1550], ranked)).toBe(SPLIT_NONE)
+    expect(appendGateState(open, settledAt(base, ranked), { bodies: b })).toEqual(
+      appendGateState(open, settledAt(base, ranked)),
+    )
+  })
+
+  it('changes nothing without bodies', () => {
+    const ranked = { ...parentAhead, 1549: { at, why: 'last is right', place: PLACE_LAST } }
+    expect(appendGateState([1542, 1543, 1544, 1549], settledAt(base, ranked)).state).toBe('settled')
+  })
+
+  it('never lets settlement absorb a held split into the baseline', () => {
+    const ranked = { ...parentAhead, 1549: { at, why: 'last is right', place: PLACE_LAST } }
+    const record = settledAt(base, ranked)
+    expect(settleRecord([1542, 1543, 1544, 1549], record, { at, bodies: bodies() }).changed).toBe(false)
+    expect(settleRecord([1542, 1543, 1544, 1549], record, { at }).record.settled.points).toContain(1549)
   })
 })

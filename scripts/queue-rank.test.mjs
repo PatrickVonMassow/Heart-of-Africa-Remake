@@ -9,6 +9,10 @@
 // git runner is injected, so those output SHAPES are driven here without a
 // repository, and the answers are asserted against what the CLI would do.
 import { describe, it, expect } from 'vitest'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { ACTION_FLAGS, chosenAction, recordProvenance } from './queue-rank.mjs'
 
 const PATH = '.claude/queue-rank.json'
@@ -170,5 +174,47 @@ describe('which action an invocation is', () => {
     expect(() => chosenAction(['--ranked', '60', '--origin', 'user', '--origin', 'machine'])).toThrow(
       /--origin was given 2 times/,
     )
+  })
+})
+
+describe('`--ranked` refuses a split of a priority point (point 1551)', () => {
+  const at = '2026-11-19T00:00:00.000Z'
+  const cli = resolve(import.meta.dirname, 'queue-rank.mjs')
+
+  function run(tasks, ranked) {
+    const root = mkdtempSync(join(tmpdir(), 'queue-rank-1551-'))
+    try {
+      mkdirSync(join(root, '.claude'))
+      const before = `${JSON.stringify({ ranked, settled: { at, points: [1542, 1543] } }, null, 2)}\n`
+      writeFileSync(join(root, 'TASKS.md'), tasks)
+      writeFileSync(join(root, '.claude', 'queue-rank.json'), before)
+      const out = spawnSync(process.execPath, [cli, '--ranked', '1549', '--why', 'host lacks timestamp queries'], {
+        cwd: root,
+        encoding: 'utf8',
+        env: { ...process.env, HOA_REPO_ROOT: root },
+      })
+      return { out, unchanged: readFileSync(join(root, '.claude', 'queue-rank.json'), 'utf8') === before }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+
+  const order = (child) => `# Work order\n\n## Open\n\n- [ ] 1542. Parent.\n- [ ] 1543. Backlog.\n${child}\n`
+
+  it('exits non-zero with the remedy and writes nothing', () => {
+    const { out, unchanged } = run(order('- [ ] 1549. Part B.\nSplit from 1542 Part B.'), {
+      1542: { at, why: 'user order', origin: 'user', place: 'ahead' },
+    })
+    expect(out.status).not.toBe(0)
+    expect(out.stderr).toMatch(/split from priority point 1542/)
+    expect(out.stderr).toMatch(/--ahead 1549/)
+    expect(unchanged).toBe(true)
+  })
+
+  it('still records `last` for a split of a `last`-ranked parent', () => {
+    const { out } = run(order('- [ ] 1549. Part B.\nSplit from 1542 Part B.'), {
+      1542: { at, why: 'last', place: 'last' },
+    })
+    expect(out.stderr).not.toMatch(/split from/)
   })
 })
