@@ -145,7 +145,7 @@ import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurche
   buildWetland,
 } from '../../render/landmarks'
 import { mulberry32, hashChunk } from '../../world/noise'
-import { PERF, maxFrameMs, recordBurst, recordCpuFrame, recordFrame, resetPerf } from './perfProbe'
+import { PERF, maxFrameMs, recordBurst, recordCpuFrame, recordFrame, resetPerf, type CpuFrame } from './perfProbe'
 import { closeFrameWindow, markFrameWork, resetFrameWindow, takeFrameLedger } from '../../systems/longFrame'
 import { useTimedFrame } from '../../render/useTimedFrame'
 import { markInstancesForUpload } from '../../render/instanceUpload'
@@ -3090,7 +3090,22 @@ export function TravelScene() {
     })
     const offAfter = addAfterEffect(() => {
       const now = performance.now()
-      recordCpuFrame({ t: now, cpu: now - cpuStart, work: takeFrameLedger(), heapDropMb: Math.max(0, heapStart - heap()) / 1e6 })
+      const frame: CpuFrame = {
+        t: now,
+        cpu: now - cpuStart,
+        work: takeFrameLedger(),
+        heapDropMb: Math.max(0, heapStart - heap()) / 1e6,
+        gpuDoneMs: null,
+      }
+      recordCpuFrame(frame)
+      const queue = (w.__renderer as { backend?: { device?: { queue?: { onSubmittedWorkDone?: () => Promise<void> } } } })
+        ?.backend?.device?.queue
+      if (queue?.onSubmittedWorkDone) {
+        const t0 = performance.now()
+        void queue.onSubmittedWorkDone().then(() => {
+          frame.gpuDoneMs = performance.now() - t0
+        })
+      }
     })
     w.__perf = {
       terrain: PERF.terrain,

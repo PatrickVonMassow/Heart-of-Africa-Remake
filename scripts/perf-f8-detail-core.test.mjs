@@ -45,4 +45,25 @@ describe('perf-f8-detail core', () => {
     expect(d.worst.find((e) => e.name === 'unbooked').ms).toBe(4)
     expect(d.nested.map((e) => [e.name, e.ms])).toEqual([['render:main', 20], ['gpu:get-texture', 15]])
   })
+
+  it('reports counters and GPU latency per frame, worst frames against all', () => {
+    const rec = {
+      cpuMs: [2, 30, 2, 2],
+      work: [
+        { 'gpu:write-buffer calls': 10, 'gpu:write-buffer KB': 4 },
+        { 'gpu:write-buffer calls': 50, 'gpu:write-buffer KB': 40, 'render-submit': 25 },
+        { 'gpu:write-buffer calls': 10 },
+        {},
+      ],
+      heapDropMb: null,
+      gpuDoneMs: [10, 60, null, 10],
+    }
+    const d = phaseDetail(rec, 1)
+    expect(d.counters).toEqual([
+      { name: 'gpu:write-buffer KB', worst: 40, all: 11 },
+      { name: 'gpu:write-buffer calls', worst: 50, all: 17.5 },
+    ])
+    expect(d.gpuDone).toEqual({ worst: 60, all: 26.7 })
+    expect(d.worst.find((e) => e.name === 'unbooked').ms).toBe(5)
+  })
 })

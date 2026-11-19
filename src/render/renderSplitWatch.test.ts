@@ -59,4 +59,29 @@ describe('renderSplitWatch', () => {
     expect(uploadOwner(root, new Float32Array(1))).toBe('?')
     expect(uploadOwner(null, m)).toBe('?')
   })
+
+  it('arms the upload booking once the backend appears, re-arms on fresh utils, and counts', () => {
+    const renderer: {
+      backend?: { attributeUtils: { updateAttribute: (a: unknown) => void } }
+      render: (scene?: unknown, camera?: unknown) => void
+    } = {
+      render() {
+        renderer.backend?.attributeUtils.updateAttribute({ array: new Float32Array(4), updateRanges: [] })
+      },
+    }
+    const g = globalThis as unknown as { __uploadBookings?: number }
+    g.__uploadBookings = 0
+    takeFrameLedger()
+    const restore = watchRenderSplit(renderer)
+    renderer.render({}, {}) // no backend yet: nothing to arm, nothing booked
+    renderer.backend = { attributeUtils: { updateAttribute: () => {} } }
+    renderer.render({}, {})
+    renderer.render({}, {})
+    expect(g.__uploadBookings).toBe(2)
+    expect((takeFrameLedger() as Record<string, number>)['gpu:upload small']).toBeGreaterThanOrEqual(0)
+    renderer.backend = { attributeUtils: { updateAttribute: () => {} } } // a re-initialised backend
+    renderer.render({}, {})
+    expect(g.__uploadBookings).toBe(3)
+    restore()
+  })
 })

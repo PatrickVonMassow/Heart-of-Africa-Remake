@@ -8,6 +8,11 @@ export function isNested(system) {
   return system.includes(':')
 }
 
+/** Counter bookings (not ms): writeBuffer calls and KB per frame. */
+export function isCounter(system) {
+  return / (calls|KB)$/.test(system)
+}
+
 /** Quantile by the F8 report's rule: sorted index floor(q * n), clamped. */
 export function quantile(xs, q) {
   const s = [...xs].sort((a, b) => a - b)
@@ -35,6 +40,7 @@ export function phaseDetail(rec, worstN = 8) {
     if (work['render-submit'] !== undefined && work['shader-programs'] !== undefined)
       work['render-submit'] = Math.max(0, work['render-submit'] - work['shader-programs'])
     for (const [k, v] of Object.entries(work)) {
+      if (isCounter(k)) continue
       sums[k] = (sums[k] ?? 0) + v
       // 'render:*' / 'gpu:*' are nested inside render-submit: listed, not summed.
       if (!isNested(k)) booked += v
@@ -48,7 +54,28 @@ export function phaseDetail(rec, worstN = 8) {
     .sort((a, b) => b.ms - a.ms)
   const entry = ([name, ms]) => ({ name, ms: +ms.toFixed(1), share: total > 0 ? +(ms / total).toFixed(2) : 0 })
   const nested = Object.entries(sums).filter(([k]) => isNested(k)).map(entry).sort((a, b) => b.ms - a.ms)
+  // Counters and GPU latency: mean per frame over the worst frames vs all frames.
+  const meanOf = (idx, get) => (idx.length ? idx.reduce((a, i) => a + get(i), 0) / idx.length : 0)
+  const all = cpu.map((_, i) => i)
+  const worstIdx = order.map((f) => f.i)
+  const counterNames = new Set()
+  for (const w of rec.work ?? []) for (const k of Object.keys(w ?? {})) if (isCounter(k)) counterNames.add(k)
+  const counters = [...counterNames].sort().map((name) => ({
+    name,
+    worst: +meanOf(worstIdx, (i) => rec.work[i]?.[name] ?? 0).toFixed(1),
+    all: +meanOf(all, (i) => rec.work[i]?.[name] ?? 0).toFixed(1),
+  }))
+  const lat = rec.gpuDoneMs ?? null
+  const latIdx = (idx) => idx.filter((i) => typeof lat?.[i] === 'number')
+  const gpuDone = lat
+    ? {
+        worst: +meanOf(latIdx(worstIdx), (i) => lat[i]).toFixed(1),
+        all: +meanOf(latIdx(all), (i) => lat[i]).toFixed(1),
+      }
+    : null
   return {
+    counters,
+    gpuDone,
     median: +median.toFixed(2),
     p95: +p95.toFixed(2),
     ratio: median > 0 ? +(p95 / median).toFixed(2) : 0,

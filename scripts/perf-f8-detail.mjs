@@ -79,4 +79,9 @@ for (const rec of recs) {
   for (const e of d.worst) console.log(`    ${e.name.padEnd(20)} ${String(e.ms).padStart(7)} ms  ${e.share}`)
   if (d.nested.length) console.log('    inside render-submit:')
   for (const e of d.nested) console.log(`      ${e.name.padEnd(20)} ${String(e.ms).padStart(7)} ms  ${e.share}`)
+  for (const c of d.counters) console.log(`    ${c.name.padEnd(24)} per frame: worst8 ${c.worst}  all ${c.all}`)
+  if (d.gpuDone)
+    console.log(
+      `    gpu latency (submit → onSubmittedWorkDone) per frame: worst8 ${d.gpuDone.worst} ms  all ${d.gpuDone.all} ms`,
+    )
 }

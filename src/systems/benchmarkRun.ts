@@ -233,6 +233,13 @@ function runFrames(count: number, collect: FrameSample[] | null, onFrame: () => 
   })
 }
 
+/** The DEV travel probe's per-frame record (src/scenes/travel/perfProbe.ts). */
+interface ProbeFrame {
+  work: Record<string, number>
+  heapDropMb: number
+  gpuDoneMs?: number | null
+}
+
 /** Reset every state a config must not inherit (determinism rule 2). */
 function resetWorld(phase: BenchPhase): void {
   balance.randomEventsEnabled = false
@@ -402,26 +409,29 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
       gpuSink = measured ? gpuSamples : null
       const samples: FrameSample[] = []
       await runFrames(counts.sample, samples, tick)
+      // DEV: the probe frames of this phase, read out after the flush below
+      // (their GPU latency resolves asynchronously).
+      const probe = import.meta.env.DEV
+        ? ((window as unknown as { __perf?: { cpuFrames: () => ProbeFrame[] } }).__perf?.cpuFrames().slice(-samples.length) ?? [])
+        : []
+      // Drain the last in-flight resolve so the phase's GPU sample is complete.
+      await gpu.flush(gpuSink)
       if (import.meta.env.DEV) {
         // Per-system split of every measured frame (docs/perf-1543-driving-hitches.md,
-        // scripts/perf-f8-detail.mjs): the travel probe's CPU frames of this
-        // phase, aligned to the samples (the probe's after-effect runs first).
-        const w = window as unknown as {
-          __perf?: { cpuFrames: () => Array<{ work: Record<string, number>; heapDropMb: number }> }
-          __f8detail?: unknown[]
-        }
-        const probe = w.__perf?.cpuFrames().slice(-samples.length) ?? []
+        // scripts/perf-f8-detail.mjs), aligned to the samples (the probe's
+        // after-effect runs first).
+        const aligned = probe.length === samples.length
+        const w = window as unknown as { __f8detail?: unknown[] }
         ;(w.__f8detail ??= []).push({
           config: config.name,
           phase: phase.name,
           measured,
           cpuMs: samples.map((x) => x.cpuMs),
-          work: probe.length === samples.length ? probe.map((f) => f.work) : null,
-          heapDropMb: probe.length === samples.length ? probe.map((f) => f.heapDropMb) : null,
+          work: aligned ? probe.map((f) => f.work) : null,
+          heapDropMb: aligned ? probe.map((f) => f.heapDropMb) : null,
+          gpuDoneMs: aligned ? probe.map((f) => f.gpuDoneMs ?? null) : null,
         })
       }
-      // Drain the last in-flight resolve so the phase's GPU sample is complete.
-      await gpu.flush(gpuSink)
       if (!measured) return
       const render = (ctx.gl.info as { render?: { drawCalls?: number; triangles?: number } }).render
       const frame = frameStats(samples.map((s) => s.frameMs))

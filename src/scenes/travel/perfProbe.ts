@@ -30,6 +30,11 @@ export interface CpuFrame {
   cpu: number
   work: Record<string, number>
   heapDropMb: number
+  /** ms from the end of this frame's submission until the GPU queue reports
+   *  all submitted work done (onSubmittedWorkDone): how far the GPU runs
+   *  behind — the back-pressure test of docs/perf-1543-driving-hitches.md.
+   *  null until it resolves, or without WebGPU. */
+  gpuDoneMs?: number | null
 }
 
 export const PERF = {

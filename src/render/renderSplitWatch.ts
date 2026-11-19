@@ -19,11 +19,18 @@ interface RendererLike {
 
 type Proto = Record<string, unknown>
 
-function wrapProto(proto: Proto | undefined, method: string, system: FrameSystem, restore: Array<() => void>): void {
+function wrapProto(
+  proto: Proto | undefined,
+  method: string,
+  system: FrameSystem,
+  restore: Array<() => void>,
+  count?: (args: unknown[]) => void,
+): void {
   const original = proto?.[method]
   if (!proto || typeof original !== 'function') return
   const fn = original as (...a: unknown[]) => unknown
   const wrapped = function (this: unknown, ...args: unknown[]): unknown {
+    if (count) count(args)
     const t0 = performance.now()
     try {
       return fn.apply(this, args)
@@ -103,43 +110,42 @@ export function watchRenderSplit(renderer: unknown): () => void {
   let mainScene: Obj3 | null = null
   // Attribute uploads by owner and size (round 4: the real-GPU plateau is
   // writeBuffer time). Large ones are named: 'gpu:upload <owner> <MB>'.
-  let uploadsArmed = false
+  // Re-checked on every render: the backend creates its attribute utils in its
+  // async init, and a re-initialised backend would bring fresh ones.
+  // `window.__uploadBookings` counts bookings so a run can prove it fired.
+  let armedOn: { updateAttribute?: (a: AttrLike) => void } | null = null
   const armUploads = (): void => {
-    const utils = (
-      renderer as {
-        backend?: {
-          attributeUtils?: { updateAttribute?: (a: AttrLike) => void }
-        }
-      }
-    ).backend?.attributeUtils
+    const utils = (renderer as { backend?: { attributeUtils?: { updateAttribute?: (a: AttrLike) => void } } }).backend
+      ?.attributeUtils
     const update = utils?.updateAttribute
-    if (!utils || typeof update !== 'function') return
-    uploadsArmed = true
-    {
-      const wrappedUpdate = function (this: unknown, attr: AttrLike): void {
-        const bytes = uploadBytes(attr)
-        const t0 = performance.now()
-        try {
-          update.call(this, attr)
-        } finally {
-          const ms = performance.now() - t0
-          const key =
-            bytes >= NAMED_UPLOAD_BYTES
-              ? `gpu:upload ${uploadOwner(mainScene, (attr.data ?? attr).array)} ${(bytes / 1e6).toFixed(2)}MB`
-              : 'gpu:upload small'
-          markFrameWork(key as FrameSystem, ms)
-        }
+    if (!utils || typeof update !== 'function' || (utils === armedOn && (update as { __split?: boolean }).__split))
+      return
+    armedOn = utils
+    const wrappedUpdate = function (this: unknown, attr: AttrLike): void {
+      const bytes = uploadBytes(attr)
+      const t0 = performance.now()
+      try {
+        update.call(this, attr)
+      } finally {
+        const ms = performance.now() - t0
+        const key =
+          bytes >= NAMED_UPLOAD_BYTES
+            ? `gpu:upload ${uploadOwner(mainScene, (attr.data ?? attr).array)} ${(bytes / 1e6).toFixed(2)}MB`
+            : 'gpu:upload small'
+        markFrameWork(key as FrameSystem, ms)
+        const w = globalThis as unknown as { __uploadBookings?: number }
+        w.__uploadBookings = (w.__uploadBookings ?? 0) + 1
       }
-      utils.updateAttribute = wrappedUpdate
-      restore.push(() => {
-        if (utils.updateAttribute === wrappedUpdate) utils.updateAttribute = update
-      })
     }
+    ;(wrappedUpdate as { __split?: boolean }).__split = true
+    utils.updateAttribute = wrappedUpdate
+    restore.push(() => {
+      if (utils.updateAttribute === wrappedUpdate) utils.updateAttribute = update
+    })
   }
   const wrapped = function (this: RendererLike, scene: unknown, camera: unknown): unknown {
     if ((scene as { isScene?: boolean }).isScene) mainScene = scene as Obj3
-    // The backend's attribute utils exist only after its async init.
-    if (!uploadsArmed) armUploads()
+    armUploads()
     const t0 = performance.now()
     childMs.push(0)
     try {
@@ -158,7 +164,16 @@ export function watchRenderSplit(renderer: unknown): () => void {
   const g = globalThis as unknown as Record<string, { prototype?: Proto } | undefined>
   wrapProto(g.GPUCanvasContext?.prototype, 'getCurrentTexture', 'gpu:get-texture', restore)
   wrapProto(g.GPUQueue?.prototype, 'submit', 'gpu:submit', restore)
-  wrapProto(g.GPUQueue?.prototype, 'writeBuffer', 'gpu:write-buffer', restore)
+  wrapProto(g.GPUQueue?.prototype, 'writeBuffer', 'gpu:write-buffer', restore, (args) => {
+    // writeBuffer(buffer, offset, data, dataOffset?, size?): size/dataOffset in
+    // elements for a typed array, bytes for an ArrayBuffer.
+    const data = args[2] as ArrayBufferView | ArrayBuffer
+    const bpe = (data as { BYTES_PER_ELEMENT?: number }).BYTES_PER_ELEMENT ?? 1
+    const size = args[4] as number | undefined
+    const bytes = size !== undefined ? size * bpe : data.byteLength - ((args[3] as number | undefined) ?? 0) * bpe
+    markFrameWork('gpu:write-buffer calls' as FrameSystem, 1)
+    markFrameWork('gpu:write-buffer KB' as FrameSystem, bytes / 1024)
+  })
   wrapProto(g.GPUDevice?.prototype, 'createRenderPipeline', 'gpu:create-pipeline', restore)
   wrapProto(g.GPUDevice?.prototype, 'createComputePipeline', 'gpu:create-pipeline', restore)
   wrapProto(g.GPUDevice?.prototype, 'createShaderModule', 'gpu:create-shader', restore)
