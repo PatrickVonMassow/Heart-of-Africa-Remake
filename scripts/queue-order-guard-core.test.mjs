@@ -762,4 +762,17 @@ describe('a split of a priority point is held at turn end (point 1551)', () => {
     }
     expect(unrankedAppendProblem(order, record(ranked))).toBe('')
   })
+
+  it('is quiet once the split leads with `ahead` and its own high tag, baseline closed', () => {
+    const placed = [
+      '- [ ] 1549. Part B.\nSplit from 1542 Part B.\nCriticality: high — Part B of 1542.',
+      '- [ ] 1560. Plain append.',
+    ].join('\n')
+    const ranked = {
+      1549: { at, why: 'split from 1542', place: 'ahead' },
+      1560: { at, why: 'last is right', place: 'last' },
+    }
+    expect(unrankedAppendProblem(placed, record(ranked))).toBe('')
+  })
 })
+

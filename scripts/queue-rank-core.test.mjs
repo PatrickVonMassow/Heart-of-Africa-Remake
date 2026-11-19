@@ -984,4 +984,21 @@ describe('a SPLIT of a priority point inherits its place (point 1551)', () => {
     expect(settleRecord([1542, 1543, 1544, 1549], record, { at, bodies: bodies() }).changed).toBe(false)
     expect(settleRecord([1542, 1543, 1544, 1549], record, { at }).record.settled.points).toContain(1549)
   })
+
+  it('settles a placed split even where no remembered point stands behind it', () => {
+    // Every baseline point closed: the split leads with `ahead` and its own high
+    // tag, an ordinary append behind it is ranked `last`.
+    const ranked = {
+      1549: { at, why: 'split from 1542', place: PLACE_AHEAD },
+      1560: { at, why: 'last is right', place: PLACE_LAST },
+    }
+    const placed = {
+      1549: `${child}\nCriticality: high — Part B of 1542.`,
+      1560: '- [ ] 1560. Plain append.',
+    }
+    const state = appendGateState([1549, 1560], settledAt([1542, 1543], ranked), { bodies: placed })
+    expect(state.state).toBe('settled')
+    const next = settleRecord([1549, 1560], settledAt([1542, 1543], ranked), { at, bodies: placed })
+    expect(next.record.settled.points).toEqual([1549, 1560])
+  })
 })

@@ -577,6 +577,10 @@ export function appendGateState(open, record, { bodies } = {}) {
       if (kind === SPLIT_UNDECLARED || ranked[n]?.place !== PLACE_AHEAD || !leading) {
         splitHeld.push({ point: n, kind, parent: splitParentOf(bodies[n]) })
         asked.add(n)
+      } else {
+        // Placed as the split rule demands: its `ahead` entry answers the append
+        // question too, even where no remembered point stands behind it.
+        asked.delete(n)
       }
     }
   }
