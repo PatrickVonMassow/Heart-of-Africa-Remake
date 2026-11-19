@@ -10,7 +10,7 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { firstAdditions, originLine, originOf, sourceLines } from './board-origin-core.mjs'
 
-const git = (args) => execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })
+const git = (args) => execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, windowsHide: true })
 
 /** Grafted roots of a shallow clone: their diff shows the whole file as added. */
 function shallowRoots() {
