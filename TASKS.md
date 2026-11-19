@@ -162,6 +162,74 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
+- [ ] 1558. Apply the 1463 plan's obsolete verdicts to the open infrastructure points (part 1 only), ranked directly after 1543
+  Apply part 1 of the parked zero-based infrastructure simplification (backlog entry 1463, decision 1505): the obsolete verdicts on open infrastructure points. Queue cleanup only — no code change, no pillar removal.
+
+  RANK: directly after 1543 (user order 19.11.2026), i.e. ahead of 1555 and everything the reorder request of the same evening places behind 1543.
+
+  Input: the approved plan on the parked branch feat/1463-infra-simplification (tip 796a58f32, 855 behind main), docs/four-eyes/1463-union-opus-v3.md (latest merged plan; check against 1463-union-fable-v2.md and the Sol final check / rechecks 1463-final-check-sol.md, 1463-recheck-sol.md, 1463-recheck-o1-sol.md for the approved revision) — read via `git show feat/1463-infra-simplification:<path>`, do not rebase or unpark the branch.
+
+  Final state:
+  1. Re-validation: every point the plan judges obsolete/deletable is checked against today's state (still open? fixed meanwhile? still matches the plan's reason?). The plan is three weeks old; a verdict that no longer holds is dropped, with one line why.
+  2. Amendment 1474 is applied: the verdicts also cover the infrastructure findings in docs/backlog.md (and the closed findings-carrier entries as record). 1474 is then closed as delivered by this point.
+  3. Each confirmed verdict is executed: the point is archived as obsolete (with the plan's reason and a pointer to the plan) or moved to docs/backlog.md; backlog findings judged obsolete are deleted from the backlog.
+  4. Result line: how many open points and backlog entries were removed, how many verdicts were dropped on re-validation, and the new position of the first infrastructure point behind the game work.
+
+  Out of scope (stays parked until an explicit user order): part 2 of the plan — removing whole pillars (daemon, doctor, etc.) and any code or hook change. The branch, its worktree and the park stay as they are.
+
+  Correction to the reorder request deposited 19.11.2026 20:43: its note "1463 has no line in TASKS.md or the archive" is wrong — 1463 is parked in docs/backlog.md by user order of 11.11.2026 (decision 1505).
+  Source: user request of 19.11.2026 19:51 UTC via the findings carrier (session unknown).
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1559. Board: a collapsed Backlog section below Erledigt with the newest entries and a link to the full backlog, ranked after the 1463 part-1 request
+  Board: a collapsed "Backlog" section below "Erledigt" (user order 19.11.2026).
+
+  RANK: directly after the 1463 part-1 request of the same evening (which itself ranks directly after 1543) — its result changes what the backlog holds.
+
+  Final state:
+  1. The board gets a new section "Backlog" directly below "Erledigt", collapsed by default (same <details class="sect"> pattern as the other sections; the Erledigt anchor ERLEDIGT_ANCHOR and board-archive-rotate.mjs keep working).
+  2. It shows the total count of open backlog entries and the NEWEST ~10 entries (one line each: title and date), like the other sections show only a part.
+  3. Entries already marked as resolved or queued (FIXED, ERLEDIGT, EINGEREIHT as point N, closed) are not shown and not counted.
+  4. A link below the list leads to the full docs/backlog.md (repository view), as the Erledigt section links to its archive.
+  5. The entries come from docs/backlog.md through one reader in the board generator; docs/backlog.md mixes "## " headed entries and "- " bullet entries (measured 19.11.2026: 109 headings, 171 bullets), so the reader handles both forms and fails soft (section shows count "unknown" plus the link) rather than breaking the board.
+  6. Player-visible-text rule does not apply (board is tooling); section heading in German like its neighbours.
+  7. A Vitest case covers the reader (both entry forms, resolved entries skipped, newest-first cut) and the section placement/collapsed default.
+
+  Out of scope: restructuring docs/backlog.md itself, new ledger fields or guards (infrastructure freeze).
+  Source: user request of 19.11.2026 19:58 UTC via the findings carrier (session unknown).
+  Bundle: Chat & Tafel.
+
+- [ ] 1557. Reorder the work-order front: render stops and leaks forward, HUD/Cairo/plausibility behind the game front, 1013/1361 out
+  Reorder the front of the work order (user-approved 19.11.2026, 20:42; proposal reviewed by GPT-6.2 Sol and re-checked by Opus 5.5).
+
+  Final state of the work order (open points, top to bottom):
+
+  1-3. 1556, 1554, 1543 — unchanged (user-placed 19.11.2026).
+  4. 1555 — scratchpad write for non-owner sessions. Sol's caveat: allow the session's OWN scratchpad, do not widen to every path outside the main tree without evidence.
+  5. 1495 — continent zoom stops drawing, TypeError every frame (from position 24).
+  6. 1520 — render targets leak across rebuilds (alone, NOT coupled with 1447; no shared cause proven).
+  7. 507 — lost WebGPU device ends the run quietly and black.
+  8. 1290 — WebGL 2 lion feeding scene shows neither lion nor prey (from position 11).
+  9. 1447 — settlement visit leaks pipelines/heap; first step: reproduce under normal travel (so far only measured in the dress harness at 6e1622764).
+  10. 1144 — MEASUREMENT HALF ONLY first (does a walker-radius player actually get shut in?). The fix moves forward only if entrapment is confirmed; otherwise it keeps its criticality "medium".
+  11-31. The existing game front (1169, 1205, 1227, 1229, 1269, 1264, 1265, 1309, 1395, 1396, 1422, 1423, 1425, 1427, 1457, 1458, 1473, 1492, 1494, 1496, 1499) in its current relative order.
+  32. 1215, then 1516 + 551 consolidated into one point (duplicate symptom: canoe hint colliding with status-bar text; resolve their conflicting remedies against criterion 9). 1215 stays separate.
+  33. 1488 — user clothing order of 05.11.2026 (still live: d94fe7672 on 08.11 closed another point because of it). First check whether 1482's frozen defect list is still open.
+  34. 1221 + 1220 — one shared Cairo start verification pass, separate disposition (1221 may be a 1 FPS shutter artefact).
+  35. 519 — handwriting fonts (downgraded from the player-blocking group: measured on one Linux host, falls back to plain text).
+  36-38. 1521, 1526, 415 — 1890 plausibility, in this order.
+  39+. Everything else in its current relative order (205, 1436, ...).
+
+  Dispositions outside the front:
+  - 1013 (cheetah in central Africa): close as delivered by archived point 1063 (d0a27cfc3 notes 1063 carries the start-region fix) after one confirming run; otherwise keep as a verification-only item.
+  - 1062: stays where it is (user rank of 07.09.2026: behind 174, end of the order).
+  - 1361: move to docs/backlog.md (bare command is a working path; no real blockade).
+  - 1059, 1328, 1289: stay in place; re-check reproduction once; whatever still reproduces as a real blockade moves directly behind 1555. 1328 and 1289 partly overlap (post-release Stop failure) — consolidate that shared part if reproduced.
+
+  Open and NOT part of this order (needs a separate user decision): point 1463 has no line in TASKS.md or the archive (stale branch since 01.11.2026, holds a pool slot); 1474 is its orphaned amendment. Sol also notes the pre-freeze infrastructure block from position ~27 holds its rank only by age and should be reviewed against the CLAUDE.md §2 freeze — that review is tied to the 1463 decision.
+  Source: user request of 19.11.2026 19:43 UTC via the findings carrier (session unknown).
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1169. The children shuffle on the spot above the gate on roughly a tenth of the world
   seeds (measured 20.09.2026 while point 1094 moved the teaching checks onto the seed axis;
   reproducible, no browser needed).
