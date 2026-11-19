@@ -155,7 +155,30 @@ returns a report within 15 s with no measured phase recorded (report flagged
 `aborted` key present; contents not yet read). Next: a development-mode build
 served by `vite preview` (no console forwarding), same DEV probe hook.
 
-Status: blocked on the headless F8 harness so far — a full headless F8 run did
-not finish within 28 min (the dev server choked on forwarded console warnings,
-~9.6 MB log); restarted with `--logLevel error`, short run in progress. No
-per-system split of the F8 phase yet.
+Last headless attempt (development build via `vite preview`, adapter
+`google swiftshader`): the short F8 run ends `ABORTED` with no measured phase
+and no GPU timestamps. Per owner decision (19.11.2026) the headless F8 harness
+is dropped; the owner runs the split on the real GPU with
+`scripts/perf-f8-detail.mjs` (below). No per-system split of the F8 phase
+exists yet — the F8 attribution is OPEN.
+
+## Round 2 — delivered
+
+- DEV hook: `runPhase` (src/systems/benchmarkRun.ts) stores per phase
+  `window.__f8detail[] = { config, phase, measured, cpuMs[], work[], heapDropMb[] }`
+  — the F8 samples next to the probe's per-system bookings of the same frames.
+- `scripts/perf-f8-detail.mjs` (core: `perf-f8-detail-core.mjs`, Vitest):
+  serves nothing; against a DEV server it presses F8, waits for the report and
+  prints per measured pass of a phase (default savanna-driving; `--short`,
+  `--phase`, `--json`) the CPU median/p95 and each system's share of the 8 worst
+  frames (`unbooked` = render internals not wrapped, GC, browser work).
+  Owner command: `npm run dev`, then
+  `BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-f8-detail.mjs`.
+  Note: it measures a DEV build (probe and wrappers active), not the preview
+  build of `perf-f8-bench.mjs`.
+- Low fix: new preset value `terrainBuildSliced` — off on low with the
+  pre-change 5 ms budget, so low builds whole chunks exactly as before the
+  slicing (its unrefined chunks fit the budget); medium/high keep slicing at
+  3 ms. Chosen over "no budget while the prefetch queue holds only
+  refinements": that would still slice the window queue on low, and low's
+  regression came from spreading work, not from refinements (low has none).
