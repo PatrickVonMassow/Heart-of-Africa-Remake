@@ -94,6 +94,7 @@ import { Figure } from './placeFigure'
 import { ColdCloaksContext, FigureLookContext, LimbDetailContext } from './placeFigureContext'
 import { useFigureLook } from './useFigureLook'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildPlayRock, buildRock } from '../../render/flora'
+import { createScatterRockMaterial } from '../../render/scatterRockMaterial'
 import { buildTableMountain, buildGizaSiteMonuments, buildGizaSiteSphinx } from '../../render/landmarks'
 import { HorizonNeighbours } from './HorizonNeighbours'
 import { useHorizonNeighbours } from './useHorizonNeighbours'
@@ -1368,8 +1369,8 @@ function GroundScatter({
 
   const tuftGeo = useMemo(() => buildGrassTuft(), [])
   const rockGeo = useMemo(() => buildRock(), [])
-  // Grass tufts follow the season (point 143); the shared rock instances ride the
-  // same material, and the tint's greenness mask leaves their grey untouched.
+  // Grass tufts follow the season (point 143). The boulders have their own
+  // material that reads the vertex colour once (point 1164, scatterRockMaterial.ts).
   const material = useMemo(() => {
     const m = new THREE.MeshStandardNodeMaterial()
     m.vertexColors = true
@@ -1378,6 +1379,7 @@ function GroundScatter({
     m.positionNode = seasonFoliagePosition() // baked attribute, point 144 retry
     return m
   }, [])
+  const rockMaterial = useMemo(() => createScatterRockMaterial(), [])
   const tuftMesh = useRef<THREE.InstancedMesh>(null)
   const rockMesh = useRef<THREE.InstancedMesh>(null)
 
@@ -1420,7 +1422,7 @@ function GroundScatter({
       {/* Sized from the runs themselves, for the reason work-order 583 found in
           the fences: a fixed ceiling below the run draws the overflow nowhere. */}
       <instancedMesh ref={tuftMesh} args={[tuftGeo, material, Math.max(1, tufts.length)]} receiveShadow frustumCulled={false} />
-      <instancedMesh ref={rockMesh} args={[rockGeo, material, Math.max(1, rocks.length)]} castShadow receiveShadow frustumCulled={false} />
+      <instancedMesh ref={rockMesh} args={[rockGeo, rockMaterial, Math.max(1, rocks.length)]} castShadow receiveShadow frustumCulled={false} />
     </>
   )
 }
