@@ -14335,3 +14335,59 @@ to land than a mechanism that needs a review.
   every catcher in line.
   Source: finding of the 1164 session, 19.11.2026 16:30.
   Bundle: Dorfleben.
+
+- [ ] 1554. Derive user-wait cards on the board from a typed user-input gate, with a text fallback
+  Queue position: FIRST in the work order (user order 19.11.2026: "Ja, so vorne in der Queue einreichen").
+
+  Immediate measure (before the mechanism): put ONE "Von dir zu klären" card on the board for the user's
+  notebook run that points 1552 and 1543 wait for (F8 benchmark, WebGPU, current build, per-pass breakdown of
+  1549; what to hand back and where). Then set the gate below on both points once it exists.
+
+  Mechanism, three layers, none of them refuses anything:
+  1. Typed gate. Add a fourth act `user-input` to CONFIRMATION_ACTS in scripts/user-gate-core.mjs ("the user
+     must run, measure or hand in something only they can"), set via the existing
+     `defer-for-user.mjs <N> --act user-input --detail … --prepared …`. defer-for-user validates at write time:
+     the detail names the action, the result to hand back and where to submit it. USER-ANSWERED on user-input
+     only re-queues the point; it never counts as approval for release-tag/public-release/board-contract.
+  2. Derived card. scripts/board-queue.mjs (already parses the gates on every build, gateSets(tasks)) renders
+     one VDZK card per open AWAITING-CONFIRMATION gate, all four acts, from the same parsed TASKS.md snapshot,
+     keyed by point number, existing rendering/escaping, derived anew each build (no duplicates; cleared gate =
+     card gone). The point leaves the queue section only after its card is assembled. The manual vdzk-add step
+     for gates is dropped from the procedure (vdzk-add stays for non-gate cards); remove existing manual cards
+     for gated points once. A gate carrying the marker token that does not parse renders a fallback card
+     ("Punkt N wartet auf dich – Marker fehlerhaft", raw text) and the board still publishes.
+  3a. Text fallback (user's addition 19.11.2026). The board build scans OPEN, UNGATED points for a small phrase
+     set (`WAITS FOR`, "waits for/on the user", "WAITING ON", "from the user.") and renders a visibly distinct
+     VDZK card "Punkt N wartet vielleicht auf dich (nur aus dem Text erkannt, nicht bestätigt)". Setting the
+     gate replaces it with the real card; closing the point removes it. Never a refusal, never a demand on the
+     LLM to rewrite prose. Measured 19.11.2026: one hit among open points (1552), zero false hits; 1543 is
+     NOT caught by text although it waits too.
+  3b. Structural advisory. When the queue head is ungated and is not the in-flight focus
+     (.claude/batch-in-flight.json focusPoint/evidence), the build prints an advisory line "head point N skipped
+     without gate: work it or defer-for-user --act user-input". Stateless (no new ledger field); advisory only.
+  Rule text: one sentence in the existing instructions — a blocker needing the user is gated when the point is
+  created, split or the blocker is discovered.
+
+  Final state: every open point with a user-input (or other) gate has a VDZK card on the published board
+  without a manual step; a text-matched ungated point shows the "vielleicht" card; 1552 and 1543 are gated and
+  carded.
+  Test: Vitest for the new act/validation in user-gate-core, the derived and fallback cards and the text
+  fallback in board-queue-core (incl. a point that quotes the phrase only in a gated state, and a closed point),
+  the advisory condition.
+  Residual risk (stated): a gate never set and no phrase in the text is only advised (layer 3b) and can be
+  ignored; the advisory fires on legitimate skips (noise, not a block).
+  Design: own proposal + GPT-6.2 Sol blind proposal, merged by Fable 5.2 (19.11.2026); text fallback added by the user.
+  Bundle: Steuerung & Performance is wrong — this is board/batch infrastructure; owner picks the bundle.
+  Source: user request of 19.11.2026 18:49 UTC via the findings carrier (session unknown).
+  Bundle: Chat & Tafel.
+
+- [ ] 1555. Let a non-owner session write into its own scratchpad past the main-write guard
+  The main-write guard (PreToolUse, "MAIN WRITE REFUSED — this session holds no batch lock") refuses a Bash
+  redirection into the session's own scratchpad under /tmp/claude-1000/… for a non-owner session, e.g.
+  `sed -n 1,90p scripts/user-gate-core.mjs > /tmp/claude-1000/<…>/scratchpad/vdzk/m1.txt` (reproduced
+  19.11.2026 three times, literal path and variable path). A write outside the repository is not a main write.
+  Final state: a redirection whose target resolves outside the main working tree (scratchpad, /tmp) passes for
+  a non-owner session; writes into the main tree stay refused.
+  Test: Vitest on the guard's core with the scratchpad target (passes) and a main-tree target (refused).
+  Source: user request of 19.11.2026 18:49 UTC via the findings carrier (session unknown).
+  Bundle: Modell & Wächter.
