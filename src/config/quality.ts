@@ -52,6 +52,11 @@ export interface QualityPreset {
    *  Smaller = smoother CPU frame time but slower window fill; the prefetch
    *  ahead of the heading hides the fill. Calibratable. */
   terrainBuildBudgetMs: number
+  /** Chunk builds yield mid-way at the budget (ChunkGeometryBuild). Off builds
+   *  each chunk whole, as before point 1543: low meshes no refined 112-seg
+   *  chunks, so its builds fit the budget and slicing only spread the work
+   *  over more frames (owner F8, real GPU: low CPU median 3.8 → 5.6 ms). */
+  terrainBuildSliced: boolean
   /** Flora fog-radius factor; <1 tightens the spawn circle so the instance
    *  count falls quadratically (floraStreaming.ts). */
   floraFogFactor: number
@@ -212,7 +217,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     fireShadowResolution: 0,
     fireShadowSoft: false,
     terrainRefine: false,
-    terrainBuildBudgetMs: 3, // calibratable
+    terrainBuildBudgetMs: 5, // calibratable — the pre-1543 value
+    terrainBuildSliced: false,
     floraFogFactor: 0.55,
     floraDensity: 0.6, // calibratable: 40 % fewer small-dressing instances (docs/bench/310-projection.md)
     floraCastShadow: false,
@@ -260,6 +266,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     fireShadowSoft: false,
     terrainRefine: true,
     terrainBuildBudgetMs: 3, // calibratable
+    terrainBuildSliced: true,
     floraFogFactor: 1,
     floraDensity: 1,
     floraCastShadow: true,
@@ -306,6 +313,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     fireShadowSoft: true,
     terrainRefine: true,
     terrainBuildBudgetMs: 3, // calibratable
+    terrainBuildSliced: true,
     floraFogFactor: 1,
     floraDensity: 1,
     floraCastShadow: true,

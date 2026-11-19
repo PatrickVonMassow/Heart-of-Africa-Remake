@@ -234,3 +234,22 @@ describe('drainSlicedQueue (per-frame budget across sliced builds)', () => {
     expect(state.parked.has('lod0')).toBe(false)
   })
 })
+
+describe('drainSlicedQueue with whole (unsliced) builds — the low level', () => {
+  it('builds whole jobs and stops once the budget is crossed, like the old atomic drain', () => {
+    const w = fakeWorld(1)
+    const whole = (j: Job): SliceBuild => {
+      const b = w.begin(j)
+      return { step: () => b.step(Infinity) }
+    }
+    const queue: Job[] = [{ key: 'a', units: 3 }, { key: 'b', units: 4 }, { key: 'c', units: 1 }]
+    const state = newSlicedDrainState<Job>()
+    const done: string[] = []
+    drainSlicedQueue(queue, state, 5, w.now, whole, (j) => done.push(j.key), () => false)
+    // a (3) fits, b (4) runs whole and overshoots to 7, then the drain stops.
+    expect(done).toEqual(['a', 'b'])
+    expect(w.now()).toBe(7)
+    expect(state.current).toBeNull()
+  })
+})
+

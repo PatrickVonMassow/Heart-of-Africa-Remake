@@ -439,6 +439,8 @@ export const effectiveFireShadowSoft = (s: UiState): boolean => currentQuality(s
 export const effectiveTerrainRefine = (s: UiState): boolean => currentQuality(s).terrainRefine
 /** Per-frame terrain chunk build budget (ms) for the current level. */
 export const effectiveTerrainBuildBudgetMs = (s: UiState): number => currentQuality(s).terrainBuildBudgetMs
+/** Whether terrain chunk builds are sliced across frames at the current level. */
+export const effectiveTerrainBuildSliced = (s: UiState): boolean => currentQuality(s).terrainBuildSliced
 /** Flora fog-radius factor for the current level (<1 tightens the spawn circle). */
 export const effectiveFloraFogFactor = (s: UiState): number => currentQuality(s).floraFogFactor
 /** Flora/dressing density factor for the current level (1 = full); the

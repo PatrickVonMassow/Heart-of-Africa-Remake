@@ -118,3 +118,13 @@ describe('F9 cycle order (design.md §21): medium → low → high → medium', 
 // A tiny compile-time witness that QUALITY_KEYS is exactly keyof QualityPreset.
 const _keyCheck: Array<keyof QualityPreset> = QUALITY_KEYS
 void _keyCheck
+
+describe('terrain build slicing per level (docs/perf-1543-driving-hitches.md)', () => {
+  it('low builds whole chunks under the pre-1543 5 ms budget; medium/high slice', () => {
+    expect(QUALITY_PRESETS.low.terrainBuildSliced).toBe(false)
+    expect(QUALITY_PRESETS.low.terrainBuildBudgetMs).toBe(5)
+    expect(QUALITY_PRESETS.medium.terrainBuildSliced).toBe(true)
+    expect(QUALITY_PRESETS.high.terrainBuildSliced).toBe(true)
+  })
+})
+

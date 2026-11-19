@@ -33,6 +33,7 @@ import {
   effectiveShadowResolution,
   effectiveTerrainRefine,
   effectiveTerrainBuildBudgetMs,
+  effectiveTerrainBuildSliced,
   effectiveFloraFogFactor,
   effectiveFloraDensity,
   effectiveFloraCastShadow,
@@ -696,6 +697,7 @@ function TerrainChunks() {
   const seed = useGame((s) => s.seed)
   const terrainRefine = useUi(effectiveTerrainRefine)
   const buildBudgetMs = useUi(effectiveTerrainBuildBudgetMs)
+  const buildSliced = useUi(effectiveTerrainBuildSliced)
   const cache = useRef(chunkGeometryCache)
   const [active, setActive] = useState<string[]>([])
   const activeSig = useRef('')
@@ -801,11 +803,18 @@ function TerrainChunks() {
       cache.current.set(job.key, buildChunkGeometry(job.cx, job.cz, seed, job.segments, job.edgeSegs))
       chunkLatestKey.set(job.chunk, job.key)
     }
-    const beginJob = (job: ChunkJob): ChunkGeometryBuild | null =>
-      cache.current.has(job.key) ? null : new ChunkGeometryBuild(job.cx, job.cz, seed, job.segments, job.edgeSegs)
-    const completeJob = (job: ChunkJob, build: SliceBuild): void => {
+    const beginJob = (job: ChunkJob): SliceBuild | null => {
+      if (cache.current.has(job.key)) return null
+      const build = new ChunkGeometryBuild(job.cx, job.cz, seed, job.segments, job.edgeSegs)
+      // Unsliced (low): the whole chunk in one step, the budget checked between chunks.
+      if (buildSliced) return build
+      const whole: SliceBuild & { build: ChunkGeometryBuild } = { step: () => build.step(Infinity), build }
+      return whole
+    }
+    const completeJob = (job: ChunkJob, slice: SliceBuild): void => {
       if (cache.current.has(job.key)) return
-      cache.current.set(job.key, (build as ChunkGeometryBuild).geometry as THREE.BufferGeometry)
+      const build = slice instanceof ChunkGeometryBuild ? slice : (slice as SliceBuild & { build: ChunkGeometryBuild }).build
+      cache.current.set(job.key, build.geometry as THREE.BufferGeometry)
       chunkLatestKey.set(job.chunk, job.key)
     }
 
