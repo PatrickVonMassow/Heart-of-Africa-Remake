@@ -255,9 +255,12 @@ export function aggregatePasses(frames: readonly (readonly BenchPassSample[])[])
     const free = pool.filter((p) => !pool.some((q) => q !== p && wins(q, p)))
     // Stuck on a cycle: break it inside a SOURCE component — a pass that can
     // reach every pass reaching it — so no edge into the component is reversed.
-    const reaches = new Map(pool.map((p) => [p, reach(p, pool)] as const))
-    const inSourceCycle = (p: string): boolean => pool.every((q) => !reaches.get(q)!.has(p) || reaches.get(p)!.has(q))
-    const next = (free.length > 0 ? free : pool.filter(inSourceCycle)).sort(byPosition)[0]
+    // Reachability is built only then, so an acyclic row never pays for it.
+    const inSourceComponent = (): string[] => {
+      const reaches = new Map(pool.map((p) => [p, reach(p, pool)] as const))
+      return pool.filter((p) => pool.every((q) => !reaches.get(q)!.has(p) || reaches.get(p)!.has(q)))
+    }
+    const next = (free.length > 0 ? free : inSourceComponent()).sort(byPosition)[0]
     ordered.push(next)
     remaining.delete(next)
   }
