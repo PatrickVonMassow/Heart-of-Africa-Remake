@@ -182,3 +182,21 @@ exists yet — the F8 attribution is OPEN.
   3 ms. Chosen over "no budget while the prefetch queue holds only
   refinements": that would still slice the window queue on low, and low's
   regression came from spreading work, not from refinements (low has none).
+
+## Round 3 — owner F8 split on the real GPU (19.11.2026)
+
+`scripts/perf-f8-detail.mjs` at db8673c, WebGPU, AMD notebook GPU,
+1536x960 @ dpr 1.25, dev server, savanna-driving:
+
+| Pass | CPU median | p95 | p95 / median | Worst 8 frames |
+| --- | --- | --- | --- | --- |
+| medium-preset | 13.9 | 45.5 | 3.27 | all 45-51 ms (a plateau) |
+| high-preset | 20.2 | 36.0 | 1.78 | — |
+| low-preset | 4.8 | 8.5 | 1.77 | — |
+
+Share of the medium worst-8 CPU time: render-submit 335 ms = 0.88,
+terrain-stream 0.06, unbooked 0.02, wildlife 0.02. The baseline config shows
+the same pattern. Conclusion: the p95 owner on the real GPU is inside
+`renderer.render` (the post pipeline's render in `Effects`), not terrain.
+Next: split render-submit (shadow cascades, main pass, post/TRAA; new
+pipelines/programs per frame; any readback/query that waits on the GPU).
