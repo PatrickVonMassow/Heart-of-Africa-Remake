@@ -37925,3 +37925,23 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   Bundle: Session- & Repo-Hygiene.
   Status 19.11.2026 06:41 (batch session, context watermark): branch feat/1548-housekeeping-branches-step (worktree .claude/worktrees/point-1548), items 1 and 3 committed and pushed (d42815dbf no break after an incomplete step + Vitest that fails without it; 8fdfd1a90 RESCUE_BRANCH_MAX_AGE_MS 3 d / CLOUD_BRANCH_MAX_AGE_MS 14 d), housekeeping Vitest 79 green. Next: item 2 — measured /tmp holds 127,795 top-level entries (50k entry budget); a dry run of the tmp step alone finished 'done' in 1.8 s but filed proc-unreadable (foreignUnreadable 3) — find why the scheduled run ends incomplete (cursor in local/housekeeping state, shared budget), fix, test; then gates, item 4 real run with before/after rescue counts, cross review, landing.
   Status 19.11.2026 07:09 (batch session, context watermark): item 2 fixed and pushed — cause measured: ~100k leftover hoa-* test dirs in /tmp spent the 50k entry budget daily; name+lstat rejects are now budget-free (3ed6969, test red without fix); backlog entry for the test leak. Cross review GPT-6.2 Sol: 3 rounds merge-with-fixes, rounds 1-2 answered (386498d, 1e2348c), round 3 recorded at 9b630f7 and OPEN: walk reports incomplete when a non-first visit exhausts the budget without cutting its scan (move the !first check onto scanCut — note the existing 'entry larger than the whole budget' test then expects complete, reconcile) and test that edge with two old tool logs at budgetEntries 2. Branch tsc/lint/build green at 3ed6969; full test:unit not yet run on the branch. Item 4 dry run of the branches step against the real repo: would delete 7 local / 6 origin rescue branches (before: 15 local, 13 origin). Then real run, report counts, landing.
+
+- [x] 1547. Board: every point's description ends with an origin line — when it was filed and by whom
+
+  User example (schema only, content illustrative):
+    "Auf dem Ufersand liegt ein kleiner dunkler Schatten, über dem nichts steht. Zu klären: fehlt das Objekt, das ihn wirft, oder ist der Schatten ein verwaistes Bodenbild?
+
+    Eingestellt: 18.11.26 durch Agenten, der beim Abarbeiten von 1234 auf das Problem gestoßen ist"
+
+  Final state:
+  - Each queue/work-order card on the board shows, below its description, one line "Eingestellt: <TT.MM.JJ> <durch wen>" (en: "Filed: <date> <by whom>"; text from the language/board text source, de and en together if the board has both).
+  - "durch wen" distinguishes at least: user request (Benutzeranfrage) vs. agent, and for an agent the context when known (e.g. found while working on point N, review of point N, covering run of point N, split from point N).
+  - Data source, in this order: the point's own `Source:` line in TASKS.md (about 70 of ~443 open points carry one); otherwise the commit that added the point to TASKS.md (git log -S on the point's header line: date, and whether the commit/trailer shows a user-request deposit or an agent finding). If nothing can be determined, the line says so ("Herkunft unbekannt") rather than guessing.
+  - Newly filed points carry a `Source:` line with date and origin from now on (finding.mjs request/record drain path), so the line no longer depends on git archaeology.
+  - Vitest for the origin derivation and the rendered line; picture check of the board at phone width.
+  - Infrastructure freeze 01.09.2026: this is an explicit user order for a board extension; keep it small (no new ledger field beyond the existing `Source:` convention).
+  - Closed points too (user order 18.11.2026: "Sofern mit vertretbarem Aufwand möglich, auch für alle erledigten Tasks nachholen"): the archive view (archive.html / docs/tasks-archive.md entries) shows the same origin line, derived the same way. If the git derivation for the archive proves unreasonably expensive, do the open points first and file the archive part as its own follow-up point with the measured cost.
+  - Queue position (user order 18.11.2026: "Einreihung nach dem Task mit den Chat-Anweisungstexten"): directly after the request "Chat instruction texts: queue explicit orders, only propose for discussed problems; rule into CLAUDE.md".
+  User approval 18.11.2026: "Sofern mit vertretbarem Aufwand möglich, auch für alle erledigten Tasks nachholen. Einreihung nach dem Task mit den Chat-Anweisungstexten."
+  Source: user request of 18.11.2026 17:44 (spec cut from 04642a868).
+  Bundle: Chat & Tafel.

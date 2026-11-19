@@ -98,26 +98,6 @@ put it is the mistake this line exists to stop.
   Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
   Bundle: Steuerung & Performance.
 
-- [ ] 1547. Board: every point's description ends with an origin line — when it was filed and by whom
-
-  User example (schema only, content illustrative):
-    "Auf dem Ufersand liegt ein kleiner dunkler Schatten, über dem nichts steht. Zu klären: fehlt das Objekt, das ihn wirft, oder ist der Schatten ein verwaistes Bodenbild?
-
-    Eingestellt: 18.11.26 durch Agenten, der beim Abarbeiten von 1234 auf das Problem gestoßen ist"
-
-  Final state:
-  - Each queue/work-order card on the board shows, below its description, one line "Eingestellt: <TT.MM.JJ> <durch wen>" (en: "Filed: <date> <by whom>"; text from the language/board text source, de and en together if the board has both).
-  - "durch wen" distinguishes at least: user request (Benutzeranfrage) vs. agent, and for an agent the context when known (e.g. found while working on point N, review of point N, covering run of point N, split from point N).
-  - Data source, in this order: the point's own `Source:` line in TASKS.md (about 70 of ~443 open points carry one); otherwise the commit that added the point to TASKS.md (git log -S on the point's header line: date, and whether the commit/trailer shows a user-request deposit or an agent finding). If nothing can be determined, the line says so ("Herkunft unbekannt") rather than guessing.
-  - Newly filed points carry a `Source:` line with date and origin from now on (finding.mjs request/record drain path), so the line no longer depends on git archaeology.
-  - Vitest for the origin derivation and the rendered line; picture check of the board at phone width.
-  - Infrastructure freeze 01.09.2026: this is an explicit user order for a board extension; keep it small (no new ledger field beyond the existing `Source:` convention).
-  - Closed points too (user order 18.11.2026: "Sofern mit vertretbarem Aufwand möglich, auch für alle erledigten Tasks nachholen"): the archive view (archive.html / docs/tasks-archive.md entries) shows the same origin line, derived the same way. If the git derivation for the archive proves unreasonably expensive, do the open points first and file the archive part as its own follow-up point with the measured cost.
-  - Queue position (user order 18.11.2026: "Einreihung nach dem Task mit den Chat-Anweisungstexten"): directly after the request "Chat instruction texts: queue explicit orders, only propose for discussed problems; rule into CLAUDE.md".
-  User approval 18.11.2026: "Sofern mit vertretbarem Aufwand möglich, auch für alle erledigten Tasks nachholen. Einreihung nach dem Task mit den Chat-Anweisungstexten."
-  Source: user request of 18.11.2026 17:44 (spec cut from 04642a868).
-  Bundle: Chat & Tafel.
-
 - [ ] 1164. A shadow lies on the river sand with nothing above it to cast it (seen
   18.09.2026 in the covering polish frame `verification/687-bank-play-rocks.png`, WebGPU
   run 2026-09-18T22:17:33 and the WebGL 2 run after it, both GREEN).
