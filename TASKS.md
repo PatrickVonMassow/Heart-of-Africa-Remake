@@ -136,6 +136,7 @@ put it is the mistake this line exists to stop.
   User approval 18.11.2026: "ja"
   Source: user request of 18.11.2026 17:56 (spec cut from 658af1aa7).
   Bundle: Session- & Repo-Hygiene.
+  Status 19.11.2026 06:41 (batch session, context watermark): branch feat/1548-housekeeping-branches-step (worktree .claude/worktrees/point-1548), items 1 and 3 committed and pushed (d42815dbf no break after an incomplete step + Vitest that fails without it; 8fdfd1a90 RESCUE_BRANCH_MAX_AGE_MS 3 d / CLOUD_BRANCH_MAX_AGE_MS 14 d), housekeeping Vitest 79 green. Next: item 2 — measured /tmp holds 127,795 top-level entries (50k entry budget); a dry run of the tmp step alone finished 'done' in 1.8 s but filed proc-unreadable (foreignUnreadable 3) — find why the scheduled run ends incomplete (cursor in local/housekeeping state, shared budget), fix, test; then gates, item 4 real run with before/after rescue counts, cross review, landing.
 
 - [ ] 1164. A shadow lies on the river sand with nothing above it to cast it (seen
   18.09.2026 in the covering polish frame `verification/687-bank-play-rocks.png`, WebGPU
