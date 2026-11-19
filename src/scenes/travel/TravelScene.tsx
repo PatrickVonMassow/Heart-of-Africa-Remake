@@ -148,6 +148,7 @@ import { mulberry32, hashChunk } from '../../world/noise'
 import { PERF, maxFrameMs, recordBurst, recordCpuFrame, recordFrame, resetPerf } from './perfProbe'
 import { closeFrameWindow, markFrameWork, resetFrameWindow, takeFrameLedger } from '../../systems/longFrame'
 import { useTimedFrame } from '../../render/useTimedFrame'
+import { markInstancesForUpload } from '../../render/instanceUpload'
 import { Climate } from './Climate'
 import { FRAME_EDGE_MARGIN, pointOnScreen, setFrameVisibilityTest } from './frameVisibility'
 import { FLORA_SPECIES, type FloraSpecies } from './floraSpecies'
@@ -1661,10 +1662,11 @@ function swapFloraFill(fill: FloraFill, meshes: VegetationMeshes): void {
       // An empty instanced mesh still costs a draw in the main pass and in
       // each shadow cascade (point 1524), so it is hidden until it has plants.
       mesh.visible = nInst > 0
-      mesh.instanceMatrix.needsUpdate = true
+      // Upload the live instances only, not the buffer's whole capacity.
+      markInstancesForUpload(mesh.instanceMatrix, nInst)
       const tintAttr = mesh.geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute
       ;(tintAttr.array as Float32Array).set(s.tint.subarray(0, nInst))
-      tintAttr.needsUpdate = true
+      markInstancesForUpload(tintAttr, nInst)
     }
     apply(meshes.base[sp], s.base)
     const crownMesh = meshes.crown[sp]
