@@ -244,29 +244,6 @@ recurring every few frames.
   fill (every 16 wu), which fits "recurring every few frames" only partly; the
   named upload booking decides.
 
-## Hand-over (state at f9b5171)
-
-Branch `feat/1543-driving-cpu-hitches`. Gates on f9b5171: see the line below
-(typecheck:test, build, lint, test:unit).
-
-Open:
-- The F8 savanna-driving p95 owner on the real GPU is `queue.writeBuffer`
-  inside `renderer.render` (round 4); the buffer is not yet named. Owner step:
-  `npm run dev`, then
-  `BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-f8-detail.mjs`
-  and read the `gpu:upload …` lines of the worst frames. If the flora swap is
-  not the owner, the named attribute shows what to range-limit, double-buffer
-  or upload once.
-- Sliced terrain builds (medium/high, 3 ms): on the real GPU they cut the max
-  (142 → 63 ms) but not the p95, and headless they cost ~2.5-3 ms in most
-  driving frames while new ground streams. Keep or revert is the owner's call
-  once the upload owner is fixed and p95 can be re-measured; low already builds
-  whole chunks again (pre-change behaviour).
-- `scripts/batch-doctor-protected.test.mjs` (2 tests) fails in this container
-  in isolation too (git push to a rescue branch); untouched by this branch.
-- Not run here: browser suites, picture check, real-GPU F8 (owner, locally);
-  cross-vendor review (four-eyes rule of the point).
-
 ## Round 5 — owner F8 detail at d464d35 and f9b5171 (real GPU)
 
 Same setup (WebGPU, AMD notebook, 1536x960 @ 1.25, dev server, full mode,
@@ -288,3 +265,91 @@ lazy arming did not take in the F8 run). The live-flora range fix moved medium
 p95 47.6 → 41.1, within run noise. Owner hypothesis: GPU back-pressure — Chrome
 blocks writeBuffer / getCurrentTexture while the GPU queue is too far behind, so
 GPU-bound frames show up as CPU wait.
+
+## Round 5 — delivered (5bb96c8)
+
+- `gpu:write-buffer calls` and `gpu:write-buffer KB` per frame (all
+  `queue.writeBuffer` calls: uniform, storage and attribute buffers);
+  perf-f8-detail prints their mean per frame over the worst 8 against all
+  frames, so many small writes and one big write are told apart.
+- Upload booking re-arms on every render whenever the backend's attribute
+  utils are new or unwrapped, and counts bookings in `window.__uploadBookings`
+  (Vitest: arms after a late backend, re-arms on fresh utils, counts). Check in
+  the owner's DEV run: `window.__uploadBookings` > 0 after F8.
+- Back-pressure test: the travel probe records per frame the GPU latency from
+  the end of the frame's submission to `queue.onSubmittedWorkDone()`;
+  perf-f8-detail prints it for the worst 8 and for all frames. If the worst
+  frames show a latency of several frame times while all frames do not, the GPU
+  runs behind and the CPU "plateau" is wait time (writeBuffer/getCurrentTexture
+  blocking under back-pressure).
+- Headless finding: in this container the SwiftShader WebGPU device is
+  effectively lost (`Instance dropped in popErrorScope` floods,
+  `onSubmittedWorkDone` never resolves, no writeBuffer/attribute upload reaches
+  the queue). Every headless render-side number in this doc (render-submit
+  shares, upload absence) is therefore without value; main-thread JS numbers
+  (terrain, wildlife) stand.
+
+## Hand-over (state at 5bb96c8)
+
+Branch `feat/1543-driving-cpu-hitches`, head 5bb96c8 (plus this doc commit).
+Gates on 5bb96c8: typecheck:test green, build green, lint green, test:unit
+19564 passed / 2 failed (only `scripts/batch-doctor-protected.test.mjs`, see Open).
+
+Proposed fix under the back-pressure cause (not implemented; needs the
+latency evidence first):
+1. Frame pacing / frames-in-flight cap: before a frame, if the GPU still has
+   more than N (1-2) submitted frames pending (counted from
+   `onSubmittedWorkDone` promises), skip that rAF's render instead of queueing
+   more work — the CPU then never blocks inside writeBuffer/getCurrentTexture,
+   and the F8 CPU frame stays at its JS cost. In R3F this means driving the
+   loop with `frameloop="demand"`/`advance` or a before-effect gate; it changes
+   frame pacing for every scene, so it is an owner decision. OPEN.
+2. If the latency shows the GPU is simply over budget on medium in the driving
+   phase, cut the GPU cost of the passes the plateau sits in (shadow cascades
+   and the post quads on medium), which is a picture decision. OPEN.
+
+Open:
+- The real-GPU F8 p95 cause is not yet fixed; target CPU p95 <= 2x median on
+  medium and high is NOT met (owner F8 at f9b5171: medium 3.16x, high 1.65x).
+- Sliced terrain builds (medium/high): cut the max on the real GPU but not the
+  p95; keep or revert is the owner's call. Low builds whole chunks again.
+- `scripts/batch-doctor-protected.test.mjs` (2 tests) fails in this container
+  in isolation as well; untouched by this branch.
+- Not run here: browser suites, picture check, real-GPU F8 (owner), the
+  cross-vendor review the point requires.
+
+## Round 6 — owner F8 detail at 5bb96c8 (real GPU, medium-preset)
+
+CPU 13.3 / 44.3 (3.33x), worst 8 44-61 ms. Inside render-submit (worst-8
+shares): write-buffer 0.50, render:shadow 0.40, render:quad 0.33,
+get-texture 0.24, render:main 0.15. writeBuffer per frame: worst 8 248 KB /
+303 calls, all frames 251 KB / 304 calls — identical, so no extra writes in
+the slow frames: the same writes simply block. GPU latency
+(submit → onSubmittedWorkDone): worst 8 1027 ms, all frames 1024 ms.
+
+Assessment of the 1 s latency (the owner asked to check it first): very likely
+an artefact of how the promise is delivered, not the queue depth.
+- It is flat (1024-1027 ms) across all frames; a real queue depth would vary
+  with the per-frame GPU cost and would differ between worst and typical frames.
+- At ~70 fps a 1 s queue would mean ~70 frames in flight; Chrome's swap chain
+  admits only a few (getCurrentTexture blocks first).
+- Chrome resolves WebGPU completion promises when it polls the device; with no
+  other trigger that poll runs on a coarse timer, so the measured time is the
+  callback delivery delay.
+Consequence: `onSubmittedWorkDone` cannot serve as the fence for a
+frames-in-flight cap (a cap would wait on the same delayed callback and pace
+the game to ~1 fps), and the latency column of perf-f8-detail is not evidence
+of back-pressure. The identical writes that block only in some frames remain
+consistent with back-pressure, but GPU time per frame is the deciding number.
+
+Next (owner, real GPU):
+1. GPU frame time per preset from the F8 report's own `gpu` column (timestamp
+   queries) for savanna-driving medium/high/low: if the medium GPU median sits
+   near or above its CPU p95 (~44 ms), medium is over GPU budget on this
+   notebook and the CPU plateau is GPU wait.
+2. If so, the fix is GPU cost on medium (the plateau sits in the shadow and
+   post-quad passes: cascade count / shadow resolution / shadow update rate,
+   post chain), a picture decision for the owner; a frames-in-flight cap only
+   moves the wait elsewhere and needs a fence other than onSubmittedWorkDone.
+   OPEN, not implemented here.
+
