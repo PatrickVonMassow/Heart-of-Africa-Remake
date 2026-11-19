@@ -305,12 +305,27 @@ describe('budget: an incomplete step does not stop later steps', () => {
       put(join(a.tmp, `hoa-old-${i}.log`))
       age(join(a.tmp, `hoa-old-${i}.log`))
     }
+    put(join(a.local, '659-a-frames/1.png'))
+    put(join(a.local, 'tool-output-logs/old.log'))
     const { r, gitCalls } = run(a, { steps: ['tmp', 'local', 'logs', 'branches', 'git'], budgetEntries: 2 })
     expect(r.steps.tmp).toBe('incomplete')
+    expect(r.steps.local).toBe('incomplete')
+    expect(r.steps.logs).toBe('incomplete')
     expect(r.outcome).toBe('incomplete')
     expect(r.steps.branches).toBeDefined()
     expect(gitCalls.some((c) => c[0] === 'for-each-ref')).toBe(true)
     expect(gitCalls.some((c) => c.includes('gc') && c.includes('--auto'))).toBe(true)
+  })
+
+  it('reports done when the only entry uses the budget up exactly', () => {
+    const a = arena()
+    put(join(a.tmp, 'hoa-only.log'))
+    age(join(a.tmp, 'hoa-only.log'))
+    // One unit for the candidate, one for its scan; spend() fails AT the limit.
+    const { r } = run(a, { steps: ['tmp'], budgetEntries: 3 })
+    expect(r.steps.tmp).toBe('done')
+    expect(r.outcome).toBe('complete')
+    expect(existsSync(join(a.tmp, 'hoa-only.log'))).toBe(false)
   })
 
   it('marks the run incomplete when its only entry outgrows the budget', () => {

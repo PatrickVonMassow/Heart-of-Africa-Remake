@@ -552,6 +552,14 @@ export function runHousekeeping({
       }
     }
 
+    // Set when a visit's tree scan ran out of budget (not merely used it up).
+    let scanCut = false
+    const scanBudgeted = (path) => {
+      const scan = scanTree(path, budget)
+      if (!scan.complete && budget.exhausted()) scanCut = true
+      return scan
+    }
+
     /** Iterate a directory's names after the step's cursor, under the budget. */
     const walk = (step, dir, visit) => {
       let names
@@ -570,17 +578,19 @@ export function runHousekeeping({
           writeState({ cursor })
           return 'incomplete'
         }
+        scanCut = false
         visit(name)
         // A visit the budget cut short kept its entry as "scan incomplete": the
         // cursor stays before it so the next run sees it again — unless it was
         // this run's first entry, which alone outgrows the budget and would
         // otherwise block every later run.
-        if (budget.exhausted()) {
+        if (budget.exhausted() && !first) {
           complete = false
-          if (!first) {
-            writeState({ cursor })
-            return 'incomplete'
-          }
+          writeState({ cursor })
+          return 'incomplete'
+        }
+        if (scanCut) {
+          complete = false
           cut = true
         }
         first = false
@@ -745,7 +755,7 @@ export function runHousekeeping({
             return
           }
           if (touchesWorktree(path, wts)) return emit({ path, size: null, rule: pre.rule, outcome: 'kept', reason: 'git worktree' })
-          const scan = scanTree(path, budget)
+          const scan = scanBudgeted(path)
           const facts = { name, isSymlink, isFile, shape, complete: scan.complete, newestMtimeMs: scan.newestMtimeMs, canonical: path }
           const v = tmpVerdict(facts, { now: clock(), liveness: live })
           if (!v.act) {
@@ -790,7 +800,7 @@ export function runHousekeeping({
           }
           if (touchesWorktree(path, worktrees))
             return emit({ path, size: null, rule: v.rule, outcome: 'kept', reason: 'git worktree' })
-          const scan = scanTree(path, budget)
+          const scan = scanBudgeted(path)
           if (!scan.complete) return emit({ path, size: scan.bytes, rule: v.rule, outcome: 'kept', reason: 'scan incomplete' })
           if (scan.hasGit) return emit({ path, size: scan.bytes, rule: v.rule, outcome: 'kept', reason: 'contains .git' })
           remove(path, st, root, v.rule, scan.bytes)
