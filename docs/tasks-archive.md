@@ -37865,3 +37865,13 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
   User approval 18.11.2026: "Ja, so als drei Aufträge einreihen"
   Source: user request of 18.11.2026 17:20 (spec cut from b08561942).
   Bundle: Steuerung & Performance.
+
+- [x] 1544. Delete the three skirt-calibration cloud branches and remove the board card "Drei Rock-Kalibrier-Branches: behalten oder löschen?"
+
+  - git push origin --delete claude/skirt-containment-calibration-r7-0w798w claude/skirt-containment-calibration-r8-02wjht claude/skirt-containment-sector-envelope-155wyt (last commits 04.11.2026: 024147d5c, 3daae3dcf, aca51bfab); remove any local copies/worktrees of them.
+  - Board: drop the card; record the closure in the decision log (what: branches deleted; why: user decision 18.11.2026; veto: commits stay recoverable by sha while unpruned).
+  - No code change.
+  - Queue position (user order 18.11.2026: "Alle drei Aufträge vorne einreihen, aber nach den drei neu anstehenden Aufträgen zur Performance-Steigerung"): front of the work order, directly after the three performance requests of 18.11.2026.
+  User approval 18.11.2026: "Auftrag an die Owner-Session"
+  Source: user request of 18.11.2026 17:24 (spec cut from b08561942).
+  Bundle: Chat & Tafel.
