@@ -1630,9 +1630,9 @@ if (section('children-bank-game')) {
         })
         return { W, H, cam: [cam.position.x, cam.position.y, cam.position.z].map((v) => +v.toFixed(2)), out }
       })
-      ;(await import('node:fs')).writeFileSync('/tmp/claude-1000/-workspace-hoa/23811f0d-a561-4a12-9931-2e75099237a7/scratchpad/diag1164-' + Date.now() + '.json', JSON.stringify(diag))
+      ;(await import('node:fs')).writeFileSync('/tmp/claude-1000/-workspace-hoa/3e7cea92-b879-4878-9cd0-182bd8775601/scratchpad/diag1164-' + Date.now() + '.json', JSON.stringify(diag))
       {
-        const S = '/tmp/claude-1000/-workspace-hoa/23811f0d-a561-4a12-9931-2e75099237a7/scratchpad/'
+        const S = '/tmp/claude-1000/-workspace-hoa/3e7cea92-b879-4878-9cd0-182bd8775601/scratchpad/'
         const flip = (step) => page.evaluate((step) => {
           let hit = null
           window.__placeScene.traverse((o) => {
