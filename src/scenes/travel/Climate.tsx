@@ -159,9 +159,10 @@ export function Climate() {
     // into ~20-unit patches that read as gray cloud blobs over the terrain.
     // Point 1556: the former per-fragment 3-octave 3D MaterialX fractal noise
     // (x/y scroll +0.03, z sweep 0.05 cells/s) is baked once into a tiling
-    // texture of the same noise (render/hazeNoise.ts). Two reads drift against
-    // each other in place of the z sweep; their centred sum is scaled by
-    // 1/sqrt(2) so the noise variance — and with it n*n, the opacity — stays.
+    // texture of the same noise (render/hazeNoise.ts). Two reads of independent
+    // slices (R, G) drift against each other in place of the z sweep; their
+    // centred sum is scaled by 1/sqrt(2) so the noise variance — and with it
+    // n*n, the opacity — stays.
     const cfg = balance.climateHaze
     const noiseTex = getHazeNoiseTexture(cfg.noiseTextureSize, cfg.noiseTilePeriod)
     const p = positionWorld.xz.mul(0.13)
@@ -169,7 +170,7 @@ export function Climate() {
     const b = texture(
       noiseTex,
       p.add(vec2(time.mul(cfg.crossDriftX), time.mul(cfg.crossDriftY))).add(vec2(5.3, 2.9)).div(cfg.noiseTilePeriod),
-    ).r
+    ).g
     const n = a.add(b).sub(1).mul(Math.SQRT1_2).add(0.5)
     // Square (Chebyshev) fade toward the quad edges, wide enough that no rotated-square
     // silhouette of the layer quad ever shows.

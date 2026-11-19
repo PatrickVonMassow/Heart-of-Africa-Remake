@@ -79,10 +79,16 @@ export function mxFractal3(px: number, py: number, pz: number, octaves: number, 
 export const MX_FRACTAL3_STD = 0.304
 
 /** Bake an N x N tile of the fractal at a fixed z slice, `period` base cells
- *  across. Stored as byte = (noise * gain) * 0.5 + 0.5, where `gain` brings the
- *  slice's std to MX_FRACTAL3_STD (a single slice has a different std than the
- *  time-averaged z sweep the shader saw). Returns the bytes and that gain. */
-export function bakeHazeNoise(size: number, period: number, octaves = 3, zSlice = 0.37): { data: Uint8Array; gain: number } {
+ *  across. Stored as byte = ((noise - mean) * gain) * 0.5 + 0.5: the slice
+ *  mean is removed and `gain` brings the slice's std to MX_FRACTAL3_STD (a
+ *  single slice has a different std than the time-averaged z sweep the shader
+ *  saw). Returns the bytes, that gain and the removed mean. */
+export function bakeHazeNoise(
+  size: number,
+  period: number,
+  octaves = 3,
+  zSlice = 0.37,
+): { data: Uint8Array; gain: number; mean: number } {
   const raw = new Float32Array(size * size)
   // Per octave the wrapped lattice is tiny (period * 2^o cells square), so the
   // corner hashes are tabulated once instead of 8 Jenkins mixes per texel.
@@ -140,19 +146,33 @@ export function bakeHazeNoise(size: number, period: number, octaves = 3, zSlice 
   const gain = MX_FRACTAL3_STD / std
   const data = new Uint8Array(n)
   for (let k = 0; k < n; k++) {
-    const t = raw[k] * gain * 0.5 + 0.5
+    const t = (raw[k] - mean) * gain * 0.5 + 0.5
     data[k] = Math.max(0, Math.min(255, Math.round(t * 255)))
   }
-  return { data, gain }
+  return { data, gain, mean }
 }
 
-let cached: THREE.DataTexture | null = null
+/** z slices of the two baked channels. Their octave lattices share no z cell
+ *  (0.37/0.74/1.48 vs 5.71/11.42/22.84), so R and G are independent fields and
+ *  two drifting reads never line up into one (review of point 1556). */
+export const HAZE_NOISE_SLICES = [0.37, 5.71] as const
 
-/** The shared, lazily baked haze noise texture (R8, repeat, mipmapped). */
+const cache = new Map<string, THREE.DataTexture>()
+
+/** The shared, lazily baked haze noise texture (RG8, repeat, mipmapped): R and
+ *  G hold independent slices of the fractal. Cached per size and period, so a
+ *  recalibrated tile is baked anew rather than reused stale. */
 export function getHazeNoiseTexture(size: number, period: number): THREE.DataTexture {
-  if (cached) return cached
-  const { data } = bakeHazeNoise(size, period)
-  const tex = new THREE.DataTexture(data, size, size, THREE.RedFormat, THREE.UnsignedByteType)
+  const key = `${size}:${period}`
+  const hit = cache.get(key)
+  if (hit) return hit
+  const [r, g] = HAZE_NOISE_SLICES.map((z) => bakeHazeNoise(size, period, 3, z).data)
+  const data = new Uint8Array(size * size * 2)
+  for (let k = 0; k < size * size; k++) {
+    data[k * 2] = r[k]
+    data[k * 2 + 1] = g[k]
+  }
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGFormat, THREE.UnsignedByteType)
   tex.wrapS = THREE.RepeatWrapping
   tex.wrapT = THREE.RepeatWrapping
   tex.magFilter = THREE.LinearFilter
@@ -160,6 +180,6 @@ export function getHazeNoiseTexture(size: number, period: number): THREE.DataTex
   tex.generateMipmaps = true
   tex.colorSpace = THREE.NoColorSpace
   tex.needsUpdate = true
-  cached = tex
+  cache.set(key, tex)
   return tex
 }
