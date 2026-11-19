@@ -563,6 +563,7 @@ export function runHousekeeping({
         return 'unreadable'
       }
       let first = true
+      let cut = false
       for (const name of names) {
         if (budget.exhausted()) {
           complete = false
@@ -574,17 +575,20 @@ export function runHousekeeping({
         // cursor stays before it so the next run sees it again — unless it was
         // this run's first entry, which alone outgrows the budget and would
         // otherwise block every later run.
-        if (budget.exhausted() && !first) {
+        if (budget.exhausted()) {
           complete = false
-          writeState({ cursor })
-          return 'incomplete'
+          if (!first) {
+            writeState({ cursor })
+            return 'incomplete'
+          }
+          cut = true
         }
         first = false
         cursor[step] = name
       }
       cursor[step] = null
       writeState({ cursor })
-      return 'done'
+      return cut ? 'incomplete' : 'done'
     }
 
     // Shared facts for local/ and tool-output-logs (rules 1, 2, 6).
@@ -734,7 +738,7 @@ export function runHousekeeping({
           // it every run and the step never completes. The time budget still bounds.
           const rule = tmpCandidateRule(name)
           if (!isSymlink && rule && !(rule === 'tmp-hoa-log' && !isFile)) budget.spend(1)
-          const shape = !isSymlink && st.isDirectory() && !/^(hoa|point)-/.test(name) ? describeShape(path, name) : null
+          const shape = !isSymlink && st.isDirectory() && rule === 'tmp-vite-cache' ? describeShape(path, name) : null
           const pre = tmpShapeVerdict({ name, isSymlink, isFile, shape })
           if (!pre.ok) {
             if (!SILENT.has(pre.reason)) emit({ path, size: st.size, rule: 'tmp', outcome: 'kept', reason: pre.reason })

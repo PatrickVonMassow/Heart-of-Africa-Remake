@@ -287,6 +287,8 @@ describe('budget: entries rejected by name and lstat alone', () => {
   it('lets many hoa-* directories pass without spending the scan budget', () => {
     const a = arena()
     for (let i = 0; i < 10; i++) mkdirSync(join(a.tmp, `hoa-leftover-${i}`))
+    for (let i = 0; i < 5; i++) put(join(a.tmp, `build.cache-${i}/web/a.js`))
+    symlinkSync(a.outside, join(a.tmp, 'linked'))
     put(join(a.tmp, 'hoa-z-old.log'))
     age(join(a.tmp, 'hoa-z-old.log'))
     const { r } = run(a, { steps: ['tmp'], budgetEntries: 4 })
@@ -303,11 +305,22 @@ describe('budget: an incomplete step does not stop later steps', () => {
       put(join(a.tmp, `hoa-old-${i}.log`))
       age(join(a.tmp, `hoa-old-${i}.log`))
     }
-    const { r, gitCalls } = run(a, { steps: ['tmp', 'branches', 'git'], budgetEntries: 2 })
+    const { r, gitCalls } = run(a, { steps: ['tmp', 'local', 'logs', 'branches', 'git'], budgetEntries: 2 })
     expect(r.steps.tmp).toBe('incomplete')
     expect(r.outcome).toBe('incomplete')
     expect(r.steps.branches).toBeDefined()
-    expect(r.steps.git).toBeDefined()
+    expect(gitCalls.some((c) => c[0] === 'for-each-ref')).toBe(true)
+    expect(gitCalls.some((c) => c.includes('gc') && c.includes('--auto'))).toBe(true)
+  })
+
+  it('marks the run incomplete when its only entry outgrows the budget', () => {
+    const a = arena()
+    put(join(a.tmp, 'hoa-only.log'))
+    age(join(a.tmp, 'hoa-only.log'))
+    const { r, gitCalls } = run(a, { steps: ['tmp', 'branches', 'git'], budgetEntries: 1 })
+    expect(r.steps.tmp).toBe('incomplete')
+    expect(r.outcome).toBe('incomplete')
+    expect(existsSync(join(a.tmp, 'hoa-only.log'))).toBe(true)
     expect(gitCalls.some((c) => c[0] === 'for-each-ref')).toBe(true)
   })
 })
