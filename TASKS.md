@@ -11309,6 +11309,9 @@ to land than a mechanism that needs a review.
   so the next one cannot be forgotten the same way.
   Criticality: medium — it loses no code and no save, but it silently changes the world and the
   random source of any session that measured itself, and it has stood unowned in every LARGE run.
+  ALSO MEASURED 19.11.2026 (main ae28726, WebGL 2): the world behind the finished benchmark dialog
+  renders black in `verification/136-benchmark-report.png` (WebGPU shows the street); likely the same
+  unreturned world — the fix's WebGL 2 frame must show the scene again, else file it separately.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1010. The Ctrl-label fusion check names a point that is closed, so its red has no owner
