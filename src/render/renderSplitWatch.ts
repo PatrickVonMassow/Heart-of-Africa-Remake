@@ -46,6 +46,52 @@ export function renderKind(scene: unknown, camera: unknown): 'render:main' | 're
   return 'render:shadow'
 }
 
+/** Uploads at or above this many bytes are named after their owner. */
+export const NAMED_UPLOAD_BYTES = 256 * 1024
+
+interface AttrLike {
+  array?: ArrayLike<number> & { byteLength?: number }
+  updateRanges?: Array<{ start: number; count: number }>
+  name?: string
+  data?: AttrLike
+}
+
+/** Bytes one attribute upload writes: its update ranges, else the whole array. */
+export function uploadBytes(attr: AttrLike): number {
+  const a = attr.data ?? attr
+  const arr = a.array
+  const bpe = arr && 'BYTES_PER_ELEMENT' in arr ? (arr as unknown as { BYTES_PER_ELEMENT: number }).BYTES_PER_ELEMENT : 4
+  const ranges = a.updateRanges ?? []
+  if (ranges.length > 0) return ranges.reduce((n, r) => n + r.count * bpe, 0)
+  return arr?.byteLength ?? 0
+}
+
+interface Obj3 {
+  name?: string
+  type?: string
+  geometry?: { attributes?: Record<string, AttrLike>; index?: AttrLike | null }
+  instanceMatrix?: AttrLike
+  instanceColor?: AttrLike | null
+  children?: Obj3[]
+}
+
+/** Name the scene object/attribute that owns `array` ('?' when none does). */
+export function uploadOwner(root: Obj3 | null, array: unknown): string {
+  if (!root || !array) return '?'
+  const stack: Obj3[] = [root]
+  while (stack.length > 0) {
+    const o = stack.pop() as Obj3
+    const who = o.name || o.type || 'object'
+    if (o.instanceMatrix?.array === array) return `${who}.instanceMatrix`
+    if (o.instanceColor?.array === array) return `${who}.instanceColor`
+    const attrs = o.geometry?.attributes
+    if (attrs) for (const [k, v] of Object.entries(attrs)) if ((v.data ?? v).array === array) return `${who}.${k}`
+    if (o.geometry?.index?.array === array) return `${who}.index`
+    if (o.children) stack.push(...o.children)
+  }
+  return '?'
+}
+
 /** Arm the split on `renderer`; returns the restore function. */
 export function watchRenderSplit(renderer: unknown): () => void {
   const restore: Array<() => void> = []
@@ -53,7 +99,9 @@ export function watchRenderSplit(renderer: unknown): () => void {
   const original = r.render
   // Exclusive timing: each frame on the stack subtracts its children.
   const childMs: number[] = []
+  let mainScene: Obj3 | null = null
   const wrapped = function (this: RendererLike, scene: unknown, camera: unknown): unknown {
+    if ((scene as { isScene?: boolean }).isScene) mainScene = scene as Obj3
     const t0 = performance.now()
     childMs.push(0)
     try {
@@ -69,6 +117,31 @@ export function watchRenderSplit(renderer: unknown): () => void {
   restore.push(() => {
     if (r.render === wrapped) r.render = original
   })
+  // Attribute uploads by owner and size (round 4: the real-GPU plateau is
+  // writeBuffer time). Large ones are named: 'gpu:upload <owner> <MB>'.
+  const utils = (renderer as { backend?: { attributeUtils?: { updateAttribute?: (a: AttrLike) => void } } }).backend
+    ?.attributeUtils
+  const update = utils?.updateAttribute
+  if (utils && typeof update === 'function') {
+    const wrappedUpdate = function (this: unknown, attr: AttrLike): void {
+      const bytes = uploadBytes(attr)
+      const t0 = performance.now()
+      try {
+        update.call(this, attr)
+      } finally {
+        const ms = performance.now() - t0
+        const key =
+          bytes >= NAMED_UPLOAD_BYTES
+            ? `gpu:upload ${uploadOwner(mainScene, (attr.data ?? attr).array)} ${(bytes / 1e6).toFixed(2)}MB`
+            : 'gpu:upload small'
+        markFrameWork(key as FrameSystem, ms)
+      }
+    }
+    utils.updateAttribute = wrappedUpdate
+    restore.push(() => {
+      if (utils.updateAttribute === wrappedUpdate) utils.updateAttribute = update
+    })
+  }
   const g = globalThis as unknown as Record<string, { prototype?: Proto } | undefined>
   wrapProto(g.GPUCanvasContext?.prototype, 'getCurrentTexture', 'gpu:get-texture', restore)
   wrapProto(g.GPUQueue?.prototype, 'submit', 'gpu:submit', restore)

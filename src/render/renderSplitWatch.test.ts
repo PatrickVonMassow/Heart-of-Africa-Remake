@@ -1,7 +1,7 @@
 // The render-submit split (docs/perf-1543-driving-hitches.md): render kinds and
 // exclusive (nested-subtracted) timing of renderer.render calls.
 import { describe, expect, it, vi } from 'vitest'
-import { renderKind, watchRenderSplit } from './renderSplitWatch'
+import { renderKind, uploadBytes, uploadOwner, watchRenderSplit } from './renderSplitWatch'
 import { takeFrameLedger } from '../systems/longFrame'
 
 describe('renderSplitWatch', () => {
@@ -18,7 +18,7 @@ describe('renderSplitWatch', () => {
     const main = { isPerspectiveCamera: true }
     const shadowCam = { isOrthographicCamera: true }
     const renderer = {
-      render(scene: unknown, camera: unknown): void {
+      render(_scene: unknown, camera: unknown): void {
         if (camera === main) {
           t += 2
           renderer.render(big, shadowCam) // the shadow pass nested in the main render
@@ -38,5 +38,25 @@ describe('renderSplitWatch', () => {
     restore()
     expect(renderer.render).toBe(original)
     spy.mockRestore()
+  })
+
+  it('counts upload bytes by update ranges, else the whole array', () => {
+    const array = new Float32Array(1000)
+    expect(uploadBytes({ array, updateRanges: [] })).toBe(4000)
+    expect(uploadBytes({ array, updateRanges: [{ start: 0, count: 16 }, { start: 32, count: 4 }] })).toBe(80)
+    expect(uploadBytes({ data: { array, updateRanges: [] } })).toBe(4000)
+  })
+
+  it('names the scene object and attribute that own an uploaded array', () => {
+    const m = new Float32Array(16)
+    const pos = new Float32Array(3)
+    const root = {
+      type: 'Scene',
+      children: [{ name: 'flora-bush', instanceMatrix: { array: m } }, { type: 'Mesh', geometry: { attributes: { position: { array: pos } } } }],
+    }
+    expect(uploadOwner(root, m)).toBe('flora-bush.instanceMatrix')
+    expect(uploadOwner(root, pos)).toBe('Mesh.position')
+    expect(uploadOwner(root, new Float32Array(1))).toBe('?')
+    expect(uploadOwner(null, m)).toBe('?')
   })
 })
