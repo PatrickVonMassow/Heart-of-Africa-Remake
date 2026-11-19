@@ -38052,3 +38052,12 @@ Handover 23.10.2026 03:43 (55e91bef3): the separation explanation of 02:15 is RE
 
   The point's final-state condition (shadows-off GPU median <= baseline in all three phases, shadows-off prices only the shadows) holds; the saving matches the ShadowMap pass. Between c8f3995 and f24ce38 no travel shadow code changed (only the 1549 per-pass measurement and 1164, which is place-scene only), so the earlier 25.9 -> 36.0 ms inversion is attributed to the old measurement run.
   Source: user request of 19.11.2026 18:59 UTC via the findings carrier (session unknown).
+
+- [x] 1361. decision-card-guard deadlocks a non-owner session's Stop by demanding a vdzk-keep the ownership guard refuses
+  Queue position: end of Session- & Repo-Hygiene.
+  Source: findings carrier 16.10.2026 09:02: session 1624ee5d (not batch owner; owner 36861bc0): Stop hook decision-card-guard demanded 'board.mjs vdzk-keep "Batchelor: Batch-Infrastruktur als eigenes Projekt abspalten"' for user message 29bbe2bf (a board-chat test log, no decision); the PreToolUse batch-ownership stand-down refused that command, and the guard fired twice in a row. scripts/decision-card-guard.mjs computes heldByOtherLiveOwner but still demands the keep (the carry path of e65219245).
+  Final state: for a session not holding the batch lock, decision-card-guard never demands an action the ownership stand-down refuses (it stands down, or carries the answer to the owner without a keep demand); the card stays open.
+  Verifiable: Vitest reproducing a non-owner Stop with an open card and a non-decision user message: no blocking demand.
+  Also (findings carrier 16.10.2026 22:14, session 7850716a): the bare `node scripts/board.mjs vdzk-keep …` passes the stand-down (isVdzkKeepSegment); only a wrapped call (`cd … && … 2>&1 | tail`) is refused, so the deadlock is avoidable in practice.
+  Bundle: Session- & Repo-Hygiene.
+  Closed 19.11.2026 by the user-approved reorder 1557: moved to docs/backlog.md (the bare command is a working path; no real blockade).
