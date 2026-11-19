@@ -91,6 +91,29 @@ put it is the mistake this line exists to stop.
   Source: user request of 19.11.2026 09:27 UTC via the findings carrier (session 9a5eca75); queued at the front of the work order by user order.
   Bundle: Modell & Wächter.
 
+- [ ] 1551. Refuse the back of the order for a split of a priority point
+  Observed: 18.11.2026 the batch split Part B of the user's high-priority performance order 1542 into 1549 and ranked it `last` (machine, position 445 of 445) with a reason about WHEN it can run (the batch host lacks WebGPU timestamp queries), not WHERE it belongs. `--ranked` accepts any nonempty reason, `appendGateState` clears on any `last` entry, and standing before one remembered point counts as a deliberate move. The 1549 block carries no `Criticality:` tag. Corrected by user order 19.11.2026 (1549 now before 1543).
+
+  Origin: blind four-eyes stage — A Claude Opus 5.5, B GPT-6.2 Sol, merged by Claude Fable 5.2 (19.11.2026). Hybrid verdict: the live parent rank entry is the detector; the child's own `Criticality: high` tag is the carrier that survives the parent's landing; no retention of closed entries (that would be a new ledger part, forbidden by the freeze).
+
+  Final state (no new guard, no new record field; `.claude/queue-rank.json` keeps its shape):
+  1. `scripts/queue-rank-core.mjs`: new pure `splitPriorityOf(body, ranked)` reads `Split from <N>` in the point's own block. `priority` when `ranked[N].place` is `ahead` or `statesHighUrgency(body)`; `undeclared` when the cited parent has no entry and the block states no `Criticality:` level; else `none`. A block without the citation is `none`.
+  2. `appendGateState(open, record, { bodies })`: a new `priority` point stays pending unless it has an `ahead` entry AND stands in the leading run (no open point without an `ahead` entry before it). An `undeclared` new point stays pending until its block states a level. Without `bodies` behaviour is unchanged.
+  3. `scripts/queue-order-guard-core.mjs` passes `openPointBodies(tasksMd)`; `scripts/queue-rank.mjs` status and `writeRankRecord` use the same call, so settlement cannot absorb a refused placement.
+  4. CLI: `--ranked <N>` is refused for `priority` and `undeclared`; the message names the remedy (move the block to the front, write `Criticality: high` into the child, then `--ahead <N> --why …` with the true origin).
+  5. TASKS.md preamble, one sentence: a point split from a priority point inherits its place; when it can run is stated in the block and is never a rank reason.
+  6. File the three blind-stage halves under `docs/four-eyes/` (A, B with model fields, union by Fable 5.2) in one commit and run the `scripts/blind-merge.mjs` count (manual count: 21/21 entries, each exactly once). The halves were preserved on 19.11.2026 from the filing session's scratchpad into `local/four-eyes-1551/` (A.json, B.json, U.json; untracked); the Fable 5.2 full text stands in session transcript ae3584ec-83cc-4c8a-8edc-06056cb3d591.
+
+  Test (Vitest, core + CLI):
+  - 1542->1549: `ranked[1542] = {user, ahead}`, 1549 appended with "Split from 1542 Part B" and no tag -> pending; a hand-written `last` entry -> still pending.
+  - Child moved before one remembered backlog point -> still pending; moved before 1543 with an `ahead` entry -> settled.
+  - Parent closed and pruned: child with `Criticality: high` -> `priority`; child without any level -> `undeclared`.
+  - A non-split appended point and a split of a `last`-ranked parent -> unchanged; `--ranked 1549` exits non-zero with the remedy text.
+
+  Still open (record, do not build): a split without the `Split from <N>` line escapes; a settled child moved back later is not re-asked; `Criticality: high` also arms the four-eyes tick gate for the child; "front" = leading run is a stand-in while no release point is open; a torn record still fails open.
+  Source: user request of 19.11.2026 10:02 UTC via the findings carrier (session 9a5eca75); queued at the front of the work order by user order 19.11.2026 11:02, directly behind 1550 which was already being landed.
+  Bundle: Modell & Wächter.
+
 - [ ] 1549. Find the cause of the shadows-off GPU inversion
   Split from 1542 Part B (main-session decision 18.11.2026 21:47, for veto). Observed in the user benchmark
   "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the
