@@ -7,7 +7,8 @@
 // median/p95 of that pass and each system's share of the 8 worst
 // frames, and inside render-submit the exclusive renderer.render time by kind
 // and the blocking WebGPU calls (src/render/renderSplitWatch.ts). Env: BENCH_W, BENCH_H, BENCH_DPR (default 1536x960 @ 1.25),
-// BENCH_TIMEOUT_MS (default 30 min).
+// BENCH_TIMEOUT_MS (default 30 min), BENCH_GPU_TIMESTAMPS=0 (do not add the
+// Chrome switches that expose timestamp-query).
 import { writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { verifyLaunchOptions } from './verify/launch-args-core.mjs'
@@ -39,7 +40,20 @@ const opts = verifyLaunchOptions(
   hasHardwareGlChain(process.platform),
 )
 opts.args = [...opts.args, '--disable-gpu-vsync', '--disable-frame-rate-limit']
+// This measurement only (not the shared verify defaults): expose the WebGPU
+// timestamp-query feature, which Chrome withholds on some adapters, so the F8
+// report carries its GPU column. BENCH_GPU_TIMESTAMPS=0 leaves it off.
+if (backend === 'webgpu' && process.env.BENCH_GPU_TIMESTAMPS !== '0')
+  opts.args = [...opts.args, '--enable-dawn-features=allow_unsafe_apis', '--enable-webgpu-developer-features']
 const browser = await chromium.launch(opts)
+const page0 = await browser.newPage()
+await page0.goto(BASE, { waitUntil: 'commit', timeout: 120000 })
+const tsq = await page0.evaluate(async () => {
+  const a = await navigator.gpu?.requestAdapter()
+  return a ? a.features.has('timestamp-query') : null
+})
+await page0.close()
+console.log(`# adapter timestamp-query: ${tsq === null ? 'no WebGPU adapter' : tsq}`)
 const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: dpr })
 const url = new URL(BASE)
 if (short) url.searchParams.set('bench', 'short')

@@ -365,3 +365,20 @@ Ready for the owner's real-GPU run (`npm run dev`, then
 which decides the medium GPU-cost cut. The raw outputs of the owner runs at
 c5f2f94, d464d35, f9b5171 and 5bb96c8 exist only on the owner host
 (worktree `local/`); this doc carries their tables.
+
+## Round 8 — owner run at 014b9c8 and the timestamp switch
+
+Owner real-GPU run at 014b9c8: every pass printed `gpu n/a (adapter without
+the timestamp-query feature)`. CPU median / p95 (ratio), savanna-driving:
+medium 12.8 / 46.0 (3.59), high 19.7 / 31.4 (1.59), low 5.0 / 13.7 (2.74),
+baseline 20.6 / 32.4, shadows-off 13.6 / 37.1, post-off 16.7 / 29.3.
+
+`scripts/perf-f8-detail.mjs` now launches Chrome, for this measurement only
+(its own args, not the shared verify defaults), with
+`--enable-dawn-features=allow_unsafe_apis --enable-webgpu-developer-features`
+(`BENCH_GPU_TIMESTAMPS=0` leaves them off), and prints first
+`# adapter timestamp-query: <true|false>` from a probe page on BASE_URL.
+Container check: the script's launch reports `timestamp-query: true`. The check
+proves little here, because this container's SwiftShader adapter offers the
+feature even without the switches. Whether the switches unlock it on the
+owner's AMD adapter shows in that first line of the next owner run.
