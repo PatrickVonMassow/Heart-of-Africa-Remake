@@ -221,3 +221,70 @@ Lowest p95: terrain-cap-84 33.5, climate-haze-off 30.2. The worst frames are a
 (on medium inside the shadow pass, the first draw of the frame that meets the
 dirty attribute; on high inside the main pass). Owner: a large buffer upload
 recurring every few frames.
+
+## Round 4 — delivered (d464d35 … f9b5171)
+
+- Upload booking (src/render/renderSplitWatch.ts): every attribute upload
+  through the WebGPU backend's attribute utils is booked; uploads >= 256 KB as
+  `gpu:upload <object>.<attribute> <MB>`, naming the scene object and attribute
+  whose array they write (instance matrices, instance colours, geometry
+  attributes, index), smaller ones as `gpu:upload small`. Armed lazily on the
+  first render (the backend initialises asynchronously). `perf-f8-detail.mjs`
+  lists them under "inside render-submit".
+- Headless check: the hook is installed, but in this container's headless
+  WebGPU (SwiftShader) no attribute upload and no `queue.writeBuffer` falls into
+  the measured frame window while driving, so the real-GPU plateau cannot be
+  reproduced here. The owner's next F8-detail run names the buffer.
+- Candidate fix (f9b5171, unconfirmed): a flora fill swap set `needsUpdate` on
+  every species' instance matrix and season tint, re-uploading each buffer's
+  whole capacity; it now marks an update range over the live instances only
+  (`markInstancesForUpload`, src/render/instanceUpload.ts, Vitest). Three's
+  InstanceNode forwards the source ranges to its interleaved buffer, so the
+  WebGPU writeBuffer shrinks to the drawn instances. A swap happens once per
+  fill (every 16 wu), which fits "recurring every few frames" only partly; the
+  named upload booking decides.
+
+## Hand-over (state at f9b5171)
+
+Branch `feat/1543-driving-cpu-hitches`. Gates on f9b5171: see the line below
+(typecheck:test, build, lint, test:unit).
+
+Open:
+- The F8 savanna-driving p95 owner on the real GPU is `queue.writeBuffer`
+  inside `renderer.render` (round 4); the buffer is not yet named. Owner step:
+  `npm run dev`, then
+  `BASE_URL=http://localhost:5173/ VERIFY_GL=webgpu node scripts/perf-f8-detail.mjs`
+  and read the `gpu:upload …` lines of the worst frames. If the flora swap is
+  not the owner, the named attribute shows what to range-limit, double-buffer
+  or upload once.
+- Sliced terrain builds (medium/high, 3 ms): on the real GPU they cut the max
+  (142 → 63 ms) but not the p95, and headless they cost ~2.5-3 ms in most
+  driving frames while new ground streams. Keep or revert is the owner's call
+  once the upload owner is fixed and p95 can be re-measured; low already builds
+  whole chunks again (pre-change behaviour).
+- `scripts/batch-doctor-protected.test.mjs` (2 tests) fails in this container
+  in isolation too (git push to a rescue branch); untouched by this branch.
+- Not run here: browser suites, picture check, real-GPU F8 (owner, locally);
+  cross-vendor review (four-eyes rule of the point).
+
+## Round 5 — owner F8 detail at d464d35 and f9b5171 (real GPU)
+
+Same setup (WebGPU, AMD notebook, 1536x960 @ 1.25, dev server, full mode,
+savanna-driving). CPU median / p95 (ratio); shares of worst-8 CPU time inside
+render-submit:
+
+| Build | Pass | Median / p95 (ratio) | Worst 8 | Inside render-submit |
+| --- | --- | --- | --- | --- |
+| d464d35 | medium | 14.6 / 49.5 (3.39) | 49-64 plateau | write-buffer 0.46, shadow 0.42, quad 0.33, get-texture 0.31, main 0.14, upload small 0.07 |
+| d464d35 | high | 21.5 / 43.6 (2.03) | 172,145,73,72,72,63,57,44 | write-buffer 0.69, main 0.67, shadow 0.25, upload small 0.04 |
+| d464d35 | low | 4.9 / 12.5 (2.55) | — | — |
+| f9b5171 | medium | 13.0 / 41.1 (3.16) | 41-58 | write-buffer 0.57, main 0.40, quad 0.24, shadow 0.23, get-texture 0.05 |
+| f9b5171 | high | 20.1 / 33.2 (1.65) | — | write-buffer 0.78, main 0.68, shadow 0.17 |
+| f9b5171 | low | 4.8 / 12.9 (2.69) | — | — |
+| f9b5171 | baseline | 20.1 / 32.8 | — | — |
+
+No upload of >= 256 KB at d464d35; at f9b5171 no `gpu:upload` line at all (the
+lazy arming did not take in the F8 run). The live-flora range fix moved medium
+p95 47.6 → 41.1, within run noise. Owner hypothesis: GPU back-pressure — Chrome
+blocks writeBuffer / getCurrentTexture while the GPU queue is too far behind, so
+GPU-bound frames show up as CPU wait.
