@@ -129,6 +129,11 @@ describe('rendered origin line', () => {
     expect(html).toContain('<p class="desc">Beschreibung.</p>\n    <p class="origin">Eingestellt: 18.11.26 durch Benutzeranfrage</p>\n    <hr class="split">')
   })
 
+  it('reaches the first card of a section, whose section heading is a summary too', () => {
+    const html = renderCardOrigins(`<details class="sect"><summary><h2>Warteschlange</h2></summary>\n${card(1547, queueBody)}</details>`, originFor)
+    expect(html).toContain('<p class="origin">Eingestellt: 18.11.26 durch Benutzeranfrage</p>')
+  })
+
   it('goes at the end of a body without a divider, and says when the origin is unknown', () => {
     const html = renderCardOrigins(card(12, '    <p>Erledigt.</p>'), originFor)
     expect(html).toContain('<p>Erledigt.</p>\n    <p class="origin">Herkunft unbekannt</p>')

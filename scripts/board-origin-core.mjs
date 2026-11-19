@@ -177,7 +177,7 @@ const escapeText = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
  */
 export function renderCardOrigins(html, originFor, lang = BOARD_LANG) {
   return String(html ?? '').replace(
-    /(<summary>([\s\S]*?)<\/summary>\s*<div class="body">)([\s\S]*?)(\n[ \t]*<hr class="split">|\s*<\/div>)/g,
+    /(<summary>((?:(?!<\/?summary>)[\s\S])*?)<\/summary>\s*<div class="body">)([\s\S]*?)(\n[ \t]*<hr class="split">|\s*<\/div>)/g,
     (whole, head, summary, body, tail) => {
       const { chip } = summaryPoint(unwrapCardHeaderGroups(summary))
       if (chip == null) return whole
