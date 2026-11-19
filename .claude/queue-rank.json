@@ -1933,6 +1933,12 @@
       "why": "User order 19.11.2026 10:17: 1549 directly before 1543",
       "origin": "user",
       "place": "ahead"
+    },
+    "1552": {
+      "at": "2026-11-19T13:48:35.588Z",
+      "why": "split from priority point 1549: its cause fix, waiting for the user's notebook F8 report",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -1960,7 +1966,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-19T12:08:29.498Z",
+    "at": "2026-11-19T13:48:35.596Z",
     "points": [
       184,
       200,
@@ -2406,7 +2412,8 @@
       1539,
       1540,
       1543,
-      1549
+      1549,
+      1552
     ]
   }
 }

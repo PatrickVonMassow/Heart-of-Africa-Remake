@@ -78,7 +78,7 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 
-- [ ] 1549. Find the cause of the shadows-off GPU inversion
+- [ ] 1549. Record a per-pass GPU breakdown in the F8 benchmark report
   Split from 1542 Part B (main-session decision 18.11.2026 21:47, for veto). Observed in the user benchmark
   "Lenovo GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the
   GPU median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and
@@ -86,11 +86,25 @@ put it is the mistake this line exists to stop.
   Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
   Final state: the F8 benchmark report carries a per-pass GPU breakdown of the measured frame (the
   WebGPUTimestampQueryPool timestamps per pass, in pass order), so a run on the user's notebook names the
-  pass that grows when shadows are off; with that number the cause is fixed in the product code, or — if
-  it is a measurement artefact — in the benchmark, so `shadows-off` prices only the shadows and its GPU
-  median is <= baseline in savanna-standing, desert-standing and savanna-driving.
+  pass that grows when shadows are off. Split 19.11.2026 (main session, for veto): the cause fix needs
+  that notebook run and moved to point 1552.
   Test: Vitest for the breakdown's formatting and report rows; Playwright benchmark suite on WebGPU.
   Source: 1542 session, 18.11.2026 21:47.
+  Bundle: Steuerung & Performance.
+
+- [ ] 1552. Fix the cause of the shadows-off GPU inversion
+  Split from 1549 (main session 19.11.2026, for veto). Observed in the user benchmark "Lenovo
+  GIP-Notebook (neu).json" (2026-11-18, webgpu, build c8f3995): turning sun shadows off RAISES the GPU
+  median (savanna-standing 25.9 -> 36.0 ms, desert-standing 35.5 -> 37.6 ms) while draws and triangles
+  fall. The batch host has no WebGPU timestamp query, so the cause can only be read from a fresh F8 run
+  on the user's notebook with the per-pass breakdown of 1549. WAITS FOR that report from the user.
+  Player impact: LOW runs without sun shadows, and any later shadow lever for medium is unreadable.
+  Final state: with the pass the breakdown names, the cause is fixed in the product code, or — if it is
+  a measurement artefact — in the benchmark, so `shadows-off` prices only the shadows and its GPU median
+  is <= baseline in savanna-standing, desert-standing and savanna-driving on the user's notebook.
+  Test: Vitest for the changed logic; Playwright benchmark suite on WebGPU; the user's notebook report.
+  Criticality: high (inherited from priority point 1549).
+  Source: 1549 split, 19.11.2026.
   Bundle: Steuerung & Performance.
 
 - [ ] 1543. Smooth the CPU hitches while driving on medium and high
