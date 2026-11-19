@@ -192,6 +192,7 @@ describe('`--ranked` refuses a split of a priority point (point 1551)', () => {
       const out = spawnSync(process.execPath, [cli, ...args], {
         cwd: root,
         encoding: 'utf8',
+        windowsHide: true,
         env: { ...process.env, HOA_REPO_ROOT: root },
       })
       const after = readFileSync(join(root, '.claude', 'queue-rank.json'), 'utf8')
