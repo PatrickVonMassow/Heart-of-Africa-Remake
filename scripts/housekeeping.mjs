@@ -56,6 +56,7 @@ import {
   parseWorktreeList,
   spawnDecision,
   summaryLine,
+  tmpCandidateRule,
   tmpShapeVerdict,
   tmpVerdict,
   toolLogVerdict,
@@ -726,9 +727,13 @@ export function runHousekeeping({
           } catch {
             return
           }
-          budget.spend(1)
           const isSymlink = st.isSymbolicLink()
           const isFile = st.isFile()
+          // Name and lstat alone reject most of /tmp (measured 19.11.2026: ~100k
+          // hoa-* test dirs); such an entry spends no budget, else they exhaust
+          // it every run and the step never completes. The time budget still bounds.
+          const rule = tmpCandidateRule(name)
+          if (!isSymlink && rule && !(rule === 'tmp-hoa-log' && !isFile)) budget.spend(1)
           const shape = !isSymlink && st.isDirectory() && !/^(hoa|point)-/.test(name) ? describeShape(path, name) : null
           const pre = tmpShapeVerdict({ name, isSymlink, isFile, shape })
           if (!pre.ok) {

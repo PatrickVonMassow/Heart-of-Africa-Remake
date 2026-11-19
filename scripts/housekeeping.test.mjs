@@ -283,6 +283,19 @@ describe('budget and resume', () => {
   })
 })
 
+describe('budget: entries rejected by name and lstat alone', () => {
+  it('lets many hoa-* directories pass without spending the scan budget', () => {
+    const a = arena()
+    for (let i = 0; i < 10; i++) mkdirSync(join(a.tmp, `hoa-leftover-${i}`))
+    put(join(a.tmp, 'hoa-z-old.log'))
+    age(join(a.tmp, 'hoa-z-old.log'))
+    const { r } = run(a, { steps: ['tmp'], budgetEntries: 4 })
+    expect(r.steps.tmp).toBe('done')
+    expect(existsSync(join(a.tmp, 'hoa-z-old.log'))).toBe(false)
+    expect(existsSync(join(a.tmp, 'hoa-leftover-0'))).toBe(true)
+  })
+})
+
 describe('budget: an incomplete step does not stop later steps', () => {
   it('runs branches and git after a tmp step that ran out of budget', () => {
     const a = arena()
