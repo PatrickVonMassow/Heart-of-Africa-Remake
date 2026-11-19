@@ -200,3 +200,24 @@ the same pattern. Conclusion: the p95 owner on the real GPU is inside
 `renderer.render` (the post pipeline's render in `Effects`), not terrain.
 Next: split render-submit (shadow cascades, main pass, post/TRAA; new
 pipelines/programs per frame; any readback/query that waits on the GPU).
+
+## Round 4 — owner F8 split inside render-submit (c5f2f94, real GPU)
+
+WebGPU, AMD notebook, 1536x960 @ dpr 1.25, dev server, full mode,
+savanna-driving. CPU median / p95 (ratio); shares of the worst-8 CPU time:
+
+| Pass | Median / p95 (ratio) | Inside render-submit (worst 8) |
+| --- | --- | --- |
+| medium-preset | 14.2 / 47.6 (3.35), max 1134 (one first-sight frame) | render-submit 0.97; gpu:write-buffer 0.92, render:shadow 0.91, render:main 0.04 |
+| high-preset | 20.0 / 33.7 (1.68) | gpu:write-buffer 0.75, render:main 0.53, render:shadow 0.29 |
+| low-preset | 4.6 / 12.8 (2.78) | terrain-stream 0.56, shader-programs 0.13, render:main 0.25 |
+| baseline | 19.8 / 31.8 | gpu:write-buffer 0.68 |
+| shadows-off | 14.2 / 40.6 (2.86) | plateau |
+| post-off | 17.0 / 37.3 | plateau |
+| all-off | 11.3 / 38.3 | — |
+
+Lowest p95: terrain-cap-84 33.5, climate-haze-off 30.2. The worst frames are a
+45-55 ms plateau, almost entirely `queue.writeBuffer` inside `renderer.render`
+(on medium inside the shadow pass, the first draw of the frame that meets the
+dirty attribute; on high inside the main pass). Owner: a large buffer upload
+recurring every few frames.
