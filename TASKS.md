@@ -129,7 +129,7 @@ put it is the mistake this line exists to stop.
   Residual risk (stated): a gate never set and no phrase in the text is only advised (layer 3b) and can be
   ignored; the advisory fires on legitimate skips (noise, not a block).
   Design: own proposal + GPT-6.2 Sol blind proposal, merged by Fable 5.2 (19.11.2026); text fallback added by the user.
-  Bundle: Steuerung & Performance is wrong — this is board/batch infrastructure; owner picks the bundle.
+   Bundle: Chat & Tafel (board/batch infrastructure, not Steuerung & Performance; owner choice 19.11.2026).
   Source: user request of 19.11.2026 18:49 UTC via the findings carrier (session unknown).
   Bundle: Chat & Tafel.
 
