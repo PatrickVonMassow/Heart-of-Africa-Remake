@@ -12,15 +12,21 @@
 // three 0.185 UID scheme (Backend.updateTimeStampUID): a render pass is
 // `r:<frameCalls>:<renderContextId>:f<frame>`, where frameCalls is the
 // 1-based index of the render call within the frame — i.e. the PASS ORDER.
+// That call index is the order passes BEGIN, not the order the GPU runs them:
+// a nested render (a shadow map updated while the scene pass records) begins
+// after its parent but is submitted before it. The pass order is therefore
+// the SUBMISSION order, recorded per UID when the backend finishes the pass.
 // Render contexts are shared between targets of equal format, so the context
-// id is not a pass identity; the label comes from the render target instead,
-// recorded per UID when the pass begins.
+// id is not a pass identity either; the identity is the render-target OBJECT
+// (three names every shadow target `ShadowMap`), keyed for the whole run.
 
 /** One render pass of one frame. */
 export interface BenchPassSample {
-  /** Stable key within the frame: the label, suffixed `#2`, `#3`… for repeats. */
+  /** Pass identity, stable across frames: the target's label, `#2`, `#3`… for
+   *  further target objects of the same label; `@2`… for a repeat of the same
+   *  target within one frame. */
   pass: string
-  /** 1-based render-call index within the frame (the pass order). */
+  /** 1-based position in the frame's GPU submission order. */
   call: number
   /** GPU duration of the pass (ms). */
   ms: number
@@ -72,29 +78,113 @@ export function passLabel(target: BenchPassTarget | null | undefined): string {
 }
 
 /**
- * The passes of ONE frame in pass order, from the pool's uid→ms map and the
- * uid→label map recorded when each pass began. Entries of other frames and
- * non-render UIDs are ignored; a repeated label is suffixed `#2`, `#3`… so
- * every pass of the frame keeps its own key.
+ * The passes of ONE frame in submission order, from the pool's uid→ms map, the
+ * uid→identity map recorded when each pass began and the uid→submission-index
+ * map recorded when it was submitted (missing → after the submitted ones, by
+ * call index). Entries of other frames and non-render UIDs are ignored; a
+ * repeat of the same identity within the frame is suffixed `@2`, `@3`….
  */
 export function framePasses(
   timestamps: Iterable<readonly [string, number]>,
   labels: ReadonlyMap<string, string>,
   frame: number,
+  submitted: ReadonlyMap<string, number> = new Map(),
 ): BenchPassSample[] {
-  const rows: Array<{ call: number; label: string; ms: number }> = []
+  const rows: Array<{ seq: number; call: number; label: string; ms: number }> = []
   for (const [uid, ms] of timestamps) {
     const p = parseRenderUid(uid)
     if (!p || p.frame !== frame || !Number.isFinite(ms)) continue
-    rows.push({ call: p.call, label: labels.get(uid) ?? `pass ${p.call}`, ms })
+    rows.push({ seq: submitted.get(uid) ?? Number.POSITIVE_INFINITY, call: p.call, label: labels.get(uid) ?? `pass ${p.call}`, ms })
   }
-  rows.sort((a, b) => a.call - b.call)
+  rows.sort((a, b) => a.seq - b.seq || a.call - b.call)
   const seen = new Map<string, number>()
-  return rows.map((r) => {
+  return rows.map((r, i) => {
     const n = (seen.get(r.label) ?? 0) + 1
     seen.set(r.label, n)
-    return { pass: n === 1 ? r.label : `${r.label}#${n}`, call: r.call, ms: r.ms }
+    return { pass: n === 1 ? r.label : `${r.label}@${n}`, call: i + 1, ms: r.ms }
   })
+}
+
+/**
+ * Run-wide pass identity: the label of a render target, and for a SECOND
+ * target object carrying the same label `label#2` (then `#3`…), so two shadow
+ * maps keep apart however many of them run in a given frame. The canvas has no
+ * target object and stays `canvas`.
+ */
+export function createPassIdentity(): (target: BenchPassTarget | null | undefined) => string {
+  const byTarget = new WeakMap<object, string>()
+  const perLabel = new Map<string, number>()
+  return (target) => {
+    if (!target) return passLabel(target)
+    const known = byTarget.get(target)
+    if (known !== undefined) return known
+    const label = passLabel(target)
+    const n = (perLabel.get(label) ?? 0) + 1
+    perLabel.set(label, n)
+    const id = n === 1 ? label : `${label}#${n}`
+    byTarget.set(target, id)
+    return id
+  }
+}
+
+/** three's per-type timestamp pool after a resolve (WebGPUTimestampQueryPool). */
+export interface BenchTimestampPool {
+  /** uid → pass duration (ms); three never prunes it, the recorder clears it. */
+  timestamps?: Map<string, number>
+  /** Frame numbers of the last resolve, in order. */
+  frames?: number[]
+}
+
+/** One resolve's outcome: FRESH only when the pool resolved a new frame. */
+export type BenchPassTake =
+  | { fresh: true; frame: number; passes: BenchPassSample[] }
+  | { fresh: false; reason: 'no-pool' | 'stale' }
+
+/** The capture the runner drives from three's hooks (testable without three). */
+export interface BenchPassRecorder {
+  /** A pass began (inspector.beginRender): remember its identity. */
+  begin(uid: string, target: BenchPassTarget | null | undefined): void
+  /** A pass was submitted (backend.finishRender): remember its position. */
+  submit(uid: string): void
+  /** Read the passes of the frame the last resolve reported, then clear what
+   *  was read. A resolve that reported no NEW frame (three hands back its
+   *  cached last value) is `stale` — the caller then records neither the
+   *  total nor the passes, so both cover the same frames. */
+  take(pool: BenchTimestampPool | null | undefined): BenchPassTake
+}
+
+export function createPassRecorder(): BenchPassRecorder {
+  const identity = createPassIdentity()
+  const labels = new Map<string, string>()
+  const submitted = new Map<string, number>()
+  let seq = 0
+  let lastFrame: number | null = null
+  const prune = (map: Map<string, unknown>, frame: number): void => {
+    for (const uid of map.keys()) {
+      const p = parseRenderUid(uid)
+      if (!p || p.frame <= frame) map.delete(uid)
+    }
+  }
+  return {
+    begin(uid, target) {
+      labels.set(uid, identity(target))
+    },
+    submit(uid) {
+      submitted.set(uid, ++seq)
+    },
+    take(pool) {
+      const timestamps = pool?.timestamps
+      if (!timestamps || !pool?.frames) return { fresh: false, reason: 'no-pool' }
+      const frame = latestFrame(pool.frames)
+      if (frame === null || frame === lastFrame) return { fresh: false, reason: 'stale' }
+      lastFrame = frame
+      const passes = framePasses(timestamps, labels, frame, submitted)
+      timestamps.clear()
+      prune(labels, frame)
+      prune(submitted, frame)
+      return { fresh: true, frame, passes }
+    },
+  }
 }
 
 /** The latest frame number among a resolve's frames (three's `pool.frames`). */

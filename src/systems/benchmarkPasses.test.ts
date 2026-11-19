@@ -5,6 +5,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   aggregatePasses,
+  createPassIdentity,
+  createPassRecorder,
   formatPass,
   framePasses,
   gpuPassSummaryLines,
@@ -50,7 +52,7 @@ describe('one frame of passes', () => {
     ['r:4:1:f10', 'canvas'],
   ])
 
-  it('keeps only the asked frame, in call order, suffixing repeated labels', () => {
+  it('keeps only the asked frame, in call order without submissions, suffixing a repeat within the frame', () => {
     const timestamps = new Map([
       ['r:4:1:f10', 0.5],
       ['r:2:3:f10', 8],
@@ -62,13 +64,34 @@ describe('one frame of passes', () => {
     expect(framePasses(timestamps, labels, 10)).toEqual([
       { pass: 'ShadowMap', call: 1, ms: 3 },
       { pass: 'output', call: 2, ms: 8 },
-      { pass: 'output#2', call: 3, ms: 1.5 },
+      { pass: 'output@2', call: 3, ms: 1.5 },
       { pass: 'canvas', call: 4, ms: 0.5 },
     ])
   })
 
+  it('orders by GPU submission, not by the order the passes began', () => {
+    // The scene pass (call 1) begins first; the shadow map it samples is
+    // rendered nested (call 2) and submitted BEFORE it.
+    const ts = new Map([
+      ['r:1:3:f10', 8],
+      ['r:2:2:f10', 3],
+    ])
+    const submitted = new Map([
+      ['r:2:2:f10', 1],
+      ['r:1:3:f10', 2],
+    ])
+    const l = new Map([
+      ['r:1:3:f10', 'output'],
+      ['r:2:2:f10', 'ShadowMap'],
+    ])
+    expect(framePasses(ts, l, 10, submitted)).toEqual([
+      { pass: 'ShadowMap', call: 1, ms: 3 },
+      { pass: 'output', call: 2, ms: 8 },
+    ])
+  })
+
   it('falls back to the call index when no label was recorded', () => {
-    expect(framePasses([['r:5:9:f10', 2]], new Map(), 10)).toEqual([{ pass: 'pass 5', call: 5, ms: 2 }])
+    expect(framePasses([['r:5:9:f10', 2]], new Map(), 10)).toEqual([{ pass: 'pass 5', call: 1, ms: 2 }])
   })
 
   it('returns nothing for a frame without entries', () => {
@@ -148,5 +171,84 @@ describe('breakdown digest', () => {
 
   it('prints nothing for an older report without the field', () => {
     expect(gpuPassSummaryLines(undefined, [{ config: 'baseline', phase: 'savanna-standing' }])).toEqual([])
+  })
+})
+
+describe('run-wide pass identity', () => {
+  it('keeps two targets of the same label apart, whichever runs in a frame', () => {
+    const id = createPassIdentity()
+    const sun = { texture: { name: 'ShadowMap' } }
+    const fire = { texture: { name: 'ShadowMap' } }
+    expect(id(sun)).toBe('ShadowMap')
+    expect(id(fire)).toBe('ShadowMap#2')
+    // A later frame with only the second target keeps its identity.
+    expect(id(fire)).toBe('ShadowMap#2')
+    expect(id(sun)).toBe('ShadowMap')
+    expect(id(null)).toBe('canvas')
+  })
+})
+
+describe('pass recorder (the live capture, without three)', () => {
+  const sun = { texture: { name: 'ShadowMap' } }
+  const fire = { texture: { name: 'ShadowMap' } }
+  const out = { texture: { name: 'output' } }
+
+  /** One frame as three 0.185 runs it: the scene pass begins, the shadow maps
+   *  render nested inside it and are submitted first, the scene pass last. */
+  const frame = (rec: ReturnType<typeof createPassRecorder>, f: number, shadows: Array<[object, number]>, sceneMs: number) => {
+    const timestamps = new Map<string, number>()
+    const sceneUid = `r:1:3:f${f}`
+    rec.begin(sceneUid, out)
+    shadows.forEach(([target, ms], i) => {
+      const uid = `r:${i + 2}:2:f${f}`
+      rec.begin(uid, target)
+      rec.submit(uid)
+      timestamps.set(uid, ms)
+    })
+    rec.submit(sceneUid)
+    timestamps.set(sceneUid, sceneMs)
+    return timestamps
+  }
+
+  it('reports shadow passes before the scene pass that samples them', () => {
+    const rec = createPassRecorder()
+    const timestamps = frame(rec, 1, [[sun, 2]], 9)
+    const take = rec.take({ timestamps, frames: [1] })
+    expect(take).toEqual({
+      fresh: true,
+      frame: 1,
+      passes: [
+        { pass: 'ShadowMap', call: 1, ms: 2 },
+        { pass: 'output', call: 2, ms: 9 },
+      ],
+    })
+  })
+
+  it('keeps an intermittent second shadow under its own identity across frames', () => {
+    const rec = createPassRecorder()
+    const t1 = frame(rec, 1, [[sun, 2], [fire, 1]], 9)
+    const a = rec.take({ timestamps: t1, frames: [1] })
+    const t2 = frame(rec, 2, [[fire, 1.2]], 9)
+    const b = rec.take({ timestamps: t2, frames: [2] })
+    if (!a.fresh || !b.fresh) throw new Error('expected fresh takes')
+    const passes = aggregatePasses([a.passes, b.passes])
+    const fireRow = passes.find((p) => p.pass === 'ShadowMap#2')
+    const sunRow = passes.find((p) => p.pass === 'ShadowMap')
+    expect(fireRow?.frames).toBe(2)
+    expect(sunRow?.frames).toBe(1)
+    expect(sunRow?.mean).toBeCloseTo(1)
+    expect(fireRow?.mean).toBeCloseTo(1.1)
+  })
+
+  it('marks a resolve that reported no new frame stale, so totals and passes stay paired', () => {
+    const rec = createPassRecorder()
+    const timestamps = frame(rec, 5, [[sun, 2]], 9)
+    expect(rec.take({ timestamps, frames: [5] }).fresh).toBe(true)
+    // three's cached lastValue: same frames, map already drained.
+    expect(rec.take({ timestamps, frames: [5] })).toEqual({ fresh: false, reason: 'stale' })
+    expect(rec.take({ timestamps, frames: [] })).toEqual({ fresh: false, reason: 'stale' })
+    expect(rec.take(undefined)).toEqual({ fresh: false, reason: 'no-pool' })
+    // The pool map is drained after a fresh take, so the run does not grow it.
+    expect(timestamps.size).toBe(0)
   })
 })

@@ -63,12 +63,11 @@ import {
   type BenchSceneNode,
 } from './benchmark'
 import {
-  framePasses,
-  latestFrame,
+  createPassRecorder,
   passBreakdown,
-  passLabel,
   type BenchPassSample,
   type BenchPassTarget,
+  type BenchTimestampPool,
 } from './benchmarkPasses'
 
 /** One rendered frame's two measurements. */
@@ -95,14 +94,6 @@ function pressKey(code: string, down: boolean): void {
 
 // --- GPU timing (the series the geometry question actually needs) ------------
 
-/** three's per-type timestamp pool after a resolve (WebGPUTimestampQueryPool). */
-interface TimestampPool {
-  /** uid → pass duration (ms); three never prunes it, the timer clears it. */
-  timestamps?: Map<string, number>
-  /** Frame numbers of the last resolve, in order. */
-  frames?: number[]
-}
-
 /** The renderer inspector's per-pass hook (three 0.185 InspectorBase). */
 type BeginRender = (uid: string, scene: unknown, camera: unknown, target: BenchPassTarget | null) => void
 
@@ -111,7 +102,10 @@ interface TimestampRenderer {
   backend?: {
     isWebGPUBackend?: boolean
     trackTimestamp?: boolean
-    timestampQueryPool?: Record<string, TimestampPool | null | undefined>
+    timestampQueryPool?: Record<string, BenchTimestampPool | null | undefined>
+    /** Submits a render pass's commands — the GPU order of the passes. */
+    finishRender?: (renderContext: unknown) => unknown
+    getTimestampUID?: (renderContext: unknown) => string
   }
   hasFeature?: (name: string) => boolean
   resolveTimestampsAsync?: (type?: string) => Promise<number | undefined>
@@ -184,21 +178,47 @@ function createGpuTimer(gl: unknown): GpuTimer {
   const originalTrack = backend.trackTimestamp === true
   backend.trackTimestamp = true
 
-  // Per-pass labels (point 1549): the inspector's beginRender receives every
-  // render pass's timestamp UID together with its target, so wrapping it for
-  // the run records uid → label without touching the render path. Restored in
-  // `restore`; without the hook the breakdown is flagged unavailable.
-  const labels = new Map<string, string>()
-  const inspector = renderer.inspector
-  const ownBeginRender = inspector ? Object.prototype.hasOwnProperty.call(inspector, 'beginRender') : false
-  const originalBeginRender = inspector?.beginRender
+  // Per-pass capture (point 1549), wrapped for the run only and restored in
+  // `restore`: the inspector's beginRender sees every pass's UID with its
+  // target (the identity), the backend's finishRender submits it (the GPU
+  // order). Without both hooks the breakdown is flagged unavailable.
+  const recorder = createPassRecorder()
+  type Hooked = Record<string, unknown>
+  const hooks: Array<() => void> = []
+  const wrap = (owner: Hooked, key: string, make: (orig: (...a: unknown[]) => unknown) => (...a: unknown[]) => unknown): boolean => {
+    const orig = owner[key]
+    if (typeof orig !== 'function') return false
+    const own = Object.prototype.hasOwnProperty.call(owner, key)
+    owner[key] = make(orig as (...a: unknown[]) => unknown)
+    hooks.push(() => {
+      if (own) owner[key] = orig
+      else delete owner[key]
+    })
+    return true
+  }
+  const inspector = renderer.inspector as Hooked | undefined
+  const getUid = backend.getTimestampUID
   let passesAvailable = false
-  let passesReason = 'renderer exposes no inspector beginRender hook'
-  if (inspector && typeof originalBeginRender === 'function') {
-    inspector.beginRender = function benchBeginRender(this: unknown, uid, scene, camera, target) {
-      if (typeof uid === 'string') labels.set(uid, passLabel(target))
-      return originalBeginRender.call(this, uid, scene, camera, target)
-    }
+  let passesReason = 'renderer exposes no per-pass hooks (inspector.beginRender, backend.finishRender)'
+  if (inspector && typeof inspector.beginRender === 'function' && typeof backend.finishRender === 'function' && typeof getUid === 'function') {
+    wrap(inspector, 'beginRender', (orig) =>
+      function benchBeginRender(this: unknown, ...a: unknown[]) {
+        if (typeof a[0] === 'string') recorder.begin(a[0], a[3] as BenchPassTarget | null)
+        return orig.apply(this, a)
+      },
+    )
+    wrap(backend as Hooked, 'finishRender', (orig) =>
+      function benchFinishRender(this: unknown, ...a: unknown[]) {
+        const result = orig.apply(this, a)
+        try {
+          const uid = getUid.call(backend, a[0])
+          if (typeof uid === 'string') recorder.submit(uid)
+        } catch {
+          // A context without a UID is simply not ordered.
+        }
+        return result
+      },
+    )
     passesAvailable = true
     passesReason = ''
   }
@@ -212,31 +232,8 @@ function createGpuTimer(gl: unknown): GpuTimer {
     flush: () => Promise.resolve(),
     restore: () => {
       backend.trackTimestamp = originalTrack
-      if (inspector && typeof originalBeginRender === 'function') {
-        if (ownBeginRender) inspector.beginRender = originalBeginRender
-        else delete inspector.beginRender
-      }
-      labels.clear()
+      for (const undo of hooks.splice(0)) undo()
     },
-  }
-  /** The passes of the frame the resolve just reported; clears what it read so
-   *  neither three's uid map nor the label map grows over the run. */
-  const takePasses = (): BenchPassSample[] | null => {
-    const pool = backend.timestampQueryPool?.render
-    const timestamps = pool?.timestamps
-    const frame = latestFrame(pool?.frames ?? [])
-    if (!timestamps || frame === null) {
-      timer.passesAvailable = false
-      timer.passesReason = 'timestamp pool exposes no per-pass durations'
-      return null
-    }
-    const passes = framePasses(timestamps, labels, frame)
-    timestamps.clear()
-    for (const uid of labels.keys()) {
-      const f = /:f(\d+)$/.exec(uid)
-      if (f && Number(f[1]) <= frame) labels.delete(uid)
-    }
-    return passes
   }
   let inFlight: Promise<void> | null = null
   const resolveOnce = (sink: GpuSink | null): Promise<void> => {
@@ -245,10 +242,24 @@ function createGpuTimer(gl: unknown): GpuTimer {
     if (inFlight) return inFlight
     inFlight = (renderer.resolveTimestampsAsync as (type?: string) => Promise<number | undefined>)('render')
       .then((ms) => {
-        const passes = timer.passesAvailable ? takePasses() : null
+        if (!timer.passesAvailable) {
+          if (typeof ms === 'number' && ms > 0 && sink !== null) sink.totals.push(ms)
+          return
+        }
+        const take = recorder.take(backend.timestampQueryPool?.render)
+        if (!take.fresh) {
+          // three handed back its cached last value: no new frame was
+          // resolved, so neither the total nor the passes are recorded (the
+          // old code counted that duration twice).
+          if (take.reason === 'no-pool') {
+            timer.passesAvailable = false
+            timer.passesReason = 'timestamp pool exposes no per-pass durations'
+          }
+          return
+        }
         if (typeof ms === 'number' && ms > 0 && sink !== null) {
           sink.totals.push(ms)
-          if (passes !== null && passes.length > 0) sink.passes.push(passes)
+          sink.passes.push(take.passes)
         }
       })
       .catch(() => {
