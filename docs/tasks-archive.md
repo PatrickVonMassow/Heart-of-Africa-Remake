@@ -47546,3 +47546,12 @@ to land than a mechanism that needs a review.
   Also: on the same coverage run (main 9afb575, 09.11.2026 23:32, WebGL 2, log local/main-enrichments-webgl.log) frame 86-berber-backdrop shows only floating roofs, doors and palms before haze — mud walls, ground and all villagers are missing (evidence local/1495-evidence/86-berber-backdrop-webgl2-main-9afb575.png; the 18.10. frame at 85bfcab78 shows the whole village), while its check stayed green; the same run logged the 1495 TypeError 7300x (WebGPU 7304x), causal link unproven. Final state extended: frame 86 shows walls, ground and villagers on both backends.
   Also (14.11.2026): --section=seasons alone takes ~14 min on WebGPU (main 15c896340 14m 21s, Congo swing 12.2 vs savanna 9.3; feat/344 14m 39s) and pushes the full enrichments suite past its 45 min wall timeout (killed at 64 frames); a covering run needs VERIFY_SUITE_TIMEOUT_MS=5400000 until this is fixed.
   Bundle: Steuerung & Performance.
+
+- [x] 1520. Render targets leak across rebuilds at travel|medium since the solar sun landed
+  Measured 14.11.2026 (full WebGPU enrichments on main 33db311fd, log local/verify-logs/2026-11-14T06-43-15-751-enrichments.log): 8x [ASSERT] render-resource-leak at travel|medium|traa/-/bloom/sun/fire/band, renderTargets 45 -> 58/68/72/365/370, then place:cairo 365 -> 395. The same leak shows on feat/344 b9082f151 (log 2026-11-14T05-34-10-777, 46 -> 397). Absent in the last full main run f7f328b10 (13.11.2026, before point 343 landed); every section involved is green alone.
+  Player impact: GPU memory grows across pipeline rebuilds in a long session.
+  Final state: a rebuild at travel|medium disposes what it replaces; renderTargets stay within the +2 allowance across the full enrichments run.
+  Test: a full WebGPU enrichments run (VERIFY_SUITE_TIMEOUT_MS=5400000) without render-resource-leak asserts, plus a Vitest case for the disposal if the cause lies in browserless pipeline code.
+  Source: finding of the 344 session, 14.11.2026 07:35.
+  Remeasured 15.11.2026: `npm test -- settings --section=render-leak-watch` reds identically on main dcf4949c7 and feat/357 6a1071735 (travel|medium|traa/-/bloom/sun/fire/band 25 -> 29, +4, allowed +2), so the settings leak watch shows the same leak.
+  Bundle: Sonne & Himmel.
