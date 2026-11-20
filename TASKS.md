@@ -107,24 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1559. Board: a collapsed Backlog section below Erledigt with the newest entries and a link to the full backlog, ranked after the 1463 part-1 request
-  Board: a collapsed "Backlog" section below "Erledigt" (user order 19.11.2026).
-
-  RANK: directly after the 1463 part-1 request of the same evening (which itself ranks directly after 1543) — its result changes what the backlog holds.
-
-  Final state:
-  1. The board gets a new section "Backlog" directly below "Erledigt", collapsed by default (same <details class="sect"> pattern as the other sections; the Erledigt anchor ERLEDIGT_ANCHOR and board-archive-rotate.mjs keep working).
-  2. It shows the total count of open backlog entries and the NEWEST ~10 entries (one line each: title and date), like the other sections show only a part.
-  3. Entries already marked as resolved or queued (FIXED, ERLEDIGT, EINGEREIHT as point N, closed) are not shown and not counted.
-  4. A link below the list leads to the full docs/backlog.md (repository view), as the Erledigt section links to its archive.
-  5. The entries come from docs/backlog.md through one reader in the board generator; docs/backlog.md mixes "## " headed entries and "- " bullet entries (measured 19.11.2026: 109 headings, 171 bullets), so the reader handles both forms and fails soft (section shows count "unknown" plus the link) rather than breaking the board.
-  6. Player-visible-text rule does not apply (board is tooling); section heading in German like its neighbours.
-  7. A Vitest case covers the reader (both entry forms, resolved entries skipped, newest-first cut) and the section placement/collapsed default.
-
-  Out of scope: restructuring docs/backlog.md itself, new ledger fields or guards (infrastructure freeze).
-  Source: user request of 19.11.2026 19:58 UTC via the findings carrier (session unknown).
-  Bundle: Chat & Tafel.
-
 - [ ] 1555. Let a non-owner session write into its own scratchpad past the main-write guard
   The main-write guard (PreToolUse, "MAIN WRITE REFUSED — this session holds no batch lock") refuses a Bash
   redirection into the session's own scratchpad under /tmp/claude-1000/… for a non-owner session, e.g.
