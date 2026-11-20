@@ -107,35 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1561. The render benchmark measures a settlement
-  Placement: directly after point 1543 in the work order (user order 20.11.2026).
-  Observed problem: the F8 benchmark (src/systems/benchmark.ts phases) measures only travel scenes (savanna-standing, desert-standing, savanna-driving). The user's bug report of 20.11.2026 shows 5 FPS inside Cairo on Medium (Intel Gen-8 notebook), while the weak AMD RDNA-2 notebook benchmark reports 55 fps on Low for travel only — whether Low is playable in a settlement is unmeasured.
-  Final state: the benchmark has a settlement phase (standing inside a port city such as Cairo, with its inhabitants active) measured for every config, including the LOW preset profile, with the same fixed-timestep and GPU-timestamp rules as the travel phases; the summary lists it beside the travel phases.
-  Test: Vitest for the phase list / report shape; a browser run of the benchmark showing the settlement rows on WebGPU.
-  Player impact: weak devices cannot be judged for settlement play, where the bug report measured 5 FPS.
-  Source: user benchmarks and bug report 20.11.2026 (local/Schwaches Notebook - *, local/Sehr schwaches Notebook - *).
-  Bundle: Steuerung & Performance.
-  Source: user request of 20.11.2026 07:31 UTC via the findings carrier (session 4c27ebaf); approved "B und D nach 1543 einreihen".
-  Progress 20.11.2026 (handover at the context watermark): feat/1561-settlement-benchmark @ 4f74001 has the phase,
-  the leaveSettlement fix for terrain-refine-off, and the WebGPU report frame; WebGPU 39/8 and WebGL 2 41/6 reds all owned by
-  1009/1012. Owed before landing (cross-review GPT-6.2 Sol, 3 passes merge-with-fixes, local/1561-cross-review-p1..3.log):
-  (1) gate settlement sampling on scene readiness (unmeasured settle until render triangles stabilise, capped, row flagged on
-  timeout; pure helper with Vitest) - WebGL 2 short mode measured a 3019-triangle baseline Cairo row; (2) leaveSettlement waits
-  until TravelScene has mounted (travel-terrain node) plus one frame, not 3 fixed frames; (3) browser check: one row per
-  (config, phase) and one digest line each, terrain-refine-off also cuts savanna-standing after Cairo; (4) record and assert
-  that the later-entry path adds no journal entry and pays no bounty. Then a confirming review pass, both backends, landing.
-  Progress 20.11.2026 12:04 (handover at the context watermark): feat/1561-settlement-benchmark @ 6076244 answers (1)-(4):
-  readiness wait (benchReadyBudget/benchTrisStable, row readyTimeout), remount wait on travel-terrain plus one frame, browser
-  checks (one row and digest line per pair, entry cost 0/0, no readiness timeout, refine-off savanna cut after Cairo). (4) found
-  a real defect: a port re-entry wrote an arrival entry AND saved a checkpoint to the player's localStorage with benchmark state;
-  benchmarkEntry.ts now enters silently (Vitest-proven). Build, lint, tsc, Vitest 48/48 green; WebGPU benchmark 42 pass /
-  8 fail, all 8 owned by 1009/1012, the 4 new checks green. Owed: WebGL 2 run, confirming cross-review, picture, landing.
-  Progress 20.11.2026 13:10 (handover at the context watermark): feat/1561-settlement-benchmark @ 8488996 READY TO LAND.
-  WebGL 2 picture found the first Cairo row half-built (6031 tris while async pipelines compiled); readiness now counts only
-  frames with warm pipelines and the travel scene gone (benchFrameReady, Vitest). Both backends re-run: settlement rows
-  consistent (817 draws/718k tris), only the 1009/1012 reds. Cross-review GPT-6.2 Sol confirm passes recorded, last verdict merge.
-  Next: node scripts/land-point.mjs 1561.
-
 - [ ] 1562. The first start picks the Low graphics level on a weak GPU
   Placement: directly after point 1543 in the work order, after the settlement benchmark point (user order 20.11.2026).
   Observed problem: the detail level defaults to 'medium' (src/state/ui.ts:300) on every device. On the user's weak notebook (AMD RDNA-2 iGPU, dpr 1.75) Medium runs ~29-32 fps and Low ~55 fps in the benchmark; a player who never opens the settings stays on Medium.
