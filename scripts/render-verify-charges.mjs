@@ -1796,6 +1796,16 @@ export const RED_CHARGES = [
       + 'continuous-route alone on webgpu at 53b168c14 on a quiet machine was GREEN. The charge dies with 200.',
   },
   {
+    point: 200,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /the parent holds itself between the hunter and the fleeing calf \(living shield\)/i,
+    why:
+      'OBSERVED 18.11.2026 in a full enrichments run (webgpu, feat/336 5f15007e4): calf-predation-drama '
+      + 'living shield red twice, green in isolation; point 200 names exactly this red as a cross-section '
+      + 'state-leak flake. Recurred unaccounted 19./20.11.2026 on webgpu. The charge dies with 200.',
+  },
+  {
     point: 1265,
     suite: 'polish-villagers',
     kind: 'check',
