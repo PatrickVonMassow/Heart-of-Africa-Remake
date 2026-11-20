@@ -10,13 +10,14 @@
 // here is how writer and readers would drift apart. None of the imported
 // modules reaches back to this one, so the direction is no cycle.
 import {
+  BACKLOG_TITLE,
   ENTSCHEIDUNGEN_ON_BOARD,
   ERLEDIGT_ON_BOARD,
   QUEUE_STUB_BODY,
   QUEUE_STUB_META,
   parseNowCardPoints,
 } from './dashboard-guard-core.mjs'
-import { ARCHIVE_PAGE_URL } from './board-currency-core.mjs'
+import { ARCHIVE_PAGE_URL, BACKLOG_PAGE_URL } from './board-currency-core.mjs'
 import { pointOwnershipFromTitle } from './dashboard-point-reader-core.mjs'
 import { namesFollowOnWork } from './handover-card-contract.mjs'
 // The derived state card's vocabulary lives beside the derivation itself, so the
@@ -662,6 +663,7 @@ const HEAD = {
   queue: '<summary><h2>Warteschlange</h2></summary>',
   done: '<summary><h2>Erledigt</h2></summary>',
   log: `<summary><h2>${DECISION_LOG_TITLE}</h2></summary>`,
+  backlog: `<summary><h2>${BACKLOG_TITLE}</h2></summary>`,
 }
 
 /** The wrapper every section heading lives directly inside. */
@@ -3470,4 +3472,135 @@ export function runCardTimesBackfill({
     },
   )
   return tx
+}
+
+/**
+ * THE BACKLOG SECTION (user order 19.11.2026): collapsed below Erledigt, the
+ * count of open docs/backlog.md entries, the newest few, and a link to the
+ * whole file. Derived at publish, never edited by hand.
+ */
+export const BACKLOG_ON_BOARD = 10 // ESTIMATE, calibratable: the section is collapsed
+
+/** A resolution marker in an entry's head line: an upper-case status word in a
+ *  marker position (line start, after a bullet's leading date, or after "(",
+ *  "—", "–", ",", ";", ":"), or a lower-case "closed" at the start, after a dash,
+ *  or after "(", ",", ";", ":" when a date, ":" or ")" follows — so a title that
+ *  merely names the word ("Explain the CLOSED badge", "Show the panel (closed by
+ *  default)") stays open. */
+const BACKLOG_RESOLVED_HEAD =
+  /(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[(—–,;:]\s*)(?:FIXED|ERLEDIGT|CLOSED|WONTFIX|EINGEREIHT)\b|(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[—–]\s*)closed\b|[(,;:]\s*closed(?=\s*(?:[:)]|\d{2}\.\d{2}\.\d{4}\b|\d{4}-\d{2}-\d{2}\b))/
+/** A body line opening with a resolution marker ("ERLEDIGT (17.09.2026): …"). */
+const BACKLOG_RESOLVED_LINE = /^\s*(?:FIXED|ERLEDIGT|CLOSED|EINGEREIHT|WONTFIX|[Cc]losed)\b/
+const BACKLOG_TITLE_MAX = 120
+
+const DATE_RE = /\b(\d{4})-(\d{2})-(\d{2})\b|\b(\d{2})\.(\d{2})\.(\d{4})\b/
+
+/** An entry's date as ISO `YYYY-MM-DD`, or ''. A heading's trailing
+ *  "(DD.MM.YYYY)" and a bullet's leading ISO date win over a date in the prose. */
+function backlogDate(head, form) {
+  const own = form === 'heading' ? /\((\d{2}\.\d{2}\.\d{4})\)\s*$/.exec(head) : /^(\d{4}-\d{2}-\d{2})\b/.exec(head)
+  const m = DATE_RE.exec(own ? own[1] : head)
+  if (!m) return ''
+  return m[1] ? `${m[1]}-${m[2]}-${m[3]}` : `${m[6]}-${m[5]}-${m[4]}`
+}
+
+function backlogEntryTitle(head, form) {
+  let t = form === 'bullet' ? head.replace(/^\d{4}-\d{2}-\d{2}\s+/, '') : head.replace(/\s*\(\d{2}\.\d{2}\.\d{4}\)\s*$/, '')
+  t = t.replace(/\s+/g, ' ').trim()
+  if (t.length <= BACKLOG_TITLE_MAX) return t
+  const cut = t.slice(0, BACKLOG_TITLE_MAX)
+  const space = cut.lastIndexOf(' ')
+  return `${(space > BACKLOG_TITLE_MAX / 2 ? cut.slice(0, space) : cut).trimEnd()} …`
+}
+
+/**
+ * The open entries of docs/backlog.md, newest first, as `{ count, entries:
+ * [{ title, date }] }`. An entry is a `## ` heading or a top-level `- ` bullet;
+ * indented lines and fenced code belong to the entry above. An entry marked
+ * resolved or queued in its head line, or by a body line opening with the
+ * marker, is neither shown nor counted. Undated entries sort last; equal dates
+ * keep the later-written entry first. Throws only on a non-string.
+ */
+export function parseBacklog(text) {
+  if (typeof text !== 'string') throw new Error('backlog: not readable')
+  const raw = []
+  let cur = null
+  let fence = null // the open fence's run (``` or ~~~, any length), CommonMark-style
+  for (const line of normaliseLineEndings(text).split('\n')) {
+    const run = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1]
+    if (fence) {
+      if (run && run[0] === fence[0] && run.length >= fence.length && !line.slice(line.indexOf(run) + run.length).trim()) fence = null
+      continue
+    }
+    // A backtick run whose info string holds a backtick is inline code, not a fence.
+    if (run && !(run[0] === '`' && line.slice(line.indexOf(run) + run.length).includes('`'))) {
+      fence = run
+      continue
+    }
+    const head = /^## +(\S.*)$/.exec(line) ?? /^- +(\S.*)$/.exec(line)
+    if (head) {
+      const form = line.startsWith('## ') ? 'heading' : 'bullet'
+      // A heading's optional closing hashes ("## Title (19.11.2026) ##") are not text.
+      const text = (form === 'heading' ? head[1].replace(/[ \t]+#+[ \t]*$/, '') : head[1]).trim()
+      cur = { head: text, form, resolved: BACKLOG_RESOLVED_HEAD.test(text), at: raw.length }
+      raw.push(cur)
+    } else if (/^# /.test(line)) {
+      cur = null
+    } else if (cur && BACKLOG_RESOLVED_LINE.test(line)) {
+      cur.resolved = true
+    }
+  }
+  const entries = raw
+    .filter((e) => !e.resolved)
+    .map((e) => ({ title: backlogEntryTitle(e.head, e.form), date: backlogDate(e.head, e.form), at: e.at }))
+    .sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : b.at - a.at))
+    .map(({ title, date }) => ({ title, date }))
+  return { count: entries.length, entries }
+}
+
+/** The Backlog section's markup for a parsed backlog, or the unknown state for null. */
+export function renderBacklogSection(backlog, { url = BACKLOG_PAGE_URL, limit = BACKLOG_ON_BOARD } = {}) {
+  const known = Number.isInteger(backlog?.count) && Array.isArray(backlog?.entries)
+  const shown = known ? backlog.entries.slice(0, limit) : []
+  const count = !known
+    ? 'Anzahl unbekannt — docs/backlog.md war nicht lesbar.'
+    : backlog.count === 1
+      ? '1 offener Eintrag.'
+      : `${backlog.count} offene Einträge${shown.length && shown.length < backlog.count ? `, die neuesten ${shown.length}:` : '.'}`
+  const items = shown.map((e) => {
+    const date = e.date ? ` <span class="meta">${e.date.split('-').reverse().join('.')}</span>` : ''
+    return `<li>${escapeHtmlText(e.title)}${date}</li>`
+  })
+  const list = items.length ? `<ul class="backlog">\n${items.join('\n')}\n</ul>\n` : ''
+  return (
+    `${SECT_OPEN}\n${HEAD.backlog}\n<p class="backlog-count">${count}</p>\n${list}` +
+    `<p class="backlog-link">Der vollständige Backlog steht in <a href="${url}">docs/backlog.md</a>.</p>\n</details>`
+  )
+}
+
+/**
+ * The board with its Backlog section rendered from `backlogText` and standing
+ * directly below Erledigt: an existing one is removed wherever it stands and the
+ * fresh one inserted after Erledigt's closer, so the call is idempotent. An
+ * unreadable backlog renders the unknown count (fail soft); a board without an
+ * Erledigt section throws, like every section edit.
+ */
+export function applyBacklogSection(html, backlogText, options = {}) {
+  let backlog = null
+  try {
+    backlog = parseBacklog(backlogText)
+  } catch {
+    backlog = null
+  }
+  let text = String(html ?? '')
+  // Past the section's own closer, as sectionBounds counted it (`</details >` included).
+  const pastCloser = (t, end) => end + /^\n?<\/details\s*>/.exec(t.slice(end))[0].length
+  if (text.includes(`<h2>${BACKLOG_TITLE}</h2>`)) {
+    const { from, end } = sectionBounds(text, 'backlog')
+    const start = text.lastIndexOf(SECT_OPEN, from)
+    text = `${text.slice(0, start).replace(/\n$/, '')}${text.slice(pastCloser(text, end))}`
+  }
+  const { end } = sectionBounds(text, 'done')
+  const after = pastCloser(text, end)
+  return `${text.slice(0, after)}\n${renderBacklogSection(backlog, options)}${text.slice(after)}`
 }

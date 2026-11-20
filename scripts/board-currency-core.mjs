@@ -62,6 +62,9 @@ export const BOARD_PAGE_URL = `https://${BOARD_OWNER.toLowerCase()}.github.io/${
 /** The archive page the board's two archive links point at (public/board/archive/). */
 export const ARCHIVE_PAGE_URL = `${BOARD_PAGE_URL}archive/`
 
+/** The full backlog in the repository view, linked below the board's Backlog section. */
+export const BACKLOG_PAGE_URL = `https://github.com/${BOARD_OWNER}/${BOARD_REPO}/blob/main/docs/backlog.md`
+
 /**
  * The floor of "current" (delta D sub-decision). raw.githubusercontent answers
  * with `cache-control: max-age=300`, so a reader can legitimately see content up

@@ -164,6 +164,42 @@ export const SECTION_TITLES = [
  *  handle that. */
 export const COLLAPSIBLE_SECTIONS = [...SECTION_TITLES]
 
+/** The derived Backlog section (user order 19.11.2026): the publisher renders it
+ *  from docs/backlog.md directly below Erledigt. A board written before it was
+ *  first published lacks it, so it is accepted absent — never out of place. */
+export const BACKLOG_TITLE = 'Backlog'
+
+/** The sections a board must show in order, given the headings it does show. */
+export function expectedSections(seen = []) {
+  if (!seen.includes(BACKLOG_TITLE)) return [...SECTION_TITLES]
+  const at = SECTION_TITLES.indexOf('Erledigt') + 1
+  return [...SECTION_TITLES.slice(0, at), BACKLOG_TITLE, ...SECTION_TITLES.slice(at)]
+}
+
+/** False when the Backlog heading stands INSIDE the Erledigt wrapper rather
+ *  after its closer (cross-vendor review of 1559): heading order alone cannot
+ *  tell a nested Backlog from a sibling. The closer is found by counting the
+ *  <details> nesting, as board-core's sectionBounds does. */
+export function backlogOutsideErledigt(html) {
+  // Comments are blanked (same length, so offsets hold): a browser ignores a
+  // "<!-- </details> -->", so the count must too.
+  const text = String(html ?? '').replace(/<!--[\s\S]*?-->/g, (c) => ' '.repeat(c.length))
+  const at = (title) => new RegExp(`<h2\\b[^>]*>\\s*${title}\\s*</h2>`).exec(text)?.index ?? -1
+  const backlog = at(BACKLOG_TITLE)
+  const done = at('Erledigt')
+  if (backlog < 0 || done < 0) return true
+  const opener = text.lastIndexOf('<details', done)
+  if (opener < 0) return true
+  const tag = /<details\b[^>]*>|<\/details\s*>/g
+  tag.lastIndex = opener
+  let depth = 0
+  for (let m = tag.exec(text); m; m = tag.exec(text)) {
+    depth += m[0].startsWith('</') ? -1 : 1
+    if (depth === 0) return backlog > m.index
+  }
+  return false
+}
+
 /** The board keeps only the newest finished cards; the rest live on their own
  *  published page (user 27.07.2026). Measured reason: at 214 cards the archive
  *  was three quarters of the file, so every review of the board grew with every
@@ -522,12 +558,16 @@ export function auditDashboard(html, input = {}) {
   const done = Array.isArray(input?.done) ? input.done : []
   const { order, sections } = sliceSections(html)
 
-  // STRUCTURE — exactly the five binding sections, in order.
-  if (order.length !== SECTION_TITLES.length || SECTION_TITLES.some((t, i) => order[i] !== t)) {
+  // STRUCTURE — exactly the five binding sections, in order (plus the derived Backlog below Erledigt).
+  const expected = expectedSections(order)
+  if (order.length !== expected.length || expected.some((t, i) => order[i] !== t)) {
     v.push({
       code: 'structure',
-      msg: `section headers are [${order.join(' | ') || '<none>'}] — the binding structure is [${SECTION_TITLES.join(' | ')}]`,
+      msg: `section headers are [${order.join(' | ') || '<none>'}] — the binding structure is [${expected.join(' | ')}]`,
     })
+  }
+  if (!backlogOutsideErledigt(html)) {
+    v.push({ code: 'structure', msg: `the ${BACKLOG_TITLE} section stands inside Erledigt — it belongs directly below it` })
   }
 
   // NO AUTO-OPEN — user mandate 23.07.2026 (dashboard-no-auto-open): no card
@@ -544,7 +584,7 @@ export function auditDashboard(html, input = {}) {
   // 26./27.07.2026). The `open` ban above already covers "closed", so this rule
   // only pins that each wrapper still EXISTS: a republish that dropped one would
   // silently unfold that section again.
-  for (const title of COLLAPSIBLE_SECTIONS) {
+  for (const title of [...COLLAPSIBLE_SECTIONS, BACKLOG_TITLE]) {
     // The derived slot line may stand beside the heading inside its summary.
     const wrapped = new RegExp(
       `<details\\b[^>]*>\\s*<summary>\\s*<h2>${title}</h2>\\s*(?:<span class="slots">[^<]*</span>\\s*)?</summary>`,

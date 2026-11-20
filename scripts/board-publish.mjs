@@ -47,6 +47,7 @@ import { readOrigins } from './board-origin.mjs'
 import { renderCardOrigins } from './board-origin-core.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
 import {
+  applyBacklogSection,
   normaliseLineEndings,
   projectNowForPublish,
   refreshFooter,
@@ -417,6 +418,20 @@ try {
 // THE "VERTEILUNG" LINE (user request 24.10.2026): who built and reviewed each
 // card's point, and where, derived from trailers and the review ledger.
 repoBytes = withDistributions(repoBytes)
+// THE BACKLOG SECTION (user order 19.11.2026): rendered from docs/backlog.md
+// directly below Erledigt. An unreadable backlog shows the unknown count; a
+// board the insertion cannot place is published without it and says why.
+try {
+  let backlogText = null
+  try {
+    backlogText = readFileSync(resolve(REPO_ROOT, 'docs', 'backlog.md'), 'utf8')
+  } catch {
+    backlogText = null
+  }
+  repoBytes = applyBacklogSection(repoBytes, backlogText)
+} catch (e) {
+  console.error(`board-publish: backlog section not rendered (${e.message})`)
+}
 
 if (repoBytes !== original) {
   // Atomic (point 443, four-eyes F3) — and this one writes the very file the
