@@ -11,6 +11,7 @@ import {
   buildQueueSection,
   derivedUserWaitCards,
   headSkipAdvisory,
+  renderDerivedVdzkCard,
 } from './board-queue-core.mjs'
 import { gateSets, markGated } from './user-gate-core.mjs'
 
@@ -45,8 +46,23 @@ describe('derivedUserWaitCards — one card per open gate, all four acts', () =>
     expect(derivedUserWaitCards(gated.replace('- [ ]', '- [x]'))).toHaveLength(0)
   })
 
-  it('skips a point a current-work card already shows', () => {
-    expect(derivedUserWaitCards(gate(tasks('- [ ] 1543. X'), 1543), { skip: [1543] })).toHaveLength(0)
+  it('keeps a gate card for a point a current-work card shows; skips only the guesses there', () => {
+    expect(derivedUserWaitCards(gate(tasks('- [ ] 1543. X'), 1543), { skip: [1543] }).map((c) => c.kind)).toEqual(['gate'])
+    expect(derivedUserWaitCards(tasks('- [ ] 1552. Y WAITS FOR the run'), { skip: [1552] })).toEqual([])
+  })
+
+  it('covers public-release and board-contract gates too', () => {
+    let text = tasks('- [ ] 14. Release', '- [ ] 15. Contract')
+    text = gate(text, 14, { act: 'public-release', detail: 'dispatch the public release build', prepared: 'the release build is verified' })
+    text = gate(text, 15, { act: 'board-contract', detail: 'rename the board section heading', prepared: 'the new heading is drafted' })
+    expect(derivedUserWaitCards(text).map((c) => [c.point, c.kind])).toEqual([[14, 'gate'], [15, 'gate']])
+  })
+
+  it('escapes HTML-sensitive text in the rendered card', () => {
+    const [card] = derivedUserWaitCards(gate(tasks('- [ ] 16. X'), 16), { titles: { 16: 'A <b>bold</b> & "quoted" title' } })
+    const html = renderDerivedVdzkCard(card)
+    expect(html).not.toContain('<b>')
+    expect(html).toContain('&lt;b&gt;')
   })
 
   it('renders a fallback card for a marker that does not parse', () => {
@@ -58,6 +74,8 @@ describe('derivedUserWaitCards — one card per open gate, all four acts', () =>
       expect(card.title).toBe(`Punkt ${point} wartet auf dich – Marker fehlerhaft`)
       expect(card.paragraphs.join(' ')).toContain('Roher Text: AWAITING-CONFIRMATION(')
     }
+    const doubled = tasks('- [ ] 79. Doubled AWAITING-CONFIRMATION(2026-11-20; release-tag: push the v1 tag, safe prepared state: the build is verified))')
+    expect(derivedUserWaitCards(doubled).map((c) => c.kind)).toEqual(['malformed'])
   })
 })
 
@@ -123,6 +141,13 @@ describe('applyDerivedVdzk — rendered into "Von dir zu klären", rebuilt each 
     const audit = auditDashboard(built.html, { open: [210, 211, 204, 1543], done: [209] })
     expect(audit.filter((v) => ['dup-in-section', 'empty-body', 'duplicate-card-title'].includes(v.code))).toEqual([])
     expect(evaluateTopic({ dashboardHtml: built.html, tasksText: text }).block).toBe(false)
+  })
+
+  it('removes a manual card of a point answered before the first derived build', () => {
+    const board = boardHtml({ queue: [211, 204], klaerungExtra: ['1543 — Notebook-Lauf bitte'] })
+    const r = applyDerivedVdzk(board, [], { knownPoints: known, answered: new Set([1543]) })
+    expect(r.removed).toEqual(['1543 — Notebook-Lauf bitte'])
+    expect([...parseKlaerungPoints(r.html, { knownPoints: known })]).toEqual([])
   })
 
   it('leaves a board without the section unchanged', () => {

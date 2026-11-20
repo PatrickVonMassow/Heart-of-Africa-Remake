@@ -505,6 +505,25 @@ describe('the user-input act — the user must run, measure or hand in something
     expect(parseGateLine(r.text.split('\n')[0]).classification).toMatchObject({ verdict: 'confirmation', act: 'user-input' })
   })
 
+  it('refuses empty labelled values, marker delimiters and a detail that would not round-trip', () => {
+    expect(markGated(tasks('- [ ] 1. A'), 1, { act: 'user-input', detail: 'run the local check, hand back: , where: chat', prepared })).toMatchObject({ ok: false })
+    expect(markGated(tasks('- [ ] 1. A'), 1, { act: 'user-input', detail: 'run the local check, hand back: log, where:', prepared })).toMatchObject({ ok: false })
+    expect(formatConfirmationReason({ act: 'user-input', detail: 'run the local check, hand back: log, where: https://x.test/up;case=42', prepared }).ok).toBe(false)
+    const split = formatConfirmationReason({
+      act: 'user-input',
+      detail: 'Run the local check, safe prepared state: use the local machine, hand back: log, where: chat',
+      prepared: 'the fixtures are ready',
+    })
+    expect(split.ok).toBe(false)
+  })
+
+  it('accepts a destination URL with a query string verbatim', () => {
+    const r = markGated(tasks('- [ ] 1. A'), 1, { act: 'user-input', detail: 'upload the benchmark json file, hand back: the json, where: https://x.test/upload?case=42', prepared })
+    expect(r.ok).toBe(true)
+    expect(r.text).toContain('where: https://x.test/upload?case=42')
+    expect(parseUserGates(r.text).gated).toHaveLength(1)
+  })
+
   it('still refuses a user-input reason that would be clipped', () => {
     const r = formatConfirmationReason({ act: 'user-input', detail: `${detail} ${'word '.repeat(60)}`, prepared })
     expect(r.ok).toBe(false)

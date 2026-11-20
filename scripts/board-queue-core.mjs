@@ -1184,9 +1184,12 @@ export function derivedUserWaitCards(tasksText, { titles = {}, skip = [] } = {})
   const cards = []
   for (const block of pointBlocks(tasksText)) {
     const { point } = block
-    if (!block.open || block.deferred || skipSet.has(point)) continue
+    if (!block.open || block.deferred) continue
     const name = boardSafeTitle(titles[point] || `Punkt ${point}`)
     const gate = gates.get(point)
+    // A SET GATE IS ALWAYS CARDED, even on the point being worked: parking it
+    // must not make its card vanish. `skip` silences only the guesses below.
+    if (!gate && skipSet.has(point)) continue
     if (gate) {
       const r = readGateReason(gate.reason)
       const since = dayOf(gate.since)
@@ -1206,8 +1209,11 @@ export function derivedUserWaitCards(tasksText, { titles = {}, skip = [] } = {})
     const line = parseGateLine(block.head)
     const tail = block.head.trimEnd()
     const brokenTyped = line?.marker === CONFIRMATION_MARKER && !line.gated
-    const unclosed = !line?.marker && new RegExp(`${CONFIRMATION_MARKER}\\([^)]*$`).test(tail)
-    if (brokenTyped || unclosed) {
+    // ANY unquoted marker opening on the head line that did not parse as a gate
+    // is malformed — unclosed, doubled `))` or otherwise.
+    const unquotedHead = tail.replace(/`[^`]*`/g, ' ')
+    const unparsed = unquotedHead.includes(`${CONFIRMATION_MARKER}(`)
+    if (brokenTyped || unparsed) {
       const raw = tail.slice(tail.lastIndexOf(CONFIRMATION_MARKER))
       cards.push({
         point,
@@ -1264,7 +1270,7 @@ const MANUAL_CARD_RE = /<details>\s*<summary><span class="t">([^<]*)<\/span>[\s\
  * gates — idempotent, so it simply never finds one again). Returns
  * { html, removed:[title] }. A board without the section comes back unchanged.
  */
-export function applyDerivedVdzk(html, cards, { knownPoints = [] } = {}) {
+export function applyDerivedVdzk(html, cards, { knownPoints = [], answered = [] } = {}) {
   const doc = String(html ?? '')
   let bounds
   try {
@@ -1273,13 +1279,17 @@ export function applyDerivedVdzk(html, cards, { knownPoints = [] } = {}) {
     return { html: doc, removed: [] }
   }
   const carded = new Set((cards ?? []).filter((c) => c.owns).map((c) => Number(c.point)))
+  // An ANSWERED point's manual card is stale too: a gate cleared before the
+  // first derived build never entered `carded`, and its old card would keep
+  // the point out of the queue.
+  const stale = new Set([...carded, ...[...answered].map(Number)])
   const removed = []
   const section = doc
     .slice(bounds.from, bounds.end)
     .replace(DERIVED_CARD_RE, '')
     .replace(MANUAL_CARD_RE, (card, title) => {
-      const { points } = pointOwnershipFromTitle(title, { knownPoints: [...knownPoints, ...carded] })
-      if (points.length === 1 && carded.has(points[0])) {
+      const { points } = pointOwnershipFromTitle(title, { knownPoints: [...knownPoints, ...stale] })
+      if (points.length === 1 && stale.has(points[0])) {
         removed.push(title.trim())
         return ''
       }

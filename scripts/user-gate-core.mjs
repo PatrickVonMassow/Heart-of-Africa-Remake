@@ -289,8 +289,10 @@ export function userInputDetailError(detail) {
   const m = String(detail ?? '').trim().match(USER_INPUT_DETAIL_RE)
   if (!m) return `a user-input detail must read ${USER_INPUT_DETAIL_FORM}`
   if (wordsIn(m[1]) < 3) return 'a user-input detail must name the action in at least three words'
-  if (wordsIn(m[2]) < 1) return 'a user-input detail must name the result to hand back'
-  if (wordsIn(m[3]) < 1) return 'a user-input detail must name where to submit the result'
+  // A bare comma is no value: a field is filled only by a letter or digit.
+  const filled = (t) => /[\p{L}\p{N}]/u.test(t)
+  if (!filled(m[2])) return 'a user-input detail must name the result to hand back'
+  if (!filled(m[3])) return 'a user-input detail must name where to submit the result'
   return ''
 }
 
@@ -322,13 +324,21 @@ export function formatConfirmationReason({ act = '', detail = '', prepared = '' 
   if (wordsIn(safe) < 3) return { ok: false, error: 'prepared must name the safe prepared state in at least three words', reason: '' }
   const userInput = key === USER_INPUT_ACT
   if (userInput) {
+    // A DESTINATION IS STORED VERBATIM OR REFUSED: `clean` would silently turn
+    // `upload;case=42` into another address, since ( ) ; delimit the marker.
+    if (/[();]/.test(String(detail ?? ''))) {
+      return { ok: false, error: 'a user-input detail must not contain ( ) or ; — they delimit the gate marker', reason: '' }
+    }
     const defect = userInputDetailError(what)
     if (defect) return { ok: false, error: defect, reason: '' }
   }
   const max = userInput ? USER_INPUT_REASON_MAX : REASON_MAX
   // A FIELD THAT ASKS IS NOT A FIELD THAT ACTS: selecting an act key does not
   // turn "choose blue or green" into one.
-  for (const [name, value] of [['detail', what], ['prepared', safe]]) {
+  // A user-input `where:` may be a URL with a query string; only the action
+  // and result are judged for asking.
+  const asked = userInput ? what.replace(/,?\s+where:\s*.+$/i, '') : what
+  for (const [name, value] of [['detail', asked], ['prepared', safe]]) {
     if (ASKS_RATHER_THAN_STATES(value.toLowerCase())) {
       return { ok: false, error: `${name} asks a question — decide it and record SELF-DECIDED instead`, reason: '' }
     }
@@ -337,7 +347,9 @@ export function formatConfirmationReason({ act = '', detail = '', prepared = '' 
   const back = reason.match(STRUCTURED_RE)
   // A CLIPPED RECORD IS ALSO A REFUSAL: `sanitiseReason` marks a cut with an
   // ellipsis, and half a prepared state is not the state.
-  if (reason.endsWith('…') || !back || wordsIn(back[2]) < 3 || wordsIn(back[3]) < 3) {
+  // AND THE FIELDS MUST COME BACK EXACTLY: a detail quoting `, safe prepared
+  // state:` would split early and store a shortened, possibly invalid detail.
+  if (reason.endsWith('…') || !back || back[2].trim() !== what || back[3].trim() !== safe) {
     return {
       ok: false,
       error: `the composed reason does not survive one work-order line (${max} characters) — shorten detail or prepared`,
