@@ -166,7 +166,7 @@ const peelTrailingMarkers = (line) => {
  * payload; the unclosed text is then prose. Each step strictly shortens the
  * token, and a bare legacy marker has no `(`.
  */
-function lastMarker(text) {
+export function lastMarker(text) {
   const hit = String(text).match(MARKER_TAIL_RE)
   if (!hit) return null
   let token = hit[1]
@@ -665,7 +665,8 @@ export function markGated(tasksText, point, { since = '', act = '', detail = '',
   const marker = `${CONFIRMATION_MARKER}(${stamp ? `${stamp}; ` : ''}${clean})`
   const { text, hit } = rewriteHead(tasksText, point, (line) => `${stripMarkers(line)} ${marker}`)
   if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order` }
-  if (hit === 'ticked') return { text, ok: false, error: `point ${Number(point)} is already ticked — a closed point is not gateable` }
+  // A refusal returns the ORIGINAL text: a ticked duplicate may follow an open head that was stamped.
+  if (hit === 'ticked') return { text: String(tasksText ?? ''), ok: false, error: `point ${Number(point)} is already ticked — a closed point is not gateable` }
   // ok ONLY WHEN THE GATE HOLDS: whatever stands on the line (an unclosed
   // marker included), the rewritten line must read back as this gate.
   // EVERY open head of the point was rewritten, so every one must hold.

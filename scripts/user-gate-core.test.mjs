@@ -20,6 +20,7 @@ import {
   markGated,
   markSelfDecided,
   migrateLegacyGates,
+  lastMarker,
   parseGateLine,
   parseUserGates,
   prepareAdvisoryDecision,
@@ -521,8 +522,17 @@ describe('the user-input act — the user must run, measure or hand in something
   it('refuses a re-stamp that does not read back as a holding gate on every head, returning the original text', () => {
     const deferred = tasks('- [ ] 1543. Hitches DEFERRED')
     expect(markGated(deferred, 1543, { since: '2026-11-21', act: 'user-input', detail, prepared })).toMatchObject({ ok: false, text: deferred })
+    const tickedAfter = tasks('- [ ] 1543. Hitches DEFERRED', '- [x] 1543. Hitches')
+    expect(markGated(tickedAfter, 1543, { since: '2026-11-21', act: 'user-input', detail, prepared })).toMatchObject({ ok: false, text: tickedAfter })
     const twoHeads = tasks('- [ ] 1543. Hitches', '- [ ] 1543. Hitches again DEFERRED')
     expect(markGated(twoHeads, 1543, { since: '2026-11-21', act: 'user-input', detail, prepared })).toMatchObject({ ok: false, text: twoHeads })
+  })
+
+  it('locates the innermost last marker behind an unclosed one', () => {
+    const line = '- [ ] 1543. Hitches AWAITING-USER(2026-11-20; choose a colour USER-ANSWERED(2026-11-21)'
+    expect(lastMarker(line)).toEqual({ token: 'USER-ANSWERED(2026-11-21)', index: line.indexOf('USER-ANSWERED(') })
+    expect(lastMarker('- [ ] 1. A AWAITING-USER')).toEqual({ token: 'AWAITING-USER', index: 11 })
+    expect(lastMarker('- [ ] 1. A')).toBeNull()
   })
 
   it('migrates a legacy gate left unclosed before an answer without losing the answer', () => {
