@@ -140,6 +140,13 @@ put it is the mistake this line exists to stop.
   card of an answered point only in the one-off transition, not on every rebuild (e.g. only when its title
   matches the old manual gate-card form, or drop the answered sweep and say so); (6) doc: the advisory needs an
   in-flight focus; test focus-vs-secondary selection and ampersand/paragraph escaping.
+  HAND-OVER 20.11.2026 02:50: all six answered in 537083c (full unit suite green, 19637); its confirming pass
+  (GPT-6.2 Sol, recorded) was do-not-merge with three gaps, answered in abd3ea1 (manual card of any gated point
+  replaced, unclosed gate no longer swallows a later answer, answered-card test rebuilds from USER-ANSWERED).
+  Confirming pass of abd3ea1 (recorded): do-not-merge on the parser only — a gate left unclosed by hand with
+  USER-ANSWERED( appended now reads malformed rather than answered, and markGated over an unclosed gate can report
+  ok without restoring a gate. Owed: decide (answer the nested marker, or refuse re-stamping an unclosed line),
+  confirming pass --since abd3ea1, then landing; no browser suite (tooling only).
 
 - [ ] 1543. Smooth the CPU hitches while driving on medium and high
   Observed: The user's notebook benchmark shows CPU p95 of 41 ms (medium) and 52 ms (high) during the drive against medians of 9-12 ms: periodic hitches that the player feels as stutter even when the GPU average would be fine. The user requires medium to be clearly smoother on mid-range notebooks.
