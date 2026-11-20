@@ -47536,3 +47536,13 @@ to land than a mechanism that needs a review.
   Bundle: Session- & Repo-Hygiene.
   Source: split from 1557 on 19.11.2026 (user approval of the reorder, 20:42).
   Criticality: high.
+
+- [x] 1495. The continent zoom stops drawing — a TypeError fires every frame
+  Final state: `npm test -- enrichments --section=seasons` is green on both backends: frame 87-continent-zoom is drawn at the unlocked wide zoom, and the page logs no "TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))".
+  Observed problem: at the continent zoom the scene draws nothing ("no frame has been drawn yet (0 draw calls)") and the TypeError repeats every frame. Measured 09.11.2026 on main ca908ee7d (`--section=seasons`, WebGPU, 277 errors, log local/verify-logs/2026-11-09T19-49-07-979-enrichments.log) and on feat/565-buried-drinking-calf 313289975 (full enrichments, WebGPU 5600 and WebGL 2 406 errors). No enrichments run up to 31.10.2026 logged it. Point 565's diff only moves wildlife body heights, so the red is owned by no point. The suite logs only the message text, so the first step is the stack (pageerror `e.stack`).
+  Player impact: zooming out to the whole continent shows a frozen or empty scene.
+  Test: the section above green on both backends; a Vitest case if the cause sits in browserless logic.
+  Source: picture check of the 565 landing session, 09.11.2026.
+  Also: on the same coverage run (main 9afb575, 09.11.2026 23:32, WebGL 2, log local/main-enrichments-webgl.log) frame 86-berber-backdrop shows only floating roofs, doors and palms before haze — mud walls, ground and all villagers are missing (evidence local/1495-evidence/86-berber-backdrop-webgl2-main-9afb575.png; the 18.10. frame at 85bfcab78 shows the whole village), while its check stayed green; the same run logged the 1495 TypeError 7300x (WebGPU 7304x), causal link unproven. Final state extended: frame 86 shows walls, ground and villagers on both backends.
+  Also (14.11.2026): --section=seasons alone takes ~14 min on WebGPU (main 15c896340 14m 21s, Congo swing 12.2 vs savanna 9.3; feat/344 14m 39s) and pushes the full enrichments suite past its 45 min wall timeout (killed at 64 frames); a covering run needs VERIFY_SUITE_TIMEOUT_MS=5400000 until this is fixed.
+  Bundle: Steuerung & Performance.
