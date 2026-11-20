@@ -1604,7 +1604,7 @@
   "id": 857,
   "title": "The docs suite's acceptance-pointer checks match nothing and fail vacuously",
   "disposition": "archive",
-  "reason": "fixed: `npm test -- docs` is green today (8 pass, 0 fail), the six vacuous pointer failures are gone; plan: docs.mjs pointer role (M-D16)",
+  "reason": "fixed: the pointer checks were replaced by companion checks that fail closed on an empty set (scripts/verify/docs.mjs:74,79 `ok: hasCriteria && ...`; scripts/verify/docs.test.mjs:106-111 asserts 0 criteria -> both rules false, :114-119 asserts a nonempty set passes); `node scripts/verify/docs.mjs` today prints \"32 criteria judged\" on all four companion rules and `npm test -- docs` is green (8 pass, 0 fail); plan: docs.mjs pointer role (M-D16)",
   "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance); §4 disagreement table row 857: resolved yes"
  },
  {
