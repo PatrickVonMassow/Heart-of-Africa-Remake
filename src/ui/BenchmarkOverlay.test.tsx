@@ -159,6 +159,17 @@ describe('benchmark overlay (design.md §21.1, §17.4)', () => {
     expect(document.querySelector('.bench-aborted')?.textContent).toBe(en.benchmark.abortedNote)
   })
 
+  it('an INVALID run names its reason instead of the aborted note and the headline, in both languages', () => {
+    const reason = 'GPU device lost (reason: unknown; Instance dropped)'
+    render(<BenchmarkOverlay />)
+    act(() => useUi.getState().setBenchReport({ ...reportFile(true), invalidReason: reason }))
+    expect(document.querySelector('.bench-invalid')?.textContent).toBe(en.benchmark.invalidNote(reason))
+    expect(document.querySelector('.bench-headline')).toBeNull()
+    expect(document.querySelectorAll('.bench-aborted')).toHaveLength(1)
+    act(() => useLocale.getState().setLang('de'))
+    expect(document.querySelector('.bench-invalid')?.textContent).toBe(de.benchmark.invalidNote(reason))
+  })
+
   it('names the trustworthy series — GPU where measured, in both languages', () => {
     render(<BenchmarkOverlay />)
     act(() => useUi.getState().setBenchReport(reportFile()))

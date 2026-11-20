@@ -504,6 +504,30 @@ export interface BenchReport {
   /** Wall-clock duration of the whole sweep (ms). */
   durationMs: number
   aborted: boolean
+  /** Set when the run was declared INVALID (point 507): a lost GPU device or
+   *  a measured phase that drew nothing. Its rows are then dropped — frames
+   *  that drew nothing are never published as fps. Absent in older reports. */
+  invalidReason?: string
+}
+
+/**
+ * Why a measurement cannot be trusted, or null. A lost device makes three's
+ * renderer return early from every render(): the frames are empty yet still
+ * vsync-paced, so they read as a healthy 60 fps (field report 20.11.2026: 42
+ * rows, all drawCalls 0). A measured phase with zero draw calls is the same
+ * symptom where the loss itself went unreported.
+ */
+export function benchInvalidReason(input: {
+  deviceLost: { reason: string; message: string } | null
+  drawCalls?: number
+}): string | null {
+  if (input.deviceLost) {
+    return `GPU device lost (reason: ${input.deviceLost.reason}; ${input.deviceLost.message})`
+  }
+  if (input.drawCalls !== undefined && input.drawCalls <= 0) {
+    return 'a measured phase drew nothing (0 draw calls)'
+  }
+  return null
 }
 
 // --- LOW-preset cost profile (point 293) ------------------------------------
@@ -649,7 +673,8 @@ export function benchSummaryLines(report: BenchReport): string[] {
   const e = report.env
   const num = (v: number | undefined): string => (v === undefined ? '—' : v.toFixed(2))
   const lines = [
-    `${report.app} — render benchmark${report.short ? ' (short mode)' : ''}${report.aborted ? ' — ABORTED' : ''}`,
+    `${report.app} — render benchmark${report.short ? ' (short mode)' : ''}${report.invalidReason ? ' — INVALID' : report.aborted ? ' — ABORTED' : ''}`,
+    ...(report.invalidReason ? [`INVALID RUN — ${report.invalidReason}; no rows were recorded.`] : []),
     `${e.startedAt} · ${e.backend} · ${e.viewport.width}x${e.viewport.height} @dpr ${e.devicePixelRatio} · build ${e.build} ${e.commit}`,
     `fixed timestep ${report.dt.toFixed(5)}s · ${report.frames.sample} sampled frames per phase · seed ${report.seed} · day ${report.day}`,
     headlineNote(report.headline, report.gpuTiming.reason),

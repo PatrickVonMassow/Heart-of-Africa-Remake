@@ -43,6 +43,9 @@ interface BenchReportFile {
   filename: string
   json: string
   aborted: boolean
+  /** Set when the run was declared invalid (a lost GPU device, a phase that
+   *  drew nothing) — the report then carries no rows. */
+  invalidReason?: string
 }
 
 /** Building types trading with the flat goods list (design.md §9). */

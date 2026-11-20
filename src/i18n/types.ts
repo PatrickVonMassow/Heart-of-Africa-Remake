@@ -338,6 +338,9 @@ export interface Strings {
     doneTitle: string
     /** Shown instead of the result when the run was aborted. */
     abortedNote: string
+    /** The run was declared invalid (lost GPU device, frames that drew
+     *  nothing); `reason` is the report's English reason string. */
+    invalidNote(reason: string): string
     /** Which of the three measured series is the trustworthy result here. */
     headline: {
       /** Real GPU timestamps were measured — the headline number. */
