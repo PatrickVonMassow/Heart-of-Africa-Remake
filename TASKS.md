@@ -107,15 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1520. Render targets leak across rebuilds at travel|medium since the solar sun landed
-  Measured 14.11.2026 (full WebGPU enrichments on main 33db311fd, log local/verify-logs/2026-11-14T06-43-15-751-enrichments.log): 8x [ASSERT] render-resource-leak at travel|medium|traa/-/bloom/sun/fire/band, renderTargets 45 -> 58/68/72/365/370, then place:cairo 365 -> 395. The same leak shows on feat/344 b9082f151 (log 2026-11-14T05-34-10-777, 46 -> 397). Absent in the last full main run f7f328b10 (13.11.2026, before point 343 landed); every section involved is green alone.
-  Player impact: GPU memory grows across pipeline rebuilds in a long session.
-  Final state: a rebuild at travel|medium disposes what it replaces; renderTargets stay within the +2 allowance across the full enrichments run.
-  Test: a full WebGPU enrichments run (VERIFY_SUITE_TIMEOUT_MS=5400000) without render-resource-leak asserts, plus a Vitest case for the disposal if the cause lies in browserless pipeline code.
-  Source: finding of the 344 session, 14.11.2026 07:35.
-  Remeasured 15.11.2026: `npm test -- settings --section=render-leak-watch` reds identically on main dcf4949c7 and feat/357 6a1071735 (travel|medium|traa/-/bloom/sun/fire/band 25 -> 29, +4, allowed +2), so the settings leak watch shows the same leak.
-  Bundle: Sonne & Himmel.
-
 - [ ] 507. A lost WebGPU device ends the run quietly and the picture black
   (measured 05.08.2026, both quiet runs of `invariants` on the software WebGPU
   lane). The suite ends `2 pass, 0 fail` with 9 and 2 console errors —

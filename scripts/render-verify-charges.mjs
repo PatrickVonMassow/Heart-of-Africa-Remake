@@ -2034,24 +2034,6 @@ export const RED_CHARGES = [
   },
 
   {
-    point: 1520,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^(solar sun|eye adaptation and glare): no console errors\b/i,
-    why:
-      'MEASURED 14.11.2026 on WebGPU (main 33db311fd) and WebGL 2 (feat/344 b9082f151): render-resource-leak asserts '
-      + 'at travel|medium, renderTargets 45 -> 370; both sections are green alone. Filed as point 1520. The charge dies with point 1520.',
-  },
-  {
-    point: 1520,
-    suite: 'settings',
-    kind: 'check',
-    match: /^a normal session of switches, detail levels and toggles trips nothing\b/i,
-    why:
-      'MEASURED 15.11.2026 on WebGPU, main d4be6047b: renderTargets 24 -> 28 at travel|medium|traa/-/bloom/sun/fire/band, '
-      + 'the same rebuild leak point 1520 owns (remeasured there with the render-leak-watch section). The charge dies with point 1520.',
-  },
-  {
     point: 1522,
     suite: 'settings',
     kind: 'check',
@@ -2060,54 +2042,6 @@ export const RED_CHARGES = [
       'MEASURED 15.11.2026 on WebGPU, main dcf4949c7 and d4be6047b: every proximity level reads 0; filed as point 1522 '
       + 'before this run. The charge dies with point 1522.',
   },
-  {
-    point: 1520,
-    suite: 'polish-settlement',
-    kind: 'console',
-    match: /^console error: \[ASSERT\] render-resource-leak — renderTargets grew back at place:/i,
-    why:
-      'MEASURED 14.11.2026 on WebGPU, main cfe6b27f1: renderTargets 52 -> 58 at place:bambara-village|medium bloom/sun '
-      + 'band — the same rebuild leak since the solar sun that point 1520 owns at travel. The charge dies with point 1520.',
-  },
-  {
-    point: 1520,
-    suite: 'polish-settlement',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^frame 1490-porter-tangier-webgl2 — the scene never finished drawing\b/i,
-    why:
-      'MEASURED 14.11.2026 on WebGL 2, feat/353 251379676: after 24 min of settlement rebuilds (renderTargets 63 -> 69, '
-      + 'textures 176 -> 200) the WebGL device is lost and the last frame draws nothing; the porter section is green '
-      + 'alone (16 pass). The cumulative rebuild leak is point 1520\'s. The charge dies with point 1520.',
-  },
-  {
-    point: 1520,
-    suite: 'polish-settlement',
-    backend: 'webgl',
-    kind: 'console',
-    match: /^console error: THREE\.THREE\.WebGPURenderer: WebGL Device Lost\b/i,
-    why:
-      'MEASURED 14.11.2026 on WebGL 2, feat/353 251379676: the device loss at the end of the full suite that follows the '
-      + 'rebuild leak point 1520 owns; the porter section is green alone. The charge dies with point 1520.',
-  },
-  ...[
-    { kind: 'check', match: /^frame 1490-porter-(cairo|tangier) — the scene never finished drawing\b/i },
-    { kind: 'check', match: /^the cook-shelter roof is still standable AND reads as a surface from below — no hut-roof\b/i },
-    { kind: 'console', match: /^console error: THREE\.THREE\.WebGPURenderer: WebGPU Device Lost\b/i },
-    { kind: 'console', match: /^console error: OperationError: Instance dropped in popErrorScope\b/i },
-    { kind: 'console', match: /^console error: An error occurred during model execution: "RangeError: Failed to execute 'createBuffer' on 'GPUDevice'/i },
-    { kind: 'console', match: /^console error: Inputs given to model:/i },
-  ].map((charge) => ({
-    point: 1520,
-    suite: 'polish-settlement',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    ...charge,
-    why:
-      'MEASURED 15.11.2026 on WebGPU, main 7b1a2d8a5: after 45 min of settlement rebuilds (renderTargets 53 -> 67) the '
-      + 'WebGPU device is lost; roof-clearance (8 pass) and porter-head-load (16 pass) are green alone. The cumulative '
-      + 'rebuild leak is point 1520\'s. The charge dies with point 1520.',
-  })),
   ...[
     /^every ending resolves on a bank within the crossing deadline\b/i,
     /^the forced drive-off leaves parent and calf alive, both on a bank\b/i,
