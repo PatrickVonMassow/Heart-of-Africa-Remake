@@ -669,7 +669,10 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     balance.randomEventsEnabled = balanceSnapshot.randomEventsEnabled
     balance.deadline.enabled = balanceSnapshot.deadlineEnabled
     useGame.setState(gameSnapshot)
-    useUi.setState(uiSnapshot)
+    // A device lost during the run outlives it: the restore keeps the live
+    // loss notice and its dismissal instead of the pre-run values.
+    const { deviceLost, deviceLostDismissed } = useUi.getState()
+    useUi.setState({ ...uiSnapshot, deviceLost, deviceLostDismissed })
     useUi.getState().setBenchProgress(null)
     useUi.getState().clearBenchAbort()
     running = false
