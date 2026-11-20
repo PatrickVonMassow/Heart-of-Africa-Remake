@@ -7,6 +7,8 @@
 // that names one ends the process with a FAIL line carrying it, so a truncated
 // check count can never read as a partial pass.
 
+import { writeSync } from 'node:fs'
+
 /** Console texts that mean the renderer's device is gone. */
 const DEVICE_LOSS_PATTERNS = [
   // The game's own dev assert (src/render/gpuHealth.ts), with its reason.
@@ -23,6 +25,15 @@ export function deviceLossFailLine(text) {
 }
 
 /**
+ * Writes the FAIL line synchronously, then exits 1: a piped console.log can
+ * still be pending when process.exit ends the process, losing the line.
+ */
+export function failAtLoss(line, io = { writeSync, exit: (code) => process.exit(code) }) {
+  io.writeSync(1, `${line}\n`)
+  io.exit(1)
+}
+
+/**
  * Attaches the gate to every page the browser hands out (newPage and
  * newContext().newPage). `onLoss(line)` defaults to printing the line and
  * exiting 1 at once.
@@ -30,12 +41,7 @@ export function deviceLossFailLine(text) {
 export function armDeviceLossGate(browser, { onLoss } = {}) {
   if (!browser) return browser
   let fired = false
-  const fail =
-    onLoss ??
-    ((line) => {
-      console.log(line)
-      process.exit(1)
-    })
+  const fail = onLoss ?? ((line) => failAtLoss(line))
   const watch = (page) => {
     if (!page || typeof page.on !== 'function') return page
     const judge = (text) => {

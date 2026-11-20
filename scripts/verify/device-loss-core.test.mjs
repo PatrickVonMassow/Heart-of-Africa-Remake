@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { armDeviceLossGate, deviceLossFailLine } from './device-loss-core.mjs'
+import { armDeviceLossGate, deviceLossFailLine, failAtLoss } from './device-loss-core.mjs'
 
 function fakePage() {
   const handlers = { console: [], pageerror: [] }
@@ -35,5 +35,17 @@ describe('device-loss gate (point 507)', () => {
     a.emitConsole('error', 'THREE.WebGPURenderer: WebGPU Device Lost')
     expect(lines).toHaveLength(1)
     expect(lines[0]).toContain('gpu-device-lost')
+  })
+
+  it('writes the FAIL line synchronously to stdout before it exits 1', () => {
+    const calls = []
+    failAtLoss('FAIL  GPU device lost — x', {
+      writeSync: (fd, text) => calls.push(['write', fd, text]),
+      exit: (code) => calls.push(['exit', code]),
+    })
+    expect(calls).toEqual([
+      ['write', 1, 'FAIL  GPU device lost — x\n'],
+      ['exit', 1],
+    ])
   })
 })
