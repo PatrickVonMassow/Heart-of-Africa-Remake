@@ -1273,7 +1273,7 @@ const MANUAL_CARD_RE = /<details>\s*<summary><span class="t">([^<]*)<\/span>[\s\
  * (20.11.2026). Returns { html, removed:[title] }. A board without the section
  * comes back unchanged.
  */
-export function applyDerivedVdzk(html, cards, { knownPoints = [] } = {}) {
+export function applyDerivedVdzk(html, cards, { knownPoints = [], gated = [] } = {}) {
   const doc = String(html ?? '')
   let bounds
   try {
@@ -1281,7 +1281,9 @@ export function applyDerivedVdzk(html, cards, { knownPoints = [] } = {}) {
   } catch {
     return { html: doc, removed: [] }
   }
-  const stale = new Set((cards ?? []).filter((c) => c.owns).map((c) => Number(c.point)))
+  // Every GATED point is stale for a manual card — the carded ones and a gated
+  // point on the current-work card, which the now card already owns.
+  const stale = new Set([...(cards ?? []).filter((c) => c.owns).map((c) => Number(c.point)), ...[...gated].map(Number)])
   const removed = []
   const section = doc
     .slice(bounds.from, bounds.end)

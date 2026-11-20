@@ -87,6 +87,10 @@ describe('derivedUserWaitCards — one card per open gate, all four acts', () =>
       expect(card.title).toBe(`Punkt ${point} wartet auf dich – Marker fehlerhaft`)
       expect(card.paragraphs.join(' ')).toContain('Roher Text: AWAITING-CONFIRMATION(')
     }
+    // An unclosed gate does not swallow a later answer into its prepared state.
+    const swallowing = tasks('- [ ] 81. X AWAITING-CONFIRMATION(2026-11-20; release-tag: push the v1 tag, safe prepared state: the build is verified USER-ANSWERED(2026-11-21)')
+    expect(gateSets(swallowing).gated.has(81)).toBe(false)
+    expect(derivedUserWaitCards(swallowing).map((c) => c.kind)).toEqual(['malformed'])
     // THE LAST MARKER IS THE STATE: a gate followed by its answer is answered, not malformed.
     const answeredAfter = tasks('- [ ] 80. Done AWAITING-CONFIRMATION(2026-11-20; release-tag: push the v1 tag, safe prepared state: the build is verified) USER-ANSWERED(2026-11-21)')
     expect(derivedUserWaitCards(answeredAfter)).toEqual([])
@@ -160,17 +164,19 @@ describe('applyDerivedVdzk — rendered into "Von dir zu klären", rebuilt each 
   })
 
   it('leaves a manual card of an answered (uncarded) point alone on every rebuild', () => {
+    const answeredText = `${text.trimEnd()} USER-ANSWERED(2026-11-21)\n`
+    expect(gateSets(answeredText).answered.has(1543)).toBe(true)
     const board = boardHtml({ queue: [211, 204], klaerungExtra: ['1543 — Eine spätere Frage'] })
-    const r = applyDerivedVdzk(board, [], { knownPoints: known })
+    const r = applyDerivedVdzk(board, derivedUserWaitCards(answeredText, { skip: [210] }), { knownPoints: known, gated: gateSets(answeredText).gated })
     expect(r.removed).toEqual([])
     expect([...parseKlaerungPoints(r.html, { knownPoints: known })]).toEqual([1543])
   })
 
   it('a gated point on the current-work card has exactly one owning card on the rebuilt board', () => {
     const nowGated = gate(tasks('- [ ] 210. Now', '- [ ] 211. Queued'), 210)
-    const board = boardHtml({ nowPoint: 210, queue: [211] })
+    const board = boardHtml({ nowPoint: 210, queue: [211], klaerungExtra: ['210 — Alte Gate-Karte'] })
     const cards = derivedUserWaitCards(nowGated, { skip: [210] })
-    const rebuilt = applyDerivedVdzk(board, cards, { knownPoints: [210, 211] }).html
+    const rebuilt = applyDerivedVdzk(board, cards, { knownPoints: [210, 211], gated: gateSets(nowGated).gated }).html
     expect([...parseKlaerungPoints(rebuilt, { knownPoints: [210, 211] })]).toEqual([])
     const audit = auditDashboard(rebuilt, { open: [210, 211], done: [209] })
     expect(audit.filter((v) => ['dup-in-section', 'duplicate-card-title'].includes(v.code) || /two|both|twice/i.test(v.message ?? ''))).toEqual([])

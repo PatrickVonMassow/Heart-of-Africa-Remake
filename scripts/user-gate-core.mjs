@@ -487,7 +487,12 @@ export function parseGateLine(line) {
   const answered = marker === ANSWERED_MARKER
   const selfDecided = marker === SELF_DECIDED_MARKER
   const { stamp, reason } = readPayload(marker, payload)
-  const classification = marker === CONFIRMATION_MARKER
+  // AN UNCLOSED GATE MUST NOT SWALLOW A LATER MARKER: a marker opening inside
+  // the payload means the gate's own `)` is missing, so the gate does not hold.
+  const swallowed = marker === CONFIRMATION_MARKER && MARKERS.some((m) => payload.includes(`${m}(`))
+  const classification = swallowed
+    ? { verdict: 'advisory', act: '', reason, error: 'another marker opens inside this gate — its closing ) is missing' }
+    : marker === CONFIRMATION_MARKER
     ? classifyConfirmationReason(reason)
     : marker === LEGACY_GATE_MARKER
       ? classifyConfirmationReason(reason, { legacy: true })

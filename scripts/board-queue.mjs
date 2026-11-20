@@ -209,7 +209,7 @@ function inputs() {
     [...new Set([...Object.keys(stored), ...Object.keys(titles)])].map((n) => [n, stored[n]?.title || titles[n]]),
   )
   const userWait = derivedUserWaitCards(tasks, { titles: germanTitles, skip: now })
-  const derived = applyDerivedVdzk(board, userWait, { knownPoints: known })
+  const derived = applyDerivedVdzk(board, userWait, { knownPoints: known, gated: gateSets(tasks).gated })
   const html = derived.html
   return {
     html,
