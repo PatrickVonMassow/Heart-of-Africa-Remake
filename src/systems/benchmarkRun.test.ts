@@ -106,6 +106,22 @@ describe('render benchmark on a lost GPU device (point 507)', () => {
     expect(useUi.getState().benchReport?.invalidReason).toBe(r.invalidReason)
   })
 
+  it('a loss after a completed healthy measured phase still drops every row', async () => {
+    fakeContext(42)
+    let measuredDone = false
+    await pump(startBenchmark({ short: true }), () => {
+      // configIndex 2 starts only after measured config 1 wrote its rows.
+      if (!measuredDone && (useUi.getState().benchProgress?.configIndex ?? 0) >= 2) {
+        measuredDone = true
+        recordDeviceLost({ api: 'WebGPU', reason: 'unknown', message: 'Instance dropped' })
+      }
+    })
+    expect(measuredDone).toBe(true)
+    const r = report()
+    expect(r.invalidReason).toContain('GPU device lost')
+    expect(r.rows).toEqual([])
+  })
+
   it('the restore after the run keeps the live device-loss notice', async () => {
     fakeContext(42)
     await pump(startBenchmark({ short: true }), (n) => {
