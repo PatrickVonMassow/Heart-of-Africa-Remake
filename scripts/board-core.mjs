@@ -3488,7 +3488,7 @@ export const BACKLOG_ON_BOARD = 10 // ESTIMATE, calibratable: the section is col
  *  merely names the word ("Explain the CLOSED badge", "Show the panel (closed by
  *  default)") stays open. */
 const BACKLOG_RESOLVED_HEAD =
-  /(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[(—–,;:]\s*)(?:FIXED|ERLEDIGT|CLOSED|WONTFIX|EINGEREIHT)\b|(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[—–]\s*)closed\b|[(,;:]\s*closed(?=\s*[:)\d])/
+  /(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[(—–,;:]\s*)(?:FIXED|ERLEDIGT|CLOSED|WONTFIX|EINGEREIHT)\b|(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[—–]\s*)closed\b|[(,;:]\s*closed(?=\s*(?:[:)]|\d{2}\.\d{2}\.\d{4}|\d{4}-\d{2}-\d{2}))/
 /** A body line opening with a resolution marker ("ERLEDIGT (17.09.2026): …"). */
 const BACKLOG_RESOLVED_LINE = /^\s*(?:FIXED|ERLEDIGT|CLOSED|EINGEREIHT|WONTFIX|[Cc]losed)\b/
 const BACKLOG_TITLE_MAX = 120
@@ -3541,7 +3541,7 @@ export function parseBacklog(text) {
     if (head) {
       const form = line.startsWith('## ') ? 'heading' : 'bullet'
       // A heading's optional closing hashes ("## Title (19.11.2026) ##") are not text.
-      const text = (form === 'heading' ? head[1].replace(/\s+#+\s*$/, '') : head[1]).trim()
+      const text = (form === 'heading' ? head[1].replace(/[ \t]+#+[ \t]*$/, '') : head[1]).trim()
       cur = { head: text, form, resolved: BACKLOG_RESOLVED_HEAD.test(text), at: raw.length }
       raw.push(cur)
     } else if (/^# /.test(line)) {

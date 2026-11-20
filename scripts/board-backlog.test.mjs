@@ -240,6 +240,8 @@ describe('cross-vendor review findings, second round', () => {
   it('keeps a lowercase closed in parentheses as prose', () => {
     expect(titles('## Show the panel state (closed by default) (19.11.2026)\n')).toEqual(['Show the panel state (closed by default)'])
     expect(titles('- 2026-11-01 old probe — closed 02.11.2026\n')).toEqual([])
+    expect(titles('- 2026-11-01 probe A (closed)\n- 2026-11-01 probe B (closed: superseded)\n')).toEqual([])
+    expect(titles('## Retry handling (closed 3 times) (19.11.2026)\n')).toEqual(['Retry handling (closed 3 times)'])
   })
 
   it('treats a backtick run with a backtick in its info string as text, not a fence', () => {
@@ -260,6 +262,13 @@ describe('cross-vendor review findings, second round', () => {
     const nested = board().replace(`${ERLEDIGT_ANCHOR}\n`, `${ERLEDIGT_ANCHOR}\n${renderBacklogSection(null).replace('<h2>Backlog</h2>', '<h2> Backlog </h2>')}\n`)
     expect(backlogOutsideErledigt(nested)).toBe(false)
     expect(structureViolations(nested).map((v) => v.code)).toContain('sections-wrong')
+    expect(auditDashboard(nested, {}).map((v) => v.code)).toContain('structure')
+  })
+
+  it('keeps hashes after a non-breaking space and does not blank an unclosed comment marker', () => {
+    expect(titles('## Keep the literal\u00a0## (19.11.2026)\n')).toEqual(['Keep the literal ##'])
+    const nested = board().replace(`${ERLEDIGT_ANCHOR}\n`, `${ERLEDIGT_ANCHOR}\n<div title="<!--"></div>\n${renderBacklogSection(null)}\n`)
+    expect(backlogOutsideErledigt(nested)).toBe(false)
   })
 
   it('ignores a closer inside an HTML comment', () => {

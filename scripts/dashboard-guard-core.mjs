@@ -183,7 +183,7 @@ export function expectedSections(seen = []) {
 export function backlogOutsideErledigt(html) {
   // Comments are blanked (same length, so offsets hold): a browser ignores a
   // "<!-- </details> -->", so the count must too.
-  const text = String(html ?? '').replace(/<!--[\s\S]*?(?:-->|$)/g, (c) => ' '.repeat(c.length))
+  const text = String(html ?? '').replace(/<!--[\s\S]*?-->/g, (c) => ' '.repeat(c.length))
   const at = (title) => new RegExp(`<h2\\b[^>]*>\\s*${title}\\s*</h2>`).exec(text)?.index ?? -1
   const backlog = at(BACKLOG_TITLE)
   const done = at('Erledigt')
