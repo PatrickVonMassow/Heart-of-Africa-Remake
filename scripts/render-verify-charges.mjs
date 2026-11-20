@@ -1696,53 +1696,6 @@ export const RED_CHARGES = [
       + 'host, and the charge now dies with the fix of that shuffle.',
   },
   {
-    point: 1010,
-    suite: 'polish-speech',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^no two Ctrl labels fuse in the village crowd/i,
-    // WHAT 1067 SETTLED, 07.09.2026: the fusion is real motion, never a placement
-    // — `declutterLabels` cannot put two boxes into each other — and the depth bar
-    // it reddened on had no cushion at all, so ONE drifted frame in ninety carried
-    // a whole run. The bar now reads the same cushion as the count, and the detail
-    // below is the wording from before that restatement: the shape this entry
-    // owns can no longer be printed. It stays until point 1010 closes, because it
-    // is 1010's record of its own red and not this table's to retire.
-    // DETAIL-SCOPED 30.08.2026 (cross-vendor review, do-not-merge on
-    // ffc9c23): the name alone charged EVERY future failure of this check — a
-    // SUSTAINED fusion regression, where most frames hold a fused pair, would have
-    // been swallowed as the single-frame observation 1010 owns. What was measured
-    // is one frame out of the sample, deep enough to cross the unreadable bar, with
-    // the retry green. A red on more than one frame, a red without the deep bar, or
-    // a crowd that never held stays a real red. The whole printed line is spelled
-    // out rather than left to a wildcard (cross-vendor review, round 2): the words
-    // `unreadable bar` can also appear inside the label pair the detail quotes.
-    // The retry's own verdict is NOT in this detail and cannot be constrained here;
-    // it is part of the record this charge cites, not of the red it reads.
-    // THE SAMPLE AND THE PAIR ARE BOTH MANDATORY 30.08.2026 (cross-vendor review,
-    // do-not-merge on a333f20): `1/\d+` accepted the impossible
-    // `1/0 frames`, and the optional `( \[…\])?` accepted a detail that has LOST
-    // the pair identity. `worstDepth` and `worstPair` come from the same reading in
-    // labelFusion.mjs, so a line printing a depth without its pair is a broken
-    // measurement — a different red from the one 1010 owns.
-    // AND THE PAIR IS SPELLED OUT, NOT MERELY BRACKETED (same review, round 2):
-    // `\[[^\]]*\]` matches an EMPTY bracket, so the identity was still optional in
-    // substance. polish.mjs writes `"<a>"×"<b>" <across>×<down> px`, and that is
-    // the only shape excused here.
-    detailMatch:
-      /^1\/[1-9]\d* frames held a pair fused beyond \d+ px \(allowed \d+\), deepest \d+ px \["[^"]+"×"[^"]+" \d+×\d+ px\], \d+–\d+ labels across the sample — as deep as the \d+ px unreadable bar$/i,
-    why:
-      'THE RED WHOSE CHECK NAMES A TICKED POINT, filed as point 1010 on 29.08.2026. The check '
-      + 'prints "(point 628)", 628 is ticked and lives in docs/tasks-archive.md, and a charge dies '
-      + 'with its point by construction — so the red had no owner at all. Measured in the '
-      + '29.08.2026 LARGE run on feat/687-roam-bound-fixes, WebGL 2: 1/90 frames held a pair fused '
-      + 'beyond 6 px, deepest 19 px, and the retry passed with 200 checks, so the record is '
-      + 'SUSPECT and covers nothing. '
-      + 'This entry gives the red an owner that can CLOSE it; it does not decide the cause. Point '
-      + '1010 owes closing it — point 1067 settled the cause as real motion (see above) rather than a '
-      + 'loaded host, and the charge dies with it.',
-  },
-  {
     point: 1050,
     suite: 'polish-settlement',
     backend: 'webgpu',
@@ -2003,7 +1956,7 @@ export const RED_CHARGES = [
     backend: 'webgl',
     kind: 'check',
     match: /^no two Ctrl labels fuse in the village crowd/i,
-    // The sustained shape only (two or more fused frames); the single-frame shape stays 1010's.
+    // The sustained shape only (two or more fused frames); the single-frame shape lost its owner when 1010 left the queue.
     detailMatch:
       /^(?:[2-9]|[1-9]\d+)\/[1-9]\d* frames held a pair fused beyond \d+ px \(allowed \d+\), \d+ of them at the \d+ px unreadable bar, deepest \d+ px \["[^"]+"×"[^"]+" \d+×\d+ px\], \d+–\d+ labels across the sample — the unreadable overlap STANDS$/i,
     why:
