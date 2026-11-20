@@ -343,21 +343,6 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   time lost. Neither side knows about the other; the in-flight declaration would know, but the
   doctor does not read it. No player impact and no blockade, so it is collected here.
 
-## The give's second evidence frame is aimed by construction, not by rule (measured 07.09.2026, FIXED 08.09.2026)
-
-`150-artefact-chiefs-answer` in `scripts/verify/polish.mjs` stepped the camera back seven
-metres and looked at the chief from the traveller's own eye height — setting his position and
-his bearing, and never his PITCH. On WebGPU that composed well on 07.09.2026 and on WebGL 2 it
-came out pitched at the sky; on 08.09.2026 the WebGPU shot came out that way too: two thirds
-cloud, the roof filling the rest, the chief nowhere in it and his note jammed against the
-inventory bar. The shutter passed it every time, because the declared subject was the note two
-metres ABOVE him and a note at the bottom edge is still in the picture.
-
-Both halves are closed now. The pose that composes the shot levels the view, so the angle no
-longer arrives from whatever the block before it last looked at; and the frame declares the
-CHIEF'S CHEST, which cannot be in a picture aimed at the sky — so the same mis-aim is refused
-instead of photographed.
-
 ## Point 1064's cross-vendor review covers only half its files (07.09.2026)
 
 GPT-6 Astra reviewed pass 1/2 of `cd0418380` — `PlaceScene.tsx`, `chiefMeeting.ts`,
