@@ -100,6 +100,11 @@ interface UiState {
   rendererUnavailable: boolean
   /** The no-renderer notice stays until the player dismisses it. */
   rendererUnavailableDismissed: boolean
+  /** True once the GPU device was lost mid-session (src/render/gpuHealth.ts):
+   *  the renderer draws nothing more, so the player is told. */
+  deviceLost: boolean
+  /** The device-lost notice stays until the player dismisses it. */
+  deviceLostDismissed: boolean
   /** Frame counter (FPS) in the screen corner; toggled in the debug menu. */
   fpsVisible: boolean
   /**
@@ -241,6 +246,8 @@ interface UiState {
   dismissWebglWarning: () => void
   setRendererUnavailable: (unavailable: boolean) => void
   dismissRendererUnavailable: () => void
+  setDeviceLost: (lost: boolean) => void
+  dismissDeviceLost: () => void
   setFpsVisible: (visible: boolean) => void
   setSpeechConceptLabels: (on: boolean) => void
   setTraaEnabled: (enabled: boolean) => void
@@ -298,6 +305,8 @@ export const useUi = create<UiState>()((set) => ({
   webglWarningDismissed: false,
   rendererUnavailable: false,
   rendererUnavailableDismissed: false,
+  deviceLost: false,
+  deviceLostDismissed: false,
   fpsVisible: true,
   speechConceptLabels: false,
   traaEnabled: true,
@@ -359,6 +368,8 @@ export const useUi = create<UiState>()((set) => ({
   dismissWebglWarning: () => set({ webglWarningDismissed: true }),
   setRendererUnavailable: (rendererUnavailable) => set({ rendererUnavailable }),
   dismissRendererUnavailable: () => set({ rendererUnavailableDismissed: true }),
+  setDeviceLost: (deviceLost) => set({ deviceLost }),
+  dismissDeviceLost: () => set({ deviceLostDismissed: true }),
   setFpsVisible: (fpsVisible) => set({ fpsVisible }),
   setSpeechConceptLabels: (speechConceptLabels) => set({ speechConceptLabels }),
   setTraaEnabled: (traaEnabled) => set({ traaEnabled }),

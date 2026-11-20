@@ -17,6 +17,8 @@ import { dispatchSyntheticKey, GAMEPAD_BUTTON_KEYS } from '../systems/input'
 import { ctrlHeld, subscribeCtrlHold } from './ctrlHold'
 import { MONTH_KEYS } from '../systems/season'
 import { useUi } from '../state/ui'
+import { armGpuHealth, resetGpuHealth } from '../render/gpuHealth'
+import { resetDevAsserts } from '../systems/devAssert'
 import { freshGame, withWorld, jumpTo, terrainAt, g, COORD } from '../test/store'
 import { balance } from '../config/balance'
 import { FORM_SOCKETS, socketPosition } from '../world/forms'
@@ -29,11 +31,11 @@ beforeEach(() => {
   // newGame() does not reset hasCheckpoint, and the UI store is a singleton —
   // clear both so overlays/prompts from a prior test never leak in.
   useGame.setState({ hasCheckpoint: false })
-  useUi.setState({ dialog: null, prompt: null, enterPlaceId: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, rendererUnavailable: false, rendererUnavailableDismissed: false, touchActive: false })
+  useUi.setState({ dialog: null, prompt: null, enterPlaceId: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, rendererUnavailable: false, rendererUnavailableDismissed: false, deviceLost: false, deviceLostDismissed: false, touchActive: false })
 })
 afterEach(() => {
   useLocale.getState().setLang('en')
-  useUi.setState({ dialog: null, prompt: null, enterPlaceId: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, rendererUnavailable: false, rendererUnavailableDismissed: false, touchActive: false })
+  useUi.setState({ dialog: null, prompt: null, enterPlaceId: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, rendererUnavailable: false, rendererUnavailableDismissed: false, deviceLost: false, deviceLostDismissed: false, touchActive: false })
 })
 
 const invClass = (eq: string) => document.querySelector(`[data-eq="${eq}"]`)?.className ?? ''
@@ -348,6 +350,34 @@ describe('renderer warning (CLAUDE.md §3)', () => {
     fireEvent.click(dismiss!)
     rerender(<Hud />)
     expect(document.querySelector('.renderer-unavailable')).not.toBeInTheDocument()
+  })
+
+  it('a simulated device.lost raises the localized device-lost notice in both languages', () => {
+    resetGpuHealth()
+    resetDevAsserts()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    // Three's backend calls renderer.onDeviceLost from its awaited device.lost.
+    const renderer: { onDeviceLost?: (i: unknown) => void } = { onDeviceLost: () => {} }
+    armGpuHealth(renderer)
+    useUi.getState().setWebglFallback(true)
+    renderer.onDeviceLost!({ api: 'WebGPU', message: 'Instance dropped', reason: 'unknown' })
+    useLocale.getState().setLang('de')
+    const { rerender } = render(<Hud />)
+    expect(document.querySelector('.renderer-device-lost')?.textContent).toContain(de.hud.deviceLost)
+    useLocale.getState().setLang('en')
+    rerender(<Hud />)
+    const notice = document.querySelector('.renderer-device-lost')
+    expect(notice?.textContent).toContain(en.hud.deviceLost)
+    expect(notice?.getAttribute('role')).toBe('alert')
+    // The loss supersedes the fallback notice in the same slot.
+    expect(document.querySelectorAll('.renderer-warning')).toHaveLength(1)
+    expect(errors.mock.calls.some((c) => String(c[0]).startsWith('[ASSERT] gpu-device-lost'))).toBe(true)
+    const dismiss = [...notice!.querySelectorAll('button')].find((b) => b.textContent === en.hud.webglFallbackDismiss)
+    fireEvent.click(dismiss!)
+    rerender(<Hud />)
+    expect(document.querySelector('.renderer-device-lost')).not.toBeInTheDocument()
+    errors.mockRestore()
+    resetGpuHealth()
   })
 })
 

@@ -151,6 +151,8 @@ export interface Strings {
     webglFallbackDismiss: string
     /** Shown when the device offers neither WebGPU nor WebGL 2. */
     rendererUnavailable: string
+    /** Shown when the GPU device was lost mid-session: the picture stopped. */
+    deviceLost: string
     /** Frame counter label, e.g. "62 FPS". */
     fps(fps: number): string
     /** Label/tooltip for the bottom-left health bar (design.md §17.1). */
