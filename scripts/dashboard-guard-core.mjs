@@ -181,9 +181,12 @@ export function expectedSections(seen = []) {
  *  tell a nested Backlog from a sibling. The closer is found by counting the
  *  <details> nesting, as board-core's sectionBounds does. */
 export function backlogOutsideErledigt(html) {
-  const text = String(html ?? '')
-  const backlog = text.indexOf(`<h2>${BACKLOG_TITLE}</h2>`)
-  const done = text.indexOf('<h2>Erledigt</h2>')
+  // Comments are blanked (same length, so offsets hold): a browser ignores a
+  // "<!-- </details> -->", so the count must too.
+  const text = String(html ?? '').replace(/<!--[\s\S]*?(?:-->|$)/g, (c) => ' '.repeat(c.length))
+  const at = (title) => new RegExp(`<h2\\b[^>]*>\\s*${title}\\s*</h2>`).exec(text)?.index ?? -1
+  const backlog = at(BACKLOG_TITLE)
+  const done = at('Erledigt')
   if (backlog < 0 || done < 0) return true
   const opener = text.lastIndexOf('<details', done)
   if (opener < 0) return true

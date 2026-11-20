@@ -3481,11 +3481,14 @@ export function runCardTimesBackfill({
  */
 export const BACKLOG_ON_BOARD = 10 // ESTIMATE, calibratable: the section is collapsed
 
-/** A resolution marker in an entry's head line: the status word in a marker
- *  position (line start, after a bullet's leading date, or after "(", "—", "–",
- *  ",", ";", ":"), so a title that
- *  merely names the word ("Explain the CLOSED badge") stays open. */
-const BACKLOG_RESOLVED_HEAD = /(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[(—–,;:]\s*)(?:FIXED|ERLEDIGT|CLOSED|WONTFIX|EINGEREIHT|closed)\b/
+/** A resolution marker in an entry's head line: an upper-case status word in a
+ *  marker position (line start, after a bullet's leading date, or after "(",
+ *  "—", "–", ",", ";", ":"), or a lower-case "closed" at the start, after a dash,
+ *  or after "(", ",", ";", ":" when a date, ":" or ")" follows — so a title that
+ *  merely names the word ("Explain the CLOSED badge", "Show the panel (closed by
+ *  default)") stays open. */
+const BACKLOG_RESOLVED_HEAD =
+  /(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[(—–,;:]\s*)(?:FIXED|ERLEDIGT|CLOSED|WONTFIX|EINGEREIHT)\b|(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[—–]\s*)closed\b|[(,;:]\s*closed(?=\s*[:)\d])/
 /** A body line opening with a resolution marker ("ERLEDIGT (17.09.2026): …"). */
 const BACKLOG_RESOLVED_LINE = /^\s*(?:FIXED|ERLEDIGT|CLOSED|EINGEREIHT|WONTFIX|[Cc]losed)\b/
 const BACKLOG_TITLE_MAX = 120
@@ -3529,14 +3532,17 @@ export function parseBacklog(text) {
       if (run && run[0] === fence[0] && run.length >= fence.length && !line.slice(line.indexOf(run) + run.length).trim()) fence = null
       continue
     }
-    if (run) {
+    // A backtick run whose info string holds a backtick is inline code, not a fence.
+    if (run && !(run[0] === '`' && line.slice(line.indexOf(run) + run.length).includes('`'))) {
       fence = run
       continue
     }
     const head = /^## +(\S.*)$/.exec(line) ?? /^- +(\S.*)$/.exec(line)
     if (head) {
       const form = line.startsWith('## ') ? 'heading' : 'bullet'
-      cur = { head: head[1].trim(), form, resolved: BACKLOG_RESOLVED_HEAD.test(head[1]), at: raw.length }
+      // A heading's optional closing hashes ("## Title (19.11.2026) ##") are not text.
+      const text = (form === 'heading' ? head[1].replace(/\s+#+\s*$/, '') : head[1]).trim()
+      cur = { head: text, form, resolved: BACKLOG_RESOLVED_HEAD.test(text), at: raw.length }
       raw.push(cur)
     } else if (/^# /.test(line)) {
       cur = null

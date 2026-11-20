@@ -233,3 +233,38 @@ describe('cross-vendor review findings', () => {
     expect(auditDashboard(nested, {}).map((v) => v.code)).toContain('structure')
   })
 })
+
+describe('cross-vendor review findings, second round', () => {
+  const titles = (text) => parseBacklog(text).entries.map((e) => e.title)
+
+  it('keeps a lowercase closed in parentheses as prose', () => {
+    expect(titles('## Show the panel state (closed by default) (19.11.2026)\n')).toEqual(['Show the panel state (closed by default)'])
+    expect(titles('- 2026-11-01 old probe — closed 02.11.2026\n')).toEqual([])
+  })
+
+  it('treats a backtick run with a backtick in its info string as text, not a fence', () => {
+    expect(titles('```literal`text\n- 2026-01-03 real entry\n')).toEqual(['real entry'])
+  })
+
+  it('does not close a backtick fence with a tilde run of the same length', () => {
+    const text = ['```', '~~~', '- 2026-01-02 still fenced', '```', '- 2026-01-03 real entry'].join('\n')
+    expect(titles(text)).toEqual(['real entry'])
+  })
+
+  it('dates a heading with closing hashes by its trailing date', () => {
+    const { entries } = parseBacklog('## Review the 2025-01-01 migration (19.11.2026) ##\n')
+    expect(entries[0]).toEqual({ title: 'Review the 2025-01-01 migration', date: '2026-11-19' })
+  })
+
+  it('refuses a nested Backlog whose heading carries whitespace', () => {
+    const nested = board().replace(`${ERLEDIGT_ANCHOR}\n`, `${ERLEDIGT_ANCHOR}\n${renderBacklogSection(null).replace('<h2>Backlog</h2>', '<h2> Backlog </h2>')}\n`)
+    expect(backlogOutsideErledigt(nested)).toBe(false)
+    expect(structureViolations(nested).map((v) => v.code)).toContain('sections-wrong')
+  })
+
+  it('ignores a closer inside an HTML comment', () => {
+    const nested = board().replace(`${ERLEDIGT_ANCHOR}\n`, `${ERLEDIGT_ANCHOR}\n<!-- </details> -->\n${renderBacklogSection(null)}\n`)
+    expect(backlogOutsideErledigt(nested)).toBe(false)
+    expect(auditDashboard(nested, {}).map((v) => v.code)).toContain('structure')
+  })
+})
