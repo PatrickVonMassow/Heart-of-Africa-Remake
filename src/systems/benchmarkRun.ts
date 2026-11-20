@@ -25,6 +25,7 @@ import { addAfterEffect, addEffect } from '@react-three/fiber'
 import { balance } from '../config/balance'
 import { QUALITY_PRESETS, type DetailLevel } from '../config/quality'
 import { getStrings } from '../i18n'
+import { asyncPipelineHandle, type PipelineBackend } from '../render/asyncPipelines'
 import { describeBackend } from '../render/backendInfo'
 import { getRenderContext } from '../render/renderContext'
 import { getTerrainRefine, resetTerrainRefine, setTerrainRefine } from '../scenes/travel/terrainLod'
@@ -47,6 +48,7 @@ import {
   PRESET_CONFIG_NAMES,
   benchFilename,
   benchFrameCounts,
+  benchReadinessPush,
   benchReadyBudget,
   benchRemainingMs,
   benchReportJson,
@@ -521,14 +523,18 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
       let readyTimeout: boolean | undefined
       if (phase.placeId !== undefined) {
         const budget = benchReadyBudget(short)
-        const tris: number[] = []
+        let tris: number[] = []
         let ready = false
+        const pipelines = asyncPipelineHandle(
+          (ctx.gl as unknown as { backend?: PipelineBackend }).backend,
+        )
         await runFrames(
           budget.maxFrames,
           null,
           () => {
             gpu.poll(null)
-            tris.push(renderInfo().triangles ?? 0)
+            const p = pipelines?.state()
+            tris = benchReadinessPush(tris, renderInfo().triangles ?? 0, !p || (p.pending === 0 && p.queued === 0))
             ready = benchTrisStable(tris, budget.stableFrames, budget.tolerance)
           },
           () => ready,

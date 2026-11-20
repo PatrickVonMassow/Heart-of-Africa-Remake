@@ -24,6 +24,7 @@ import {
   benchFrameCounts,
   benchReadyBudget,
   benchTrisStable,
+  benchReadinessPush,
   benchRemainingMs,
   benchReportJson,
   benchShortMode,
@@ -647,6 +648,19 @@ describe('settlement readiness and the later-entry path (point 1561)', () => {
     expect(benchTrisStable(standing, stableFrames, tolerance)).toBe(true)
     expect(benchTrisStable(Array(stableFrames).fill(0), stableFrames, tolerance)).toBe(false)
     expect(benchTrisStable([153000, 153000, 3019, 153000], 4, tolerance)).toBe(false)
+  })
+
+  it('counts stability only over frames drawn with a warm pipeline set', () => {
+    const { stableFrames, tolerance } = benchReadyBudget(true)
+    // WebGL 2 first entry: flat 6031 triangles while pipelines still compile.
+    let h: number[] = []
+    for (let i = 0; i < stableFrames * 3; i++) h = benchReadinessPush(h, 6031, false)
+    expect(benchTrisStable(h, stableFrames, tolerance)).toBe(false)
+    h = benchReadinessPush(h, 254000, true)
+    expect(h).toEqual([254000])
+    for (let i = 1; i < stableFrames; i++) h = benchReadinessPush(h, 254000, true)
+    expect(benchTrisStable(h, stableFrames, tolerance)).toBe(true)
+    expect(benchReadinessPush(h, 254000, false)).toEqual([])
   })
 
   it('caps the readiness wait, the short run tighter than the full one', () => {

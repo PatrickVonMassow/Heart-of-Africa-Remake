@@ -212,6 +212,17 @@ export function benchTrisStable(history: readonly number[], stableFrames: number
   return min > 0 && max - min <= max * tolerance
 }
 
+/** One readiness reading: while shader pipelines still compile, the renderer
+ *  SKIPS their objects (src/render/asyncPipelines.ts) and the triangle count
+ *  holds flat at a half-built value (WebGL 2 first Cairo entry: 6031 triangles
+ *  against ~254k). So stability only counts frames drawn with a warm pipeline
+ *  set — a cold frame clears the history. Pure (point 1561). */
+export function benchReadinessPush(history: number[], triangles: number, pipelinesWarm: boolean): number[] {
+  if (!pipelinesWarm) return []
+  history.push(triangles)
+  return history
+}
+
 /** The state patch that puts a settlement on the LATER-entry path before the
  *  benchmark enters it: already visited and entered, no bounty pending — so no
  *  config pays a first-arrival journal entry or a bounty another one skips. */
