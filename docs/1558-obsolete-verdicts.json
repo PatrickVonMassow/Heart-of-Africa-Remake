@@ -1459,8 +1459,8 @@
   "kind": "point",
   "id": 609,
   "title": "The proof guard is built, taught and wired to nothing",
-  "disposition": "archive",
-  "reason": "done: point-proof-guard is wired in .claude/settings.json (PreToolUse, line 197); the class check would be new guard machinery the freeze forbids",
+  "disposition": "drop",
+  "reason": "partial evidence only: point-proof-guard is wired (.claude/settings.json PreToolUse), but the point also asks for its class check, which nothing shows done - stays open",
   "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
  },
  {
@@ -1739,8 +1739,8 @@
   "kind": "point",
   "id": 1111,
   "title": "Two cases in scripts/mechanism-review-guard.test.mjs run 19.4 s against a 20 s timeout, so the fast gate fa...",
-  "disposition": "archive",
-  "reason": "duplicates closed 1199 (the mechanism-review gather test no longer times out; it is bounded by construction, mechanism-review-guard.test.mjs:602); plan: = closed 1199",
+  "disposition": "drop",
+  "reason": "partial evidence only: closed 1199 bounds one gather case (mechanism-review-guard.test.mjs:602), not both named cases (see B47) - stays open",
   "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
  },
  {

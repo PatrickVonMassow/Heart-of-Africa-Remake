@@ -33,7 +33,7 @@ Points: 261 plan "yes" (253 agreed + 8 resolved yes: 330, 464, 857, 956, 972,
 
 | archive | backlog | drop |
 |---|---|---|
-| 4 | 250 | 7 |
+| 2 | 250 | 9 |
 
 Backlog entries: 53 plan "yes" (38 agreed + 15 resolved), all 53 mapped to a
 `## ` heading of today's `docs/backlog.md`. The 109 headings match A's §6 order
@@ -59,6 +59,8 @@ leftover carrier file and its header sit on the host and cannot be checked here.
 - 330: stays open; 303 does not yet carry its assurance requirement.
 - 932: the handover brake shows the fence can refuse, not that the
   observe-mode arming question is resolved.
+- 609: partial evidence; the guard is wired, its class check is not shown done.
+- 1111: partial evidence; closed 1199 bounds one of the two named cases (B47).
 - 1467: real blockade still reproducible; the doctor's quarantine stash does
   not protect `.claude/closing-state.json` and aborts a live closing LARGE.
 
