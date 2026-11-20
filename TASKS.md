@@ -78,7 +78,7 @@ kind is MOVED to the front in the same turn that files it; leaving it where appe
 put it is the mistake this line exists to stop.
 
 
-- [ ] 1543. Smooth the CPU hitches while driving on medium and high
+- [ ] 1543. Smooth the CPU hitches while driving on medium and high AWAITING-CONFIRMATION(2026-11-20; user-input: Notebook-Benchmark laut Perf-Doku fahren plus Intel-Konsolenfehler in Kairo kopieren, hand back: Benchmark-JSON und Konsolentext, where: local/ plus Chat-Notiz, safe prepared state: Zweig gepusht und gate-gruen)
   Observed: The user's notebook benchmark shows CPU p95 of 41 ms (medium) and 52 ms (high) during the drive against medians of 9-12 ms: periodic hitches that the player feels as stutter even when the GPU average would be fine. The user requires medium to be clearly smoother on mid-range notebooks.
 
   Final state: while driving (savanna-driving route), the CPU frame time on medium and high has no recurring multi-frame spikes: CPU p95 stays within 2x the CPU median. The responsible systems (streaming of terrain/flora dressing, chunk builds, shader/pipeline compilation, GC — identified by measurement) spread their work across frames, move it off the frame (worker/idle time) or pre-warm it.
