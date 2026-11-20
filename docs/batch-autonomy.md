@@ -3188,12 +3188,21 @@ guard error — not skipping the inspection.
   it>"`: the point keeps a `SELF-DECIDED` marker, stays workable, and the
   `Entscheidungsprotokoll:` card carries the record for retroactive veto. Only
   the narrow confirmation class U3 may park a point, and its act is SELECTED
-  rather than described: add a *Von dir zu klären* card, run `node
-  scripts/defer-for-user.mjs <N> --act <release-tag|public-release|board-contract>
+  rather than described: run `node
+  scripts/defer-for-user.mjs <N> --act <release-tag|public-release|board-contract|user-input>
   --detail "<the concrete act>" --prepared "<what stands safely prepared>"`, and
-  move on to the next workable point. Such points remain open and are skipped; the user's
+  move on to the next workable point. A `user-input` gate (the user must run,
+  measure or hand in something only they can) reads its detail as `<action>,
+  hand back: <result>, where: <where to submit it>`. A blocker needing the user
+  is gated when the point is created, split or the blocker is discovered. The
+  *Von dir zu klären* card is DERIVED from the gate by `node
+  scripts/board-queue.mjs` (point 1554) — no manual `vdzk-add` for a gate; a
+  marker that does not parse yields a fallback card, an ungated point whose text
+  names a wait yields a "vielleicht" card, and the build advises when the ungated
+  queue head is skipped. Such points remain open and are skipped; the user's
   answer clears them with `defer-for-user.mjs --clear <N>`, records
-  `USER-ANSWERED`, and returns them to the head of the queue.
+  `USER-ANSWERED`, and returns them to the head of the queue. A `user-input`
+  answer is a hand-in only and approves no other act.
   THE SYNTAX OF RECORD is `scripts/user-gate-core.mjs` (points 450 and 864): the
   marker sits at the END of the point's `- [ ] N.` head line, carries a date and a
   reason, and is written only through `defer-for-user.mjs` — which accepts an act
