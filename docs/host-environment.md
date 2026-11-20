@@ -127,13 +127,15 @@ undeclared 30 s (492), and `invariants` loses the device mid-run and still repor
 accepted (point 489). Never record acceptance screenshots from the software fallback lane.
 
 **The `invariants` device loss, decided 20.11.2026 (point 507).** The renderer now awaits
-`device.lost` and a suite fails at the loss, naming it. With that detector armed,
-`VERIFY_GL=webgpu npm test -- invariants` on the compatibility lane completes `2 pass, 0 fail,
-0 console-errors` (`dcf3844e3`): no loss, no teardown race on this host. The 05.08 loss was
-therefore the software device giving up under the long run, gone with that lane. The same
-loss on a player's weak Intel Gen-8 notebook (benchmark of 20.11.2026, drawCalls 0 in every
-row) happened mid-session, not at teardown: a real-device loss, which the in-game notice and
-the INVALID benchmark verdict now report.
+`device.lost` and a suite fails at the loss, naming it. With that detector armed, one run of
+`VERIFY_GL=webgpu npm test -- invariants` on the compatibility lane completed `2 pass, 0 fail,
+0 console-errors` (`dcf3844e3`): the detector reported no loss on that attempt, which proves
+nothing beyond that attempt. A CDP `Browser.crashGpuProcess` on this host reproduces the exact
+05.08 message `A valid external Instance reference no longer exists`, so that message marks a
+lost GPU process, not a page teardown; what killed the process on 05.08 stays unconfirmed. The
+player's benchmark of 20.11.2026 (weak Intel Gen-8 notebook) shows drawCalls 0 in every row.
+That justifies the INVALID verdict, but it is not by itself proof of a device-loss event, nor
+of its timing; whether the in-game notice would have fired there needs separate loss evidence.
 
 Quiet, the hardware WebGL 2 lane kept (05.08.2026) five red checks under four named
 points (500–503), each red twice: the leave capture and the two band probes (500/501) in `polish`, the calf that
