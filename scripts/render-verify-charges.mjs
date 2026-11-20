@@ -1799,7 +1799,7 @@ export const RED_CHARGES = [
     point: 200,
     suite: 'enrichments',
     kind: 'check',
-    match: /the parent holds itself between the hunter and the fleeing calf \(living shield\)/i,
+    match: /the parent holds itself between the hunter and the fleeing calf \(living shield\)|the hunter takes the blocking parent in the calf's place before any catch/i,
     why:
       'OBSERVED 18.11.2026 in a full enrichments run (webgpu, feat/336 5f15007e4): calf-predation-drama '
       + 'living shield red twice, green in isolation; point 200 names exactly this red as a cross-section '
