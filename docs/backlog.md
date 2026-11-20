@@ -343,21 +343,6 @@ Format: one line per finding — `- YYYY-MM-DD <source> — <finding>`.
   time lost. Neither side knows about the other; the in-flight declaration would know, but the
   doctor does not read it. No player impact and no blockade, so it is collected here.
 
-## The give's second evidence frame is aimed by construction, not by rule (measured 07.09.2026, FIXED 08.09.2026)
-
-`150-artefact-chiefs-answer` in `scripts/verify/polish.mjs` stepped the camera back seven
-metres and looked at the chief from the traveller's own eye height — setting his position and
-his bearing, and never his PITCH. On WebGPU that composed well on 07.09.2026 and on WebGL 2 it
-came out pitched at the sky; on 08.09.2026 the WebGPU shot came out that way too: two thirds
-cloud, the roof filling the rest, the chief nowhere in it and his note jammed against the
-inventory bar. The shutter passed it every time, because the declared subject was the note two
-metres ABOVE him and a note at the bottom edge is still in the picture.
-
-Both halves are closed now. The pose that composes the shot levels the view, so the angle no
-longer arrives from whatever the block before it last looked at; and the frame declares the
-CHIEF'S CHEST, which cannot be in a picture aimed at the sky — so the same mis-aim is refused
-instead of photographed.
-
 ## Point 1064's cross-vendor review covers only half its files (07.09.2026)
 
 GPT-6 Astra reviewed pass 1/2 of `cd0418380` — `PlaceScene.tsx`, `chiefMeeting.ts`,
@@ -408,10 +393,6 @@ Measured 07.09.2026 (discussion only, no code change). The children's bank game 
 ## Village speech has no stereo bearing, and the hush flag is both cause and exemption (07.09.2026)
 
 Measured 07.09.2026 (discussion only, no code change). TWO things found while checking whether the adults' hush could be dropped in favour of the player telling voices apart by ear. (1) NO SPATIALISATION AT ALL: src/ contains no PannerNode, createPanner, StereoPanner or PositionalAudio. speaking.ts phrasePlan takes a scalar distance and returns a scalar peak (hearingGain), and ambience.ts routes every syllable through one mono speechBus. All village speech arrives dead centre, whatever the bearing to the speaker. Two overlapping voices therefore cannot be separated by direction, only by level -- and the level says nothing when the two speakers stand at similar distance. Every voice also shares one timbre and the same two pitches (ba/BA, 140 Hz and 1.68x), which is the hardest case for the ear. So any argument of the form 'overlap is fine, stereo sorts it out' does not hold on the current build; a StereoPanner per utterance driven by the camera bearing would be a small, self-contained addition and would make the argument true. (2) THE HUSH FLAG IS ITS OWN EXEMPTION: in adultWork.ts, view.childrenHear() sets t.hushed = true and leaves t.owes true, so the word is DEFERRED, not cancelled -- it falls as soon as the children are out of earshot. But assertNoOwedWord (adultWork.ts:176-182) fires 'adult-atom-lost' only when !task.owes || task.hushed === true is false, i.e. hushed is exactly the exemption that permits an owed word to be dropped when the villager runs out of time. At the current 10 m radius the hush is rare and brief, so this is latent. Any enlargement of the hearing/carrying radius makes the hush frequent or permanent, and the adults' RIVER/DIG words would then be lost SILENTLY, with the one assert that should catch it disarmed by the very flag causing the loss. If the carrying distance is ever raised, the hush must become a bounded deferral (speak anyway after a hold) rather than an open one, and the assert must stop taking hushed as a blanket excuse. WHAT DOES WORK as a disambiguator, confirmed: pickSpeechTarget takes the NEAREST speaker inside the hearing radius and his label alone carries highlight and SPACE invitation; other speakers' labels stand unhighlighted (speechLabel.ts showSpeechLabel keeps one label per speaker); pickUseCandidate arbitrates the speaker against doors and other SPACE meanings. The player is never in doubt WHICH utterance he is annotating. The residual gap is that hearUtterance records EVERY in-range utterance, target or not, so overlap fills the journal with entries whose accompanying act the player could not attach. Not yet queued; the operator asked for discussion first.
-
-## Der dokumentierte Pfad des Findings-Traegers ist der falsche — der Owner liest eine leere Datei (07.09.2026)
-
-Gemessen 07.09.2026 18:50. Der Batch-Owner-Runbook (docs/batch-owner-runbook.md, Abschnitt 'Board and owner-only operating hooks') nennt als Traeger /home/node/.claude/projects/-workspace-hoa-/memory/findings-carrier.md — MIT Bindestrich am Slug — und der Kopfkommentar IM Traeger begruendet diesen Bindestrich ausdruecklich ('findings-paths.mjs derives that slug from the repository root trailing slash'). scripts/finding.mjs benutzt aber tatsaechlich /home/node/.claude/projects/-workspace-hoa/memory/findings-carrier.md, OHNE Bindestrich. BEIDE Dateien existieren. WIRKUNG, in dieser Sitzung real eingetreten: Ich habe zu Beginn des Zuges die dokumentierte Datei mit Bindestrich gelesen, dort 0 offene Eintraege gezaehlt (alle 297 abgehakt) und dem Nutzer 'Findings-Traeger geprueft: 0 offene Eintraege, nichts zu uebertragen' gemeldet. Das war FALSCH: im echten Traeger ohne Bindestrich standen zu diesem Zeitpunkt 9 wartende Befunde von 16:11-16:49, DARUNTER ZWEI NUTZER-AUFTRAEGE vom 07.09.2026 (Brunnen komplett aus dem Dorf entfernen; eigener spaeterer Task fuer Requisiten-Clipping). Sichtbar wurde das erst, als der PostToolUse-Hook nach batch-in-flight --clear von sich aus 'FINDINGS CARRIER: 9 waiting' meldete — nicht durch meine Pruefung. Der Traeger mit Bindestrich ist also ein historischer Rest, dessen eigener Kopftext die Verwechslung aktiv erzeugt. VORSCHLAG: entweder den Rest-Traeger loeschen und Runbook plus Kopfkommentar auf den Pfad ohne Bindestrich stellen, oder die Nennung eines Pfades in der Doku ganz streichen und ausschliesslich 'node scripts/finding.mjs --drain' als Zugang dokumentieren — der Befehl war die ganze Zeit richtig, nur die Datei daneben nicht.
 
 ## Punkt 1070: der Autoren-Screenshot ist bei 4 FPS aufgenommen und das CHIEF-Label sitzt ueber dem Huettendach (07.09.2026)
 
@@ -623,18 +604,6 @@ which is exactly what `render-verify-guard` then demands before the branch may m
 behaves correctly here; what was wrong was the reading of it, so this is a note rather than a
 point.
 
-## The polish retry hangs after a red, and its expected runtime is stale
-
-Measured 08.09.2026. After a red first attempt, `run-all` started the prescribed retry (point
-200) and then wrote nothing for 24 minutes: `polish.mjs` alive at 2 % CPU, two Chrome instances
-standing, the log ending at the retry line. `run-wait --await` booked the run as HUNG after
-51m 30s — two and a half times the 5m 41s expectation — and pointed at killing it rather than
-waiting again; SIGTERM did not clear the processes, SIGKILL did. Open: whether the retry raises
-its own dev server and wedges on the occupied port or on the first attempt's still-open Chrome.
-Noticed beside it: polish takes about 28 minutes on this machine against the
-`expectedRuntimeMs` of 340900 ms recorded in run.json, so every hang detection fires early.
-Infrastructure, and the freeze (CLAUDE.md §2) keeps it here until it reproducibly blocks.
-
 ## The scattered boulders are far darker than the play rocks
 
 Seen on the picture evidence `187-child-on-the-boulder` (09.09.2026, both backends): the stone
@@ -673,22 +642,6 @@ Nothing stops the second start: the quiet-machine check NAMES the leftovers and
 lets the run proceed by design. Whether that is worth a refusal rather than a
 warning is a judgement for whoever next touches that check — it costs two runs
 each time, and it happened twice in one night.
-
-## The guard's own unit file sits close enough to the per-test cap to red under load (measured 10.09.2026)
-
-Non-blocking, collected — and a near relative of the entry above. `scripts/mechanism-review-guard.test.mjs`
-runs 65 cases in 34.0 s on a quiet machine, which puts its slowest single case within reach of the
-20 s per-test timeout. On 10.09.2026 a covering LARGE run and a `batch-doctor --gate` overlapped —
-both run the whole unit suite — and the LARGE died 5m 23s in on exactly that file, with
-`bootstrapBase > seeds the anchor from the one shape that carries the flag AND the baseline` timing
-out. Nothing was wrong with the product: the same file passed in the doctor's own gate and in a
-standalone `vitest run` of all 465 files the same hour.
-
-The run diagnosed itself correctly ("UNDER LOAD — the unit stage failed on a machine whose quiet
-could not be verified"), so no mechanism is missing. What is collected here is the MARGIN: a unit
-file this near the cap converts any contention into a red that costs a whole two-hour run, and it is
-the second time in two days that one run has been paid for by another starting beside it. Whoever
-next touches that file can buy the margin back by splitting its slowest case; nobody needs to.
 
 ## `run-logged.mjs --help` starts a full LARGE run instead of printing help (measured 10.09.2026)
 
@@ -948,19 +901,6 @@ guide's ceiling IS the guard's exact measured size and only ratchets down
 size"). So the room must be CUT elsewhere first, the way design.md paid for its
 speech-floor section. Drafted, measured, reverted in 55b12d04e's successor commit rather
 than left half-applied; non-blocking, because the guide is prose nobody's build reads.
-
-## A unit test spends twenty seconds reading the live review history (14.09.2026)
-
-`scripts/mechanism-review-guard.test.mjs` has two cases that scan the REAL review
-history through `gatherMechanismReviewInputs`. Measured 14.09.2026 in isolation:
-23.34 s and 20.60 s. Point 1073's second author raised both to a 60 s per-case
-budget so the unit gate stays green, which is the right unblocking move and was
-accepted in review.
-
-The cost grows with the history, so the budget will be raised again. The test asks
-a question about the guard, not about the archive: a fixture history would answer
-it in milliseconds and would not drift. Non-blocking — noted so the next raise is
-recognised as the third one, not the first.
 
 ## Der Saum-Test des Erdhaufens beweist die Saumschließung nicht (14.09.2026)
 
@@ -1265,19 +1205,6 @@ den sie abdeckten (zerschnittene Ergebniszeilen im Log, eine Frist, die sich
 selbst erneuerte, verlorene Beobachtungen). Der billige Weg wäre, gar keinen zu
 bauen und die Meldung zu lesen, wie sie gemeint ist.
 
-## Zehn Prüfrunden an einem Punkt: die Abbruchentscheidung (16.09.2026)
-
-Punkt 1137 hat zehn kreuzverlagerte Prüfrunden durchlaufen; jede fand etwas
-Echtes, und die Voraussetzungen wurden von Runde zu Runde enger — von einer
-veralteten Kostentabelle über eine Umfrage, die ihre eigene Akte neu schreibt,
-bis zu einem Besitzerwechsel an einer Datei mitten im Lauf. Abgebrochen wurde
-nach Runde zehn, mit folgender Begründung: Alles, was einen **gesunden Lauf
-beenden** kann, ist repariert und durch Tests festgehalten. Was bleibt, lässt das
-Hängend-Urteil zu spät oder falsch **melden** — und eine Meldung tötet nichts.
-Der Infrastruktur-Freeze (CLAUDE.md §2) arbeitet an einem Infrastrukturdefekt
-nur, wenn er reproduzierbar blockiert oder eine falsche Freigabe erlaubt; beides
-trifft auf den Rest nicht zu.
-
 ## `--help` startet auf den beiden schwersten Einstiegen einen vollen Prüflauf (16.09.2026)
 
 Beim Bearbeiten von Punkt 1137 selbst aufgelaufen: `node
@@ -1448,24 +1375,6 @@ oder ihm die Frames unter `verification/` als Fortschrittssignal geben, statt
 das Log. Kosten, wenn es bleibt: die meistgelaufene Suite wird bei jedem vollen
 Durchgang als Stillstand gemeldet, und der Bediener lernt, das Urteil zu
 ignorieren.
-
-## Die Laufprotokolle eines Branches sterben gar nicht mit seinem Worktree (18.09.2026)
-
-Gemessen 18.09.2026 beim Bau von Punkt 1134. Der Punkt bestellt, die `run.json`
-eines gelandeten Punktes beim Merge in das Haupt-Checkout zu kopieren, weil
-`local/verify-logs/` ignoriert und pro Worktree sei und die Protokolle mit dem
-Baum verschwänden. Der Kopierschritt ist gebaut und liegt auf `main` — er hat
-bei seiner eigenen Landung aber NICHTS zu tun gefunden: alle fünf `run.json` der
-Branch-Läufe lagen bereits unter `/workspace/hoa/local/verify-logs/`, obwohl
-jeder Lauf mit cwd im Worktree gestartet wurde. Die Quittung der Läufe nennt
-denselben Hauptbaum-Pfad.
-
-Nicht als Punkt eingereiht (Befundaufnahme CLAUDE.md §2, Infrastruktur-Freeze):
-kein Spielerbelang, keine Blockade, keine falsche Freigabe — der Kopierschritt
-ist in dieser Konfiguration schlicht ein No-op und schadet nicht. Offen bleibt
-die Frage, für welche Lauf-Formen die im Punkt genannte Messgrenze überhaupt
-gilt; wer sie das nächste Mal braucht, misst sie an einer Suite, die ihr Log
-tatsächlich im Worktree anlegt, statt sie aus dem Punkttext zu übernehmen.
 
 ## Fünf `feat/`-Branches überleben ihren Merge, zwei davon mit ungemergter Arbeit
 
