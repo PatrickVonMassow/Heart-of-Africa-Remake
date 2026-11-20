@@ -525,6 +525,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
         const budget = benchReadyBudget(short)
         let tris: number[] = []
         let ready = false
+        const sceneNodes = ctx.scene as unknown as { getObjectByName(name: string): unknown }
         const pipelines = asyncPipelineHandle(
           (ctx.gl as unknown as { backend?: PipelineBackend }).backend,
         )
@@ -534,7 +535,10 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
           () => {
             gpu.poll(null)
             const p = pipelines?.state()
-            tris = benchReadinessPush(tris, renderInfo().triangles ?? 0, !p || (p.pending === 0 && p.queued === 0))
+            // A frame counts only once the outgoing travel scene is gone and the
+            // settlement's pipelines are warm.
+            const swapped = sceneNodes.getObjectByName('travel-terrain') === undefined
+            tris = benchReadinessPush(tris, renderInfo().triangles ?? 0, swapped && (!p || (p.pending === 0 && p.queued === 0)))
             ready = benchTrisStable(tris, budget.stableFrames, budget.tolerance)
           },
           () => ready,

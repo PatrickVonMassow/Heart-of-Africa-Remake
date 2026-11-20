@@ -165,8 +165,17 @@ const result = await page.evaluate(() => {
   return { filename: file.filename, aborted: file.aborted, report: JSON.parse(file.json) }
 })
 const report = result.report
-const configs = [...new Set(report.rows.map((r) => r.config))]
-const phases = [...new Set(report.rows.map((r) => r.phase))]
+// The EXPECTED sweep comes from the shipped plan, never from the rows it judges:
+// a config missing from both the rows and the digest must still fail.
+const sweep = await page.evaluate(async () => {
+  const m = await import('/src/systems/benchmark.ts')
+  return {
+    configs: [...m.BENCH_CONFIGS.map((c) => c.name), ...m.BENCH_PRESET_LEVELS.map((l) => m.PRESET_CONFIG_NAMES[l])],
+    phases: m.BENCH_PHASES.map((p) => p.name),
+  }
+})
+const configs = sweep.configs
+const phases = sweep.phases
 check('the run completed without an abort', result.aborted === false)
 check(
   'one report row per config and phase',
@@ -305,9 +314,13 @@ for (const config of ['terrain-refine-off', 'terrain-cap-84']) {
 // dpr-1's Cairo row, and TravelScene's remount rewrites the refine setting —
 // its FIRST phase, savanna-standing, must already show the cut.
 const savannaRow = (config) => report.rows.find((r) => r.config === config && r.phase === 'savanna-standing')
+// Both rows must carry the terrain group: a missing or renamed group reads 0
+// and would pass as a cut.
+const hasTerrain = (row) => typeof row?.sceneTriangles?.[heaviest?.[0]]?.tris === 'number'
 check(
   'terrain-refine-off also cuts the savanna terrain right after the settlement',
-  terrainTris(savannaRow('baseline')) - terrainTris(savannaRow('terrain-refine-off')) > 0,
+  hasTerrain(savannaRow('baseline')) && hasTerrain(savannaRow('terrain-refine-off')) &&
+    terrainTris(savannaRow('baseline')) - terrainTris(savannaRow('terrain-refine-off')) > 0,
   `${terrainTris(savannaRow('baseline'))} -> ${terrainTris(savannaRow('terrain-refine-off'))} (${heaviest?.[0]})`,
 )
 
