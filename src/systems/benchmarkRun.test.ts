@@ -153,6 +153,25 @@ describe('render benchmark on a lost GPU device (point 507)', () => {
     expect(r.rows).toEqual([])
   })
 
+  it('judges the draw count of the last sampled frame, not one drawn after it', async () => {
+    const gl = fakeContext(0)
+    const run = startBenchmark({ short: true })
+    let settled = false
+    void run.then(() => (settled = true))
+    for (let n = 0; n < 5000 && !settled; n++) {
+      gl.info.render.drawCalls = 0
+      for (const cb of [...before]) cb()
+      for (const cb of [...after]) cb()
+      // A later frame draws before the phase reads its counters.
+      gl.info.render.drawCalls = 42
+      await new Promise((r) => setTimeout(r, 0))
+    }
+    await run
+    const r = report()
+    expect(r.invalidReason).toContain('0 draw calls')
+    expect(r.rows).toEqual([])
+  })
+
   it('a healthy run still records its rows and stays valid', async () => {
     fakeContext(42)
     await pump(startBenchmark({ short: true }))

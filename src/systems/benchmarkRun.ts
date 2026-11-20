@@ -563,11 +563,16 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
       }
       gpuSink = measured ? gpuSamples : null
       const samples: FrameSample[] = []
-      await runFrames(counts.sample, samples, tick)
+      // The render counters of the LAST sampled frame: the flush below can let
+      // later frames draw, so the live counters are read before it.
+      let render: { drawCalls?: number; triangles?: number } = {}
+      await runFrames(counts.sample, samples, () => {
+        tick()
+        render = { ...renderInfo() }
+      })
       // Drain the last in-flight resolve so the phase's GPU sample is complete.
       await gpu.flush(gpuSink)
       if (!measured) return
-      const render = renderInfo()
       const invalid = benchInvalidReason({
         deviceLost: gpuHealthSnapshot().deviceLost,
         drawCalls: render.drawCalls ?? 0,
