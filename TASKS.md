@@ -122,6 +122,14 @@ put it is the mistake this line exists to stop.
    Bundle: Chat & Tafel (board/batch infrastructure, not Steuerung & Performance; owner choice 19.11.2026).
   Source: user request of 19.11.2026 18:49 UTC via the findings carrier (session unknown).
   Bundle: Chat & Tafel.
+  HAND-OVER 20.11.2026 01:56 (main session at the context watermark): the cloud author finished on
+  feat/1554-user-input-gate-cards at 0ba72c2 (typecheck, tsc, lint, build green; unit red only in the known
+  container case batch-doctor-protected). Owed: cross-vendor review, local Vitest confirmation, landing; then on
+  main: node scripts/defer-for-user.mjs 1543 --act user-input --detail "run perf-f8-detail.mjs --json
+  local/f8-detail-notebook.json in native Windows Chrome WebGPU on branch feat/1543-driving-cpu-hitches, hand
+  back: local/f8-detail-notebook.json plus a chat note, where: the Windows checkout" --prepared "the branch is
+  pushed, steps in docs/perf-1543-driving-hitches.md" followed by node scripts/board-queue.mjs. Also owed on main:
+  the WebGL enrichments run for the desert-haze render change (section calf-predation-drama re-ran green 01:45).
 
 - [ ] 1543. Smooth the CPU hitches while driving on medium and high
   Observed: The user's notebook benchmark shows CPU p95 of 41 ms (medium) and 52 ms (high) during the drive against medians of 9-12 ms: periodic hitches that the player feels as stutter even when the GPU average would be fine. The user requires medium to be clearly smoother on mid-range notebooks.
