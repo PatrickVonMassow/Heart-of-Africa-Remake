@@ -2173,7 +2173,7 @@
   "id": "B32",
   "title": "The guard's own unit file sits close enough to the per-test cap to red under load",
   "disposition": "keep",
-  "reason": "the closed 1199/1111 bounded the live-history gather cases (B47); no evidence that the bootstrapBase case this entry names was fixed - keep (Sol review of 643311d)",
+  "reason": "closed 1199 bounds one gather case (B47; 1111 stays open); no evidence that the bootstrapBase case this entry names was fixed - keep (Sol review of 643311d)",
   "planRef": "§5 Agreed obsolete yes",
   "match": "## The guard's own unit file sits close enough to the per-test cap to red under "
  },

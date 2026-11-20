@@ -45,8 +45,8 @@ cleanup"); no ambiguous mapping.
 | 1 | 52 | 0 |
 
 Deleted: B1. B47 stays: the cited fix bounds one gather test, not
-both named ones. B63 stays: it carries the ten-round abort rationale. B32 stays: the closed 1199/1111 fixed the
-live-history gather cases (B47), not its `bootstrapBase` case. B71 stays: which
+both named ones. B63 stays: it carries the ten-round abort rationale. B32 stays: closed 1199 bounds one gather case
+(B47; 1111 stays open), and its `bootstrapBase` fix is unverified. B71 stays: which
 run forms still write logs into a worktree is unresolved. B28 stays: its retry half is void, but the
 polish expectation is still 340900 ms against a ~28-min run. B12 stays: the
 leftover carrier file and its header sit on the host and cannot be checked here.
