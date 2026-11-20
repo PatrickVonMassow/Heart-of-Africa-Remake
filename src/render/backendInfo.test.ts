@@ -19,14 +19,18 @@ describe('probeWebglRendererName (point 1562)', () => {
   function fakeContext(opts: { debug: boolean; throwOnRead?: boolean }) {
     const loseContext = vi.fn()
     const gl = {
-      getExtension: (name: string) =>
-        name === 'WEBGL_lose_context' ? { loseContext } : opts.debug ? { UNMASKED_RENDERER_WEBGL: 0x9246 } : null,
-      getParameter: () => {
+      getExtension: (name: string) => {
+        if (name === 'WEBGL_lose_context') return { loseContext }
+        if (name === 'WEBGL_debug_renderer_info') return opts.debug ? { UNMASKED_RENDERER_WEBGL: 0x9246 } : null
+        throw new Error(`unexpected extension ${name}`)
+      },
+      getParameter: (pname: number) => {
         if (opts.throwOnRead) throw new Error('refused')
-        return 'AMD Radeon(TM) Graphics'
+        return pname === 0x9246 ? 'AMD Radeon(TM) Graphics' : 'WebKit WebGL'
       },
     }
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(gl as never)
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(((type: string) =>
+      type === 'webgl2' ? gl : null) as never)
     return loseContext
   }
 
