@@ -151,6 +151,8 @@ describe('render benchmark on a lost GPU device (point 507)', () => {
     expect(r.aborted).toBe(true)
     expect(r.invalidReason).toContain('0 draw calls')
     expect(r.rows).toEqual([])
+    // No timing headline (here the wall-clock one) for a run that measured nothing.
+    expect(r.summary.some((l) => /end to end|GPU column|CPU column|headline/i.test(l))).toBe(false)
   })
 
   it('judges the draw count of the last sampled frame, not one drawn after it', async () => {

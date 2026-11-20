@@ -677,7 +677,8 @@ export function benchSummaryLines(report: BenchReport): string[] {
     ...(report.invalidReason ? [`INVALID RUN — ${report.invalidReason}; no rows were recorded.`] : []),
     `${e.startedAt} · ${e.backend} · ${e.viewport.width}x${e.viewport.height} @dpr ${e.devicePixelRatio} · build ${e.build} ${e.commit}`,
     `fixed timestep ${report.dt.toFixed(5)}s · ${report.frames.sample} sampled frames per phase · seed ${report.seed} · day ${report.day}`,
-    headlineNote(report.headline, report.gpuTiming.reason),
+    // An INVALID run measured nothing, so no timing series is the headline.
+    ...(report.invalidReason ? [] : [headlineNote(report.headline, report.gpuTiming.reason)]),
     `${pad('config', 20)}${pad('phase', PHASE_COL)}${padStart('fps', 7)}${padStart('gpu', 8)}${padStart('gpu95', 8)}${padStart('cpu', 8)}${padStart('frame', 8)}${padStart('f95', 8)}${padStart('draws', 8)}${padStart('tris', 10)}${padStart('dpr', 6)}`,
   ]
   for (const r of report.rows) {
