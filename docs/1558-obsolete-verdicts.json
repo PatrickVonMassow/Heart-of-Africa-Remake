@@ -1,0 +1,2567 @@
+[
+ {
+  "kind": "point",
+  "id": 1048,
+  "title": "The batch crawled through the night while every safeguard reported health: the owner waited on stacked watc...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 898,
+  "title": "The pause file and the in-flight declaration stayed per checkout after the lock and the fence were shared",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 868,
+  "title": "The Windows launcher can be re-armed without an attended session",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 760,
+  "title": "The launcher's own CLI can lose its native binary, and the arming probe cannot see it",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 738,
+  "title": "The lease fence does not know the fold command, so a dispossessed session can still rewrite the work order",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 739,
+  "title": "Taking the batch is fenced by the HANDOVER mark, so a window can take it with a third of its context alread...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 719,
+  "title": "The Stop chain fires ONCE per headless batch session, so every guard whose stated effect is \"blocks the tur...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 660,
+  "title": "One session, two identities: the fence locks out the session that is working",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 696,
+  "title": "A handed-over session kept writing, and the successor was told it was dead",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 814,
+  "title": "The dictated handover card claims nothing is running while a delegated authoring run continues",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 871,
+  "title": "The boundary's dictated handover card claims nothing is running while it transfers a live author run",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1020,
+  "title": "The handover card is judged for length only after the fence has forbidden changing it, so an honest card ca...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1024,
+  "title": "The handover card claims a standstill while transferable work is still building",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1025,
+  "title": "A delegate the boundary named only in prose vetoes its own successor, and the batch stands ownerless",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1027,
+  "title": "A launcher that needed two seconds to write its record is disowned forever, and every handover with it",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1042,
+  "title": "The context handover cannot be recorded while another session holds a now-card",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 504,
+  "title": "Every batch owner is dispossessed at half an hour of age",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 463,
+  "title": "Two liveness readings the forced handover proved wrong (30.07.2026, both observed while taking the batch ba...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 533,
+  "title": "What brings the container back after a host reboot",
+  "disposition": "backlog",
+  "reason": "the container-restore question concerns the Linux launcher daemon (scripts/batch-launcher.mjs) and the Windows autostart path (scripts/batch-autostart.mjs), both present today; plan M-D1 deletes launcher, daemon, autostart and Windows tasks without replacement (a scheduled runner stays a user-scope choice), part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 448,
+  "title": "One command that says \"ready for a fortnight alone\" (30.07.2026; bundle Urlaubsfestigkeit)",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 449,
+  "title": "The chaos drill — kills at random moments",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 616,
+  "title": "The idle modes point 612 does not reach (blind-parallel enumeration by both models, 10.08.2026 — CLAUDE.md...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 617,
+  "title": "An owner that works once and then idles still holds the batch for an hour (four-eyes finding on point 612,...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 646,
+  "title": "The repo doctor is the second door into the same disaster",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 798,
+  "title": "The doctor's quarantine says nothing about having swept away a finished finding, and its verdict still read...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 806,
+  "title": "The repair-loop bound speaks on the ninth commit, one minute after the human already ended the session (rep...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 815,
+  "title": "The standstill classifier scales quadratically with the journal it reads, and the journal has no rotation",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 817,
+  "title": "The activity journal's tail read can hand out a sequence number twice, and appends onto a torn line",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 818,
+  "title": "The standstill report blanks or mislabels the very time it exists to measure",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 823,
+  "title": "The parallel-session detector counts the predecessor that has just handed over, and a batch pause is the price",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 831,
+  "title": "The launcher's singleton is the RECORD, so a live daemon the record does not name is invisible and --start...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 841,
+  "title": "The parallel-session detector counts a stood-down chat session as a second batch worker",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 849,
+  "title": "The parallel-session alert fires on the retired predecessor that already handed over",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 904,
+  "title": "Three findings the whole-range review found in the landed attempt lease",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 908,
+  "title": "The parallel-session detector counts the session's OWN declared authoring child, so every turn of every del...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 911,
+  "title": "The escape drill's \"launcher's shape\" is a comment, not a coupling, and the drill's claims outrun its instr...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 912,
+  "title": "An interrupted takeover drill leaves its daemon and its sandbox behind, and the doctor does not see it",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 964,
+  "title": "The launcher's stalled-writer recovery is unreachable, so only a DECLARED delegate can ever be recovered",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 994,
+  "title": "A writer veto with a known expiry does not wake the launcher when it expires, and never asks whether the wr...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1055,
+  "title": "A killed board writer keeps the board's edit lock, and the next three board writes wait three minutes and fail",
+  "disposition": "backlog",
+  "reason": "the stale lock is the board edit lock (scripts/board-edit-lock.mjs) held by the board heartbeat's killed status writer (scripts/board-heartbeat.mjs), both present today; plan M-D4 deletes the board without replacement, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1059,
+  "title": "Every context boundary kills the interactive session with exit code 143 and tears Remote Control down, so t...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1071,
+  "title": "The prepared container-restart path is deployed on the host and proven without an editor (split off 1069, 0...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1097,
+  "title": "A pause the session wrote itself holds the batch forever and is booked as user downtime",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1099,
+  "title": "The wait calls a healthy picture run hung after a quarter of its normal length",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover); §4 disagreement table row 1099: resolved yes"
+ },
+ {
+  "kind": "point",
+  "id": 1122,
+  "title": "A third session-death class is undocumented, so every recurrence is re-derived from scratch",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1179,
+  "title": "A session that is waiting cannot declare its wait while it does closing work, and the attempt leaves the bo...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1188,
+  "title": "A daemon checkpoint acknowledges one SHA while another is what actually landed, and the red it makes on mai...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1189,
+  "title": "The parallel alert re-raises itself from a stale reading and blocks the session that just cleared it",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1235,
+  "title": "Stop guards trap a releasing session while the free lock is reserved for a claimant",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1289,
+  "title": "Stop guards keep binding a session whose lock was released to a reserved claimant Measured 03.10.2026, abou...",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1328,
+  "title": "A chat-answer session recorded as batch-lock holder cannot end",
+  "disposition": "backlog",
+  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1361,
+  "title": "decision-card-guard deadlocks a non-owner session's Stop by demanding a vdzk-keep the ownership guard refuses",
+  "disposition": "drop",
+  "reason": "already closed (in docs/tasks-archive.md); its twin 1364 is closed too",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 1467,
+  "title": "batch-doctor quarantine-stash aborts a live LARGE run",
+  "disposition": "drop",
+  "reason": "real blockade still reproducible in kept code: the batch-doctor quarantine stash does not protect .claude/closing-state.json (no match in batch-doctor-core.mjs) and aborts a live closing LARGE",
+  "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
+ },
+ {
+  "kind": "point",
+  "id": 746,
+  "title": "A point is not begun that cannot finish under the ceiling (19.08.2026, the same user decision as 745, appli...",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 759,
+  "title": "The context fence's worktree stand-down never fires, so every delegated agent is fenced against its PARENT...",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 553,
+  "title": "An explicit context budget per point, and a written handoff when it is spent (08.08.2026, chosen BY MEASURE...",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 932,
+  "title": "The context fence has stood in observe mode for six days with no visible arming point (systematic dormant-f...",
+  "disposition": "drop",
+  "reason": "verdict does not hold as stated: the handover brake's refusals show the fence can block, not that the observe-mode arming question the point asks is resolved; stays open (Sol review of 643311d)",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 764,
+  "title": "The chat header's context reading is required by nothing, and six replies proved it",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 747,
+  "title": "The ceiling is recalibrated from a series, and gives ground back only against evidence (19.08.2026)",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 750,
+  "title": "A session that dies without a boundary leaves no reading, so the overshoot series under-counts exactly wher...",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 797,
+  "title": "The watermark only speaks at the END of the turn, so it warns after the expensive turn has already run",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 785,
+  "title": "The chat header's context reading is wrong exactly where it is read most — at the start of a session and af...",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 621,
+  "title": "A ceiling raise is no longer a question for the user",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 755,
+  "title": "Three more mandatory Stop guards demand at the exit what the context fence forbids, because point 751 scope...",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 756,
+  "title": "The context fence reads the BODY of a heredoc as a command and denies the board card that describes the suc...",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 881,
+  "title": "Armed, the context fence would refuse the very commands that end a session — and on a fresh machine it refu...",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 997,
+  "title": "The queue order for the context work rests on three readings that do not carry it, and the two measurements...",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 596,
+  "title": "The tail is visible while it runs (point 572's measure 6)",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 599,
+  "title": "Measure what the cache and the calendar hide (point 572's measure 9)",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 1084,
+  "title": "The planning price that was only ever meant to size a wait also pronounces a run dead",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 855,
+  "title": "The confirming review of the budget fixes names two test gaps its verdict leaves owed",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 559,
+  "title": "The time-tracking mandate is abolished, its useful half kept",
+  "disposition": "backlog",
+  "reason": "G2 mechanism still present today (scripts/context-fence-guard.mjs, context-watermark-core.mjs); plan deletes it in M-D3, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
+ },
+ {
+  "kind": "point",
+  "id": 899,
+  "title": "board-first-guard locks a delegated author out of its own worktree",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 1049,
+  "title": "A user front-order and the communication-first rule both failed to order the queue: the bank-round point wa...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 706,
+  "title": "The queue commands lose the card text one way and re-write a blocked one the other",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 705,
+  "title": "The board is republished once per guard correction, instead of once at the end",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 665,
+  "title": "Every board card names its problem before its status — and a mechanism enforces it",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 777,
+  "title": "A decision card published after its answer arrived is never retired",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 664,
+  "title": "The estimate on the board expires unseen, and every card says \"stand\" twice",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 635,
+  "title": "The queue is cut into releases, and the cut is data",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 638,
+  "title": "A ticket I open myself gets its urgency decided, not its default",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 637,
+  "title": "The board becomes a place to decide, not only to read",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 465,
+  "title": "A now-card outlives the session that wrote it",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 467,
+  "title": "The versioned board refresher reaches no reader (30.07.2026, found by the agent that fixed the refresh stea...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 471,
+  "title": "The work order starves the pool it is supposed to feed",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 491,
+  "title": "Queue prose written only into the HTML is lost on the next rebuild",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 508,
+  "title": "Each now-card is judged by its own number",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 520,
+  "title": "The board demands a time it gives no way to write",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 451,
+  "title": "The reply that sent its own flag",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 554,
+  "title": "The chat watcher leaks orphans the supervision cannot see",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 799,
+  "title": "watcherSupervision can no longer return stop, but the launcher still handles it and the docstring still pro...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 704,
+  "title": "The board defeats every cache, so a reader who reloads is rate-limited out of it",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 728,
+  "title": "The chat responder answers while a session owns the batch, and answers one message three times",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 819,
+  "title": "The queue's front block predates the ranking gate and was never cleared, so 34 points stand ahead of the co...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 822,
+  "title": "A now-card names the mechanism instead of the problem, and outlives its own landing",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 838,
+  "title": "Point 834's estimate is 1.8x the whole programme it is the front stage of, and the 676 board card still des...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 869,
+  "title": "The board command cannot be run from a session that has no CLAUDE_SESSION_ID",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 877,
+  "title": "The urgency parser reads negation by proximity and takes a question for a claim",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 883,
+  "title": "The queue's urgency baseline proves membership and stops there",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 929,
+  "title": "The board's core hardens against damaged and hand-edited input — the remainder of the eighth cross-vendor r...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 930,
+  "title": "A now-card removed by the projection takes its handwritten text with it — the one disagreement the ninth cr...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 931,
+  "title": "A machine ranking that parks a high-criticality point stays invisible to the user",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 934,
+  "title": "The dependency mechanism is built as the smaller core Sol's review prescribes, not as proposed (cross-vendo...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 937,
+  "title": "After a landing the board's closing state is unreachable, and it blocks the branch cleanup",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 940,
+  "title": "The derived state card is authenticated by a shape that is not the writer's (cross-vendor four-eyes review...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 952,
+  "title": "The board-layout suite measures a COPY of the board stylesheet, so the pressure it calls its proof can go a...",
+  "disposition": "backlog",
+  "reason": "scripts/verify/board-layout.mjs still renders a hand-written BOARD_STYLE copy of the board stylesheet (present today); plan M-D4 deletes the board and its layout suite without replacement, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 954,
+  "title": "The board header's outer groups still never break, so a phone squeezes the title while the number and the t...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 959,
+  "title": "A done card reports the last run's start and end, so a point worked over several sessions understates what...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 965,
+  "title": "The closing card the board's own refusal prescribes cannot reach the page",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 976,
+  "title": "A point landed by the command loses every route to its own Erledigt card",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 978,
+  "title": "done accepts an empty card text and publishes the internal focus note instead",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 989,
+  "title": "A current-work card's ESTIMATE has no board command, so changing it costs two focus transitions",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 1005,
+  "title": "Bookkeeping without a point has no card, and board-first-guard locks the owner out of work CLAUDE.md expres...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 1100,
+  "title": "A verification for a just-landed point can publish no board at all",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 1153,
+  "title": "A landed point's board bookkeeping has a door that locks behind it, and the running proof for its closing w...",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 1261,
+  "title": "Let the answering window remove an answered board card; drop point 1240",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 1304,
+  "title": "A request whose open questions read \"none\" is queued, not turned into a decision card",
+  "disposition": "backlog",
+  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
+ },
+ {
+  "kind": "point",
+  "id": 1436,
+  "title": "Evidence that a cloud-authored point landed under the cloud gate flow QUEUE POSITION: carried by the next p...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 1461,
+  "title": "Cloud author clones judge the scarce lane OFF and stop on the serving-model tripwire",
+  "disposition": "drop",
+  "reason": "already closed (in docs/tasks-archive.md)",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 900,
+  "title": "The review recorder answers a failed identity check with the advice to do what was already done",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 896,
+  "title": "review-sol.mjs swallows an unknown flag and spends a real cross-vendor pass on it",
+  "disposition": "backlog",
+  "reason": "defect present in the successor: scripts/cross-review.mjs (review-sol.mjs renamed) validates no argv (lines 1075-1103); measured `--sha HEAD --brief x --bogus-flag-xyz` passes argument checks and stops only at the absent lane-switch state (exit 1), `--bogus-flag-xyz` alone exits 2 on missing --sha/--brief without naming the flag; plan deletes the gate in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 887,
+  "title": "Part of the durable-lane branch can be cleared by no reviewer, so the point cannot land however green it is",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 888,
+  "title": "Naming the cross-vendor reviewer in a commit trailer silently removes those files from cross-vendor review",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 867,
+  "title": "An exhausted vendor allowance parks its point on a probe, not on the user",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 735,
+  "title": "The mechanism gate fires on a TOUCH, where it was built for a CHANGE",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 736,
+  "title": "The escalation lane has no way back DOWN, so one point sits on the scarcest model for good",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 778,
+  "title": "Answer the cross-vendor review of the suspended Fable escalation (GPT-5.6 Sol, 20.08.2026, verdict **merge-...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 457,
+  "title": "A recorded \"do not merge\" must not satisfy the gate (retrospective §3.67, 30.07.2026 — three cases in one m...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 309,
+  "title": "Serving-model degradation: repair + tripwire",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 330,
+  "title": "Full post-degradation assurance pass",
+  "disposition": "drop",
+  "reason": "stays open: the plan folds its assurance need into open 303, but 303 does not carry that requirement today, so closing 330 would lose it",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes); §4 disagreement table row 330: resolved yes"
+ },
+ {
+  "kind": "point",
+  "id": 625,
+  "title": "The same defect was built twice, in parallel",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 678,
+  "title": "A lane is routed to when it has nothing left, and what dies there is rescued by hand",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 722,
+  "title": "The mechanism gate's HISTORICAL backlog on main is worked off with the rebuilt planner",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 729,
+  "title": "A truthful \"5 skipped\" reads as a failed gate",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 767,
+  "title": "The five-round escalation covers commissions only, so the batch's own work can never trigger it",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 804,
+  "title": "Merge attribution survives only while the merged parent stays in the analysed commit set",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 825,
+  "title": "The criticality gate demands a receipt that no command writes",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 826,
+  "title": "The criticality gate measures coverage against the reviewed sha, never against the head it is clearing",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 830,
+  "title": "The model-policy fingerprint swallows the rest of §6, so seven unrelated rules cannot be edited without sta...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 836,
+  "title": "author-sol reports every run as a",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 837,
+  "title": "The four-eyes gate on main has been standing open on a suspended demand, and the debt behind it is now 28 c...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 839,
+  "title": "The four-eyes gate on main has become unresolvable, and it refuses every turn end",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 856,
+  "title": "The review planner reads a reviewer credit as authorship and calls the commit unreviewable",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 872,
+  "title": "A merge's conflict resolution is still attributed to the side it merged, not to the model that resolved it,...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 875,
+  "title": "A corrupt Fable-switch file makes the whole tree uncommittable, and the gate that does it promises the oppo...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 905,
+  "title": "The Git-only point-file fallback re-lists every merge on main once per review row",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 914,
+  "title": "A multi-pass review's diffstat is pass-scoped while its manifest swears it is whole-range, so the reviewer...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 915,
+  "title": "The review planner names a reviewer the recorder then refuses, so a multi-group pass can never be completed",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 916,
+  "title": "A tightened ledger row contract was applied to the whole PAST, so 216 recorded reviews read as hand-forged...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 922,
+  "title": "A worktree working directory makes the four-eyes gate report a missing baseline it cannot fix",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 933,
+  "title": "A commit subject naming a review pass index goes stale the moment the split is recut",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 942,
+  "title": "The criticality gate's second way out has no command that writes it",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 956,
+  "title": "A merge-with-fixes verdict leaves its named fix owed, and nothing tracks it",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes); §4 disagreement table row 956: resolved yes"
+ },
+ {
+  "kind": "point",
+  "id": 962,
+  "title": "The readiness check charges a delegated lane with the main commits its own brief told it to merge in",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 970,
+  "title": "Canonical model trailers are not enforced at commit time",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 972,
+  "title": "A file cut from the review material reaches no manifest, so the reviewer reports its absence as a defect of...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes); §4 disagreement table row 972: resolved yes"
+ },
+ {
+  "kind": "point",
+  "id": 974,
+  "title": "The criticality gate charges a high-criticality point with every file that landed near it, so it cannot con...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 975,
+  "title": "A four-eyes debt whose fix comes from the other vendor can be cleared by nobody",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 984,
+  "title": "Every landing writes its tick commit with the author model at the wrong vendor address",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 986,
+  "title": "The criticality gate charges a point for every main commit that landed beside it",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 987,
+  "title": "A verified Claude review receipt with no text result is blamed on the wrong model",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 998,
+  "title": "The mechanism gate bills a merged contribution PER COMMIT, so a long branch owes hundreds of review calls f...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 999,
+  "title": "The review ledger's physical order does not follow its at stamps, so a reader that trusts append order read...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 1001,
+  "title": "The Sol authoring lane judges commits it only MERGED IN as its own lane's work",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 1006,
+  "title": "A later same-vendor clearance over the same files silently displaces the earlier cross-vendor read in the m...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 1007,
+  "title": "The durable lane's measured trial is run, and its verdict decides the switch (split out of point 925 on 29....",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 1014,
+  "title": "The Anthropic share of the batch has no lever left except ending the session",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 1028,
+  "title": "An examination recorded at the old round-4 boundary suppresses the round-9 examination the raised threshold...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 1030,
+  "title": "A refusal is consumed as coverage: a recorded do-not-merge CLEARS the very file it refuses (Opus 5, cross-v...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 1231,
+  "title": "Cloud authoring may run during a local regression once the cloud offload switch is ON and proven Point 1230...",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 1369,
+  "title": "Astra routing sends a point the share switch then refuses to commission",
+  "disposition": "backlog",
+  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
+ },
+ {
+  "kind": "point",
+  "id": 762,
+  "title": "The memory index has no line of headroom, so the next memory blocks the guard",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 715,
+  "title": "The staged rewiring of the hook paths is finished, and the check accepts the defaulted anchor",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 630,
+  "title": "A shell write into .claude/ raises a prompt in the user's VS Code window",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 632,
+  "title": "A lesson counts as served the moment its enforcer is named — not when it stands",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 511,
+  "title": "The memory index still carries what thirty guards now enforce",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 602,
+  "title": "What else did we build and never use?",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 333,
+  "title": "Why the docs drift — and a mechanism against it (root-cause analysis 25.07.2026, user question \"where does...",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 535,
+  "title": "One definition of what counts as a mechanism, and it reaches the hooks (guard/memory audit 07.08.2026, find...",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 536,
+  "title": "The two wired enforcers no selector reaches get conventional names (guard/memory audit 07.08.2026, finding 4)",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 537,
+  "title": "The untested-guard ratchet is ratcheted, and the real debt named (guard/memory audit 07.08.2026, finding 8)",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 538,
+  "title": "Two memories that describe mechanisms that are gone (guard/memory audit 07.08.2026, findings 7/10)",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 609,
+  "title": "The proof guard is built, taught and wired to nothing",
+  "disposition": "drop",
+  "reason": "partial evidence only: point-proof-guard is wired (.claude/settings.json PreToolUse), but the point also asks for its class check, which nothing shows done - stays open",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 495,
+  "title": "A versioned git hook without its executable bit is silently inert",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 497,
+  "title": "The German-language rule has no mechanism at all, and the audit PASSED IT ANYWAY",
+  "disposition": "backlog",
+  "reason": "the German-answer rule is still enforced by no hook (only the memory line and the timestamp/context header guards exist); plan M-D17 deletes the governance docs and rewrites CLAUDE.md and the memory index where the rule lives, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 529,
+  "title": "A Stop hook in the user scope now enforces what a project guard ALREADY HARD-BLOCKS",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 591,
+  "title": "Does the project still obey its own rules? A full adherence audit",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 652,
+  "title": "The session may not assert a state it did not measure, and is handed the facts it OTHERWISE GUESSES",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 677,
+  "title": "A guard run by hand hangs forever on its own stdin",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 683,
+  "title": "The seal lets the work order through, because it classifies by target (Sol's closing review of point 675, 1...",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 754,
+  "title": "The rule corpus carries twenty-three measured defects, four of them in code that cannot do what its own tex...",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 763,
+  "title": "Three of the five ruled document cuts are still standing in the documents",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 766,
+  "title": "The lesson register cannot be kept for the last two dozen lessons, and the document says it is complete",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 802,
+  "title": "The design.md budget still owes the user a yes he withdrew ten days earlier",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 832,
+  "title": "The ratchet holds against today's ceiling, not against the one it replaced — and three of the cut guard's r...",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 833,
+  "title": "The timestamp guard's own test loses a minute race under load",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 842,
+  "title": "The link witness still has three routes to a clean pass over a real link failure (cross-vendor review of po...",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 845,
+  "title": "A unit test pins the size of a file that lives outside the repository, so an unrelated memory edit reddens...",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 850,
+  "title": "The generated command index publishes commands nobody can run, and its own test cannot see it",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 853,
+  "title": "The guard preflight names a remediation that cannot clear its own block",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 857,
+  "title": "The docs suite's acceptance-pointer checks match nothing and fail vacuously",
+  "disposition": "archive",
+  "reason": "fixed: the pointer checks were replaced by companion checks that fail closed on an empty set (scripts/verify/docs.mjs:74,79 `ok: hasCriteria && ...`; scripts/verify/docs.test.mjs:106-111 asserts 0 criteria -> both rules false, :114-119 asserts a nonempty set passes); `node scripts/verify/docs.mjs` today prints \"32 criteria judged\" on all four companion rules and `npm test -- docs` is green (8 pass, 0 fail); plan: docs.mjs pointer role (M-D16)",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance); §4 disagreement table row 857: resolved yes"
+ },
+ {
+  "kind": "point",
+  "id": 873,
+  "title": "guard-preflight predicts a block where mechanism-review-guard rules a review gap, and a session that trusts...",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 876,
+  "title": "Guard-health reads absence and measurement failure as one state, and clears a dead enforcer on a bare subst...",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 882,
+  "title": "Deleting a governed document disables its budget, and a misspelled ceiling disables half of it",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 910,
+  "title": "A session working in a worktree is blocked by dashboard-guard with a repair that cannot work",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 950,
+  "title": "A documentation cut and the guard that parses that documentation must land in one commit",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 961,
+  "title": "The commit-msg hook checks two properties of a message and not its SHAPE, so a body written without the bla...",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 980,
+  "title": "The retrospective hands out the same section number to several lessons",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 981,
+  "title": "Fifteen rule-corpus findings of the 28.08.2026 cross-vendor review are recorded and unfixed",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 1021,
+  "title": "A stale chat timestamp still costs the user a second message — nine guard blocks in one morning",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 1022,
+  "title": "The brevity guard raises its own ceiling to admit the document it is measuring (cross-vendor round 31.08.20...",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 1023,
+  "title": "A refusal that reprints its whole inventory bills the blocked session for the size of the debt",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 1032,
+  "title": "A blocking Stop guard can refuse the same finding forever, and every refusal spends a user-visible answer",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 1039,
+  "title": "The run is redirected: freeze, intake rule, and the checklist that stops gating",
+  "disposition": "archive",
+  "reason": "done: all three clauses (§7.1 not a gate, infrastructure freeze, finding intake) stand in CLAUDE.md §2 and docs/backlog.md exists; plan: superseded by 1463",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 1054,
+  "title": "A content guard demands a write from a session that no guard lets write",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 1095,
+  "title": "The guide's ceiling equals its size, so the review that demands a new lesson cannot deliver one",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 1098,
+  "title": "Half the memory rules are stated but never loaded",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 1111,
+  "title": "Two cases in scripts/mechanism-review-guard.test.mjs run 19.4 s against a 20 s timeout, so the fast gate fa...",
+  "disposition": "drop",
+  "reason": "partial evidence only: closed 1199 bounds one gather case (mechanism-review-guard.test.mjs:602), not both named cases (see B47) - stays open",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 1214,
+  "title": "Apply the rule-review findings of 25.09.2026 (deletions and contradiction fixes)",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 1291,
+  "title": "retro-currency-guard deadlocks a session after a committed context boundary Measured 04.10.2026 (session 05...",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 1373,
+  "title": "The approval guard refuses ordinary commands that merely contain quotes or operators",
+  "disposition": "backlog",
+  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
+ },
+ {
+  "kind": "point",
+  "id": 643,
+  "title": "A red is released by the wrong proof: the suite passed, not the check",
+  "disposition": "backlog",
+  "reason": "G6 mechanism still present today (scripts/render-verify-core.mjs, render-verify-guard.mjs); plan deletes it in M-D7, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G6 (charges/recorder/run records)"
+ },
+ {
+  "kind": "point",
+  "id": 668,
+  "title": "The landing gate proves the charges only while the point is still open",
+  "disposition": "backlog",
+  "reason": "G6 mechanism still present today (scripts/render-verify-core.mjs, render-verify-guard.mjs); plan deletes it in M-D7, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G6 (charges/recorder/run records)"
+ },
+ {
+  "kind": "point",
+  "id": 670,
+  "title": "A filtered gate chain destroys the evidence its own suspect record demands",
+  "disposition": "backlog",
+  "reason": "G6 mechanism still present today (scripts/render-verify-core.mjs, render-verify-guard.mjs); plan deletes it in M-D7, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G6 (charges/recorder/run records)"
+ },
+ {
+  "kind": "point",
+  "id": 990,
+  "title": "A red charge cannot verify the ROOT its downstream sentence points back to",
+  "disposition": "backlog",
+  "reason": "G6 mechanism still present today (scripts/render-verify-core.mjs, render-verify-guard.mjs); plan deletes it in M-D7, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G6 (charges/recorder/run records)"
+ },
+ {
+  "kind": "point",
+  "id": 992,
+  "title": "The compatibility-lane console charge is not scoped to the lane it was measured on",
+  "disposition": "backlog",
+  "reason": "G6 mechanism still present today (scripts/render-verify-core.mjs, render-verify-guard.mjs); plan deletes it in M-D7, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G6 (charges/recorder/run records)"
+ },
+ {
+  "kind": "point",
+  "id": 995,
+  "title": "Three charge-ledger entries cannot be narrowed to the failure mode their own evidence names, because the re...",
+  "disposition": "backlog",
+  "reason": "G6 mechanism still present today (scripts/render-verify-core.mjs, render-verify-guard.mjs); plan deletes it in M-D7, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G6 (charges/recorder/run records)"
+ },
+ {
+  "kind": "point",
+  "id": 1000,
+  "title": "Two waved-red cases still construct a console identity the recorder cannot mint, and their names still clai...",
+  "disposition": "backlog",
+  "reason": "G6 mechanism still present today (scripts/render-verify-core.mjs, render-verify-guard.mjs); plan deletes it in M-D7, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G6 (charges/recorder/run records)"
+ },
+ {
+  "kind": "point",
+  "id": 1010,
+  "title": "The Ctrl-label fusion check names a point that is closed, so its red has no owner",
+  "disposition": "backlog",
+  "reason": "G6 mechanism still present today (scripts/render-verify-core.mjs, render-verify-guard.mjs); plan deletes it in M-D7, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G6 (charges/recorder/run records)"
+ },
+ {
+  "kind": "point",
+  "id": 1015,
+  "title": "Half the red-charge table still names a check by its prefix and excuses whatever else fails under that name...",
+  "disposition": "backlog",
+  "reason": "G6 mechanism still present today (scripts/render-verify-core.mjs, render-verify-guard.mjs); plan deletes it in M-D7, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G6 (charges/recorder/run records)"
+ },
+ {
+  "kind": "point",
+  "id": 1017,
+  "title": "A charge is scoped to the lane it was first measured on, so the same red needs a second half on the other l...",
+  "disposition": "backlog",
+  "reason": "G6 mechanism still present today (scripts/render-verify-core.mjs, render-verify-guard.mjs); plan deletes it in M-D7, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G6 (charges/recorder/run records)"
+ },
+ {
+  "kind": "point",
+  "id": 1035,
+  "title": "The charge ledger landed with six named findings against it, and two of them widen what a red is excused for",
+  "disposition": "backlog",
+  "reason": "G6 mechanism still present today (scripts/render-verify-core.mjs, render-verify-guard.mjs); plan deletes it in M-D7, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G6 (charges/recorder/run records)"
+ },
+ {
+  "kind": "point",
+  "id": 708,
+  "title": "Only the landing is one command; the beginning and the turn's end are hand-driven chains (analysed 17.08.20...",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 791,
+  "title": "A user's waiver of the closing has to be typed thirteen times, and once it has to sound like a run",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 639,
+  "title": "The assurance regime for the release machinery",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 636,
+  "title": "A finished block closes and tags itself",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 552,
+  "title": "The CI guard replays a frozen reason and sends the reader at a green run",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 464,
+  "title": "A red unit layer reached main through the pre-push gate",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing); §4 disagreement table row 464: resolved yes"
+ },
+ {
+  "kind": "point",
+  "id": 560,
+  "title": "The only active channel for a red branch run is not configured",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 561,
+  "title": "The silenced branch gate has three blind spots (four-eyes review of point 513 by Fable 5, 08.08.2026; bundl...",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 724,
+  "title": "A feature branch fully contained in a SIBLING branch keeps eating a pool slot",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 803,
+  "title": "The push gate runs the full unit layer while an authoring agent holds the same machine",
+  "disposition": "drop",
+  "reason": "already closed (in docs/tasks-archive.md)",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 810,
+  "title": "Sixteen candidate defects in the CI guard and the launcher, found by the blind half of point 809's four-eye...",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 878,
+  "title": "A proven red CI verdict is thrown away by a lock timeout, and the guard's own tests never run it",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 919,
+  "title": "A sha whose ref has already moved on is reported as a red CI verdict, and the successor session is sent dow...",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 924,
+  "title": "The pre-push fast gate calls test:unit red where the same command, in the same tree and on the same machine...",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 1096,
+  "title": "The landing's cleanup keeps every branch alive while any detached worktree stands",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing); §4 disagreement table row 1096: resolved yes"
+ },
+ {
+  "kind": "point",
+  "id": 1101,
+  "title": "A runner-only script answers \"CI gate passed\" to a question nobody asked",
+  "disposition": "drop",
+  "reason": "reproducible false approval today: `node scripts/ci-gate-verdict.mjs --ref x` outside a runner prints \"CI gate passed.\" and exits 0; the freeze keeps false-approval fixes open",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing)"
+ },
+ {
+  "kind": "point",
+  "id": 1226,
+  "title": "Worktree cleanup refuses a locked registered worktree without an expectation",
+  "disposition": "backlog",
+  "reason": "G7 mechanism still present today (scripts/land-point.mjs, ci-status-guard-core.mjs, closing-guard-core.mjs, worktree-cleanup.mjs); plan deletes it in M-D10/M-D14, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G7 (landing/CI guard/closing); §4 disagreement table row 1226: resolved yes"
+ },
+ {
+  "kind": "point",
+  "id": 1060,
+  "title": "Seven findings of 05.09.2026 that the carrier held while the batch stood still",
+  "disposition": "backlog",
+  "reason": "G8 mechanism still present today (scripts/finding.mjs, findings-core.mjs, bundle-first-guard.mjs, fold-point.mjs); plan deletes it in M-D11, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G8 (carrier/work-order machinery)"
+ },
+ {
+  "kind": "point",
+  "id": 710,
+  "title": "The remaining forty-five sequences of the multi-step analysis are worked into the order, bundle-first (the...",
+  "disposition": "backlog",
+  "reason": "G8 mechanism still present today (scripts/finding.mjs, findings-core.mjs, bundle-first-guard.mjs, fold-point.mjs); plan deletes it in M-D11, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G8 (carrier/work-order machinery)"
+ },
+ {
+  "kind": "point",
+  "id": 774,
+  "title": "bundle-first-guard --status reports a stand-down that does not apply to the session running it",
+  "disposition": "backlog",
+  "reason": "G8 mechanism still present today (scripts/finding.mjs, findings-core.mjs, bundle-first-guard.mjs, fold-point.mjs); plan deletes it in M-D11, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G8 (carrier/work-order machinery)"
+ },
+ {
+  "kind": "point",
+  "id": 534,
+  "title": "One project-slug resolver, and a finding recorded from a worktree survives (guard/memory audit 07.08.2026,...",
+  "disposition": "backlog",
+  "reason": "G8 mechanism still present today (scripts/finding.mjs, findings-core.mjs, bundle-first-guard.mjs, fold-point.mjs); plan deletes it in M-D11, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G8 (carrier/work-order machinery)"
+ },
+ {
+  "kind": "point",
+  "id": 468,
+  "title": "The same blind parse sits in two more readers of the work order (30.07.2026, named by the agent that fixed...",
+  "disposition": "backlog",
+  "reason": "G8 mechanism still present today (scripts/finding.mjs, findings-core.mjs, bundle-first-guard.mjs, fold-point.mjs); plan deletes it in M-D11, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G8 (carrier/work-order machinery)"
+ },
+ {
+  "kind": "point",
+  "id": 741,
+  "title": "A carrier entry carries its writer's situation as though it were the finding's own",
+  "disposition": "backlog",
+  "reason": "G8 mechanism still present today (scripts/finding.mjs, findings-core.mjs, bundle-first-guard.mjs, fold-point.mjs); plan deletes it in M-D11, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G8 (carrier/work-order machinery)"
+ },
+ {
+  "kind": "point",
+  "id": 765,
+  "title": "A finding whose target point is already archived counts itself as delivered",
+  "disposition": "backlog",
+  "reason": "G8 mechanism still present today (scripts/finding.mjs, findings-core.mjs, bundle-first-guard.mjs, fold-point.mjs); plan deletes it in M-D11, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G8 (carrier/work-order machinery)"
+ },
+ {
+  "kind": "point",
+  "id": 786,
+  "title": "A tick is not a delivery, and nothing in the work order tells the two apart — so every throughput statement...",
+  "disposition": "backlog",
+  "reason": "G8 mechanism still present today (scripts/finding.mjs, findings-core.mjs, bundle-first-guard.mjs, fold-point.mjs); plan deletes it in M-D11, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G8 (carrier/work-order machinery)"
+ },
+ {
+  "kind": "point",
+  "id": 920,
+  "title": "Appending a work-order point is hand work, so it can take a number that is already taken and turn main red",
+  "disposition": "backlog",
+  "reason": "G8 mechanism still present today (scripts/finding.mjs, findings-core.mjs, bundle-first-guard.mjs, fold-point.mjs); plan deletes it in M-D11, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G8 (carrier/work-order machinery)"
+ },
+ {
+  "kind": "point",
+  "id": 960,
+  "title": "A filed finding is never checked against the work order, so with 313 open points the cheapest mistake is to...",
+  "disposition": "backlog",
+  "reason": "G8 mechanism still present today (scripts/finding.mjs, findings-core.mjs, bundle-first-guard.mjs, fold-point.mjs); plan deletes it in M-D11, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G8 (carrier/work-order machinery)"
+ },
+ {
+  "kind": "point",
+  "id": 1004,
+  "title": "Nineteen review rounds settled the bundle reader and left five findings standing, one of them a REFUSAL on...",
+  "disposition": "backlog",
+  "reason": "G8 mechanism still present today (scripts/finding.mjs, findings-core.mjs, bundle-first-guard.mjs, fold-point.mjs); plan deletes it in M-D11, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G8 (carrier/work-order machinery)"
+ },
+ {
+  "kind": "point",
+  "id": 1029,
+  "title": "The bundle table's shared-file exclusions are one-sided, so the half that reads the other entry schedules t...",
+  "disposition": "backlog",
+  "reason": "G8 mechanism still present today (scripts/finding.mjs, findings-core.mjs, bundle-first-guard.mjs, fold-point.mjs); plan deletes it in M-D11, part 2 parked - defer under the freeze",
+  "planRef": "§4 Agreed obsolete yes, A's G8 (carrier/work-order machinery)"
+ },
+ {
+  "kind": "backlog",
+  "id": "B1",
+  "title": "The give's second evidence frame is aimed by construction, not by rule",
+  "disposition": "delete",
+  "reason": "marked FIXED 08.09.2026 in its own heading; plan §5: B1 marked FIXED",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## The give's second evidence frame is aimed by construction, not by rule (measu"
+ },
+ {
+  "kind": "backlog",
+  "id": "B2",
+  "title": "Point 1064's cross-vendor review covers only half its files (07.09.2026)",
+  "disposition": "keep",
+  "reason": "game files src/state/store.ts, src/ui/Hud.tsx, src/world/finds.ts still owe the cross-vendor read; plan M-S1 inventory not run; part 2 parked",
+  "planRef": "§5 disagreement table row B2: resolved yes",
+  "match": "## Point 1064's cross-vendor review covers only half its files (07.09.2026)"
+ },
+ {
+  "kind": "backlog",
+  "id": "B12",
+  "title": "Der dokumentierte Pfad des Findings-Traegers ist der falsche — der Owner liest eine leere Datei (07.09.2026)",
+  "disposition": "keep",
+  "reason": "not verifiably gone: the runbook no longer names the hyphenated path and scripts/findings-paths.mjs:30-47 now reads the -workspace-hoa- twin too, but the leftover carrier file and its misleading header live under /home/node/.claude/projects/-workspace-hoa-/memory/ on the host, absent from this container (ls: no such file); part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Der dokumentierte Pfad des Findings-Traegers ist der falsche — der Owner lies"
+ },
+ {
+  "kind": "backlog",
+  "id": "B16",
+  "title": "Der sanktionierte Nicht-Owner-Weg ist unbenutzbar: --request verlangt eine Datei, und der Stand-down verbie...",
+  "disposition": "keep",
+  "reason": "non-owner request path (request deposit, request-approval-guard) still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Der sanktionierte Nicht-Owner-Weg ist unbenutzbar: --request verlangt eine Da"
+ },
+ {
+  "kind": "backlog",
+  "id": "B17",
+  "title": "Gegenbeleg: am 06.09. gingen drei --request-Uebergaben aus einem Nicht-Owner-Fenster gegen einen LEBENDEN O...",
+  "disposition": "keep",
+  "reason": "counter-evidence belonging to B16, which stays; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Gegenbeleg: am 06.09. gingen drei --request-Uebergaben aus einem Nicht-Owner-"
+ },
+ {
+  "kind": "backlog",
+  "id": "B21",
+  "title": "Infrastructure grew threefold while the game stood still",
+  "disposition": "keep",
+  "reason": "evidence base for the parked part 2; 1463 is still open; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Infrastructure grew threefold while the game stood still (measured 08.09.2026"
+ },
+ {
+  "kind": "backlog",
+  "id": "B26",
+  "title": "The LARGE run of 08.09.2026 started on a machine that was not quiet",
+  "disposition": "keep",
+  "reason": "quiet-machine check still present (throttle-probe-core.mjs; notice printed by today's docs run); part 2 parked",
+  "planRef": "§5 disagreement table row B26: resolved yes",
+  "match": "## The LARGE run of 08.09.2026 started on a machine that was not quiet"
+ },
+ {
+  "kind": "backlog",
+  "id": "B28",
+  "title": "The polish retry hangs after a red, and its expected runtime is stale",
+  "disposition": "keep",
+  "reason": "retry half void (scripts/verify/run-all.mjs:497 \"retry is GONE\", closed 1135), but the stale-expectation half stands: expectedRuntimeMs(['polish']) in scripts/verify/run-wait-core.mjs still returns 340900 ms against a ~28-min run; part 2 parked",
+  "planRef": "§5 disagreement table row B28: resolved yes",
+  "match": "## The polish retry hangs after a red, and its expected runtime is stale"
+ },
+ {
+  "kind": "backlog",
+  "id": "B30",
+  "title": "The beginner guide has no room left for a new lesson",
+  "disposition": "keep",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md and retro-currency-guard.mjs still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## The beginner guide has no room left for a new lesson"
+ },
+ {
+  "kind": "backlog",
+  "id": "B32",
+  "title": "The guard's own unit file sits close enough to the per-test cap to red under load",
+  "disposition": "keep",
+  "reason": "closed 1199 bounds one gather case (B47; 1111 stays open); no evidence that the bootstrapBase case this entry names was fixed - keep (Sol review of 643311d)",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## The guard's own unit file sits close enough to the per-test cap to red under "
+ },
+ {
+  "kind": "backlog",
+  "id": "B34",
+  "title": "wait-lease --status calls a dead run's lease running",
+  "disposition": "keep",
+  "reason": "wait-lease-core.mjs waitTimeoutDecision still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## `wait-lease --status` calls a dead run's lease running (measured 10.09.2026)"
+ },
+ {
+  "kind": "backlog",
+  "id": "B36",
+  "title": "A run the operator ends himself is recorded as a CRASHED RUN (11.09.2026)",
+  "disposition": "keep",
+  "reason": "render-verify-guard.mjs died-run list still present; part 2 parked",
+  "planRef": "§5 disagreement table row B36: resolved yes",
+  "match": "## A run the operator ends himself is recorded as a CRASHED RUN (11.09.2026)"
+ },
+ {
+  "kind": "backlog",
+  "id": "B44",
+  "title": "What the closing regression actually costs, measured at one point (12.09.2026)",
+  "disposition": "keep",
+  "reason": "measurement still feeds the unfixed B59 timeout repair; part 2 parked",
+  "planRef": "§5 disagreement table row B44: resolved yes",
+  "match": "## What the closing regression actually costs, measured at one point (12.09.2026"
+ },
+ {
+  "kind": "backlog",
+  "id": "B45",
+  "title": "The handover card claims nothing is running while an adopted run runs (12.09.2026)",
+  "disposition": "keep",
+  "reason": "batch-boundary-core.mjs still prints \"Hier läuft nichts weiter.\"; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## The handover card claims nothing is running while an adopted run runs (12.09."
+ },
+ {
+  "kind": "backlog",
+  "id": "B46",
+  "title": "The beginner guide is missing the ceiling a green run cannot show (13.09.2026)",
+  "disposition": "keep",
+  "reason": "docs/analysis_de/vibe-coding-anleitung.md and retro-currency-guard.mjs still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## The beginner guide is missing the ceiling a green run cannot show (13.09.2026"
+ },
+ {
+  "kind": "backlog",
+  "id": "B47",
+  "title": "A unit test spends twenty seconds reading the live review history (14.09.2026)",
+  "disposition": "keep",
+  "reason": "the fix of closed 1199 bounds one gather test (1111 stays open); that both named live-history tests stopped scanning is not established - keep (Sol review of 30f7663)",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## A unit test spends twenty seconds reading the live review history (14.09.2026"
+ },
+ {
+  "kind": "backlog",
+  "id": "B49",
+  "title": "Erledigt-Karten des Boards behaupten pauschal ausstehende Abschlussarbeiten (14.09.2026)",
+  "disposition": "keep",
+  "reason": "board Erledigt template still present (board.mjs); part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Erledigt-Karten des Boards behaupten pauschal ausstehende Abschlussarbeiten ("
+ },
+ {
+  "kind": "backlog",
+  "id": "B50",
+  "title": "Lebendigkeit wird aus der Buchhaltung abgeleitet statt am Prozess gemessen (14.09.2026)",
+  "disposition": "keep",
+  "reason": "batch liveness bookkeeping still present (batch-singleton.mjs, batch-in-flight.mjs); part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Lebendigkeit wird aus der Buchhaltung abgeleitet statt am Prozess gemessen (1"
+ },
+ {
+  "kind": "backlog",
+  "id": "B51",
+  "title": "Ein vom Nutzer erlassenes Closing kostet dreizehn einzelne Verzichtsbuchungen (14.09.2026)",
+  "disposition": "keep",
+  "reason": "closing-guard-core.mjs step list still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Ein vom Nutzer erlassenes Closing kostet dreizehn einzelne Verzichtsbuchungen"
+ },
+ {
+  "kind": "backlog",
+  "id": "B53",
+  "title": "Der deckende Lauf stirbt mit seinem Arbeitsverzeichnis (15.09.2026)",
+  "disposition": "keep",
+  "reason": "land-point/worktree-cleanup still remove worktrees; plan reason (that automation deleted) not executed; part 2 parked",
+  "planRef": "§5 disagreement table row B53: resolved yes",
+  "match": "## Der deckende Lauf stirbt mit seinem Arbeitsverzeichnis (15.09.2026)"
+ },
+ {
+  "kind": "backlog",
+  "id": "B54",
+  "title": "Der Bildschirm-Wächter verweigert jeden Zug, wenn die Sitzung im Arbeitsverzeichnis steht (15.09.2026)",
+  "disposition": "keep",
+  "reason": "dashboard-guard.mjs still reads state from its own root; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Der Bildschirm-Wächter verweigert jeden Zug, wenn die Sitzung im Arbeitsverze"
+ },
+ {
+  "kind": "backlog",
+  "id": "B55",
+  "title": "Die Wartehilfe erklärt einen gesunden Bild-Lauf für hängend (15.09.2026)",
+  "disposition": "keep",
+  "reason": "run-wait hang detector still present (scripts/verify/run-wait-core.mjs); part 2 parked",
+  "planRef": "§5 disagreement table row B55: resolved yes",
+  "match": "## Die Wartehilfe erklärt einen gesunden Bild-Lauf für hängend (15.09.2026)"
+ },
+ {
+  "kind": "backlog",
+  "id": "B56",
+  "title": "Der batch-resume-Kopf nach /clear ist auf den Sitzungsbeginn eingefroren (15.09.2026)",
+  "disposition": "keep",
+  "reason": "scripts/batch-resume-hook.mjs still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Der batch-resume-Kopf nach /clear ist auf den Sitzungsbeginn eingefroren (15."
+ },
+ {
+  "kind": "backlog",
+  "id": "B60",
+  "title": "Geparkte Zweige zählen als lebende Agentenlanes (16.09.2026)",
+  "disposition": "keep",
+  "reason": "batch-doctor live-agent classification still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Geparkte Zweige zählen als lebende Agentenlanes (16.09.2026)"
+ },
+ {
+  "kind": "backlog",
+  "id": "B61",
+  "title": "Ein festgefahrener Lauf kann von fremden Bildern am Leben gehalten werden (16.09.2026)",
+  "disposition": "keep",
+  "reason": "run-wait progress attribution still present (run-wait-core.mjs); part 2 parked",
+  "planRef": "§5 disagreement table row B61: resolved yes",
+  "match": "## Ein festgefahrener Lauf kann von fremden Bildern am Leben gehalten werden (16"
+ },
+ {
+  "kind": "backlog",
+  "id": "B62",
+  "title": "Eine Marke, deren Besitzer sich mitten im Lauf ändert, bleibt stehen (16.09.2026)",
+  "disposition": "keep",
+  "reason": "run-wait marker still present (run-wait-core.mjs); part 2 parked",
+  "planRef": "§5 disagreement table row B62: resolved yes",
+  "match": "## Eine Marke, deren Besitzer sich mitten im Lauf ändert, bleibt stehen (16.09.2"
+ },
+ {
+  "kind": "backlog",
+  "id": "B63",
+  "title": "Zehn Prüfrunden an einem Punkt: die Abbruchentscheidung (16.09.2026)",
+  "disposition": "keep",
+  "reason": "carries the ten-round abort rationale and the freeze boundary, which survive nowhere else cited - keep (Sol review of 30f7663)",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Zehn Prüfrunden an einem Punkt: die Abbruchentscheidung (16.09.2026)"
+ },
+ {
+  "kind": "backlog",
+  "id": "B65",
+  "title": "Der Warteschlangen-Neubau überschreibt die Prosa der aktuellen Karte (16.09.2026)",
+  "disposition": "keep",
+  "reason": "scripts/board-queue.mjs still rebuilds the queue; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Der Warteschlangen-Neubau überschreibt die Prosa der aktuellen Karte (16.09.2"
+ },
+ {
+  "kind": "backlog",
+  "id": "B66",
+  "title": "Der Arbeitsbaum eines beauftragten Agenten sieht den Fehlerbericht nicht (16.09.2026)",
+  "disposition": "keep",
+  "reason": "author-delegate still present; local/ is not copied into delegate worktrees; part 2 parked",
+  "planRef": "§5 disagreement table row B66: resolved yes",
+  "match": "## Der Arbeitsbaum eines beauftragten Agenten sieht den Fehlerbericht nicht (16."
+ },
+ {
+  "kind": "backlog",
+  "id": "B67",
+  "title": "Der Unit-Lauf liest eine Datei außerhalb jedes Checkouts und stirbt an ihr (17.09.2026)",
+  "disposition": "keep",
+  "reason": "= open 845; scripts/guard-hooks.test.mjs doc-budget case still present; part 2 parked",
+  "planRef": "§5 disagreement table row B67: resolved yes",
+  "match": "## Der Unit-Lauf liest eine Datei außerhalb jedes Checkouts und stirbt an ihr (1"
+ },
+ {
+  "kind": "backlog",
+  "id": "B70",
+  "title": "Der Hänge-Detektor liest die Polish-Suite falsch, die erst am Ende schreibt (17.09.2026)",
+  "disposition": "keep",
+  "reason": "run-wait hang detector still present (scripts/verify/run-wait-core.mjs); part 2 parked",
+  "planRef": "§5 disagreement table row B70: resolved yes",
+  "match": "## Der Hänge-Detektor liest die Polish-Suite falsch, die erst am Ende schreibt ("
+ },
+ {
+  "kind": "backlog",
+  "id": "B71",
+  "title": "Die Laufprotokolle eines Branches sterben gar nicht mit seinem Worktree (18.09.2026)",
+  "disposition": "keep",
+  "reason": "the entry leaves open which run forms still write logs into a worktree; that scope is unresolved, so the entry stays (Sol review of 643311d)",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Die Laufprotokolle eines Branches sterben gar nicht mit seinem Worktree (18.0"
+ },
+ {
+  "kind": "backlog",
+  "id": "B72",
+  "title": "Fünf feat/-Branches überleben ihren Merge, zwei davon mit ungemergter Arbeit",
+  "disposition": "keep",
+  "reason": "the five branches are absent on origin today, but local branches and the two unmerged ones need an executed disposition on the user's written decision (plan O7); part 2 parked",
+  "planRef": "§5 disagreement table row B72: resolved yes",
+  "match": "## Fünf `feat/`-Branches überleben ihren Merge, zwei davon mit ungemergter Arbei"
+ },
+ {
+  "kind": "backlog",
+  "id": "B73",
+  "title": "Die Lastmessung starb mit der Sitzung, die sie gestartet hatte",
+  "disposition": "keep",
+  "reason": "throttle-probe still present; part 2 parked",
+  "planRef": "§5 disagreement table row B73: resolved yes",
+  "match": "## Die Lastmessung starb mit der Sitzung, die sie gestartet hatte"
+ },
+ {
+  "kind": "backlog",
+  "id": "B74",
+  "title": "Der Doktor hat keine Prüfung für seine eigene Pfadliste (20.09.2026)",
+  "disposition": "keep",
+  "reason": "batch-doctor-core.mjs path parsing still has no self-check; doctor present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Der Doktor hat keine Prüfung für seine eigene Pfadliste (20.09.2026)"
+ },
+ {
+  "kind": "backlog",
+  "id": "B76",
+  "title": "Ein laufender beauftragter Autor ist in keiner Wiederaufnahme-Prüfung sichtbar (21.09.2026)",
+  "disposition": "keep",
+  "reason": "batch-in-flight resume reading still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Ein laufender beauftragter Autor ist in keiner Wiederaufnahme-Prüfung sichtba"
+ },
+ {
+  "kind": "backlog",
+  "id": "B77",
+  "title": "--agent-check urteilt „alive\" auf Dateien, die eine beendete Suite geschrieben hat (21.09.2026)",
+  "disposition": "keep",
+  "reason": "batch-in-flight --agent-check still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## `--agent-check` urteilt „alive\" auf Dateien, die eine beendete Suite geschrie"
+ },
+ {
+  "kind": "backlog",
+  "id": "B83",
+  "title": "render-verify-guard blockt auf testreinen Harness-Dateien (22.09.2026)",
+  "disposition": "keep",
+  "reason": "render-verify-guard.mjs still present; layoutHarness.ts/tagShuffleHarness.ts exist; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## render-verify-guard blockt auf testreinen Harness-Dateien (22.09.2026)"
+ },
+ {
+  "kind": "backlog",
+  "id": "B85",
+  "title": "Der Retry-Takt der automatischen Pause kennt keinen Nutzer-Halt (22.09.2026)",
+  "disposition": "keep",
+  "reason": "automatic pause retry still present (batch-paused handling); part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Der Retry-Takt der automatischen Pause kennt keinen Nutzer-Halt (22.09.2026)"
+ },
+ {
+  "kind": "backlog",
+  "id": "B87",
+  "title": "Board card titles keep a hold marker after the point resumes",
+  "disposition": "keep",
+  "reason": ".claude/board-queue.json card titles still carry markers; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Board card titles keep a hold marker after the point resumes"
+ },
+ {
+  "kind": "backlog",
+  "id": "B89",
+  "title": "CI flake: batch-daemon M40 lease-fence test",
+  "disposition": "keep",
+  "reason": "scripts/batch-daemon.test.mjs still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## CI flake: batch-daemon M40 lease-fence test"
+ },
+ {
+  "kind": "backlog",
+  "id": "B90",
+  "title": "Board liveness: running verification unattributed on Windows",
+  "disposition": "keep",
+  "reason": "scripts/board-liveness.mjs still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Board liveness: running verification unattributed on Windows"
+ },
+ {
+  "kind": "backlog",
+  "id": "B91",
+  "title": "Doctor quarantine stash sweeps a live run's frames",
+  "disposition": "keep",
+  "reason": "doctor quarantine stash still present (see point 1467); part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Doctor quarantine stash sweeps a live run's frames"
+ },
+ {
+  "kind": "backlog",
+  "id": "B92",
+  "title": "Blind-reviewer net rejects complete enumerations",
+  "disposition": "keep",
+  "reason": "BLIND_FIRST_PERSON still in scripts/mechanism-review-core.mjs; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Blind-reviewer net rejects complete enumerations"
+ },
+ {
+  "kind": "backlog",
+  "id": "B93",
+  "title": "Closing 633 cleanup: 1011 backlog decisions",
+  "disposition": "keep",
+  "reason": "closing machinery still present and the entry is the only pointer to the 1011 tracked decisions in docs/blind-633/decisions; part 2 parked",
+  "planRef": "§5 disagreement table row B93: resolved yes",
+  "match": "## Closing 633 cleanup: 1011 backlog decisions"
+ },
+ {
+  "kind": "backlog",
+  "id": "B94",
+  "title": "CI flake: batch-daemon cancel-attempt journals a stale pushed SHA",
+  "disposition": "keep",
+  "reason": "scripts/batch-daemon.test.mjs still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## CI flake: batch-daemon cancel-attempt journals a stale pushed SHA"
+ },
+ {
+  "kind": "backlog",
+  "id": "B95",
+  "title": "Chat responder holds the batch lock and loops in batch stop guards",
+  "disposition": "keep",
+  "reason": "batch-progress-guard.mjs and chat-watcher still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Chat responder holds the batch lock and loops in batch stop guards"
+ },
+ {
+  "kind": "backlog",
+  "id": "B96",
+  "title": "Bookkeeping commits on main invalidate the running closing regression",
+  "disposition": "keep",
+  "reason": "closing-guard-core.mjs HEAD rule still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Bookkeeping commits on main invalidate the running closing regression"
+ },
+ {
+  "kind": "backlog",
+  "id": "B97",
+  "title": "The standstill watchdog fires during a declared LARGE wait",
+  "disposition": "keep",
+  "reason": "batch-standstill still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## The standstill watchdog fires during a declared LARGE wait"
+ },
+ {
+  "kind": "backlog",
+  "id": "B98",
+  "title": "awk is classified as a read, so its program can write unguarded",
+  "disposition": "keep",
+  "reason": "directSegmentIntent in scripts/command-classify-core.mjs still present; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## `awk` is classified as a read, so its program can write unguarded"
+ },
+ {
+  "kind": "backlog",
+  "id": "B99",
+  "title": "Decision-log rotation retry: text identity cannot tell every twin from a retry",
+  "disposition": "keep",
+  "reason": "rotateBoardArchives still present (board-archive-rotate.mjs); part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Decision-log rotation retry: text identity cannot tell every twin from a retr"
+ },
+ {
+  "kind": "backlog",
+  "id": "B104",
+  "title": "Board reads \"BATCH STEHT\" while the owner is landing (30.09.2026)",
+  "disposition": "keep",
+  "reason": "board heartbeat still present (board-heartbeat.mjs); part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## Board reads \"BATCH STEHT\" while the owner is landing (30.09.2026)"
+ },
+ {
+  "kind": "backlog",
+  "id": "B106",
+  "title": "A live claimant loses the released lock after the 30-minute pick-up cap (01.10.2026)",
+  "disposition": "keep",
+  "reason": "HOA_CLAIM_MAX_MIN pick-up cap still in scripts/batch-claim-core.mjs; part 2 parked",
+  "planRef": "§5 Agreed obsolete yes",
+  "match": "## A live claimant loses the released lock after the 30-minute pick-up cap (01.1"
+ }
+]
