@@ -48,4 +48,17 @@ describe('device-loss gate (point 507)', () => {
       ['exit', 1],
     ])
   })
+
+  it('still exits 1 when the stdout write throws', () => {
+    const exits = []
+    expect(() =>
+      failAtLoss('FAIL  GPU device lost — x', {
+        writeSync: () => {
+          throw Object.assign(new Error('EAGAIN'), { code: 'EAGAIN' })
+        },
+        exit: (code) => exits.push(code),
+      }),
+    ).toThrow('EAGAIN')
+    expect(exits).toEqual([1])
+  })
 })

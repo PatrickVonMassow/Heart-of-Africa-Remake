@@ -29,8 +29,12 @@ export function deviceLossFailLine(text) {
  * still be pending when process.exit ends the process, losing the line.
  */
 export function failAtLoss(line, io = { writeSync, exit: (code) => process.exit(code) }) {
-  io.writeSync(1, `${line}\n`)
-  io.exit(1)
+  try {
+    io.writeSync(1, `${line}\n`)
+  } finally {
+    // A failed write (EAGAIN on a full pipe) must not skip the red exit.
+    io.exit(1)
+  }
 }
 
 /**
