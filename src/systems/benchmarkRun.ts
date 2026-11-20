@@ -289,6 +289,10 @@ function createGpuTimer(gl: unknown): GpuTimer {
  * so their difference is the CPU cost of the frame, uncapped by vsync, while
  * the before-to-before interval is the wall-clock frame time.
  */
+/** Unmeasured frames that let TravelScene remount (and run its mount effect)
+ *  after the settlement phase, before the next config applies its levers. */
+const BENCH_REMOUNT_FRAMES = 3
+
 function runFrames(count: number, collect: FrameSample[] | null, onFrame: () => void): Promise<void> {
   return new Promise((resolve, reject) => {
     let seen = 0
@@ -541,6 +545,17 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     }
   }
 
+  /** Back to the bird's-eye view BEFORE the next config's levers apply. The
+   *  settlement phase runs last, and TravelScene's mount effect writes the
+   *  player's terrain-refine setting over the global override — so the levers
+   *  must land after the remount, or `terrain-refine-off` measures nothing.
+   *  The frames are unmeasured and uncounted (only the GPU pool is drained). */
+  const leaveSettlement = async (): Promise<void> => {
+    if (useGame.getState().mode !== 'place') return
+    useGame.setState({ mode: 'travel', placeId: null })
+    await runFrames(BENCH_REMOUNT_FRAMES, null, () => gpu.poll(null))
+  }
+
   try {
     // Warm-up pass: DISCARDED. The first pass pays the cold caches (terrain
     // geometry, flora instances, shader compiles) and that cost must not land
@@ -550,6 +565,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
 
     for (let i = 0; i < BENCH_CONFIGS.length; i++) {
       const config = BENCH_CONFIGS[i]
+      await leaveSettlement()
       applyConfig(config, nativePixelRatio)
       for (const phase of BENCH_PHASES) await runPhase(config, i + 1, phase, true)
     }
@@ -560,6 +576,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     // same baseline and `buildLowProfile` can rank where LOW's cost still sits.
     for (let i = 0; i < BENCH_PRESET_LEVELS.length; i++) {
       const level = BENCH_PRESET_LEVELS[i]
+      await leaveSettlement()
       applyPreset(level, nativePixelRatio)
       const presetConfig: BenchConfig = { name: PRESET_CONFIG_NAMES[level], flags: {} }
       for (const phase of BENCH_PHASES) await runPhase(presetConfig, BENCH_CONFIGS.length + i + 1, phase, true)
