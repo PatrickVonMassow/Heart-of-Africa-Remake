@@ -39,6 +39,7 @@ import {
   summaryPoint,
 } from './board-core.mjs'
 import { DERIVED_STATE_KIND } from './board-state-core.mjs'
+import { expectedSections } from './dashboard-guard-core.mjs'
 
 /** The five sections, in the order the user's mandate fixes them — the decision
  *  log last, below Erledigt (user order 22.09.2026). */
@@ -91,24 +92,26 @@ export function structureViolations(html) {
   // (2) Exactly the five sections, in order, each wrapped so it collapses.
   const seen = []
   for (const hit of m.matchAll(/<h2\b[^>]*>([^<]*)<\/h2>/g)) seen.push(hit[1].trim())
-  if (seen.length !== REQUIRED_SECTIONS.length || seen.some((t, i) => t !== REQUIRED_SECTIONS[i])) {
+  // The derived Backlog counts only directly below Erledigt (user order 19.11.2026).
+  const expected = expectedSections(seen)
+  if (seen.length !== expected.length || seen.some((t, i) => t !== expected[i])) {
     out.push({
       code: 'sections-wrong',
-      msg: `expected the five sections ${REQUIRED_SECTIONS.join(' | ')} - found ${seen.join(' | ') || '<none>'}`,
+      msg: `expected the five sections ${expected.join(' | ')} - found ${seen.join(' | ') || '<none>'}`,
     })
   }
   const wrappers = count(m, /<details class="sect">/g)
-  if (wrappers !== REQUIRED_SECTIONS.length) {
+  if (wrappers !== expected.length) {
     out.push({
       code: 'section-wrappers',
-      msg: `${wrappers} collapsible section wrapper(s), expected ${REQUIRED_SECTIONS.length}`,
+      msg: `${wrappers} collapsible section wrapper(s), expected ${expected.length}`,
     })
   }
 
   // (3) An orphan wrapper: a section opener whose heading is not one of the five.
   // This is the exact leftover a cut-and-paste reorder produced.
   for (const hit of m.matchAll(/<details class="sect"><summary><h2\b[^>]*>([^<]*)/g)) {
-    if (!REQUIRED_SECTIONS.includes(hit[1].trim())) {
+    if (!expected.includes(hit[1].trim())) {
       out.push({
         code: 'orphan-section',
         msg: `a section wrapper opens on "${hit[1].trim().slice(0, 40)}", which is not one of the five`,

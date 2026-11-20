@@ -164,6 +164,18 @@ export const SECTION_TITLES = [
  *  handle that. */
 export const COLLAPSIBLE_SECTIONS = [...SECTION_TITLES]
 
+/** The derived Backlog section (user order 19.11.2026): the publisher renders it
+ *  from docs/backlog.md directly below Erledigt. A board written before it was
+ *  first published lacks it, so it is accepted absent — never out of place. */
+export const BACKLOG_TITLE = 'Backlog'
+
+/** The sections a board must show in order, given the headings it does show. */
+export function expectedSections(seen = []) {
+  if (!seen.includes(BACKLOG_TITLE)) return [...SECTION_TITLES]
+  const at = SECTION_TITLES.indexOf('Erledigt') + 1
+  return [...SECTION_TITLES.slice(0, at), BACKLOG_TITLE, ...SECTION_TITLES.slice(at)]
+}
+
 /** The board keeps only the newest finished cards; the rest live on their own
  *  published page (user 27.07.2026). Measured reason: at 214 cards the archive
  *  was three quarters of the file, so every review of the board grew with every
@@ -522,11 +534,12 @@ export function auditDashboard(html, input = {}) {
   const done = Array.isArray(input?.done) ? input.done : []
   const { order, sections } = sliceSections(html)
 
-  // STRUCTURE — exactly the five binding sections, in order.
-  if (order.length !== SECTION_TITLES.length || SECTION_TITLES.some((t, i) => order[i] !== t)) {
+  // STRUCTURE — exactly the five binding sections, in order (plus the derived Backlog below Erledigt).
+  const expected = expectedSections(order)
+  if (order.length !== expected.length || expected.some((t, i) => order[i] !== t)) {
     v.push({
       code: 'structure',
-      msg: `section headers are [${order.join(' | ') || '<none>'}] — the binding structure is [${SECTION_TITLES.join(' | ')}]`,
+      msg: `section headers are [${order.join(' | ') || '<none>'}] — the binding structure is [${expected.join(' | ')}]`,
     })
   }
 
@@ -544,7 +557,7 @@ export function auditDashboard(html, input = {}) {
   // 26./27.07.2026). The `open` ban above already covers "closed", so this rule
   // only pins that each wrapper still EXISTS: a republish that dropped one would
   // silently unfold that section again.
-  for (const title of COLLAPSIBLE_SECTIONS) {
+  for (const title of [...COLLAPSIBLE_SECTIONS, BACKLOG_TITLE]) {
     // The derived slot line may stand beside the heading inside its summary.
     const wrapped = new RegExp(
       `<details\\b[^>]*>\\s*<summary>\\s*<h2>${title}</h2>\\s*(?:<span class="slots">[^<]*</span>\\s*)?</summary>`,
