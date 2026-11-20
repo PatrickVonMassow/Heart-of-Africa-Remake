@@ -47438,3 +47438,14 @@ to land than a mechanism that needs a review.
   Out of scope: restructuring docs/backlog.md itself, new ledger fields or guards (infrastructure freeze).
   Source: user request of 19.11.2026 19:58 UTC via the findings carrier (session unknown).
   Bundle: Chat & Tafel.
+
+- [x] 1555. Let a non-owner session write into its own scratchpad past the main-write guard
+  The main-write guard (PreToolUse, "MAIN WRITE REFUSED — this session holds no batch lock") refuses a Bash
+  redirection into the session's own scratchpad under /tmp/claude-1000/… for a non-owner session, e.g.
+  `sed -n 1,90p scripts/user-gate-core.mjs > /tmp/claude-1000/<…>/scratchpad/vdzk/m1.txt` (reproduced
+  19.11.2026 three times, literal path and variable path). A write outside the repository is not a main write.
+  Final state: a redirection whose target resolves outside the main working tree (scratchpad, /tmp) passes for
+  a non-owner session; writes into the main tree stay refused.
+  Test: Vitest on the guard's core with the scratchpad target (passes) and a main-tree target (refused).
+  Source: user request of 19.11.2026 18:49 UTC via the findings carrier (session unknown).
+  Bundle: Modell & Wächter.

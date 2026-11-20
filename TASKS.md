@@ -107,17 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1555. Let a non-owner session write into its own scratchpad past the main-write guard
-  The main-write guard (PreToolUse, "MAIN WRITE REFUSED — this session holds no batch lock") refuses a Bash
-  redirection into the session's own scratchpad under /tmp/claude-1000/… for a non-owner session, e.g.
-  `sed -n 1,90p scripts/user-gate-core.mjs > /tmp/claude-1000/<…>/scratchpad/vdzk/m1.txt` (reproduced
-  19.11.2026 three times, literal path and variable path). A write outside the repository is not a main write.
-  Final state: a redirection whose target resolves outside the main working tree (scratchpad, /tmp) passes for
-  a non-owner session; writes into the main tree stay refused.
-  Test: Vitest on the guard's core with the scratchpad target (passes) and a main-tree target (refused).
-  Source: user request of 19.11.2026 18:49 UTC via the findings carrier (session unknown).
-  Bundle: Modell & Wächter.
-
 - [ ] 1560. Finish the reorder dispositions: confirm 1013, re-check 1059/1328/1289, consolidate 1516 with 551
   Split off point 1557 (the user-approved work-order reorder of 19.11.2026) because these parts need measurement runs, not queue edits.
 
