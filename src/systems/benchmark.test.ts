@@ -4,6 +4,9 @@
 // half (F8 driving the real scene) is scripts/verify/benchmark.mjs.
 
 import { describe, it, expect } from 'vitest'
+import { balance } from '../config/balance'
+import { freshGame, g, useGame, withWorld } from '../test/store'
+import { benchEnterPlace } from './benchmarkEntry'
 import {
   BENCH_APP,
   BENCH_CONFIGS,
@@ -13,11 +16,16 @@ import {
   BENCH_SEED,
   BENCH_ZOOM,
   BENCH_PRESET_LEVELS,
+  BENCH_SETTLEMENT_PLACE,
   LOW_CONFIG_NAME,
   PRESET_CONFIG_NAMES,
   benchFilename,
   benchNativePixelRatio,
   benchFrameCounts,
+  benchReadyBudget,
+  benchTrisStable,
+  benchFrameReady,
+  benchReadinessPush,
   benchRemainingMs,
   benchReportJson,
   benchShortMode,
@@ -39,6 +47,7 @@ import {
   type BenchSceneNode,
 } from './benchmark'
 import { DETAIL_LEVELS, QUALITY_PRESETS } from '../config/quality'
+import { placeById } from '../world/geo'
 
 describe('benchmark preset passes (point 1524)', () => {
   it('measures every graphics level once, high to low, under names distinct from the sweep', () => {
@@ -58,9 +67,9 @@ describe('benchmark preset passes (point 1524)', () => {
     expect(benchNativePixelRatio(undefined)).toBe(1)
   })
 
-  it('keeps the full run with all preset passes under ~3 min at 60 Hz', () => {
+  it('keeps the full run with all preset passes and the settlement phase under ~4 min at 60 Hz', () => {
     const total = benchTotalFrames(false, BENCH_CONFIGS.length + BENCH_PRESET_LEVELS.length)
-    expect(total / 60).toBeLessThan(180)
+    expect(total / 60).toBeLessThan(240)
   })
 })
 
@@ -113,13 +122,24 @@ describe('benchmark sweep plan (design.md §21.1)', () => {
   })
 })
 
-describe('benchmark route (the three point-276 states)', () => {
-  it('visits dense savanna, empty desert and the savanna drive, in order', () => {
-    expect(BENCH_PHASES.map((p) => p.name)).toEqual(['savanna-standing', 'desert-standing', 'savanna-driving'])
+describe('benchmark route (the three point-276 states, then the settlement)', () => {
+  it('visits dense savanna, empty desert, the savanna drive and the settlement, in order', () => {
+    expect(BENCH_PHASES.map((p) => p.name)).toEqual(['savanna-standing', 'desert-standing', 'savanna-driving', 'settlement-standing'])
     // The same anchors scripts/perf-bench.mjs measures, so both agree.
     expect(BENCH_PHASES[0]).toMatchObject({ lat: -2.5, lon: 34.0, drive: false })
     expect(BENCH_PHASES[1]).toMatchObject({ lat: 23.0, lon: 15.0, drive: false })
     expect(BENCH_PHASES[2]).toMatchObject({ lat: -2.5, lon: 34.0, drive: true })
+    // Only the settlement phase enters a place; the travel phases stay outside.
+    expect(BENCH_PHASES.slice(0, 3).every((p) => p.placeId === undefined)).toBe(true)
+  })
+
+  it('stands inside a port city, at its own map position, entered last from the bird\'s-eye view (point 1561)', () => {
+    const settlement = BENCH_PHASES.find((p) => p.name === 'settlement-standing')
+    expect(settlement?.placeId).toBe(BENCH_SETTLEMENT_PLACE)
+    const place = placeById(BENCH_SETTLEMENT_PLACE)
+    expect(place.kind).toBe('port')
+    expect(settlement).toMatchObject({ lat: place.lat, lon: place.lon, drive: false })
+    expect(BENCH_PHASES.at(-1)).toBe(settlement)
   })
 
   it('pins the deterministic run state (seed, date, reachable zoom, timestep)', () => {
@@ -140,11 +160,11 @@ describe('benchmark route (the three point-276 states)', () => {
     }
   })
 
-  it('counts the discarded warm-up pass into the total, and stays under ~3 min at 60 Hz', () => {
+  it('counts the discarded warm-up pass into the total, and stays under ~4 min at 60 Hz', () => {
     const c = benchFrameCounts(false)
     const total = benchTotalFrames(false)
     expect(total).toBe((BENCH_CONFIGS.length + 1) * BENCH_PHASES.length * (c.settle + c.sample))
-    expect(total / 60).toBeLessThan(180)
+    expect(total / 60).toBeLessThan(240)
     expect(benchTotalFrames(true)).toBeLessThan(total)
   })
 
@@ -518,6 +538,23 @@ describe('report shaping', () => {
     expect(lines).toHaveLength(6) // 3 header lines + headline + table head + one row
   })
 
+  it('lists the settlement row beside the travel phases, column-aligned (point 1561)', () => {
+    const r = report()
+    const travel = r.rows[0]
+    r.rows.push({ ...travel, phase: 'settlement-standing', place: BENCH_SETTLEMENT_PLACE, frame: frameStats([200, 200, 200]) })
+    const lines = benchSummaryLines(r)
+    const travelLine = lines.find((l) => l.includes('savanna-standing')) ?? ''
+    const settlementLine = lines.find((l) => l.includes('settlement-standing')) ?? ''
+    expect(settlementLine).toMatch(/^baseline\s+settlement-standing\s+5\.0\s/)
+    // The longest phase name keeps a gap, so every column stays aligned.
+    expect(settlementLine.length).toBe(travelLine.length)
+    expect(lines[4].indexOf('fps') + 3).toBe(settlementLine.indexOf('5.0') + 3)
+    // The JSON keeps the row's place as the evidence it stood in the settlement.
+    const parsed = JSON.parse(benchReportJson(r)) as BenchReport
+    expect(parsed.rows.map((row) => row.phase)).toEqual(['savanna-standing', 'settlement-standing'])
+    expect(parsed.rows[1].place).toBe('cairo')
+  })
+
   it('prints the GPU column where it exists and a dash where it does not', () => {
     const withGpu = benchSummaryLines(report()).at(-1) ?? ''
     expect(withGpu).toContain('6.50') // the gpu median of [6, 6.5, 7]
@@ -598,5 +635,76 @@ describe('report shaping', () => {
     expect(formatDuration(0)).toBe('0:00')
     expect(formatDuration(9000)).toBe('0:09')
     expect(formatDuration(125000)).toBe('2:05')
+  })
+})
+
+describe('settlement readiness and the later-entry path (point 1561)', () => {
+  withWorld()
+  it('waits for a held, non-zero triangle count before sampling a settlement', () => {
+    const { stableFrames, tolerance } = benchReadyBudget(false)
+    // The short-mode WebGL 2 baseline row measured 3019 triangles mid-build.
+    const building = [0, 0, 3019, 3019, 40000, 76000, 120000, 153000]
+    expect(benchTrisStable(building, stableFrames, tolerance)).toBe(false)
+    const standing = [...building, ...Array.from({ length: stableFrames }, (_, i) => 153000 + (i % 2) * 500)]
+    expect(benchTrisStable(standing, stableFrames, tolerance)).toBe(true)
+    expect(benchTrisStable(Array(stableFrames).fill(0), stableFrames, tolerance)).toBe(false)
+    expect(benchTrisStable([153000, 153000, 3019, 153000], 4, tolerance)).toBe(false)
+  })
+
+  it('counts stability only over frames drawn with a warm pipeline set', () => {
+    const { stableFrames, tolerance } = benchReadyBudget(true)
+    // WebGL 2 first entry: flat 6031 triangles while pipelines still compile.
+    let h: number[] = []
+    for (let i = 0; i < stableFrames * 3; i++) h = benchReadinessPush(h, 6031, false)
+    expect(benchTrisStable(h, stableFrames, tolerance)).toBe(false)
+    h = benchReadinessPush(h, 254000, true)
+    expect(h).toEqual([254000])
+    for (let i = 1; i < stableFrames; i++) h = benchReadinessPush(h, 254000, true)
+    expect(benchTrisStable(h, stableFrames, tolerance)).toBe(true)
+    expect(benchReadinessPush(h, 254000, false)).toEqual([])
+  })
+
+  it('counts no readiness frame while the outgoing travel scene is still mounted', () => {
+    const { stableFrames, tolerance } = benchReadyBudget(true)
+    const idle = { pending: 0, queued: 0 }
+    let h: number[] = []
+    // Stable travel triangles with idle pipelines must not open the gate.
+    for (let i = 0; i < stableFrames * 3; i++) h = benchReadinessPush(h, 1668873, benchFrameReady(true, idle))
+    expect(benchTrisStable(h, stableFrames, tolerance)).toBe(false)
+    for (let i = 0; i < stableFrames; i++) h = benchReadinessPush(h, 718139, benchFrameReady(false, idle))
+    expect(benchTrisStable(h, stableFrames, tolerance)).toBe(true)
+    expect(benchFrameReady(false, { pending: 1, queued: 0 })).toBe(false)
+    expect(benchFrameReady(false, { pending: 0, queued: 2 })).toBe(false)
+    expect(benchFrameReady(false, null)).toBe(true)
+  })
+
+  it('caps the readiness wait, the short run tighter than the full one', () => {
+    const full = benchReadyBudget(false)
+    const short = benchReadyBudget(true)
+    expect(short.maxFrames).toBeLessThan(full.maxFrames)
+    for (const b of [full, short]) expect(b.maxFrames).toBeGreaterThan(b.stableFrames)
+  })
+
+  it('enters Cairo silently: no journal entry, no bounty, no money, no checkpoint', () => {
+    freshGame()
+    balance.randomEventsEnabled = false
+    g().leavePlace()
+    useGame.setState({ pendingBounties: [{ kind: 'landmark', id: 'giza' }] })
+    localStorage.clear()
+    for (let pass = 0; pass < 2; pass++) {
+      const journal = g().journal.length
+      const money = g().money
+      expect(benchEnterPlace(BENCH_SETTLEMENT_PLACE)).toEqual({ journal: 0, money: 0 })
+      expect(g().mode).toBe('place')
+      expect(g().placeId).toBe(BENCH_SETTLEMENT_PLACE)
+      expect({ journal: g().journal.length, money: g().money }).toEqual({ journal, money })
+      expect(g().pendingBounties).toEqual([])
+      expect(localStorage.length).toBe(0)
+      g().leavePlace()
+    }
+    // The ordinary re-entry the stubs suppress: a port writes both.
+    g().enterPlace(BENCH_SETTLEMENT_PLACE)
+    expect(localStorage.length).toBeGreaterThan(0)
+    balance.randomEventsEnabled = true
   })
 })

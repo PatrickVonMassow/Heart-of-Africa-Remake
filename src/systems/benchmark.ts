@@ -19,6 +19,7 @@
 // to run, though not config to config within a sweep.
 
 import { QUALITY_PRESETS, type DetailLevel, type QualityPreset } from '../config/quality'
+import { placeById } from '../world/geo'
 import { gpuPassSummaryLines, type BenchGpuPassBreakdown, type BenchGpuPassTiming } from './benchmarkPasses'
 
 /** Simulation timestep every benchmark frame is stepped with (seconds). */
@@ -134,7 +135,7 @@ export function benchNativePixelRatio(devicePixelRatio: number | undefined): num
 /** The preset passes in run order (high → medium → low). */
 export const BENCH_PRESET_LEVELS: readonly DetailLevel[] = ['high', 'medium', 'low']
 
-export type BenchPhaseName = 'savanna-standing' | 'desert-standing' | 'savanna-driving'
+export type BenchPhaseName = 'savanna-standing' | 'desert-standing' | 'savanna-driving' | 'settlement-standing'
 
 export interface BenchPhase {
   name: BenchPhaseName
@@ -142,17 +143,34 @@ export interface BenchPhase {
   lon: number
   /** true = hold forward for the whole phase (the streaming/driving state). */
   drive: boolean
+  /** A settlement entered after the jump (the walkable local scene with its
+   *  inhabitants active); undefined = the phase stays in the bird's-eye view. */
+  placeId?: string
 }
 
+/** The port city the settlement phase stands in: Cairo, the size-3 port of
+ *  the user's 5 FPS bug report (20.11.2026). Calibratable. */
+export const BENCH_SETTLEMENT_PLACE = 'cairo'
+
 /**
- * The route: the three states of point 276 in order. The anchors are the ones
- * `scripts/perf-bench.mjs` measures, so the in-game numbers and the headless
- * ones describe the same places.
+ * The route: the three travel states of point 276 in order, then the
+ * settlement. The travel anchors are the ones `scripts/perf-bench.mjs`
+ * measures, so the in-game numbers and the headless ones describe the same
+ * places. The settlement phase runs LAST so it is always entered from the
+ * bird's-eye view, exactly as a player walks in; its anchor is Cairo's own
+ * map position (`placeById`), so the jump lands where `debugJumpToPlace` does.
  */
 export const BENCH_PHASES: readonly BenchPhase[] = [
   { name: 'savanna-standing', lat: -2.5, lon: 34.0, drive: false },
   { name: 'desert-standing', lat: 23.0, lon: 15.0, drive: false },
   { name: 'savanna-driving', lat: -2.5, lon: 34.0, drive: true },
+  {
+    name: 'settlement-standing',
+    lat: placeById(BENCH_SETTLEMENT_PLACE).lat,
+    lon: placeById(BENCH_SETTLEMENT_PLACE).lon,
+    drive: false,
+    placeId: BENCH_SETTLEMENT_PLACE,
+  },
 ]
 
 interface BenchFrameCounts {
@@ -170,9 +188,59 @@ export function benchShortMode(search: string): boolean {
 }
 
 /** Fixed frame budget per phase. Full run: 2.5 s of samples after a 1.3 s
- *  settle. */
+ *  settle — the settlement phase takes the same budget as the travel ones. */
 export function benchFrameCounts(short: boolean): BenchFrameCounts {
   return short ? { settle: 8, sample: 16 } : { settle: 80, sample: 150 }
+}
+
+/** Settlement readiness (point 1561): after the fixed settle the settlement
+ *  phase keeps running UNMEASURED frames until the drawn triangle count has
+ *  held within `tolerance` for `stableFrames` frames — a half-built walkable
+ *  scene must never be sampled. `maxFrames` caps the wait; a row that hit it is
+ *  flagged `readyTimeout`. Calibratable estimates. */
+export function benchReadyBudget(short: boolean): { stableFrames: number; tolerance: number; maxFrames: number } {
+  return short ? { stableFrames: 6, tolerance: 0.02, maxFrames: 180 } : { stableFrames: 12, tolerance: 0.02, maxFrames: 600 }
+}
+
+/** True once the last `stableFrames` triangle readings are all non-zero and
+ *  spread by at most `tolerance` of their maximum. Pure (point 1561). */
+export function benchTrisStable(history: readonly number[], stableFrames: number, tolerance: number): boolean {
+  if (stableFrames < 1 || history.length < stableFrames) return false
+  const tail = history.slice(-stableFrames)
+  const max = Math.max(...tail)
+  const min = Math.min(...tail)
+  return min > 0 && max - min <= max * tolerance
+}
+
+/** One readiness reading: while shader pipelines still compile, the renderer
+ *  SKIPS their objects (src/render/asyncPipelines.ts) and the triangle count
+ *  holds flat at a half-built value (WebGL 2 first Cairo entry: 6031 triangles
+ *  against ~254k). So stability only counts frames drawn with a warm pipeline
+ *  set — a cold frame clears the history. Pure (point 1561). */
+/** Whether a readiness frame counts: the outgoing travel scene is gone and
+ *  no pipeline is pending or queued (absent handle = synchronous compile). */
+export function benchFrameReady(travelMounted: boolean, pipelines: { pending: number; queued: number } | null): boolean {
+  return !travelMounted && (!pipelines || (pipelines.pending === 0 && pipelines.queued === 0))
+}
+
+export function benchReadinessPush(history: number[], triangles: number, pipelinesWarm: boolean): number[] {
+  if (!pipelinesWarm) return []
+  history.push(triangles)
+  return history
+}
+
+/** The state patch that puts a settlement on the LATER-entry path before the
+ *  benchmark enters it: already visited and entered, no bounty pending — so no
+ *  config pays a first-arrival journal entry or a bounty another one skips. */
+export function benchLaterEntryPatch(
+  state: { visitedPlaces: readonly string[]; enteredPlaces: readonly string[] },
+  id: string,
+): { pendingBounties: never[]; visitedPlaces: string[]; enteredPlaces: string[] } {
+  return {
+    pendingBounties: [],
+    visitedPlaces: state.visitedPlaces.includes(id) ? [...state.visitedPlaces] : [...state.visitedPlaces, id],
+    enteredPlaces: state.enteredPlaces.includes(id) ? [...state.enteredPlaces] : [...state.enteredPlaces, id],
+  }
 }
 
 /**
@@ -397,6 +465,16 @@ export interface BenchRow {
    *  inherits the ratio active when F8 was pressed, so it is recorded rather
    *  than assumed). Absent in reports from older builds. */
   pixelRatio?: number
+  /** The settlement the game stood in at the end of the sample (point 1561),
+   *  null in the bird's-eye view — the evidence a settlement row really
+   *  measured the walkable scene. Absent in reports from older builds. */
+  place?: string | null
+  /** Settlement rows: true when the readiness wait hit its cap and the sample
+   *  may still show a half-built scene (point 1561). */
+  readyTimeout?: boolean
+  /** Settlement rows: journal entries added and money gained by the entry
+   *  itself — 0/0 is the proof of the later-entry path (point 1561). */
+  entryCost?: { journal: number; money: number }
   /** Scene-graph triangles per system at the end of the sample. */
   sceneTriangles: Record<string, BenchTriGroup>
 }
@@ -534,7 +612,7 @@ export function lowProfileSummaryLines(profile: BenchLowProfile): string[] {
   ]
   for (const p of profile.phases) {
     const gpu = p.gpu ? `${p.gpu.median.toFixed(2)}ms gpu` : 'gpu n/a'
-    lines.push(`  ${pad(p.phase, 18)}${padStart(String(p.totalTris), 9)} tris · ${padStart(String(p.drawCalls), 5)} draws · ${gpu} · ${p.cpu.median.toFixed(2)}ms cpu · ${p.frame.median.toFixed(2)}ms frame`)
+    lines.push(`  ${pad(p.phase, PHASE_COL)}${padStart(String(p.totalTris), 9)} tris · ${padStart(String(p.drawCalls), 5)} draws · ${gpu} · ${p.cpu.median.toFixed(2)}ms cpu · ${p.frame.median.toFixed(2)}ms frame`)
     for (const e of p.ranking.slice(0, 6)) {
       lines.push(`    ${pad(e.system, 22)}${padStart(String(e.tris), 9)}${padStart(`${Math.round(e.pct * 100)}%`, 5)}${padStart(`${e.meshes} mesh`, 10)}`)
     }
@@ -552,6 +630,9 @@ export function benchFilename(backend: string, date: Date = new Date()): string 
   const tag = backend.replace(/[^a-z0-9]+/gi, '').toLowerCase() || 'unknown'
   return `hoa-bench-${y}-${m}-${d}-${tag}.json`
 }
+
+/** Digest column width for the phase name: the longest one plus a gap. */
+const PHASE_COL = Math.max(...BENCH_PHASES.map((p) => p.name.length)) + 2
 
 function pad(s: string, n: number): string {
   return s.length >= n ? s : s + ' '.repeat(n - s.length)
@@ -572,12 +653,12 @@ export function benchSummaryLines(report: BenchReport): string[] {
     `${e.startedAt} · ${e.backend} · ${e.viewport.width}x${e.viewport.height} @dpr ${e.devicePixelRatio} · build ${e.build} ${e.commit}`,
     `fixed timestep ${report.dt.toFixed(5)}s · ${report.frames.sample} sampled frames per phase · seed ${report.seed} · day ${report.day}`,
     headlineNote(report.headline, report.gpuTiming.reason),
-    `${pad('config', 20)}${pad('phase', 18)}${padStart('fps', 7)}${padStart('gpu', 8)}${padStart('gpu95', 8)}${padStart('cpu', 8)}${padStart('frame', 8)}${padStart('f95', 8)}${padStart('draws', 8)}${padStart('tris', 10)}${padStart('dpr', 6)}`,
+    `${pad('config', 20)}${pad('phase', PHASE_COL)}${padStart('fps', 7)}${padStart('gpu', 8)}${padStart('gpu95', 8)}${padStart('cpu', 8)}${padStart('frame', 8)}${padStart('f95', 8)}${padStart('draws', 8)}${padStart('tris', 10)}${padStart('dpr', 6)}`,
   ]
   for (const r of report.rows) {
     lines.push(
       pad(r.config, 20) +
-        pad(r.phase, 18) +
+        pad(r.phase, PHASE_COL) +
         padStart(r.frame.fps.toFixed(1), 7) +
         padStart(num(r.gpu?.median), 8) +
         padStart(num(r.gpu?.p95), 8) +

@@ -165,13 +165,58 @@ const result = await page.evaluate(() => {
   return { filename: file.filename, aborted: file.aborted, report: JSON.parse(file.json) }
 })
 const report = result.report
-const configs = [...new Set(report.rows.map((r) => r.config))]
-const phases = [...new Set(report.rows.map((r) => r.phase))]
+// The EXPECTED sweep comes from the shipped plan, never from the rows it judges:
+// a config missing from both the rows and the digest must still fail.
+const sweep = await page.evaluate(async () => {
+  const m = await import('/src/systems/benchmark.ts')
+  return {
+    configs: [...m.BENCH_CONFIGS.map((c) => c.name), ...m.BENCH_PRESET_LEVELS.map((l) => m.PRESET_CONFIG_NAMES[l])],
+    phases: m.BENCH_PHASES.map((p) => p.name),
+  }
+})
+const configs = sweep.configs
+const phases = sweep.phases
 check('the run completed without an abort', result.aborted === false)
 check(
   'one report row per config and phase',
-  report.rows.length === configs.length * phases.length && configs.length >= 10 && phases.length === 3,
+  report.rows.length === configs.length * phases.length && configs.length >= 10 && phases.length === 4,
   `${report.rows.length} rows, ${configs.length} configs, ${phases.length} phases`,
+)
+// Point 1561: the settlement phase stands INSIDE the port city for every
+// config, the presets included — judged by the state the row recorded at the
+// end of its sample, not by the phase name.
+const settlementRows = report.rows.filter((r) => r.phase === 'settlement-standing')
+check(
+  'every config, the low preset included, has a settlement row measured inside Cairo',
+  settlementRows.length === configs.length && configs.includes('low-preset') &&
+    settlementRows.every((r) => r.place === 'cairo') &&
+    report.rows.filter((r) => r.phase !== 'settlement-standing').every((r) => r.place === null),
+  `${settlementRows.length}/${configs.length} rows, places ${JSON.stringify([...new Set(report.rows.map((r) => r.place))])}`,
+)
+// Exactly ONE row and ONE digest line per (config, phase): a remount race or a
+// doubled phase would add a row the count check above could balance away.
+const pairKeys = report.rows.map((r) => `${r.config}|${r.phase}`)
+const digestKeys = report.summary
+  .map((l) => l.match(/^(\S+)\s+(savanna-standing|desert-standing|savanna-driving|settlement-standing)\s/))
+  .filter(Boolean)
+  .map((m) => `${m[1]}|${m[2]}`)
+const pairsOnce = (keys) => configs.every((c) => phases.every((ph) => keys.filter((k) => k === `${c}|${ph}`).length === 1))
+check(
+  'one row and one digest line per (config, phase), the settlement included',
+  new Set(pairKeys).size === pairKeys.length && pairsOnce(pairKeys) && pairsOnce(digestKeys) && digestKeys.length === pairKeys.length,
+  `${pairKeys.length} rows, ${new Set(pairKeys).size} distinct, ${digestKeys.length} digest lines`,
+)
+// The silent later entry: no journal entry, no money, and the readiness wait
+// reached a standing scene for every settlement row (no cap hit).
+check(
+  'every settlement entry added no journal entry and paid nothing',
+  settlementRows.every((r) => r.entryCost?.journal === 0 && r.entryCost?.money === 0),
+  JSON.stringify([...new Set(settlementRows.map((r) => JSON.stringify(r.entryCost ?? null)))]),
+)
+check(
+  'every settlement row was sampled after its scene stood (no readiness timeout)',
+  settlementRows.every((r) => r.readyTimeout === false),
+  `${settlementRows.filter((r) => r.readyTimeout !== false).length} row(s) flagged`,
 )
 check(
   'every row carries frame-time statistics, draw calls and triangles',
@@ -265,6 +310,20 @@ for (const config of ['terrain-refine-off', 'terrain-cap-84']) {
     `${terrainTris(baseDesert)} -> ${terrainTris(desertRow(config))} (${heaviest?.[0]})`,
   )
 }
+// The config after a settlement phase (point 1561): terrain-refine-off follows
+// dpr-1's Cairo row, and TravelScene's remount rewrites the refine setting —
+// its FIRST phase, savanna-standing, must already show the cut.
+const savannaRow = (config) => report.rows.find((r) => r.config === config && r.phase === 'savanna-standing')
+// Both rows must carry the terrain group: a missing or renamed group would
+// otherwise pass as a cut.
+// The group is named, not inferred from the largest one.
+const savannaTerrain = (row) => row?.sceneTriangles?.['travel-terrain']?.tris
+const [savBase, savCut] = [savannaTerrain(savannaRow('baseline')), savannaTerrain(savannaRow('terrain-refine-off'))]
+check(
+  'terrain-refine-off also cuts the savanna terrain right after the settlement',
+  typeof savBase === 'number' && typeof savCut === 'number' && savBase - savCut > 0,
+  `${savBase} -> ${savCut} (travel-terrain)`,
+)
 
 check(
   'the report names the series to read, consistent with the GPU availability',
