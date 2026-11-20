@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { freshGame, withWorld } from '../test/store'
 import { useUi } from '../state/ui'
+import { useGame } from '../state/store'
 import { setRenderContext, type RenderContext } from '../render/renderContext'
 import { recordDeviceLost, resetGpuHealth } from '../render/gpuHealth'
 import { resetDevAsserts } from './devAssert'
@@ -113,6 +114,34 @@ describe('render benchmark on a lost GPU device (point 507)', () => {
     expect(report().invalidReason).toContain('GPU device lost')
     expect(useUi.getState().deviceLost).toBe(true)
     expect(useUi.getState().deviceLostDismissed).toBe(false)
+  })
+
+  it('a loss that stops the frames after rows accumulated ends INVALID, not as a plain abort', async () => {
+    fakeContext(42)
+    const run = startBenchmark({ short: true })
+    let settled = false
+    void run.then(() => (settled = true))
+    // Healthy frames until the first measured config has written its rows.
+    for (let n = 0; n < 5000 && (useUi.getState().benchProgress?.configIndex ?? 0) < 2; n++) {
+      for (const cb of [...before]) cb()
+      for (const cb of [...after]) cb()
+      await new Promise((r) => setTimeout(r, 0))
+    }
+    expect(useUi.getState().benchProgress?.configIndex).toBe(2)
+    // The device dies and no frame callback runs again: only the watchdog ends it.
+    recordDeviceLost({ api: 'WebGPU', reason: 'unknown', message: 'Instance dropped' })
+    const t = performance.now()
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(t + 60000)
+    try {
+      await run
+    } finally {
+      clock.mockRestore()
+    }
+    expect(settled).toBe(true)
+    const r = report()
+    expect(r.invalidReason).toContain('GPU device lost')
+    expect(r.rows).toEqual([])
+    expect(useGame.getState().toast).toBeNull()
   })
 
   it('a measured phase with zero draw calls ends the run INVALID instead of reporting fps', async () => {

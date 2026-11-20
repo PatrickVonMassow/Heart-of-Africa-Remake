@@ -647,8 +647,12 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
       const presetConfig: BenchConfig = { name: PRESET_CONFIG_NAMES[level], flags: {} }
       for (const phase of BENCH_PHASES) await runPhase(presetConfig, BENCH_CONFIGS.length + i + 1, phase, true)
     }
-  } catch (error) {
+  } catch (caught) {
     aborted = true
+    // A lost device can stop the frame callbacks altogether: the watchdog's
+    // "no frames" (or any other failure) then still ends the run INVALID.
+    const lost = caught instanceof BenchAborted || caught instanceof BenchInvalid ? null : deviceLostReason()
+    const error = lost !== null ? new BenchInvalid(lost) : caught
     if (error instanceof BenchInvalid) {
       // Rows measured before the loss are dropped too: the loss's onset is
       // unknown, so none of them is known to have drawn the scene.
