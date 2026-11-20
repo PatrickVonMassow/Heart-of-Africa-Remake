@@ -77,3 +77,14 @@ leftover carrier file and its header sit on the host and cannot be checked here.
   Measured for 896: `cross-review.mjs` still accepts an unknown flag.
 - The clone is shallow, so fixing commits were checked in the tree, not with
   `git log -S`.
+
+## Result
+
+Executed on main (e4b1daa14): 253 open points removed (2 archived as obsolete,
+250 moved to `docs/backlog.md` with their specs verbatim in the archive, 1474
+closed as delivered) and 1 backlog entry deleted (B1); 9 point verdicts dropped
+on re-validation. Open points 447 → 194; points in the infrastructure bundles
+252 → 75, unbundled 103 → 46. The first infrastructure point behind the game
+work stays 1447 at position 10 of the work order (its rank, not the cleanup,
+places it there); behind it, the infrastructure share of the queue falls from
+252 of 447 to 75 of 194.
