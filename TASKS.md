@@ -116,6 +116,14 @@ put it is the mistake this line exists to stop.
   Source: user benchmarks and bug report 20.11.2026 (local/Schwaches Notebook - *, local/Sehr schwaches Notebook - *).
   Bundle: Steuerung & Performance.
   Source: user request of 20.11.2026 07:31 UTC via the findings carrier (session 4c27ebaf); approved "B und D nach 1543 einreihen".
+  Progress 20.11.2026 (handover at the context watermark): feat/1561-settlement-benchmark @ 4f74001 has the phase,
+  the leaveSettlement fix for terrain-refine-off, and the WebGPU report frame; WebGPU 39/8 and WebGL 2 41/6 reds all owned by
+  1009/1012. Owed before landing (cross-review GPT-6.2 Sol, 3 passes merge-with-fixes, local/1561-cross-review-p1..3.log):
+  (1) gate settlement sampling on scene readiness (unmeasured settle until render triangles stabilise, capped, row flagged on
+  timeout; pure helper with Vitest) - WebGL 2 short mode measured a 3019-triangle baseline Cairo row; (2) leaveSettlement waits
+  until TravelScene has mounted (travel-terrain node) plus one frame, not 3 fixed frames; (3) browser check: one row per
+  (config, phase) and one digest line each, terrain-refine-off also cuts savanna-standing after Cairo; (4) record and assert
+  that the later-entry path adds no journal entry and pays no bounty. Then a confirming review pass, both backends, landing.
 
 - [ ] 1562. The first start picks the Low graphics level on a weak GPU
   Placement: directly after point 1543 in the work order, after the settlement benchmark point (user order 20.11.2026).
