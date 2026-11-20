@@ -107,6 +107,26 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
+- [ ] 1561. The render benchmark measures a settlement
+  Placement: directly after point 1543 in the work order (user order 20.11.2026).
+  Observed problem: the F8 benchmark (src/systems/benchmark.ts phases) measures only travel scenes (savanna-standing, desert-standing, savanna-driving). The user's bug report of 20.11.2026 shows 5 FPS inside Cairo on Medium (Intel Gen-8 notebook), while the weak AMD RDNA-2 notebook benchmark reports 55 fps on Low for travel only — whether Low is playable in a settlement is unmeasured.
+  Final state: the benchmark has a settlement phase (standing inside a port city such as Cairo, with its inhabitants active) measured for every config, including the LOW preset profile, with the same fixed-timestep and GPU-timestamp rules as the travel phases; the summary lists it beside the travel phases.
+  Test: Vitest for the phase list / report shape; a browser run of the benchmark showing the settlement rows on WebGPU.
+  Player impact: weak devices cannot be judged for settlement play, where the bug report measured 5 FPS.
+  Source: user benchmarks and bug report 20.11.2026 (local/Schwaches Notebook - *, local/Sehr schwaches Notebook - *).
+  Bundle: Steuerung & Performance.
+  Source: user request of 20.11.2026 07:31 UTC via the findings carrier (session 4c27ebaf); approved "B und D nach 1543 einreihen".
+
+- [ ] 1562. The first start picks the Low graphics level on a weak GPU
+  Placement: directly after point 1543 in the work order, after the settlement benchmark point (user order 20.11.2026).
+  Observed problem: the detail level defaults to 'medium' (src/state/ui.ts:300) on every device. On the user's weak notebook (AMD RDNA-2 iGPU, dpr 1.75) Medium runs ~29-32 fps and Low ~55 fps in the benchmark; a player who never opens the settings stays on Medium.
+  Final state: on a first start without a stored or URL-given detail level, the game chooses Low for a weak adapter (decision rule from the adapter info the game already reads in src/render/backendInfo.ts and/or a short measured startup probe — the rule and its thresholds are calibratable values in src/config/balance.ts or src/config/quality.ts); otherwise Medium as today. A player's own choice always wins and is never overridden later.
+  Test: Vitest for the decision rule (weak adapter -> low, others -> medium, stored choice wins).
+  Player impact: weak devices start in a playable state instead of ~30 fps or worse.
+  Source: user benchmarks 20.11.2026.
+  Bundle: Steuerung & Performance.
+  Source: user request of 20.11.2026 07:31 UTC via the findings carrier (session 4c27ebaf); approved "B und D nach 1543 einreihen".
+
 - [ ] 1560. Finish the reorder dispositions: confirm 1013, re-check 1059/1328/1289, consolidate 1516 with 551
   Split off point 1557 (the user-approved work-order reorder of 19.11.2026) because these parts need measurement runs, not queue edits.
 
@@ -176,6 +196,13 @@ put it is the mistake this line exists to stop.
   case proves a suite that loses its device reports the loss as its failure
   rather than a truncated pass; and `VERIFY_GL=webgpu npm test -- invariants`
   either completes on this host or names the device loss as its verdict.
+  AMENDMENT TO POINT 507 (append to its text; do not open a new point). Placement: user order 20.11.2026 "A umsetzen" — work it as a user-ordered point.
+  Field evidence (20.11.2026, user's very weak notebook: Intel Gen-8 adapter, Chrome 140, WebGPU, build 0fdb5b5): the F8 render benchmark `local/Sehr schwaches Notebook - hoa-bench-2026-11-20-webgpu.json` reports drawCalls 0 and triangles 0 in ALL 42 rows and a vsync-capped 60 fps even for high-preset with SSAO — impossible on that GPU. three's Renderer returns early from render() once `_isDeviceLost` is set (node_modules/three/src/renderers/common/Renderer.js:886), so the device was lost and the benchmark measured empty frames and published them as valid. The device loss of 507 therefore happens on a real player device, not only on a test lane.
+  Additional final states:
+  5. The render benchmark (src/systems/benchmarkRun.ts) detects a lost device (or a measured phase with drawCalls 0) and ends the run as INVALID, naming the reason in its summary and JSON (`aborted`/reason), instead of writing rows; it never reports fps for frames that drew nothing.
+  6. The bug report / state dump (src/state/stateDump.ts) carries the renderer's GPU health: device-lost flag with reason, and the WebGPU uncaptured errors (validation/pipeline errors, capped list with count of omitted) seen in the session, so a report from a player device names GPU failures without DevTools.
+  Test: Vitest — the benchmark run with a simulated lost device (or drawCalls 0) yields an invalid result with the reason and no rows; the state dump includes a simulated uncaptured error and the device-lost reason. Both language files if any player-visible text is added.
+  Source: user benchmark and bug report of 20.11.2026 (local/Sehr schwaches Notebook - *).
 
 - [ ] 1290. On WebGL 2 the lion feeding scene shows neither the lion nor its prey, only a shadow and the blood stain
   Measured 04.10.2026 on feat/1283 (base a13dcae0e), `settings --section=lion-feeding`, VERIFY_GL=webgl: frame 68-lion-feeding without a wait shows only grey haze with place labels (no terrain); with a 4 s wait it shows terrain, the blood stain and one predator shadow, but neither the lion mesh nor the prey mesh. WebGPU shows lion, lying prey and stain in the same section. The section's checks read poses only, so they stay green while the animals are invisible.
