@@ -47401,3 +47401,22 @@ to land than a mechanism that needs a review.
   No new mechanism.
   Bundle: Session- & Repo-Hygiene (amendment to 1463, rides with it).
   Closed 20.11.2026 as delivered by 1558: docs/1558-obsolete-verdicts.md judges the 53 infrastructure backlog entries the 1463 plan marks obsolete.
+
+- [x] 1558. Apply the 1463 plan's obsolete verdicts to the open infrastructure points (part 1 only), ranked directly after 1543
+  Apply part 1 of the parked zero-based infrastructure simplification (backlog entry 1463, decision 1505): the obsolete verdicts on open infrastructure points. Queue cleanup only — no code change, no pillar removal.
+
+  RANK: directly after 1543 (user order 19.11.2026), i.e. ahead of 1555 and everything the reorder request of the same evening places behind 1543.
+
+  Input: the approved plan on the parked branch feat/1463-infra-simplification (tip 796a58f32, 855 behind main), docs/four-eyes/1463-union-opus-v3.md (latest merged plan; check against 1463-union-fable-v2.md and the Sol final check / rechecks 1463-final-check-sol.md, 1463-recheck-sol.md, 1463-recheck-o1-sol.md for the approved revision) — read via `git show feat/1463-infra-simplification:<path>`, do not rebase or unpark the branch.
+
+  Final state:
+  1. Re-validation: every point the plan judges obsolete/deletable is checked against today's state (still open? fixed meanwhile? still matches the plan's reason?). The plan is three weeks old; a verdict that no longer holds is dropped, with one line why.
+  2. Amendment 1474 is applied: the verdicts also cover the infrastructure findings in docs/backlog.md (and the closed findings-carrier entries as record). 1474 is then closed as delivered by this point.
+  3. Each confirmed verdict is executed: the point is archived as obsolete (with the plan's reason and a pointer to the plan) or moved to docs/backlog.md; backlog findings judged obsolete are deleted from the backlog.
+  4. Result line: how many open points and backlog entries were removed, how many verdicts were dropped on re-validation, and the new position of the first infrastructure point behind the game work.
+
+  Out of scope (stays parked until an explicit user order): part 2 of the plan — removing whole pillars (daemon, doctor, etc.) and any code or hook change. The branch, its worktree and the park stay as they are.
+
+  Correction to the reorder request deposited 19.11.2026 20:43: its note "1463 has no line in TASKS.md or the archive" is wrong — 1463 is parked in docs/backlog.md by user order of 11.11.2026 (decision 1505).
+  Source: user request of 19.11.2026 19:51 UTC via the findings carrier (session unknown).
+  Bundle: Session- & Repo-Hygiene.
