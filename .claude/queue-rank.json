@@ -851,18 +851,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1555": {
-      "at": "2026-11-19T20:40:31.616Z",
-      "why": "user-approved reorder 1557 of 19.11.2026: position 4, behind 1543",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "1559": {
-      "at": "2026-11-19T19:58:32.410Z",
-      "why": "user order 19.11.2026: directly after the 1463 part-1 point 1558",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1560": {
       "at": "2026-11-19T20:40:31.749Z",
       "why": "split from 1557 (user-approved reorder of 19.11.2026), directly behind 1555",
@@ -878,7 +866,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-20T05:46:23.957Z",
+    "at": "2026-11-20T11:04:32.057Z",
     "points": [
       184,
       200,
@@ -1070,9 +1058,9 @@
       1540,
       1543,
       1553,
-      1555,
-      1559,
-      1560
+      1560,
+      1561,
+      1562
     ]
   }
 }

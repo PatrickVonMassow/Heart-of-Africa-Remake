@@ -124,6 +124,12 @@ put it is the mistake this line exists to stop.
   until TravelScene has mounted (travel-terrain node) plus one frame, not 3 fixed frames; (3) browser check: one row per
   (config, phase) and one digest line each, terrain-refine-off also cuts savanna-standing after Cairo; (4) record and assert
   that the later-entry path adds no journal entry and pays no bounty. Then a confirming review pass, both backends, landing.
+  Progress 20.11.2026 12:04 (handover at the context watermark): feat/1561-settlement-benchmark @ 6076244 answers (1)-(4):
+  readiness wait (benchReadyBudget/benchTrisStable, row readyTimeout), remount wait on travel-terrain plus one frame, browser
+  checks (one row and digest line per pair, entry cost 0/0, no readiness timeout, refine-off savanna cut after Cairo). (4) found
+  a real defect: a port re-entry wrote an arrival entry AND saved a checkpoint to the player's localStorage with benchmark state;
+  benchmarkEntry.ts now enters silently (Vitest-proven). Build, lint, tsc, Vitest 48/48 green; WebGPU benchmark 42 pass /
+  8 fail, all 8 owned by 1009/1012, the 4 new checks green. Owed: WebGL 2 run, confirming cross-review, picture, landing.
 
 - [ ] 1562. The first start picks the Low graphics level on a weak GPU
   Placement: directly after point 1543 in the work order, after the settlement benchmark point (user order 20.11.2026).
