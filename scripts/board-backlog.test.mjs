@@ -242,6 +242,7 @@ describe('cross-vendor review findings, second round', () => {
     expect(titles('- 2026-11-01 old probe — closed 02.11.2026\n')).toEqual([])
     expect(titles('- 2026-11-01 probe A (closed)\n- 2026-11-01 probe B (closed: superseded)\n')).toEqual([])
     expect(titles('## Retry handling (closed 3 times) (19.11.2026)\n')).toEqual(['Retry handling (closed 3 times)'])
+    expect(titles('## Handle filenames (closed 2026-11-200.log) (19.11.2026)\n')).toHaveLength(1)
   })
 
   it('treats a backtick run with a backtick in its info string as text, not a fence', () => {

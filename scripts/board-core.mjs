@@ -3488,7 +3488,7 @@ export const BACKLOG_ON_BOARD = 10 // ESTIMATE, calibratable: the section is col
  *  merely names the word ("Explain the CLOSED badge", "Show the panel (closed by
  *  default)") stays open. */
 const BACKLOG_RESOLVED_HEAD =
-  /(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[(—–,;:]\s*)(?:FIXED|ERLEDIGT|CLOSED|WONTFIX|EINGEREIHT)\b|(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[—–]\s*)closed\b|[(,;:]\s*closed(?=\s*(?:[:)]|\d{2}\.\d{2}\.\d{4}|\d{4}-\d{2}-\d{2}))/
+  /(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[(—–,;:]\s*)(?:FIXED|ERLEDIGT|CLOSED|WONTFIX|EINGEREIHT)\b|(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[—–]\s*)closed\b|[(,;:]\s*closed(?=\s*(?:[:)]|\d{2}\.\d{2}\.\d{4}\b|\d{4}-\d{2}-\d{2}\b))/
 /** A body line opening with a resolution marker ("ERLEDIGT (17.09.2026): …"). */
 const BACKLOG_RESOLVED_LINE = /^\s*(?:FIXED|ERLEDIGT|CLOSED|EINGEREIHT|WONTFIX|[Cc]losed)\b/
 const BACKLOG_TITLE_MAX = 120
