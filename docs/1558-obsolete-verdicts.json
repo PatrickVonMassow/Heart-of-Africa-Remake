@@ -2227,7 +2227,7 @@
   "id": "B47",
   "title": "A unit test spends twenty seconds reading the live review history (14.09.2026)",
   "disposition": "keep",
-  "reason": "the cited 1111 fix bounds one gather test; that both named live-history tests stopped scanning is not established - keep (Sol review of 30f7663)",
+  "reason": "the fix of closed 1199 bounds one gather test (1111 stays open); that both named live-history tests stopped scanning is not established - keep (Sol review of 30f7663)",
   "planRef": "§5 Agreed obsolete yes",
   "match": "## A unit test spends twenty seconds reading the live review history (14.09.2026"
  },
