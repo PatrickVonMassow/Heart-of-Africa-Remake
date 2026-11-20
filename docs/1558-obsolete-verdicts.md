@@ -38,9 +38,10 @@ cleanup"); no ambiguous mapping.
 
 | delete | keep | drop |
 |---|---|---|
-| 7 | 46 | 0 |
+| 6 | 47 | 0 |
 
-Deleted: B1, B12, B28, B32, B47, B63, B71.
+Deleted: B1, B12, B32, B47, B63, B71. B28 stays: its retry half is void, but the
+polish expectation is still 340900 ms against a ~28-min run.
 
 ## Dropped verdicts
 

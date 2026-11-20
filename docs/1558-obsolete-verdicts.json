@@ -2154,8 +2154,8 @@
   "kind": "backlog",
   "id": "B28",
   "title": "The polish retry hangs after a red, and its expected runtime is stale",
-  "disposition": "delete",
-  "reason": "void: the polish retry is gone (scripts/verify/run-all.mjs:497 \"retry is GONE\"), closed 1135 removed it; plan §5 row B28",
+  "disposition": "keep",
+  "reason": "retry half void (scripts/verify/run-all.mjs:497 \"retry is GONE\", closed 1135), but the stale-expectation half stands: expectedRuntimeMs(['polish']) in scripts/verify/run-wait-core.mjs still returns 340900 ms against a ~28-min run; part 2 parked",
   "planRef": "§5 disagreement table row B28: resolved yes",
   "match": "## The polish retry hangs after a red, and its expected runtime is stale"
  },
