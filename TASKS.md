@@ -517,14 +517,6 @@ put it is the mistake this line exists to stop.
   Refs: src/ui/Hud.tsx, the graphics-notice and place-title components.
   Bundle: Kommunikation.
 
-- [ ] 1516. The hint toast sits inside the status bar over the heading text during play
-  Measured 13.11.2026 in the covering enrichments run (both backends, feat/1508-covering-enrichments 18d2abc41): verification/131-burning-grass.png and verification/327-vulture-cluster-one-flock.png show the canoe hint toast at y≈16 inside the status bar, drawn over the compass heading text so it reads 'Westcanoe…' / 'Eastcanoe…'. docs/backlog.md (20.10.2026, victory frame) held this until an in-play frame showed it; these two do.
-  Player impact: while the toast stands, neither the heading nor the hint is readable.
-  Final state: an in-play hint toast never overlaps the status bar's text; it sits below the bar as on verification/04-chief-hut-meeting.png.
-  Test: a Playwright layout check that the toast's box does not intersect the status bar's box with a hint raised in play, picture-checked on both backends.
-  Source: finding of the 1508 session, 13.11.2026 15:34.
-  Bundle: Steuerung & Performance.
-
 - [ ] 551. The transient status hint is drawn on top of the region name (seen
   07.08.2026 in the verification frames `121-harmattan-pall-january.png` and
   `122-atlas-snow-february.png`, WebGL 2, and reproducible in every frame the
@@ -549,6 +541,11 @@ put it is the mistake this line exists to stop.
   languages, since the German hint has a different width.
   Criticality: medium — nothing breaks, but it is the first thing in the picture a reader
   sees as sloppy, and it is in every screenshot the suites write.
+  MERGED 20.11.2026 (1560): 1516 is folded in. The same hint also covers the compass heading
+  (verification/131-burning-grass.png, 327-vulture-cluster-one-flock.png: "Westcanoe…" / "Eastcanoe…"),
+  so the heading is a yieldable element too. 1516's remedy (move the hint below the bar) is rejected by
+  criterion 9. Added check: a Playwright layout check that, with a hint raised in play, the hint's box
+  intersects no visible status-bar text box; picture-checked on both backends. 1215 stays separate.
 
 - [ ] 1488. Villager clothing: one fix per listed defect, one final picture check (user order 05.11.2026; amends the working method of 1482 under 1487)
   The 24-hour budget of 1487 did not limit precision: since 04.11 17:00, 34 of 57 main commits were bookkeeping ("Record the picture judgement / delegation / withdraw verdict ..."); the child hip cloth alone took nine commits on 05.11 morning. A time box cuts the list, it does not cut the per-candidate ritual. Replace the method of 1482:
@@ -3862,32 +3859,6 @@ put it is the mistake this line exists to stop.
   Criticality: low - it costs no code and no data, but it is a check that cannot pass on the lane
   it runs on, which is a red trained to be ignored.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 1013. A cheetah hunts in central Africa, where the food web does not provide for it
-  (measured 29.08.2026, `enrichments` suite, section `predator-food-web`).
-  The check `every predator fits the region and period` failed once with
-  `{"count":16,"familyHunts":0,"distinctPrey":["zebra","warthog","antelope"],"distinctPredators":
-  ["lion","cheetah","hyena","leopard"],"preyMismatch":[],"predMismatch":[{"predator":"cheetah",
-  "region":"central"}],"webMismatch":[]}` - one mismatch out of sixteen hunts, and the prey side
-  clean.
-  TWO READINGS, AND ONLY ONE CAN BE RIGHT. Read from the code and NOT measured: the check may read
-  the region where the hunter BRINGS THE PREY DOWN rather than where it set off, so a long chase
-  across a region boundary reports an origin nobody meant. The counter-reading - that the species
-  is genuinely placed where its food web does not carry it - stays open, because the two regions
-  have never been logged side by side. Nothing here is settled by inspection; the measurement
-  decides.
-  FINAL STATE: the hunt carries both regions - where it began and where it ended - and the check
-  asks the one it means, stated in its own text so a later reader cannot re-derive it wrongly. If
-  the placement turns out to be the real fault, the species table is corrected instead and the
-  check stays as it is.
-  VERIFIABLE: a logged sample of hunts crossing a region boundary showing both regions per hunt;
-  the `enrichments` section green over the seeds that produced the mismatch; and a Vitest case
-  pinning which region the check asks and why.
-  Recurred 18.10.2026: WebGPU full `enrichments` on feat/1378 335c9552e, same cheetah/central mismatch (local/verify-logs/2026-10-18T07-07-21-927-enrichments.log); the section alone was green on rerun.
-  SAME CAUSE AS 1063, measured 18.11.2026 (local/1063-border-probe.log: 8/8 hunts began east, 4/8 read central at the first look): the chase crosses the border. 1063 carries the fix — the hunt records `startRegion`, `pickHuntSpecies` casts for it, and both fit checks in `predator-food-web` ask that start region and log crossings separately. What stays here after 1063 lands is only this point's own verification against that fix.
-  Criticality: low - a single mis-scored hunt in sixteen, invisible to the player, but it makes an
-  ecology check report a fault it may not have found.
-  Bundle: Tierverhalten.
 
 - [ ] 1043. The speech-label check stands on one figure, and that figure is a coin toss.
   `polish --section=speech-hypothesis` picks a figure of the maasai village to speak over and

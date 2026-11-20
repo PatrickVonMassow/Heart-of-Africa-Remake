@@ -47488,3 +47488,39 @@ to land than a mechanism that needs a review.
   Source: user benchmarks 20.11.2026.
   Bundle: Steuerung & Performance.
   Source: user request of 20.11.2026 07:31 UTC via the findings carrier (session 4c27ebaf); approved "B und D nach 1543 einreihen".
+
+- [x] 1013. A cheetah hunts in central Africa, where the food web does not provide for it
+  (measured 29.08.2026, `enrichments` suite, section `predator-food-web`).
+  The check `every predator fits the region and period` failed once with
+  `{"count":16,"familyHunts":0,"distinctPrey":["zebra","warthog","antelope"],"distinctPredators":
+  ["lion","cheetah","hyena","leopard"],"preyMismatch":[],"predMismatch":[{"predator":"cheetah",
+  "region":"central"}],"webMismatch":[]}` - one mismatch out of sixteen hunts, and the prey side
+  clean.
+  TWO READINGS, AND ONLY ONE CAN BE RIGHT. Read from the code and NOT measured: the check may read
+  the region where the hunter BRINGS THE PREY DOWN rather than where it set off, so a long chase
+  across a region boundary reports an origin nobody meant. The counter-reading - that the species
+  is genuinely placed where its food web does not carry it - stays open, because the two regions
+  have never been logged side by side. Nothing here is settled by inspection; the measurement
+  decides.
+  FINAL STATE: the hunt carries both regions - where it began and where it ended - and the check
+  asks the one it means, stated in its own text so a later reader cannot re-derive it wrongly. If
+  the placement turns out to be the real fault, the species table is corrected instead and the
+  check stays as it is.
+  VERIFIABLE: a logged sample of hunts crossing a region boundary showing both regions per hunt;
+  the `enrichments` section green over the seeds that produced the mismatch; and a Vitest case
+  pinning which region the check asks and why.
+  Recurred 18.10.2026: WebGPU full `enrichments` on feat/1378 335c9552e, same cheetah/central mismatch (local/verify-logs/2026-10-18T07-07-21-927-enrichments.log); the section alone was green on rerun.
+  SAME CAUSE AS 1063, measured 18.11.2026 (local/1063-border-probe.log: 8/8 hunts began east, 4/8 read central at the first look): the chase crosses the border. 1063 carries the fix — the hunt records `startRegion`, `pickHuntSpecies` casts for it, and both fit checks in `predator-food-web` ask that start region and log crossings separately. What stays here after 1063 lands is only this point's own verification against that fix.
+  Criticality: low - a single mis-scored hunt in sixteen, invisible to the player, but it makes an
+  ecology check report a fault it may not have found.
+  Bundle: Tierverhalten.
+  Closed 20.11.2026 by 1560: delivered by 1063 — predator-food-web green on WebGPU against the start-region fix (docs/1560-reorder-dispositions.md).
+
+- [x] 1516. The hint toast sits inside the status bar over the heading text during play
+  Measured 13.11.2026 in the covering enrichments run (both backends, feat/1508-covering-enrichments 18d2abc41): verification/131-burning-grass.png and verification/327-vulture-cluster-one-flock.png show the canoe hint toast at y≈16 inside the status bar, drawn over the compass heading text so it reads 'Westcanoe…' / 'Eastcanoe…'. docs/backlog.md (20.10.2026, victory frame) held this until an in-play frame showed it; these two do.
+  Player impact: while the toast stands, neither the heading nor the hint is readable.
+  Final state: an in-play hint toast never overlaps the status bar's text; it sits below the bar as on verification/04-chief-hut-meeting.png.
+  Test: a Playwright layout check that the toast's box does not intersect the status bar's box with a hint raised in play, picture-checked on both backends.
+  Source: finding of the 1508 session, 13.11.2026 15:34.
+  Bundle: Steuerung & Performance.
+  Closed 20.11.2026 by 1560 as a duplicate of 551: same hint element; acceptance criterion 9 keeps the hint centred inside the bar, so 551's remedy holds and 551 carries this evidence (docs/1560-reorder-dispositions.md).
