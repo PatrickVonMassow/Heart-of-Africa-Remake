@@ -964,7 +964,7 @@
   "id": 896,
   "title": "review-sol.mjs swallows an unknown flag and spends a real cross-vendor pass on it",
   "disposition": "backlog",
-  "reason": "G4 mechanism still present today (scripts/mechanism-review*.mjs, criticality-review-guard.mjs, cross-review.mjs, author-delegate-core.mjs, lane-switch.mjs); plan deletes it in M-D5/M-D6, part 2 parked - defer under the freeze",
+  "reason": "defect present in the successor: scripts/cross-review.mjs (review-sol.mjs renamed) validates no argv (lines 1075-1103); measured `--sha HEAD --brief x --bogus-flag-xyz` passes argument checks and stops only at the absent lane-switch state (exit 1), `--bogus-flag-xyz` alone exits 2 on missing --sha/--brief without naming the flag; plan deletes the gate in M-D5/M-D6, part 2 parked - defer under the freeze",
   "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes)"
  },
  {

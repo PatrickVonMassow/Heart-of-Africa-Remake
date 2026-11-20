@@ -63,6 +63,6 @@ leftover carrier file and its header sit on the host and cannot be checked here.
 - Renamed successors keep several defects alive: `review-sol.mjs` →
   `cross-review.mjs` (856, 896, 915, 933), `author-sol` → `author-delegate`
   (729, 836, 962, 1001), astra/fable switch → lane routing/switch (875, 1369).
-  896's unknown-flag rejection in `cross-review.mjs` was not verified.
+  Measured for 896: `cross-review.mjs` still accepts an unknown flag.
 - The clone is shallow, so fixing commits were checked in the tree, not with
   `git log -S`.
