@@ -422,6 +422,22 @@ if (section('settlement-sizes')) {
   await page.waitForFunction(() => window.__placeBackdropInfo, null, { timeout: 30000 })
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   await page.waitForTimeout(1200)
+  // Point 1495: three.js skips every object whose shader pipeline is still
+  // compiling, so on WebGL 2 the frame showed floating roofs over fog — walls,
+  // ground and villagers not yet drawable. Wait until the pipeline set stays
+  // warm for a few frames (the same wait as _polish.mjs awaitPlaceDrawn).
+  const berberWarm = await page.evaluate(async () => {
+    let run = 0
+    const t0 = Date.now()
+    while (Date.now() - t0 < 120000) {
+      const s = window.__shaderPipelines?.() ?? null
+      run = !s || (s.pending === 0 && s.queued === 0) ? run + 1 : 0
+      if (run >= 3) return { ok: true, ms: Date.now() - t0 }
+      await new Promise((r) => requestAnimationFrame(() => r()))
+    }
+    return { ok: false, state: window.__shaderPipelines?.() ?? null }
+  })
+  check('Berber Village: the shader pipelines settle before the backdrop shot', berberWarm.ok, JSON.stringify(berberWarm))
   const berber = await page.evaluate(() => window.__placeBackdropInfo)
   check(
     'Berber Village: mountainous backdrop stays a distant range (no looming/clipping)',
