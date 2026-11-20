@@ -184,9 +184,30 @@ check(
     report.rows.filter((r) => r.phase !== 'settlement-standing').every((r) => r.place === null),
   `${settlementRows.length}/${configs.length} rows, places ${JSON.stringify([...new Set(report.rows.map((r) => r.place))])}`,
 )
+// Exactly ONE row and ONE digest line per (config, phase): a remount race or a
+// doubled phase would add a row the count check above could balance away.
+const pairKeys = report.rows.map((r) => `${r.config}|${r.phase}`)
+const digestKeys = report.summary
+  .map((l) => l.match(/^(\S+)\s+(savanna-standing|desert-standing|savanna-driving|settlement-standing)\s/))
+  .filter(Boolean)
+  .map((m) => `${m[1]}|${m[2]}`)
+const pairsOnce = (keys) => configs.every((c) => phases.every((ph) => keys.filter((k) => k === `${c}|${ph}`).length === 1))
 check(
-  'the digest lists the settlement rows beside the travel phases',
-  report.summary.filter((l) => /^\S+\s+settlement-standing\s/.test(l)).length === configs.length,
+  'one row and one digest line per (config, phase), the settlement included',
+  new Set(pairKeys).size === pairKeys.length && pairsOnce(pairKeys) && pairsOnce(digestKeys) && digestKeys.length === pairKeys.length,
+  `${pairKeys.length} rows, ${new Set(pairKeys).size} distinct, ${digestKeys.length} digest lines`,
+)
+// The silent later entry: no journal entry, no money, and the readiness wait
+// reached a standing scene for every settlement row (no cap hit).
+check(
+  'every settlement entry added no journal entry and paid nothing',
+  settlementRows.every((r) => r.entryCost?.journal === 0 && r.entryCost?.money === 0),
+  JSON.stringify([...new Set(settlementRows.map((r) => JSON.stringify(r.entryCost ?? null)))]),
+)
+check(
+  'every settlement row was sampled after its scene stood (no readiness timeout)',
+  settlementRows.every((r) => r.readyTimeout === false),
+  `${settlementRows.filter((r) => r.readyTimeout !== false).length} row(s) flagged`,
 )
 check(
   'every row carries frame-time statistics, draw calls and triangles',
@@ -280,6 +301,15 @@ for (const config of ['terrain-refine-off', 'terrain-cap-84']) {
     `${terrainTris(baseDesert)} -> ${terrainTris(desertRow(config))} (${heaviest?.[0]})`,
   )
 }
+// The config after a settlement phase (point 1561): terrain-refine-off follows
+// dpr-1's Cairo row, and TravelScene's remount rewrites the refine setting —
+// its FIRST phase, savanna-standing, must already show the cut.
+const savannaRow = (config) => report.rows.find((r) => r.config === config && r.phase === 'savanna-standing')
+check(
+  'terrain-refine-off also cuts the savanna terrain right after the settlement',
+  terrainTris(savannaRow('baseline')) - terrainTris(savannaRow('terrain-refine-off')) > 0,
+  `${terrainTris(savannaRow('baseline'))} -> ${terrainTris(savannaRow('terrain-refine-off'))} (${heaviest?.[0]})`,
+)
 
 check(
   'the report names the series to read, consistent with the GPU availability',
