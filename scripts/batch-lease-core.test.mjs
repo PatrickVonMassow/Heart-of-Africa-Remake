@@ -558,6 +558,17 @@ describe('the main-write ownership fence', () => {
     expect(shell(`sed 's/a/b/e' src/a.ts > ${pad}/m.txt`).writes).toBe(true)
     expect(shell(`sed -i 's/a/b/' src/a.ts > ${pad}/m.txt`).writes).toBe(true)
     expect(shell(`sed -f prog.sed src/a.ts > ${pad}/m.txt`).writes).toBe(true)
+    // With every ordinary path OUTSIDE, unsafe sed syntax still earns nothing.
+    expect(shell(`sed --expression='w /workspace/hoa/TASKS.md' /tmp/a > /tmp/b`).writes).toBe(true)
+    expect(shell(`sed --expression=1p /tmp/a > /tmp/b`).writes).toBe(true)
+    expect(shell(`sed -n -e 1p -e 'w /workspace/hoa/TASKS.md' /tmp/a > /tmp/b`).writes).toBe(true)
+    expect(shell(`sed -n "$SCRIPT" /tmp/a > /tmp/b`).writes).toBe(true)
+    // An expanded target is not the text the guard resolved.
+    expect(shell(`D=${pad}; sed -n 1,90p scripts/a.mjs > $D/m1.txt`).writes).toBe(true)
+    expect(shell(`head scripts/a.mjs > ${pad}/*.txt`).writes).toBe(true)
+    // Read/write and descriptor redirects into the checkout stay refused.
+    expect(shell(`head /tmp/a 1<>TASKS.md`).writes).toBe(true)
+    expect(shell(`cat scripts/a.mjs > ${pad}/m.txt 3>TASKS.md`).writes).toBe(true)
     // Operand writers keep the strict rule: an inside source disqualifies.
     expect(shell(`sort -o src/a.ts src/a.ts > ${pad}/m.txt`).writes).toBe(true)
     expect(shell(`awk '{print > "src/a.ts"}' src/b.ts > ${pad}/m.txt`).writes).toBe(true)

@@ -849,7 +849,10 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
   const { head, args } = headAndArgs(segment)
   // A pure stream reader writes only through its redirections; its operands are
   // inputs (point 1555: `sed -n 1,90p scripts/x.mjs > <scratchpad>/m.txt`).
-  const reader = streamReaderOnly(String(head), args)
+  const sed = String(head) === 'sed' ? sedInvocation(args) : null
+  // Unreadable sed syntax (`--expression=…`, `-f`, a w/W/e script) earns no exemption.
+  if (sed && !sed.safe) return false
+  const reader = (sed ? !sed.inPlace : PLAIN_STREAM_READERS.has(String(head))) && literalCall(segment, args)
   if (!reader && !FILE_TOOLS.has(String(head))) return false
   const candidates = [
     // `/dev/null` alone is no destination: it discards, whoever opens it.
@@ -886,24 +889,35 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
 const PLAIN_STREAM_READERS = new Set(['cat', 'head', 'tail', 'grep', 'wc', 'cut', 'nl'])
 const SED_READ_OPTIONS = new Set(['-n', '-E', '-r', '-s', '-u', '-z', '--quiet', '--silent'])
 
-function streamReaderOnly(head, args) {
-  if (PLAIN_STREAM_READERS.has(head)) return true
-  if (head !== 'sed') return false
+/** sed's options and scripts, read strictly: any unknown option is unsafe. */
+function sedInvocation(args) {
   const scripts = []
-  let sawScriptFlag = false
+  let inPlace = false
+  let explicit = false
   for (let i = 0; i < args.length; i++) {
     const text = String(args[i]?.text ?? '')
     if (text === '-e') {
-      sawScriptFlag = true
-      if (i + 1 >= args.length) return false
+      if (i + 1 >= args.length) return { safe: false }
+      explicit = true
       scripts.push(String(args[++i]?.text ?? ''))
+    } else if (/^-i[^-\s]*$/.test(text) || /^--in-place(=.*)?$/.test(text)) {
+      inPlace = true
+    } else if (text === '--') {
+      return { safe: false }
     } else if (text.startsWith('-')) {
-      if (!SED_READ_OPTIONS.has(text)) return false
-    } else if (!sawScriptFlag && scripts.length === 0) {
+      if (!SED_READ_OPTIONS.has(text)) return { safe: false }
+    } else if (!explicit && scripts.length === 0) {
       scripts.push(text)
     }
   }
-  return scripts.length > 0 && scripts.every((script) => !/[wWe]/.test(script))
+  const safe = scripts.length > 0 && scripts.every((script) => !/[wWe$`]/.test(script))
+  return { safe, inPlace }
+}
+
+/** No expansion anywhere: what is checked is what Bash passes (review of 6f89699). */
+function literalCall(segment, args) {
+  const words = [...args.map((arg) => String(arg?.text ?? '')), ...(segment?.redirects ?? []).map((r) => String(r.target ?? ''))]
+  return words.every((text) => !/[$`*?[\]{}~]/.test(text))
 }
 
 /** The injected resolver's answer; '' (unknown, so inside) on a throw. */
