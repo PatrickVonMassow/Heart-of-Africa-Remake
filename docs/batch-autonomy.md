@@ -3197,14 +3197,17 @@ guard error — not skipping the inspection.
   is gated when the point is created, split or the blocker is discovered. The
   *Von dir zu klären* card is DERIVED from the gate by `node
   scripts/board-queue.mjs` (point 1554) — no manual `vdzk-add` for a gate; a
-  marker that does not parse yields a fallback card. Only an
+  gated point on the current-work card gets its card once that card moves on
+  (one owner per point); a marker that does not parse yields a fallback card,
+  and a gate field may not contain the bare word `DEFERRED`. Only an
   `AWAITING-CONFIRMATION` gate parks a point: it remains open and is skipped
   until the user's answer clears it with `defer-for-user.mjs --clear <N>`, which records
   `USER-ANSWERED` and returns it to the head of the queue. A `user-input`
   answer is a hand-in only and approves no other act. Advisory only, parking
   nothing: an ungated point whose text names a wait gets a "vielleicht" card,
-  and the build prints a line when the ungated queue head is not the in-flight
-  focus.
+  and, when an in-flight focus is recorded, the build prints a line if the
+  ungated queue head is not that focus (a secondary in-flight point does not
+  count; no recorded focus prints nothing).
   THE SYNTAX OF RECORD is `scripts/user-gate-core.mjs` (points 450 and 864): the
   marker sits at the END of the point's `- [ ] N.` head line, carries a date and a
   reason, and is written only through `defer-for-user.mjs` — which accepts an act

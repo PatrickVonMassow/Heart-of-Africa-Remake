@@ -2,6 +2,7 @@
 // case uses text fixtures — never live TASKS.md, which is main-only.
 import { describe, expect, it } from 'vitest'
 import {
+  parseUserInputDetail,
   ANSWERED_MARKER,
   CONFIRMATION_MARKER,
   SELF_DECIDED_MARKER,
@@ -515,6 +516,21 @@ describe('the user-input act — the user must run, measure or hand in something
       prepared: 'the fixtures are ready',
     })
     expect(split.ok).toBe(false)
+  })
+
+  it('judges action and hand back as the one parser splits them, even when the action says where:', () => {
+    const asks = { act: 'user-input', detail: 'run where: it fits the benchmark, hand back: which file is newest?, where: the chat', prepared }
+    expect(formatConfirmationReason(asks)).toMatchObject({ ok: false })
+    expect(formatConfirmationReason(asks).error).toMatch(/asks a question/)
+    expect(parseUserInputDetail(asks.detail)).toEqual({ action: 'run where: it fits the benchmark', handBack: 'which file is newest?', where: 'the chat' })
+  })
+
+  it('refuses a status word in any gate field, since it would change the point state', () => {
+    const r = markGated(tasks('- [ ] 1. A'), 1, { act: 'user-input', detail: 'run the local check, hand back: log, where: the DEFERRED folder', prepared })
+    expect(r).toMatchObject({ ok: false })
+    expect(r.error).toMatch(/status word DEFERRED/)
+    expect(parseUserGates(tasks('- [ ] 1. A')).gated).toEqual([])
+    expect(formatConfirmationReason({ act: 'release-tag', detail: 'push the v1 tag', prepared: 'the DEFERRED build is verified' }).ok).toBe(false)
   })
 
   it('accepts a destination URL with a query string verbatim', () => {

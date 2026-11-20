@@ -52,7 +52,7 @@ import {
 } from './dashboard-guard-core.mjs'
 import { normaliseLineEndings, QUEUE_STATUS_TEXT, renderStatusSection, sectionBounds } from './board-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
-import { CONFIRMATION_MARKER, USER_INPUT_ACT, gateSets, parseGateLine, parseUserGates } from './user-gate-core.mjs'
+import { CONFIRMATION_MARKER, USER_INPUT_ACT, gateSets, parseGateLine, parseUserGates, parseUserInputDetail } from './user-gate-core.mjs'
 import { INHERITED_ESTIMATE_NOTE, inheritedEstimate } from './queue-calibration-core.mjs'
 import { pointNumbersFromChip, pointOwnershipFromTitle } from './dashboard-point-reader-core.mjs'
 // The pool cap is the width of the queue's front (point 712) — one candidate
@@ -1155,10 +1155,8 @@ function readGateReason(reason) {
   const m = String(reason ?? '').match(/^([a-z-]+): (.+?), safe prepared state: (.+)$/i)
   if (!m) return { act: '', detail: String(reason ?? ''), prepared: '' }
   const [, act, detail, prepared] = m
-  const fields = act.toLowerCase() === USER_INPUT_ACT ? detail.match(/^(.+?),?\s+hand back:\s*(.+?),?\s+where:\s*(.+)$/i) : null
-  return fields
-    ? { act: act.toLowerCase(), detail, action: fields[1], handBack: fields[2], where: fields[3], prepared }
-    : { act: act.toLowerCase(), detail, prepared }
+  const fields = act.toLowerCase() === USER_INPUT_ACT ? parseUserInputDetail(detail) : null
+  return { act: act.toLowerCase(), detail, prepared, ...(fields ?? {}) }
 }
 
 /** The excerpt around the first phrase hit, one sentence's worth. */
@@ -1176,7 +1174,10 @@ function phraseExcerpt(text, re) {
  * `kind` is 'gate', 'malformed' or 'maybe'; `owns` says the card's title claims
  * the point (only a real gate does — the point then leaves the queue).
  * `titles` maps a point to its German board title; `skip` holds the points a
- * current-work card already shows (a point is never on two open sections).
+ * current-work card already shows. ONE OWNER PER POINT: a gated point on the
+ * current-work card gets no gate card while it stands there — the now card owns
+ * it, and its gate card appears on the first rebuild after the card moves on.
+ * A malformed marker is never skipped: it owns nothing and must stay visible.
  */
 export function derivedUserWaitCards(tasksText, { titles = {}, skip = [] } = {}) {
   const skipSet = new Set([...skip].map(Number))
@@ -1187,9 +1188,31 @@ export function derivedUserWaitCards(tasksText, { titles = {}, skip = [] } = {})
     if (!block.open || block.deferred) continue
     const name = boardSafeTitle(titles[point] || `Punkt ${point}`)
     const gate = gates.get(point)
-    // A SET GATE IS ALWAYS CARDED, even on the point being worked: parking it
-    // must not make its card vanish. `skip` silences only the guesses below.
-    if (!gate && skipSet.has(point)) continue
+    const line = parseGateLine(block.head)
+    const tail = block.head.trimEnd()
+    // THE LAST MARKER IS THE STATE (user-gate-core): a gate followed by
+    // USER-ANSWERED is answered, not malformed. Malformed is a last marker that
+    // is a gate yet does not gate, or a gate opening no marker reading found.
+    const brokenTyped = line?.marker === CONFIRMATION_MARKER && !line.gated
+    const unquotedHead = tail.replace(/`[^`]*`/g, ' ')
+    const unparsed = !line?.marker && unquotedHead.includes(`${CONFIRMATION_MARKER}(`)
+    if (!gate && (brokenTyped || unparsed)) {
+      const raw = tail.slice(tail.lastIndexOf(CONFIRMATION_MARKER))
+      cards.push({
+        point,
+        kind: 'malformed',
+        owns: false,
+        title: `Punkt ${point} wartet auf dich – Marker fehlerhaft`,
+        paragraphs: [
+          `${name}: der Warte-Marker dieses Punkts lässt sich nicht lesen, der Punkt bleibt deshalb in der Warteschlange.`,
+          `Roher Text: ${raw}`,
+          ...(line?.classification?.error ? [`Fehler: ${line.classification.error}`] : []),
+          'Der Batch setzt den Marker neu, sobald er das bemerkt; du musst nichts tun, außer der Punkt wartet wirklich auf dich.',
+        ],
+      })
+      continue
+    }
+    if (skipSet.has(point)) continue
     if (gate) {
       const r = readGateReason(gate.reason)
       const since = dayOf(gate.since)
@@ -1204,29 +1227,6 @@ export function derivedUserWaitCards(tasksText, { titles = {}, skip = [] } = {})
           : 'Deine Möglichkeiten: den Schritt freigeben oder ablehnen; mit deiner Antwort verschwindet diese Karte.',
       ]
       cards.push({ point, kind: 'gate', owns: true, title: `${point} — Wartet auf dich: ${name}`, paragraphs })
-      continue
-    }
-    const line = parseGateLine(block.head)
-    const tail = block.head.trimEnd()
-    const brokenTyped = line?.marker === CONFIRMATION_MARKER && !line.gated
-    // ANY unquoted marker opening on the head line that did not parse as a gate
-    // is malformed — unclosed, doubled `))` or otherwise.
-    const unquotedHead = tail.replace(/`[^`]*`/g, ' ')
-    const unparsed = unquotedHead.includes(`${CONFIRMATION_MARKER}(`)
-    if (brokenTyped || unparsed) {
-      const raw = tail.slice(tail.lastIndexOf(CONFIRMATION_MARKER))
-      cards.push({
-        point,
-        kind: 'malformed',
-        owns: false,
-        title: `Punkt ${point} wartet auf dich – Marker fehlerhaft`,
-        paragraphs: [
-          `${name}: der Warte-Marker dieses Punkts lässt sich nicht lesen, der Punkt bleibt deshalb in der Warteschlange.`,
-          `Roher Text: ${raw}`,
-          ...(line?.classification?.error ? [`Fehler: ${line.classification.error}`] : []),
-          'Der Batch setzt den Marker neu, sobald er das bemerkt; du musst nichts tun, außer der Punkt wartet wirklich auf dich.',
-        ],
-      })
       continue
     }
     // A phrase QUOTED in backticks or double quotes is mentioned, not meant —
@@ -1266,11 +1266,14 @@ const MANUAL_CARD_RE = /<details>\s*<summary><span class="t">([^<]*)<\/span>[\s\
 /**
  * Rewrite the "Von dir zu klären" section: the previous build's derived cards go,
  * the new ones stand at the top, and a MANUAL card owning exactly one carded
- * gated point is removed (the one-off cleanup of the retired vdzk-add step for
- * gates — idempotent, so it simply never finds one again). Returns
- * { html, removed:[title] }. A board without the section comes back unchanged.
+ * gated point is removed (its derived card replaces it — two owners would
+ * double the point). An ANSWERED point's manual card is left alone: deleting it
+ * on every rebuild would also delete a later, legitimate manual card, and no
+ * answered gate stood on the board when the derived cards took over
+ * (20.11.2026). Returns { html, removed:[title] }. A board without the section
+ * comes back unchanged.
  */
-export function applyDerivedVdzk(html, cards, { knownPoints = [], answered = [] } = {}) {
+export function applyDerivedVdzk(html, cards, { knownPoints = [] } = {}) {
   const doc = String(html ?? '')
   let bounds
   try {
@@ -1278,11 +1281,7 @@ export function applyDerivedVdzk(html, cards, { knownPoints = [], answered = [] 
   } catch {
     return { html: doc, removed: [] }
   }
-  const carded = new Set((cards ?? []).filter((c) => c.owns).map((c) => Number(c.point)))
-  // An ANSWERED point's manual card is stale too: a gate cleared before the
-  // first derived build never entered `carded`, and its old card would keep
-  // the point out of the queue.
-  const stale = new Set([...carded, ...[...answered].map(Number)])
+  const stale = new Set((cards ?? []).filter((c) => c.owns).map((c) => Number(c.point)))
   const removed = []
   const section = doc
     .slice(bounds.from, bounds.end)
@@ -1298,6 +1297,15 @@ export function applyDerivedVdzk(html, cards, { knownPoints = [], answered = [] 
   const rendered = (cards ?? []).map(renderDerivedVdzkCard).join('')
   const rest = section.replace(/^\n+/, '')
   return { html: `${doc.slice(0, bounds.from)}\n${rendered}${rest}${doc.slice(bounds.end)}`, removed }
+}
+
+/**
+ * The in-flight points the advisory may count: only the FOCUS (spec 3b). A
+ * secondary in-flight point must not silence it, and an unreadable source
+ * (ok false) yields none, which silences the advisory (fail-soft).
+ */
+export function advisoryInFlight(source) {
+  return source?.ok && source.focusPoint ? [Number(source.focusPoint)] : []
 }
 
 /**

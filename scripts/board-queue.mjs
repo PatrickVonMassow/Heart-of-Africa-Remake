@@ -43,6 +43,7 @@ import {
   applyDerivedVdzk,
   buildQueueSection,
   derivedUserWaitCards,
+  advisoryInFlight,
   headSkipAdvisory,
   normaliseQueueData,
   gatedEntryPoints,
@@ -187,9 +188,7 @@ function activePoints(tasks, html) {
   const now = [...parseNowCardPoints(html)]
   try {
     const source = gatherActiveWorkSource({ tasksText: tasks })
-    // Only the in-flight FOCUS excuses the head (spec 3b); a secondary in-flight
-    // point must not silence the advisory.
-    return { now, inFlight: source.ok && source.focusPoint ? [source.focusPoint] : [] }
+    return { now, inFlight: advisoryInFlight(source) }
   } catch {
     return { now, inFlight: [] }
   }
@@ -210,7 +209,7 @@ function inputs() {
     [...new Set([...Object.keys(stored), ...Object.keys(titles)])].map((n) => [n, stored[n]?.title || titles[n]]),
   )
   const userWait = derivedUserWaitCards(tasks, { titles: germanTitles, skip: now })
-  const derived = applyDerivedVdzk(board, userWait, { knownPoints: known, answered: gateSets(tasks).answered })
+  const derived = applyDerivedVdzk(board, userWait, { knownPoints: known })
   const html = derived.html
   return {
     html,

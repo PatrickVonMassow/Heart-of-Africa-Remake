@@ -284,17 +284,34 @@ export const USER_INPUT_ACT = 'user-input'
 const USER_INPUT_DETAIL_RE = /^(.+?),?\s+hand back:\s*(.+?),?\s+where:\s*(.+)$/i
 export const USER_INPUT_DETAIL_FORM = '"<action>, hand back: <result>, where: <where to submit it>"'
 
+/**
+ * The three fields of a user-input detail — { action, handBack, where } — or
+ * null. The ONE parser: the write-time check and the board card both read it.
+ */
+export function parseUserInputDetail(detail) {
+  const m = String(detail ?? '').trim().match(USER_INPUT_DETAIL_RE)
+  return m ? { action: m[1], handBack: m[2], where: m[3] } : null
+}
+
 /** '' when a user-input detail names action, result and destination; else the defect. */
 export function userInputDetailError(detail) {
-  const m = String(detail ?? '').trim().match(USER_INPUT_DETAIL_RE)
-  if (!m) return `a user-input detail must read ${USER_INPUT_DETAIL_FORM}`
-  if (wordsIn(m[1]) < 3) return 'a user-input detail must name the action in at least three words'
+  const fields = parseUserInputDetail(detail)
+  if (!fields) return `a user-input detail must read ${USER_INPUT_DETAIL_FORM}`
+  if (wordsIn(fields.action) < 3) return 'a user-input detail must name the action in at least three words'
   // A bare comma is no value: a field is filled only by a letter or digit.
   const filled = (t) => /[\p{L}\p{N}]/u.test(t)
-  if (!filled(m[2])) return 'a user-input detail must name the result to hand back'
-  if (!filled(m[3])) return 'a user-input detail must name where to submit the result'
+  if (!filled(fields.handBack)) return 'a user-input detail must name the result to hand back'
+  if (!filled(fields.where)) return 'a user-input detail must name where to submit the result'
   return ''
 }
+
+/**
+ * A bare work-order STATUS WORD inside a gate field is refused: `DEFERRED` is
+ * read anywhere on the head line and would drop the gated point from the batch.
+ * It is the only bare one — marker words count only with their `(`, and the
+ * last-marker rule already keeps a quoted marker word from changing the state.
+ */
+const STATUS_TOKEN_RE = /\bDEFERRED\b/
 
 /** The stored shape of a typed confirmation reason. */
 const STRUCTURED_RE = new RegExp(
@@ -322,6 +339,10 @@ export function formatConfirmationReason({ act = '', detail = '', prepared = '' 
   const [what, safe] = [clean(detail), clean(prepared)]
   if (wordsIn(what) < 3) return { ok: false, error: 'detail must name the concrete act in at least three words', reason: '' }
   if (wordsIn(safe) < 3) return { ok: false, error: 'prepared must name the safe prepared state in at least three words', reason: '' }
+  for (const [name, value] of [['detail', what], ['prepared', safe]]) {
+    const token = value.match(STATUS_TOKEN_RE)
+    if (token) return { ok: false, error: `${name} must not contain the status word ${token[0]} — it would change the point's state`, reason: '' }
+  }
   const userInput = key === USER_INPUT_ACT
   if (userInput) {
     // A DESTINATION IS STORED VERBATIM OR REFUSED: `clean` would silently turn
@@ -336,9 +357,10 @@ export function formatConfirmationReason({ act = '', detail = '', prepared = '' 
   // A FIELD THAT ASKS IS NOT A FIELD THAT ACTS: selecting an act key does not
   // turn "choose blue or green" into one.
   // A user-input `where:` may be a URL with a query string; only the action
-  // and result are judged for asking.
-  const asked = userInput ? what.replace(/,?\s+where:\s*.+$/i, '') : what
-  for (const [name, value] of [['detail', asked], ['prepared', safe]]) {
+  // and result — as the one parser splits them — are judged for asking.
+  const fields = userInput ? parseUserInputDetail(what) : null
+  const asked = fields ? [fields.action, fields.handBack] : [what]
+  for (const [name, value] of [...asked.map((v) => ['detail', v]), ['prepared', safe]]) {
     if (ASKS_RATHER_THAN_STATES(value.toLowerCase())) {
       return { ok: false, error: `${name} asks a question — decide it and record SELF-DECIDED instead`, reason: '' }
     }

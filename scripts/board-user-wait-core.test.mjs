@@ -10,6 +10,7 @@ import {
   applyDerivedVdzk,
   buildQueueSection,
   derivedUserWaitCards,
+  advisoryInFlight,
   headSkipAdvisory,
   renderDerivedVdzkCard,
 } from './board-queue-core.mjs'
@@ -46,9 +47,11 @@ describe('derivedUserWaitCards — one card per open gate, all four acts', () =>
     expect(derivedUserWaitCards(gated.replace('- [ ]', '- [x]'))).toHaveLength(0)
   })
 
-  it('keeps a gate card for a point a current-work card shows; skips only the guesses there', () => {
-    expect(derivedUserWaitCards(gate(tasks('- [ ] 1543. X'), 1543), { skip: [1543] }).map((c) => c.kind)).toEqual(['gate'])
+  it('gives a point on the current-work card no second owner; a malformed marker stays visible there', () => {
+    expect(derivedUserWaitCards(gate(tasks('- [ ] 1543. X'), 1543), { skip: [1543] })).toEqual([])
     expect(derivedUserWaitCards(tasks('- [ ] 1552. Y WAITS FOR the run'), { skip: [1552] })).toEqual([])
+    const broken = tasks('- [ ] 78. Cut AWAITING-CONFIRMATION(2026-11-20; user-input: run the benchmark')
+    expect(derivedUserWaitCards(broken, { skip: [78] }).map((c) => c.kind)).toEqual(['malformed'])
   })
 
   it('covers public-release and board-contract gates too', () => {
@@ -63,6 +66,16 @@ describe('derivedUserWaitCards — one card per open gate, all four acts', () =>
     const html = renderDerivedVdzkCard(card)
     expect(html).not.toContain('<b>')
     expect(html).toContain('&lt;b&gt;')
+    expect(html).toContain('&amp; ')
+    expect(html).not.toMatch(/ & /)
+  })
+
+  it('renders each paragraph as its own escaped <p>', () => {
+    const html = renderDerivedVdzkCard({ kind: 'gate', title: 'T & U', paragraphs: ['Eins & zwei.', 'Drei <i>vier</i>.'] })
+    expect(html.match(/<p>/g)).toHaveLength(2)
+    expect(html).toContain('<p>Eins &amp; zwei.</p>')
+    expect(html).toContain('<p>Drei &lt;i&gt;vier&lt;/i&gt;.</p>')
+    expect(html).toContain('T &amp; U')
   })
 
   it('renders a fallback card for a marker that does not parse', () => {
@@ -74,6 +87,9 @@ describe('derivedUserWaitCards — one card per open gate, all four acts', () =>
       expect(card.title).toBe(`Punkt ${point} wartet auf dich – Marker fehlerhaft`)
       expect(card.paragraphs.join(' ')).toContain('Roher Text: AWAITING-CONFIRMATION(')
     }
+    // THE LAST MARKER IS THE STATE: a gate followed by its answer is answered, not malformed.
+    const answeredAfter = tasks('- [ ] 80. Done AWAITING-CONFIRMATION(2026-11-20; release-tag: push the v1 tag, safe prepared state: the build is verified) USER-ANSWERED(2026-11-21)')
+    expect(derivedUserWaitCards(answeredAfter)).toEqual([])
     const doubled = tasks('- [ ] 79. Doubled AWAITING-CONFIRMATION(2026-11-20; release-tag: push the v1 tag, safe prepared state: the build is verified))')
     expect(derivedUserWaitCards(doubled).map((c) => c.kind)).toEqual(['malformed'])
   })
@@ -143,11 +159,23 @@ describe('applyDerivedVdzk — rendered into "Von dir zu klären", rebuilt each 
     expect(evaluateTopic({ dashboardHtml: built.html, tasksText: text }).block).toBe(false)
   })
 
-  it('removes a manual card of a point answered before the first derived build', () => {
-    const board = boardHtml({ queue: [211, 204], klaerungExtra: ['1543 — Notebook-Lauf bitte'] })
-    const r = applyDerivedVdzk(board, [], { knownPoints: known, answered: new Set([1543]) })
-    expect(r.removed).toEqual(['1543 — Notebook-Lauf bitte'])
-    expect([...parseKlaerungPoints(r.html, { knownPoints: known })]).toEqual([])
+  it('leaves a manual card of an answered (uncarded) point alone on every rebuild', () => {
+    const board = boardHtml({ queue: [211, 204], klaerungExtra: ['1543 — Eine spätere Frage'] })
+    const r = applyDerivedVdzk(board, [], { knownPoints: known })
+    expect(r.removed).toEqual([])
+    expect([...parseKlaerungPoints(r.html, { knownPoints: known })]).toEqual([1543])
+  })
+
+  it('a gated point on the current-work card has exactly one owning card on the rebuilt board', () => {
+    const nowGated = gate(tasks('- [ ] 210. Now', '- [ ] 211. Queued'), 210)
+    const board = boardHtml({ nowPoint: 210, queue: [211] })
+    const cards = derivedUserWaitCards(nowGated, { skip: [210] })
+    const rebuilt = applyDerivedVdzk(board, cards, { knownPoints: [210, 211] }).html
+    expect([...parseKlaerungPoints(rebuilt, { knownPoints: [210, 211] })]).toEqual([])
+    const audit = auditDashboard(rebuilt, { open: [210, 211], done: [209] })
+    expect(audit.filter((v) => ['dup-in-section', 'duplicate-card-title'].includes(v.code) || /two|both|twice/i.test(v.message ?? ''))).toEqual([])
+    // Once the now card moves on, the gate card appears on the next build.
+    expect(derivedUserWaitCards(nowGated, { skip: [211] }).map((c) => [c.point, c.kind])).toEqual([[210, 'gate']])
   })
 
   it('leaves a board without the section unchanged', () => {
@@ -165,5 +193,13 @@ describe('headSkipAdvisory — stateless, advisory only', () => {
     expect(headSkipAdvisory({ open, inFlight: [] })).toBe('')
     const gates = gateSets(gate(tasks('- [ ] 5. A', '- [ ] 6. B', '- [ ] 7. C'), 5))
     expect(headSkipAdvisory({ open, gates, inFlight: [6] })).toBe('')
+  })
+  it('counts only the in-flight focus, never a secondary point; an unreadable source silences it', () => {
+    expect(advisoryInFlight({ ok: true, focusPoint: 6, points: [6, 5] })).toEqual([6])
+    expect(advisoryInFlight({ ok: true, focusPoint: 5, points: [5, 6] })).toEqual([5])
+    expect(advisoryInFlight({ ok: true, focusPoint: null, points: [6] })).toEqual([])
+    expect(advisoryInFlight({ ok: false, focusPoint: 6 })).toEqual([])
+    expect(headSkipAdvisory({ open, inFlight: advisoryInFlight({ ok: true, focusPoint: 5, points: [5, 6] }) })).toBe('')
+    expect(headSkipAdvisory({ open, inFlight: advisoryInFlight({ ok: true, focusPoint: 6, points: [6, 5] }) })).toMatch(/head point 5/)
   })
 })
