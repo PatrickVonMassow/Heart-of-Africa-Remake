@@ -2109,8 +2109,8 @@
   "kind": "backlog",
   "id": "B12",
   "title": "Der dokumentierte Pfad des Findings-Traegers ist der falsche — der Owner liest eine leere Datei (07.09.2026)",
-  "disposition": "delete",
-  "reason": "fixed: docs/batch-owner-runbook.md no longer names the hyphenated carrier path (no findings-carrier match); plan: documented carrier path is wrong (M-D11)",
+  "disposition": "keep",
+  "reason": "not verifiably gone: the runbook no longer names the hyphenated path and scripts/findings-paths.mjs:30-47 now reads the -workspace-hoa- twin too, but the leftover carrier file and its misleading header live under /home/node/.claude/projects/-workspace-hoa-/memory/ on the host, absent from this container (ls: no such file); part 2 parked",
   "planRef": "§5 Agreed obsolete yes",
   "match": "## Der dokumentierte Pfad des Findings-Traegers ist der falsche — der Owner lies"
  },

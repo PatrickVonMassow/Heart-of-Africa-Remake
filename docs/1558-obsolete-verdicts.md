@@ -38,10 +38,11 @@ cleanup"); no ambiguous mapping.
 
 | delete | keep | drop |
 |---|---|---|
-| 6 | 47 | 0 |
+| 5 | 48 | 0 |
 
-Deleted: B1, B12, B32, B47, B63, B71. B28 stays: its retry half is void, but the
-polish expectation is still 340900 ms against a ~28-min run.
+Deleted: B1, B32, B47, B63, B71. B28 stays: its retry half is void, but the
+polish expectation is still 340900 ms against a ~28-min run. B12 stays: the
+leftover carrier file and its header sit on the host and cannot be checked here.
 
 ## Dropped verdicts
 
