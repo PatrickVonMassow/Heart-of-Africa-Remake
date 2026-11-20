@@ -55,7 +55,8 @@ describe('startDetailLevelForAdapter (point 1562)', () => {
     // WebGPU architecture plus the probed WebGL name of a discrete card
     expect(startDetailLevelForAdapter('amd rdna-2', 2, 'ANGLE (AMD, AMD Radeon RX 6800 XT Direct3D11)')).toBe('medium')
     expect(startDetailLevelForAdapter('amd rdna-2', 1.5, 'ANGLE (AMD, AMD Radeon(TM) RX 6700M Direct3D11)')).toBe('medium')
-    expect(startDetailLevelForAdapter('amd rdna-2', 1, 'ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11)')).toBe('low')
+    // the probe never triggers Low: on a hybrid desktop it may name the iGPU beside an active RX card
+    expect(startDetailLevelForAdapter('amd rdna-2', 1, 'ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11)')).toBe('medium')
     expect(startDetailLevelForAdapter('amd rdna-2', 1.75, 'ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11)')).toBe('low')
   })
 

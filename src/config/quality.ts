@@ -360,10 +360,9 @@ export interface WeakAdapterRule {
   unless?: RegExp
   minDpr?: number
   /** Rules for an architecture-only WebGPU name also consult the probed WebGL
-   *  name: `unless` on it exempts a discrete card, `probeConfirms` on it marks
-   *  the APU at any dpr. Other rules never read the probe — it may name a
-   *  second GPU (hybrid notebook). */
-  probeConfirms?: RegExp
+   *  name, whose `unless` can only exempt a discrete card. Other rules never
+   *  read the probe, and no rule lets it trigger Low — it may name a second
+   *  GPU (hybrid machine). */
   readsProbe?: boolean
 }
 
@@ -386,12 +385,12 @@ export const WEAK_ADAPTER_RULES: readonly WeakAdapterRule[] = [
   // The WebGL name probed beside it (startProbeName) exempts a discrete
   // RX/Pro card; without one, a high-dpr screen marks the notebook/handheld.
   // OPEN: with no probed name a discrete RDNA-2 card on a dpr >= 1.25 screen
-  // still starts at Low — GPUAdapterInfo carries no iGPU/dGPU signal.
+  // still starts at Low, and an APU on a dpr-1 screen stays at Medium —
+  // GPUAdapterInfo carries no iGPU/dGPU signal.
   {
     pattern: /\bamd (rdna-[12]|gcn-\d)\b/i,
     readsProbe: true,
     unless: /radeon(\(tm\))? (rx|pro)\b/i,
-    probeConfirms: /\bamd\b.*(radeon(\(tm\))? graphics|\bvega \d+ graphics)/i,
     minDpr: 1.25,
   },
 ]

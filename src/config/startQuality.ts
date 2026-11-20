@@ -26,7 +26,7 @@ export function isWeakAdapter(adapter: string, dpr: number, rules = WEAK_ADAPTER
     if (!r.pattern.test(adapter)) return false
     const probe = r.readsProbe ? probed : ''
     if (r.unless?.test(`${adapter} | ${probe}`)) return false
-    return dpr >= (r.minDpr ?? 0) || (probe !== '' && (r.probeConfirms?.test(probe) ?? false))
+    return dpr >= (r.minDpr ?? 0)
   })
 }
 
