@@ -107,16 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1562. The first start picks the Low graphics level on a weak GPU
-  Placement: directly after point 1543 in the work order, after the settlement benchmark point (user order 20.11.2026).
-  Observed problem: the detail level defaults to 'medium' (src/state/ui.ts:300) on every device. On the user's weak notebook (AMD RDNA-2 iGPU, dpr 1.75) Medium runs ~29-32 fps and Low ~55 fps in the benchmark; a player who never opens the settings stays on Medium.
-  Final state: on a first start without a stored or URL-given detail level, the game chooses Low for a weak adapter (decision rule from the adapter info the game already reads in src/render/backendInfo.ts and/or a short measured startup probe — the rule and its thresholds are calibratable values in src/config/balance.ts or src/config/quality.ts); otherwise Medium as today. A player's own choice always wins and is never overridden later.
-  Test: Vitest for the decision rule (weak adapter -> low, others -> medium, stored choice wins).
-  Player impact: weak devices start in a playable state instead of ~30 fps or worse.
-  Source: user benchmarks 20.11.2026.
-  Bundle: Steuerung & Performance.
-  Source: user request of 20.11.2026 07:31 UTC via the findings carrier (session 4c27ebaf); approved "B und D nach 1543 einreihen".
-
 - [ ] 1560. Finish the reorder dispositions: confirm 1013, re-check 1059/1328/1289, consolidate 1516 with 551
   Split off point 1557 (the user-approved work-order reorder of 19.11.2026) because these parts need measurement runs, not queue edits.
 
