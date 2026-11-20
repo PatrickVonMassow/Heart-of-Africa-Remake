@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createEnvironmentTexture, updateEnvironmentTexture } from './environment'
 
 // three's PMREM cache keys its render target by the environment TEXTURE object
@@ -13,9 +13,13 @@ describe('environment re-bake', () => {
     const before = Float32Array.from(data)
     const version = tex.version
     const pmremVersion = tex.pmremVersion
+    // A dispose would evict the PMREM cache entry and defeat the reuse.
+    const disposed = vi.fn()
+    tex.addEventListener('dispose', disposed)
 
     updateEnvironmentTexture(tex, [-0.5, 0.2, -0.36])
 
+    expect(disposed).not.toHaveBeenCalled()
     expect(tex.image.data).toBe(data)
     expect(data).not.toEqual(before)
     expect(tex.version).toBeGreaterThan(version)

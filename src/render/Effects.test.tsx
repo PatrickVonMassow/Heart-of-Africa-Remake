@@ -177,4 +177,24 @@ describe('post chain ownership', () => {
     view.unmount()
     dispose.mockRestore()
   })
+
+  // Point 1520: a replaced environment texture leaks its PMREM render target, so
+  // pipeline rebuilds must keep the one scene texture and free it only on unmount.
+  it('keeps the one environment texture across pipeline rebuilds and frees it on unmount', () => {
+    useUi.setState({ detailLevel: 'medium', traaEnabled: true, ssaoEnabled: true })
+    const view = mountEffects()
+    const scene = fiber.state.scene as Scene
+    const env = scene.environment!
+    const disposed = vi.fn()
+    env.addEventListener('dispose', disposed)
+    for (const state of [{ traaEnabled: false }, { detailLevel: 'high' as const }, { detailLevel: 'low' as const }, { detailLevel: 'medium' as const }, { traaEnabled: true }]) {
+      act(() => useUi.setState(state))
+      view.processing()
+      expect(scene.environment).toBe(env)
+      expect(disposed).not.toHaveBeenCalled()
+    }
+    view.unmount()
+    expect(disposed).toHaveBeenCalledTimes(1)
+    expect(scene.environment).toBeNull()
+  })
 })
