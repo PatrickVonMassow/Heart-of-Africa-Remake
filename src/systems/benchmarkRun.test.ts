@@ -144,6 +144,8 @@ describe('render benchmark on a lost GPU device (point 507)', () => {
       await new Promise((r) => setTimeout(r, 0))
     }
     expect(useUi.getState().benchProgress?.configIndex).toBe(2)
+    // The snapshot restore would erase a toast set in the catch, so spy on it.
+    const setToast = vi.spyOn(useGame.getState(), 'setToast')
     // The device dies and no frame callback runs again: only the watchdog ends it.
     recordDeviceLost({ api: 'WebGPU', reason: 'unknown', message: 'Instance dropped' })
     const t = performance.now()
@@ -157,7 +159,28 @@ describe('render benchmark on a lost GPU device (point 507)', () => {
     const r = report()
     expect(r.invalidReason).toContain('GPU device lost')
     expect(r.rows).toEqual([])
-    expect(useGame.getState().toast).toBeNull()
+    expect(setToast).not.toHaveBeenCalled()
+  })
+
+  it('an Esc that races the loss still ends INVALID and drops the completed rows', async () => {
+    fakeContext(42)
+    const run = startBenchmark({ short: true })
+    for (let n = 0; n < 5000 && (useUi.getState().benchProgress?.configIndex ?? 0) < 2; n++) {
+      for (const cb of [...before]) cb()
+      for (const cb of [...after]) cb()
+      await new Promise((r) => setTimeout(r, 0))
+    }
+    expect(useUi.getState().benchProgress?.configIndex).toBe(2)
+    // Esc lands first and its frame rejects with the abort; the loss is
+    // recorded in the same tick, before the runner's catch classifies it.
+    useUi.getState().requestBenchAbort()
+    for (const cb of [...before]) cb()
+    for (const cb of [...after]) cb()
+    recordDeviceLost({ api: 'WebGPU', reason: 'unknown', message: 'Instance dropped' })
+    await pump(run)
+    const r = report()
+    expect(r.invalidReason).toContain('GPU device lost')
+    expect(r.rows).toEqual([])
   })
 
   it('a measured phase with zero draw calls ends the run INVALID instead of reporting fps', async () => {

@@ -655,8 +655,9 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   } catch (caught) {
     aborted = true
     // A lost device can stop the frame callbacks altogether: the watchdog's
-    // "no frames" (or any other failure) then still ends the run INVALID.
-    const lost = caught instanceof BenchAborted || caught instanceof BenchInvalid ? null : deviceLostReason()
+    // "no frames", an Esc that raced the loss, or any other failure then
+    // still ends the run INVALID.
+    const lost = caught instanceof BenchInvalid ? null : deviceLostReason()
     const error = lost !== null ? new BenchInvalid(lost) : caught
     if (error instanceof BenchInvalid) {
       // Rows measured before the loss are dropped too: the loss's onset is
