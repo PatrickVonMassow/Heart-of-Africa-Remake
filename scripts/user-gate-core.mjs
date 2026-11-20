@@ -32,9 +32,13 @@
 //   prose, not state. Only the legacy marker may appear without them.
 // * `AWAITING-CONFIRMATION(<since>; <act>: <what>, safe prepared state: <what
 //   stands prepared>)` is the only gate, and `<act>` is SELECTED from
-//   `CONFIRMATION_ACTS` — `release-tag`, `public-release`, `board-contract` —
-//   never described. `formatConfirmationReason` is the only way to build one and
-//   demands at least three words in each field.
+//   `CONFIRMATION_ACTS` — `release-tag`, `public-release`, `board-contract`,
+//   `user-input` — never described. `formatConfirmationReason` is the only way
+//   to build one and demands at least three words in each field. A `user-input`
+//   detail must also read `<action>, hand back: <result>, where: <place>`.
+//   ITS ANSWER IS A HAND-IN, NOT AN APPROVAL: `USER-ANSWERED` carries no act, so
+//   answering a user-input gate only re-queues the point and never stands in
+//   for a release-tag, public-release or board-contract confirmation.
 //   WHY SELECTED RATHER THAN DESCRIBED (three cross-vendor rounds,
 //   23.08.2026): reading a free sentence for "is this an outward act" is a
 //   bag-of-words guess, and each widening of the patterns produced the next
@@ -86,6 +90,13 @@ export const ANSWERED_MARKER = 'USER-ANSWERED'
 
 /** How long a recorded reason may be before it is cut (a work-order line, not an essay). */
 const REASON_MAX = 160
+/**
+ * A user-input gate names three facts (action, result, where it goes), which do
+ * not fit 160 characters; it alone gets a second line's worth.
+ */
+const USER_INPUT_REASON_MAX = 320
+/** What a reader accepts back — never less than any writer's cap. */
+const READ_MAX = 1000
 
 const MARKERS = [CONFIRMATION_MARKER, LEGACY_GATE_MARKER, SELF_DECIDED_MARKER, ANSWERED_MARKER]
 /**
@@ -125,7 +136,9 @@ const readPayload = (marker, payload) => {
   const answered = marker === ANSWERED_MARKER
   const stamp = leadingStamp(payload)
   const rest = payload.slice(stamp.length).replace(/^\s*;\s*/, '').trim()
-  return { stamp, reason: answered ? '' : sanitiseReason(rest || (stamp ? '' : payload)) }
+  // READ WITHOUT THE WRITE CAP: clipping is the writer's concern, and a reader
+  // that clipped a longer user-input reason would turn its gate advisory.
+  return { stamp, reason: answered ? '' : sanitiseReason(rest || (stamp ? '' : payload), { max: READ_MAX }) }
 }
 
 /**
@@ -138,11 +151,34 @@ const peelTrailingMarkers = (line) => {
   let head = String(line)
   const markers = []
   for (;;) {
-    const hit = head.match(MARKER_TAIL_RE)
+    const hit = lastMarker(head)
     if (!hit) return { head, markers }
-    markers.unshift(hit[1])
+    markers.unshift(hit.token)
     head = head.slice(0, hit.index).replace(/[ \t]+$/, '')
   }
+}
+
+/**
+ * The LAST marker ending `text`, as { token, index } (index = where the token
+ * starts), or null. AN UNCLOSED MARKER DOES NOT SWALLOW A LATER ONE: the
+ * leftmost tail match spans from the unclosed opening to the later marker's
+ * `)`, so the token is re-matched inside itself until no marker opens in its
+ * payload; the unclosed text is then prose. Each step strictly shortens the
+ * token, and a bare legacy marker has no `(`.
+ */
+export function lastMarker(text) {
+  const hit = String(text).match(MARKER_TAIL_RE)
+  if (!hit) return null
+  let token = hit[1]
+  let index = hit.index + hit[0].indexOf(token)
+  for (let open = token.indexOf('('); open >= 0; open = token.indexOf('(')) {
+    const rest = token.slice(open + 1)
+    const inner = rest.match(MARKER_TAIL_RE)
+    if (!inner) break
+    index += open + 1 + inner.index + inner[0].indexOf(inner[1])
+    token = inner[1]
+  }
+  return { token, index }
 }
 
 /**
@@ -258,7 +294,47 @@ export const CONFIRMATION_ACTS = {
   'release-tag': 'create, move, push or delete a version/poc/release tag',
   'public-release': 'dispatch or withdraw the public release',
   'board-contract': 'change the published four-section board contract',
+  'user-input': 'the user must run, measure or hand in something only they can',
 }
+
+/** The act whose answer is a hand-in, never an approval of any other act. */
+export const USER_INPUT_ACT = 'user-input'
+
+/**
+ * The detail a user-input gate must carry, checked at write time:
+ * `<action>, hand back: <result>, where: <place it is submitted>`.
+ */
+const USER_INPUT_DETAIL_RE = /^(.+?),?\s+hand back:\s*(.+?),?\s+where:\s*(.+)$/i
+export const USER_INPUT_DETAIL_FORM = '"<action>, hand back: <result>, where: <where to submit it>"'
+
+/**
+ * The three fields of a user-input detail — { action, handBack, where } — or
+ * null. The ONE parser: the write-time check and the board card both read it.
+ */
+export function parseUserInputDetail(detail) {
+  const m = String(detail ?? '').trim().match(USER_INPUT_DETAIL_RE)
+  return m ? { action: m[1], handBack: m[2], where: m[3] } : null
+}
+
+/** '' when a user-input detail names action, result and destination; else the defect. */
+export function userInputDetailError(detail) {
+  const fields = parseUserInputDetail(detail)
+  if (!fields) return `a user-input detail must read ${USER_INPUT_DETAIL_FORM}`
+  if (wordsIn(fields.action) < 3) return 'a user-input detail must name the action in at least three words'
+  // A bare comma is no value: a field is filled only by a letter or digit.
+  const filled = (t) => /[\p{L}\p{N}]/u.test(t)
+  if (!filled(fields.handBack)) return 'a user-input detail must name the result to hand back'
+  if (!filled(fields.where)) return 'a user-input detail must name where to submit the result'
+  return ''
+}
+
+/**
+ * A bare work-order STATUS WORD inside a gate field is refused: `DEFERRED` is
+ * read anywhere on the head line and would drop the gated point from the batch.
+ * It is the only bare one — marker words count only with their `(`, and the
+ * last-marker rule already keeps a quoted marker word from changing the state.
+ */
+const STATUS_TOKEN_RE = /\bDEFERRED\b/
 
 /** The stored shape of a typed confirmation reason. */
 const STRUCTURED_RE = new RegExp(
@@ -286,21 +362,42 @@ export function formatConfirmationReason({ act = '', detail = '', prepared = '' 
   const [what, safe] = [clean(detail), clean(prepared)]
   if (wordsIn(what) < 3) return { ok: false, error: 'detail must name the concrete act in at least three words', reason: '' }
   if (wordsIn(safe) < 3) return { ok: false, error: 'prepared must name the safe prepared state in at least three words', reason: '' }
+  for (const [name, value] of [['detail', what], ['prepared', safe]]) {
+    const token = value.match(STATUS_TOKEN_RE)
+    if (token) return { ok: false, error: `${name} must not contain the status word ${token[0]} — it would change the point's state`, reason: '' }
+  }
+  const userInput = key === USER_INPUT_ACT
+  if (userInput) {
+    // A DESTINATION IS STORED VERBATIM OR REFUSED: `clean` would silently turn
+    // `upload;case=42` into another address, since ( ) ; delimit the marker.
+    if (/[();]/.test(String(detail ?? ''))) {
+      return { ok: false, error: 'a user-input detail must not contain ( ) or ; — they delimit the gate marker', reason: '' }
+    }
+    const defect = userInputDetailError(what)
+    if (defect) return { ok: false, error: defect, reason: '' }
+  }
+  const max = userInput ? USER_INPUT_REASON_MAX : REASON_MAX
   // A FIELD THAT ASKS IS NOT A FIELD THAT ACTS: selecting an act key does not
   // turn "choose blue or green" into one.
-  for (const [name, value] of [['detail', what], ['prepared', safe]]) {
+  // A user-input `where:` may be a URL with a query string; only the action
+  // and result — as the one parser splits them — are judged for asking.
+  const fields = userInput ? parseUserInputDetail(what) : null
+  const asked = fields ? [fields.action, fields.handBack] : [what]
+  for (const [name, value] of [...asked.map((v) => ['detail', v]), ['prepared', safe]]) {
     if (ASKS_RATHER_THAN_STATES(value.toLowerCase())) {
       return { ok: false, error: `${name} asks a question — decide it and record SELF-DECIDED instead`, reason: '' }
     }
   }
-  const reason = sanitiseReason(`${key}: ${what}, safe prepared state: ${safe}`)
+  const reason = sanitiseReason(`${key}: ${what}, safe prepared state: ${safe}`, { max })
   const back = reason.match(STRUCTURED_RE)
   // A CLIPPED RECORD IS ALSO A REFUSAL: `sanitiseReason` marks a cut with an
   // ellipsis, and half a prepared state is not the state.
-  if (reason.endsWith('…') || !back || wordsIn(back[2]) < 3 || wordsIn(back[3]) < 3) {
+  // AND THE FIELDS MUST COME BACK EXACTLY: a detail quoting `, safe prepared
+  // state:` would split early and store a shortened, possibly invalid detail.
+  if (reason.endsWith('…') || !back || back[2].trim() !== what || back[3].trim() !== safe) {
     return {
       ok: false,
-      error: `the composed reason does not survive one work-order line (${REASON_MAX} characters) — shorten detail or prepared`,
+      error: `the composed reason does not survive one work-order line (${max} characters) — shorten detail or prepared`,
       reason: '',
     }
   }
@@ -403,13 +500,13 @@ export function parseGateLine(line) {
   const point = Number(head[2])
   const open = head[1] === ' '
   const deferred = /\bDEFERRED\b/.test(text)
-  const hit = text.match(MARKER_TAIL_RE)
-  if (!hit) {
+  const last = lastMarker(text)
+  if (!last) {
     return { point, open, gated: false, answered: false, since: '', at: '', reason: '', reasonMissing: false, stale: false }
   }
   // The LAST marker on the line is the state — a gate written after an answer
   // gates again, an answer written after a gate answers. No precedence rule.
-  const { marker, payload } = readMarkerToken(hit[1])
+  const { marker, payload } = readMarkerToken(last.token)
   const answered = marker === ANSWERED_MARKER
   const selfDecided = marker === SELF_DECIDED_MARKER
   const { stamp, reason } = readPayload(marker, payload)
@@ -568,7 +665,15 @@ export function markGated(tasksText, point, { since = '', act = '', detail = '',
   const marker = `${CONFIRMATION_MARKER}(${stamp ? `${stamp}; ` : ''}${clean})`
   const { text, hit } = rewriteHead(tasksText, point, (line) => `${stripMarkers(line)} ${marker}`)
   if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order` }
-  if (hit === 'ticked') return { text, ok: false, error: `point ${Number(point)} is already ticked — a closed point is not gateable` }
+  // A refusal returns the ORIGINAL text: a ticked duplicate may follow an open head that was stamped.
+  if (hit === 'ticked') return { text: String(tasksText ?? ''), ok: false, error: `point ${Number(point)} is already ticked — a closed point is not gateable` }
+  // ok ONLY WHEN THE GATE HOLDS: whatever stands on the line (an unclosed
+  // marker included), the rewritten line must read back as this gate.
+  // EVERY open head of the point was rewritten, so every one must hold.
+  const written = text.split('\n').map(parseGateLine).filter((g) => g?.point === Number(point) && g.open)
+  if (!written.length || !written.every((g) => g.gated)) {
+    return { text: String(tasksText ?? ''), ok: false, error: `point ${Number(point)}: the re-stamped line does not read back as a gate — clear its markers first` }
+  }
   return { text, ok: true, error: '' }
 }
 
@@ -746,7 +851,7 @@ export function migrateLegacyGates(tasksText, { at = '' } = {}) {
 /**
  * Record the user's answer: the gate becomes `USER-ANSWERED(<when>)`, which is
  * what returns the point to the HEAD of the queue. Returns { text, ok, error,
- * wasGated }.
+ * wasGated, wasUserInput }.
  */
 export function markAnswered(tasksText, point, { at = '' } = {}) {
   const before = parseGateLine(
@@ -760,11 +865,13 @@ export function markAnswered(tasksText, point, { at = '' } = {}) {
   const stamp = leadingStamp(at)
   const marker = `${ANSWERED_MARKER}(${stamp})`
   const { text, hit } = rewriteHead(tasksText, point, (line) => `${stripMarkers(line)} ${marker}`)
-  if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order`, wasGated: false }
+  if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order`, wasGated: false, wasUserInput: false }
   if (hit === 'ticked') {
-    return { text, ok: false, error: `point ${Number(point)} is already ticked — nothing to answer`, wasGated: false }
+    return { text, ok: false, error: `point ${Number(point)} is already ticked — nothing to answer`, wasGated: false, wasUserInput: false }
   }
-  return { text, ok: true, error: '', wasGated: Boolean(before?.gated) }
+  // A user-input answer is a hand-in: reported so the CLI can say it approves nothing.
+  const wasUserInput = Boolean(before?.gated) && before?.classification?.act === USER_INPUT_ACT
+  return { text, ok: true, error: '', wasGated: Boolean(before?.gated), wasUserInput }
 }
 
 /**
