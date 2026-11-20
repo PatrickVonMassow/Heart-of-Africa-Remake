@@ -1035,8 +1035,8 @@
   "kind": "point",
   "id": 330,
   "title": "Full post-degradation assurance pass",
-  "disposition": "archive",
-  "reason": "plan folds the assurance need into open 303 (kept); no own work remains under this number - the main session appends the need to 303 when archiving",
+  "disposition": "drop",
+  "reason": "stays open: the plan folds its assurance need into open 303, but 303 does not carry that requirement today, so closing 330 would lose it",
   "planRef": "§4 Agreed obsolete yes, A's G4 (four-eyes gates/ledger/lanes); §4 disagreement table row 330: resolved yes"
  },
  {

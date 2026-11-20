@@ -29,7 +29,7 @@ Points: 261 plan "yes" (253 agreed + 8 resolved yes: 330, 464, 857, 956, 972,
 
 | archive | backlog | drop |
 |---|---|---|
-| 6 | 250 | 5 |
+| 5 | 250 | 6 |
 
 Backlog entries: 53 plan "yes" (38 agreed + 15 resolved), all 53 mapped to a
 `## ` heading of today's `docs/backlog.md`. The 109 headings match A's §6 order
@@ -49,13 +49,13 @@ leftover carrier file and its header sit on the host and cannot be checked here.
 - 803, 1361, 1461: already closed in the archive.
 - 1101: reproducible false approval today; `ci-gate-verdict.mjs` outside a
   runner still prints "CI gate passed." and exits 0.
+- 330: stays open; 303 does not yet carry its assurance requirement.
 - 1467: real blockade still reproducible; the doctor's quarantine stash does
   not protect `.claude/closing-state.json` and aborts a live closing LARGE.
 
 ## Open questions
 
-- 330: the plan folds its need into open 303; archiving it needs that line
-  appended to 303 first.
+- 330: closes only after its assurance requirement is appended to 303.
 - B72: the five branches are gone on origin, but the main checkout's local
   branches and the two unmerged ones need the user's written disposition (O7).
 - 646, 798 (doctor deletes or stashes live work) stay `backlog`; their data
