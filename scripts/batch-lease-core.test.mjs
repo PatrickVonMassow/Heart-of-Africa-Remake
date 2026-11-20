@@ -540,6 +540,29 @@ describe('the main-write ownership fence', () => {
     expect(shell('git commit -F /tmp/message.txt').writes).toBe(true)
   })
 
+  it('lets a stream reader redirect into the scratchpad while main-tree targets stay refused (point 1555)', () => {
+    const shell = (command) =>
+      mainWritingAction({ toolName: 'Bash', command, checkoutRoot: '/workspace/hoa', cwd: '/workspace/hoa' })
+    const pad = '/tmp/claude-1000/-workspace-hoa/s1/scratchpad'
+    // The reproduced refusal of 19.11.2026: the inputs lie in the checkout.
+    expect(shell(`sed -n 1,90p scripts/user-gate-core.mjs > ${pad}/vdzk/m1.txt`).writes).toBe(false)
+    expect(shell(`sed -n 1,90p scripts/user-gate-core.mjs > "${pad}/vdzk/m1.txt"`).writes).toBe(false)
+    expect(shell(`sed -n -e 's/a/b/' src/x.ts >> ${pad}/m.txt`).writes).toBe(false)
+    expect(shell(`head -40 TASKS.md > ${pad}/t.txt`).writes).toBe(false)
+    expect(shell(`grep -n foo scripts/a.mjs > /tmp/out.txt`).writes).toBe(false)
+    // A target in the main tree stays refused, and so does any second target there.
+    expect(shell('sed -n 1,90p scripts/user-gate-core.mjs > scripts/m1.txt').writes).toBe(true)
+    expect(shell(`head TASKS.md > ${pad}/a.txt 2> docs/err.txt`).writes).toBe(true)
+    // sed that can write or execute through its script, or edits in place, stays refused.
+    expect(shell(`sed -n 'w scripts/x.mjs' src/a.ts > ${pad}/m.txt`).writes).toBe(true)
+    expect(shell(`sed 's/a/b/e' src/a.ts > ${pad}/m.txt`).writes).toBe(true)
+    expect(shell(`sed -i 's/a/b/' src/a.ts > ${pad}/m.txt`).writes).toBe(true)
+    expect(shell(`sed -f prog.sed src/a.ts > ${pad}/m.txt`).writes).toBe(true)
+    // Operand writers keep the strict rule: an inside source disqualifies.
+    expect(shell(`sort -o src/a.ts src/a.ts > ${pad}/m.txt`).writes).toBe(true)
+    expect(shell(`awk '{print > "src/a.ts"}' src/b.ts > ${pad}/m.txt`).writes).toBe(true)
+  })
+
   it('judges file writes by their resolved target, not by the main session', () => {
     const checkoutRoot = '/workspace/hoa'
     const write = (filePath, resolvedFilePath) =>

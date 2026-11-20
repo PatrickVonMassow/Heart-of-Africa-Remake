@@ -847,11 +847,14 @@ const processLocalPath = (path) => /^\/(proc|dev)(\/|$)/.test(String(path))
 export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRoot = '', canonical } = {}) {
   if (!checkoutRoot) return false
   const { head, args } = headAndArgs(segment)
-  if (!FILE_TOOLS.has(String(head))) return false
+  // A pure stream reader writes only through its redirections; its operands are
+  // inputs (point 1555: `sed -n 1,90p scripts/x.mjs > <scratchpad>/m.txt`).
+  const reader = streamReaderOnly(String(head), args)
+  if (!reader && !FILE_TOOLS.has(String(head))) return false
   const candidates = [
     // `/dev/null` alone is no destination: it discards, whoever opens it.
     ...(segment?.redirects ?? []).filter((r) => r.op?.includes('>') && r.target !== '/dev/null').map((r) => r.target),
-    ...args.map((arg) => arg.text).filter((text) => text && !text.startsWith('-') && text !== '--'),
+    ...(reader ? [] : args.map((arg) => arg.text).filter((text) => text && !text.startsWith('-') && text !== '--')),
     // EVERY positional counts, bare filenames included (measured while building
     // this: requiring a slash let `cp <outside> TASKS.md` pass as an outside-only
     // write, because the target with no slash was not even a candidate). Counting
@@ -872,6 +875,35 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
       !resolvedTargetInCheckout({ resolvedFilePath: resolved, checkoutRoot })
     )
   })
+}
+
+/**
+ * Readers whose operands can never be written (point 1555). `sed` qualifies only
+ * with harmless options and a script free of `w`/`W`/`e` (file write, command
+ * execution); refusing a script that merely contains those letters is the safe
+ * side. `awk`, `sort -o`, `uniq`, `tee` and `dd` write through operands and stay out.
+ */
+const PLAIN_STREAM_READERS = new Set(['cat', 'head', 'tail', 'grep', 'wc', 'cut', 'nl'])
+const SED_READ_OPTIONS = new Set(['-n', '-E', '-r', '-s', '-u', '-z', '--quiet', '--silent'])
+
+function streamReaderOnly(head, args) {
+  if (PLAIN_STREAM_READERS.has(head)) return true
+  if (head !== 'sed') return false
+  const scripts = []
+  let sawScriptFlag = false
+  for (let i = 0; i < args.length; i++) {
+    const text = String(args[i]?.text ?? '')
+    if (text === '-e') {
+      sawScriptFlag = true
+      if (i + 1 >= args.length) return false
+      scripts.push(String(args[++i]?.text ?? ''))
+    } else if (text.startsWith('-')) {
+      if (!SED_READ_OPTIONS.has(text)) return false
+    } else if (!sawScriptFlag && scripts.length === 0) {
+      scripts.push(text)
+    }
+  }
+  return scripts.length > 0 && scripts.every((script) => !/[wWe]/.test(script))
 }
 
 /** The injected resolver's answer; '' (unknown, so inside) on a throw. */
