@@ -130,6 +130,11 @@ put it is the mistake this line exists to stop.
   a real defect: a port re-entry wrote an arrival entry AND saved a checkpoint to the player's localStorage with benchmark state;
   benchmarkEntry.ts now enters silently (Vitest-proven). Build, lint, tsc, Vitest 48/48 green; WebGPU benchmark 42 pass /
   8 fail, all 8 owned by 1009/1012, the 4 new checks green. Owed: WebGL 2 run, confirming cross-review, picture, landing.
+  Progress 20.11.2026 13:10 (handover at the context watermark): feat/1561-settlement-benchmark @ 8488996 READY TO LAND.
+  WebGL 2 picture found the first Cairo row half-built (6031 tris while async pipelines compiled); readiness now counts only
+  frames with warm pipelines and the travel scene gone (benchFrameReady, Vitest). Both backends re-run: settlement rows
+  consistent (817 draws/718k tris), only the 1009/1012 reds. Cross-review GPT-6.2 Sol confirm passes recorded, last verdict merge.
+  Next: node scripts/land-point.mjs 1561.
 
 - [ ] 1562. The first start picks the Low graphics level on a weak GPU
   Placement: directly after point 1543 in the work order, after the settlement benchmark point (user order 20.11.2026).
