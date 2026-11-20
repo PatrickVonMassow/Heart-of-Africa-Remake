@@ -1994,25 +1994,6 @@ export const RED_CHARGES = [
       + 'assert fired for a Bambara water-back pair forced after 240 s. Filed as point 1473. The charge dies with point 1473.',
   },
   {
-    point: 1495,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^frame 87-continent-zoom\b/i,
-    why:
-      'MEASURED 09.11.2026 on both backends: enrichments on main ca908ee7d (webgpu, --section=seasons) and on '
-      + 'feat/565 313289975 (webgpu and webgl, whole suite): the continent zoom never draws (0 draw calls). '
-      + 'Filed as point 1495. The charge dies with point 1495.',
-  },
-  {
-    point: 1495,
-    suite: 'enrichments',
-    kind: 'console',
-    match: /^console error: TypeError: undefined is not iterable \(cannot read property Symbol\(Symbol\.iterator\)\)/i,
-    why:
-      'MEASURED 09.11.2026 beside the frame 87-continent-zoom red on both backends, the per-frame TypeError '
-      + 'point 1495 names. The charge dies with point 1495.',
-  },
-  {
     point: 1496,
     suite: 'enrichments',
     kind: 'check',
@@ -2078,15 +2059,6 @@ export const RED_CHARGES = [
     why:
       'MEASURED 15.11.2026 on WebGPU, main dcf4949c7 and d4be6047b: every proximity level reads 0; filed as point 1522 '
       + 'before this run. The charge dies with point 1522.',
-  },
-  {
-    point: 1495,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^the Congo basin does NOT swing\b/i,
-    why:
-      'MEASURED 14.11.2026 on WebGL 2, feat/344 b9082f151: congo swing 7.2 vs savanna 10.7 in the whole pass; point 1495 '
-      + 'owns the seasons section until it is green on both backends. The charge dies with point 1495.',
   },
   {
     point: 1520,
