@@ -4,6 +4,9 @@
 // half (F8 driving the real scene) is scripts/verify/benchmark.mjs.
 
 import { describe, it, expect } from 'vitest'
+import { balance } from '../config/balance'
+import { freshGame, g, useGame, withWorld } from '../test/store'
+import { benchEnterPlace } from './benchmarkEntry'
 import {
   BENCH_APP,
   BENCH_CONFIGS,
@@ -19,6 +22,8 @@ import {
   benchFilename,
   benchNativePixelRatio,
   benchFrameCounts,
+  benchReadyBudget,
+  benchTrisStable,
   benchRemainingMs,
   benchReportJson,
   benchShortMode,
@@ -628,5 +633,49 @@ describe('report shaping', () => {
     expect(formatDuration(0)).toBe('0:00')
     expect(formatDuration(9000)).toBe('0:09')
     expect(formatDuration(125000)).toBe('2:05')
+  })
+})
+
+describe('settlement readiness and the later-entry path (point 1561)', () => {
+  withWorld()
+  it('waits for a held, non-zero triangle count before sampling a settlement', () => {
+    const { stableFrames, tolerance } = benchReadyBudget(false)
+    // The short-mode WebGL 2 baseline row measured 3019 triangles mid-build.
+    const building = [0, 0, 3019, 3019, 40000, 76000, 120000, 153000]
+    expect(benchTrisStable(building, stableFrames, tolerance)).toBe(false)
+    const standing = [...building, ...Array.from({ length: stableFrames }, (_, i) => 153000 + (i % 2) * 500)]
+    expect(benchTrisStable(standing, stableFrames, tolerance)).toBe(true)
+    expect(benchTrisStable(Array(stableFrames).fill(0), stableFrames, tolerance)).toBe(false)
+    expect(benchTrisStable([153000, 153000, 3019, 153000], 4, tolerance)).toBe(false)
+  })
+
+  it('caps the readiness wait, the short run tighter than the full one', () => {
+    const full = benchReadyBudget(false)
+    const short = benchReadyBudget(true)
+    expect(short.maxFrames).toBeLessThan(full.maxFrames)
+    for (const b of [full, short]) expect(b.maxFrames).toBeGreaterThan(b.stableFrames)
+  })
+
+  it('enters Cairo silently: no journal entry, no bounty, no money, no checkpoint', () => {
+    freshGame()
+    balance.randomEventsEnabled = false
+    g().leavePlace()
+    useGame.setState({ pendingBounties: [{ kind: 'landmark', id: 'giza' }] })
+    localStorage.clear()
+    for (let pass = 0; pass < 2; pass++) {
+      const journal = g().journal.length
+      const money = g().money
+      expect(benchEnterPlace(BENCH_SETTLEMENT_PLACE)).toEqual({ journal: 0, money: 0 })
+      expect(g().mode).toBe('place')
+      expect(g().placeId).toBe(BENCH_SETTLEMENT_PLACE)
+      expect({ journal: g().journal.length, money: g().money }).toEqual({ journal, money })
+      expect(g().pendingBounties).toEqual([])
+      expect(localStorage.length).toBe(0)
+      g().leavePlace()
+    }
+    // The ordinary re-entry the stubs suppress: a port writes both.
+    g().enterPlace(BENCH_SETTLEMENT_PLACE)
+    expect(localStorage.length).toBeGreaterThan(0)
+    balance.randomEventsEnabled = true
   })
 })

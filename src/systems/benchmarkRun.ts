@@ -30,6 +30,7 @@ import { getRenderContext } from '../render/renderContext'
 import { getTerrainRefine, resetTerrainRefine, setTerrainRefine } from '../scenes/travel/terrainLod'
 import { setClimateHazeEnabled } from '../scenes/travel/Climate'
 import { useGame } from '../state/store'
+import { benchEnterPlace } from './benchmarkEntry'
 import { effectiveDprCap, useUi } from '../state/ui'
 import { mulberry32 } from '../world/noise'
 import {
@@ -46,10 +47,12 @@ import {
   PRESET_CONFIG_NAMES,
   benchFilename,
   benchFrameCounts,
+  benchReadyBudget,
   benchRemainingMs,
   benchReportJson,
   benchShortMode,
   benchTotalFrames,
+  benchTrisStable,
   buildLowProfile,
   frameStats,
   headlineSeries,
@@ -289,11 +292,17 @@ function createGpuTimer(gl: unknown): GpuTimer {
  * so their difference is the CPU cost of the frame, uncapped by vsync, while
  * the before-to-before interval is the wall-clock frame time.
  */
-/** Unmeasured frames that let TravelScene remount (and run its mount effect)
- *  after the settlement phase, before the next config applies its levers. */
-const BENCH_REMOUNT_FRAMES = 3
+/** Cap on the unmeasured frames that wait for TravelScene to remount after
+ *  the settlement phase (its `travel-terrain` node, plus one frame for the
+ *  mount effect). Calibratable. */
+const BENCH_REMOUNT_MAX_FRAMES = 300
 
-function runFrames(count: number, collect: FrameSample[] | null, onFrame: () => void): Promise<void> {
+function runFrames(
+  count: number,
+  collect: FrameSample[] | null,
+  onFrame: () => void,
+  until?: () => boolean,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     let seen = 0
     let previous = 0
@@ -316,7 +325,7 @@ function runFrames(count: number, collect: FrameSample[] | null, onFrame: () => 
       if (collect !== null && seen > 1) collect.push({ frameMs, cpuMs: now - cpuStart })
       onFrame()
       if (useUi.getState().benchAbort) return finish(new BenchAborted())
-      if (seen >= count) finish(null)
+      if (seen >= count || (until !== undefined && until())) finish(null)
     })
     const watchdog = window.setInterval(() => {
       if (performance.now() - lastFrameAt > FRAME_STALL_MS) finish(new Error('benchmark: no frames'))
@@ -334,7 +343,7 @@ function runFrames(count: number, collect: FrameSample[] | null, onFrame: () => 
 }
 
 /** Reset every state a config must not inherit (determinism rule 2). */
-function resetWorld(phase: BenchPhase): void {
+function resetWorld(phase: BenchPhase): { journal: number; money: number } | undefined {
   balance.randomEventsEnabled = false
   balance.deadline.enabled = false
   balance.travelSpeed = BENCH_TRAVEL_SPEED
@@ -361,19 +370,11 @@ function resetWorld(phase: BenchPhase): void {
   })
   useGame.getState().debugJumpTo(phase.lat, phase.lon)
   if (phase.placeId !== undefined) {
-    // The settlement phase: every config takes the identical LATER-entry path
-    // (already visited and entered, no bounty payout), so no config pays a
-    // first-arrival journal entry another one skips. Then the ordinary entry
-    // runs — the walkable scene with its inhabitants, as a player walks in.
-    const g = useGame.getState()
-    const id = phase.placeId
-    useGame.setState({
-      pendingBounties: [],
-      visitedPlaces: g.visitedPlaces.includes(id) ? g.visitedPlaces : [...g.visitedPlaces, id],
-      enteredPlaces: g.enteredPlaces.includes(id) ? g.enteredPlaces : [...g.enteredPlaces, id],
-    })
-    useGame.getState().enterPlace(id)
+    // The settlement phase: every config takes the identical, silent
+    // LATER-entry path (benchmarkEntry.ts) into the walkable scene.
+    return benchEnterPlace(phase.placeId)
   }
+  return undefined
 }
 
 /** Apply one config's levers (the flags reset to their defaults first, so no
@@ -466,6 +467,8 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   // Real GPU milliseconds where the backend can measure them — the only series
   // that answers the geometry question under vsync.
   const gpu = createGpuTimer(ctx.gl)
+  const renderInfo = (): { drawCalls?: number; triangles?: number } =>
+    (ctx.gl.info as { render?: { drawCalls?: number; triangles?: number } }).render ?? {}
   Math.random = mulberry32(BENCH_SEED)
 
   ui.clearBenchAbort()
@@ -495,7 +498,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     phase: BenchPhase,
     measured: boolean,
   ): Promise<void> => {
-    resetWorld(phase)
+    const entryCost = resetWorld(phase)
     publish(measured ? config.name : null, configIndex, phase.name)
     let sinceUpdate = 0
     // GPU durations of the measured frames. During the settle the queries are
@@ -513,13 +516,32 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     if (phase.drive) pressKey('KeyW', true)
     try {
       await runFrames(counts.settle, null, tick)
+      // A settlement is sampled only once its scene stands (unmeasured,
+      // uncounted frames; the GPU pool is drained, its samples discarded).
+      let readyTimeout: boolean | undefined
+      if (phase.placeId !== undefined) {
+        const budget = benchReadyBudget(short)
+        const tris: number[] = []
+        let ready = false
+        await runFrames(
+          budget.maxFrames,
+          null,
+          () => {
+            gpu.poll(null)
+            tris.push(renderInfo().triangles ?? 0)
+            ready = benchTrisStable(tris, budget.stableFrames, budget.tolerance)
+          },
+          () => ready,
+        )
+        readyTimeout = !ready
+      }
       gpuSink = measured ? gpuSamples : null
       const samples: FrameSample[] = []
       await runFrames(counts.sample, samples, tick)
       // Drain the last in-flight resolve so the phase's GPU sample is complete.
       await gpu.flush(gpuSink)
       if (!measured) return
-      const render = (ctx.gl.info as { render?: { drawCalls?: number; triangles?: number } }).render
+      const render = renderInfo()
       const frame = frameStats(samples.map((s) => s.frameMs))
       const game = useGame.getState()
       rows.push({
@@ -532,10 +554,12 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
         // The per-pass split of those same frames (point 1549).
         gpuPasses: gpu.available && gpu.passesAvailable ? passBreakdown(gpuSamples.passes) : null,
         vsyncLikely: vsyncLikely(frame),
-        drawCalls: render?.drawCalls ?? 0,
+        drawCalls: render.drawCalls ?? 0,
         pixelRatio: ctx.gl.getPixelRatio(),
-        triangles: render?.triangles ?? 0,
+        triangles: render.triangles ?? 0,
         place: game.mode === 'place' ? game.placeId : null,
+        ...(readyTimeout !== undefined ? { readyTimeout } : {}),
+        ...(entryCost !== undefined ? { entryCost } : {}),
         sceneTriangles: sceneTriangleBreakdown(ctx.scene as unknown as BenchSceneNode),
       })
     } finally {
@@ -553,7 +577,18 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   const leaveSettlement = async (): Promise<void> => {
     if (useGame.getState().mode !== 'place') return
     useGame.setState({ mode: 'travel', placeId: null })
-    await runFrames(BENCH_REMOUNT_FRAMES, null, () => gpu.poll(null))
+    const scene = ctx.scene as unknown as { getObjectByName(name: string): unknown }
+    let mountedFrames = 0
+    await runFrames(
+      BENCH_REMOUNT_MAX_FRAMES,
+      null,
+      () => {
+        gpu.poll(null)
+        if (scene.getObjectByName('travel-terrain') !== undefined) mountedFrames++
+      },
+      () => mountedFrames >= 2,
+    )
+    if (mountedFrames < 2) throw new Error('benchmark: the travel scene did not remount after the settlement')
   }
 
   try {

@@ -193,6 +193,39 @@ export function benchFrameCounts(short: boolean): BenchFrameCounts {
   return short ? { settle: 8, sample: 16 } : { settle: 80, sample: 150 }
 }
 
+/** Settlement readiness (point 1561): after the fixed settle the settlement
+ *  phase keeps running UNMEASURED frames until the drawn triangle count has
+ *  held within `tolerance` for `stableFrames` frames — a half-built walkable
+ *  scene must never be sampled. `maxFrames` caps the wait; a row that hit it is
+ *  flagged `readyTimeout`. Calibratable estimates. */
+export function benchReadyBudget(short: boolean): { stableFrames: number; tolerance: number; maxFrames: number } {
+  return short ? { stableFrames: 6, tolerance: 0.02, maxFrames: 180 } : { stableFrames: 12, tolerance: 0.02, maxFrames: 600 }
+}
+
+/** True once the last `stableFrames` triangle readings are all non-zero and
+ *  spread by at most `tolerance` of their maximum. Pure (point 1561). */
+export function benchTrisStable(history: readonly number[], stableFrames: number, tolerance: number): boolean {
+  if (stableFrames < 1 || history.length < stableFrames) return false
+  const tail = history.slice(-stableFrames)
+  const max = Math.max(...tail)
+  const min = Math.min(...tail)
+  return min > 0 && max - min <= max * tolerance
+}
+
+/** The state patch that puts a settlement on the LATER-entry path before the
+ *  benchmark enters it: already visited and entered, no bounty pending — so no
+ *  config pays a first-arrival journal entry or a bounty another one skips. */
+export function benchLaterEntryPatch(
+  state: { visitedPlaces: readonly string[]; enteredPlaces: readonly string[] },
+  id: string,
+): { pendingBounties: never[]; visitedPlaces: string[]; enteredPlaces: string[] } {
+  return {
+    pendingBounties: [],
+    visitedPlaces: state.visitedPlaces.includes(id) ? [...state.visitedPlaces] : [...state.visitedPlaces, id],
+    enteredPlaces: state.enteredPlaces.includes(id) ? [...state.enteredPlaces] : [...state.enteredPlaces, id],
+  }
+}
+
 /**
  * Total frames the run takes, warm-up pass included. The warm-up repeats the
  * route once at the baseline config and is DISCARDED: the first pass pays the
@@ -419,6 +452,12 @@ export interface BenchRow {
    *  null in the bird's-eye view — the evidence a settlement row really
    *  measured the walkable scene. Absent in reports from older builds. */
   place?: string | null
+  /** Settlement rows: true when the readiness wait hit its cap and the sample
+   *  may still show a half-built scene (point 1561). */
+  readyTimeout?: boolean
+  /** Settlement rows: journal entries added and money gained by the entry
+   *  itself — 0/0 is the proof of the later-entry path (point 1561). */
+  entryCost?: { journal: number; money: number }
   /** Scene-graph triangles per system at the end of the sample. */
   sceneTriangles: Record<string, BenchTriGroup>
 }
