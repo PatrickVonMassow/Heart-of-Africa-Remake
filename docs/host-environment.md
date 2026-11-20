@@ -131,8 +131,9 @@ accepted (point 489). Never record acceptance screenshots from the software fall
 `VERIFY_GL=webgpu npm test -- invariants` on the compatibility lane completed `2 pass, 0 fail,
 0 console-errors` (`dcf3844e3`): the detector reported no loss on that attempt, which proves
 nothing beyond that attempt. A CDP `Browser.crashGpuProcess` on this host reproduces the exact
-05.08 message `A valid external Instance reference no longer exists`, so that message marks a
-lost GPU process, not a page teardown; what killed the process on 05.08 stays unconfirmed. The
+05.08 message `A valid external Instance reference no longer exists`, so a lost GPU process is
+one way to produce that message; whether a page teardown produces it too is untested, and what
+caused it on 05.08 stays unconfirmed. The
 player's benchmark of 20.11.2026 (weak Intel Gen-8 notebook) shows drawCalls 0 in every row.
 That justifies the INVALID verdict, but it is not by itself proof of a device-loss event, nor
 of its timing; whether the in-game notice would have fired there needs separate loss evidence.
