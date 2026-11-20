@@ -20,6 +20,10 @@ Each plan verdict "obsolete: yes" got exactly one disposition:
 - Backlog entries: `delete` (void, subject removed, or FIXED), `keep` (defect
   still exists in kept infrastructure, or player impact).
 
+A `backlog` row rests on the approved plan's per-point verdict plus the
+presence today of the pillar that plan step deletes; it parks the point
+verbatim and loses nothing, so it does not claim a per-point reproduction.
+
 "Obsolete: no" verdicts were not judged.
 
 ## Counts
@@ -38,9 +42,10 @@ cleanup"); no ambiguous mapping.
 
 | delete | keep | drop |
 |---|---|---|
-| 3 | 50 | 0 |
+| 1 | 52 | 0 |
 
-Deleted: B1, B47, B63. B32 stays: the closed 1199/1111 fixed the
+Deleted: B1. B47 stays: the cited fix bounds one gather test, not
+both named ones. B63 stays: it carries the ten-round abort rationale. B32 stays: the closed 1199/1111 fixed the
 live-history gather cases (B47), not its `bootstrapBase` case. B71 stays: which
 run forms still write logs into a worktree is unresolved. B28 stays: its retry half is void, but the
 polish expectation is still 340900 ms against a ~28-min run. B12 stays: the

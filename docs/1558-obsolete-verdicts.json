@@ -844,7 +844,7 @@
   "id": 952,
   "title": "The board-layout suite measures a COPY of the board stylesheet, so the pressure it calls its proof can go a...",
   "disposition": "backlog",
-  "reason": "G3 mechanism still present today (scripts/board.mjs, dashboard-guard.mjs, chat-watcher.mjs, queue-rank.mjs); plan deletes it in M-D4, part 2 parked - defer under the freeze",
+  "reason": "scripts/verify/board-layout.mjs still renders a hand-written BOARD_STYLE copy of the board stylesheet (present today); plan M-D4 deletes the board and its layout suite without replacement, part 2 parked - defer under the freeze",
   "planRef": "§4 Agreed obsolete yes, A's G3 (board/chat/queue/decision)"
  },
  {
@@ -1476,7 +1476,7 @@
   "id": 497,
   "title": "The German-language rule has no mechanism at all, and the audit PASSED IT ANYWAY",
   "disposition": "backlog",
-  "reason": "G5 mechanism still present today (scripts/guard-health-core.mjs, doc-budget-core.mjs, retro-currency-guard.mjs, rule-review-guard.mjs); plan deletes it in M-D12/M-D17, part 2 parked - defer under the freeze",
+  "reason": "the German-answer rule is still enforced by no hook (only the memory line and the timestamp/context header guards exist); plan M-D17 deletes the governance docs and rewrites CLAUDE.md and the memory index where the rule lives, part 2 parked - defer under the freeze",
   "planRef": "§4 Agreed obsolete yes, A's G5 (guards/rules/docs governance)"
  },
  {
@@ -2226,8 +2226,8 @@
   "kind": "backlog",
   "id": "B47",
   "title": "A unit test spends twenty seconds reading the live review history (14.09.2026)",
-  "disposition": "delete",
-  "reason": "duplicates closed 1199 (= 1111): the mechanism-review-guard live-history cases are bounded by construction now; plan: B32 + B47 = 1111",
+  "disposition": "keep",
+  "reason": "the cited 1111 fix bounds one gather test; that both named live-history tests stopped scanning is not established - keep (Sol review of 30f7663)",
   "planRef": "§5 Agreed obsolete yes",
   "match": "## A unit test spends twenty seconds reading the live review history (14.09.2026"
  },
@@ -2325,8 +2325,8 @@
   "kind": "backlog",
   "id": "B63",
   "title": "Zehn Prüfrunden an einem Punkt: die Abbruchentscheidung (16.09.2026)",
-  "disposition": "delete",
-  "reason": "void: abort-decision record of closed point 1137, decision taken; the residual reporting defects stay as B55/B70/B61/B62; plan: ten review rounds (M-D5/M-D6)",
+  "disposition": "keep",
+  "reason": "carries the ten-round abort rationale and the freeze boundary, which survive nowhere else cited - keep (Sol review of 30f7663)",
   "planRef": "§5 Agreed obsolete yes",
   "match": "## Zehn Prüfrunden an einem Punkt: die Abbruchentscheidung (16.09.2026)"
  },

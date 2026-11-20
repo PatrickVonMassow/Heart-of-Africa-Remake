@@ -934,6 +934,19 @@ size"). So the room must be CUT elsewhere first, the way design.md paid for its
 speech-floor section. Drafted, measured, reverted in 55b12d04e's successor commit rather
 than left half-applied; non-blocking, because the guide is prose nobody's build reads.
 
+## A unit test spends twenty seconds reading the live review history (14.09.2026)
+
+`scripts/mechanism-review-guard.test.mjs` has two cases that scan the REAL review
+history through `gatherMechanismReviewInputs`. Measured 14.09.2026 in isolation:
+23.34 s and 20.60 s. Point 1073's second author raised both to a 60 s per-case
+budget so the unit gate stays green, which is the right unblocking move and was
+accepted in review.
+
+The cost grows with the history, so the budget will be raised again. The test asks
+a question about the guard, not about the archive: a fixture history would answer
+it in milliseconds and would not drift. Non-blocking — noted so the next raise is
+recognised as the third one, not the first.
+
 ## Der Saum-Test des Erdhaufens beweist die Saumschließung nicht (14.09.2026)
 
 `src/scenes/place/digSpoilGeometry.test.ts` prüft, dass die Vertex-Positionen des
@@ -1236,6 +1249,19 @@ für genau diese Klasse gebaut wurden, haben jedes Mal mehr gekostet als der Fal
 den sie abdeckten (zerschnittene Ergebniszeilen im Log, eine Frist, die sich
 selbst erneuerte, verlorene Beobachtungen). Der billige Weg wäre, gar keinen zu
 bauen und die Meldung zu lesen, wie sie gemeint ist.
+
+## Zehn Prüfrunden an einem Punkt: die Abbruchentscheidung (16.09.2026)
+
+Punkt 1137 hat zehn kreuzverlagerte Prüfrunden durchlaufen; jede fand etwas
+Echtes, und die Voraussetzungen wurden von Runde zu Runde enger — von einer
+veralteten Kostentabelle über eine Umfrage, die ihre eigene Akte neu schreibt,
+bis zu einem Besitzerwechsel an einer Datei mitten im Lauf. Abgebrochen wurde
+nach Runde zehn, mit folgender Begründung: Alles, was einen **gesunden Lauf
+beenden** kann, ist repariert und durch Tests festgehalten. Was bleibt, lässt das
+Hängend-Urteil zu spät oder falsch **melden** — und eine Meldung tötet nichts.
+Der Infrastruktur-Freeze (CLAUDE.md §2) arbeitet an einem Infrastrukturdefekt
+nur, wenn er reproduzierbar blockiert oder eine falsche Freigabe erlaubt; beides
+trifft auf den Rest nicht zu.
 
 ## `--help` startet auf den beiden schwersten Einstiegen einen vollen Prüflauf (16.09.2026)
 
