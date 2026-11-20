@@ -148,7 +148,7 @@
   "id": 533,
   "title": "What brings the container back after a host reboot",
   "disposition": "backlog",
-  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "reason": "the container-restore question concerns the Linux launcher daemon (scripts/batch-launcher.mjs) and the Windows autostart path (scripts/batch-autostart.mjs), both present today; plan M-D1 deletes launcher, daemon, autostart and Windows tasks without replacement (a scheduled runner stays a user-scope choice), part 2 parked - defer under the freeze",
   "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
  },
  {
@@ -316,7 +316,7 @@
   "id": 1055,
   "title": "A killed board writer keeps the board's edit lock, and the next three board writes wait three minutes and fail",
   "disposition": "backlog",
-  "reason": "G1 mechanism still present today (scripts/batch-singleton.mjs, batch-boundary.mjs, batch-doctor.mjs); plan deletes it in M-D1/M-D2, part 2 parked - defer under the freeze",
+  "reason": "the stale lock is the board edit lock (scripts/board-edit-lock.mjs) held by the board heartbeat's killed status writer (scripts/board-heartbeat.mjs), both present today; plan M-D4 deletes the board without replacement, part 2 parked - defer under the freeze",
   "planRef": "§4 Agreed obsolete yes, A's G1 (batch/session/handover)"
  },
  {
@@ -451,8 +451,8 @@
   "kind": "point",
   "id": 932,
   "title": "The context fence has stood in observe mode for six days with no visible arming point (systematic dormant-f...",
-  "disposition": "archive",
-  "reason": "void: the context fence refuses today through the handover brake (point 1204) in scripts/context-fence-guard.mjs, independent of observe mode; plan: fence already armed, 252 refusals in §3",
+  "disposition": "drop",
+  "reason": "verdict does not hold as stated: the handover brake's refusals show the fence can block, not that the observe-mode arming question the point asks is resolved; stays open (Sol review of 643311d)",
   "planRef": "§4 Agreed obsolete yes, A's G2 (context/measurement)"
  },
  {
@@ -2172,8 +2172,8 @@
   "kind": "backlog",
   "id": "B32",
   "title": "The guard's own unit file sits close enough to the per-test cap to red under load",
-  "disposition": "delete",
-  "reason": "duplicates closed 1199 (= 1111): the mechanism-review-guard live-history cases are bounded by construction now; plan: B32 + B47 = 1111",
+  "disposition": "keep",
+  "reason": "the closed 1199/1111 bounded the live-history gather cases (B47); no evidence that the bootstrapBase case this entry names was fixed - keep (Sol review of 643311d)",
   "planRef": "§5 Agreed obsolete yes",
   "match": "## The guard's own unit file sits close enough to the per-test cap to red under "
  },
@@ -2370,8 +2370,8 @@
   "kind": "backlog",
   "id": "B71",
   "title": "Die Laufprotokolle eines Branches sterben gar nicht mit seinem Worktree (18.09.2026)",
-  "disposition": "delete",
-  "reason": "void: the entry records a non-defect (copy step is a harmless no-op, logs already land in the main tree); plan: run records (M-D7)",
+  "disposition": "keep",
+  "reason": "the entry leaves open which run forms still write logs into a worktree; that scope is unresolved, so the entry stays (Sol review of 643311d)",
   "planRef": "§5 Agreed obsolete yes",
   "match": "## Die Laufprotokolle eines Branches sterben gar nicht mit seinem Worktree (18.0"
  },

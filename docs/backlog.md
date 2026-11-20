@@ -659,6 +659,22 @@ lets the run proceed by design. Whether that is worth a refusal rather than a
 warning is a judgement for whoever next touches that check — it costs two runs
 each time, and it happened twice in one night.
 
+## The guard's own unit file sits close enough to the per-test cap to red under load (measured 10.09.2026)
+
+Non-blocking, collected — and a near relative of the entry above. `scripts/mechanism-review-guard.test.mjs`
+runs 65 cases in 34.0 s on a quiet machine, which puts its slowest single case within reach of the
+20 s per-test timeout. On 10.09.2026 a covering LARGE run and a `batch-doctor --gate` overlapped —
+both run the whole unit suite — and the LARGE died 5m 23s in on exactly that file, with
+`bootstrapBase > seeds the anchor from the one shape that carries the flag AND the baseline` timing
+out. Nothing was wrong with the product: the same file passed in the doctor's own gate and in a
+standalone `vitest run` of all 465 files the same hour.
+
+The run diagnosed itself correctly ("UNDER LOAD — the unit stage failed on a machine whose quiet
+could not be verified"), so no mechanism is missing. What is collected here is the MARGIN: a unit
+file this near the cap converts any contention into a red that costs a whole two-hour run, and it is
+the second time in two days that one run has been paid for by another starting beside it. Whoever
+next touches that file can buy the margin back by splitting its slowest case; nobody needs to.
+
 ## `run-logged.mjs --help` starts a full LARGE run instead of printing help (measured 10.09.2026)
 
 Non-blocking, collected — and the third relative of the two entries above, all of them a run paid
@@ -1391,6 +1407,24 @@ oder ihm die Frames unter `verification/` als Fortschrittssignal geben, statt
 das Log. Kosten, wenn es bleibt: die meistgelaufene Suite wird bei jedem vollen
 Durchgang als Stillstand gemeldet, und der Bediener lernt, das Urteil zu
 ignorieren.
+
+## Die Laufprotokolle eines Branches sterben gar nicht mit seinem Worktree (18.09.2026)
+
+Gemessen 18.09.2026 beim Bau von Punkt 1134. Der Punkt bestellt, die `run.json`
+eines gelandeten Punktes beim Merge in das Haupt-Checkout zu kopieren, weil
+`local/verify-logs/` ignoriert und pro Worktree sei und die Protokolle mit dem
+Baum verschwänden. Der Kopierschritt ist gebaut und liegt auf `main` — er hat
+bei seiner eigenen Landung aber NICHTS zu tun gefunden: alle fünf `run.json` der
+Branch-Läufe lagen bereits unter `/workspace/hoa/local/verify-logs/`, obwohl
+jeder Lauf mit cwd im Worktree gestartet wurde. Die Quittung der Läufe nennt
+denselben Hauptbaum-Pfad.
+
+Nicht als Punkt eingereiht (Befundaufnahme CLAUDE.md §2, Infrastruktur-Freeze):
+kein Spielerbelang, keine Blockade, keine falsche Freigabe — der Kopierschritt
+ist in dieser Konfiguration schlicht ein No-op und schadet nicht. Offen bleibt
+die Frage, für welche Lauf-Formen die im Punkt genannte Messgrenze überhaupt
+gilt; wer sie das nächste Mal braucht, misst sie an einer Suite, die ihr Log
+tatsächlich im Worktree anlegt, statt sie aus dem Punkttext zu übernehmen.
 
 ## Fünf `feat/`-Branches überleben ihren Merge, zwei davon mit ungemergter Arbeit
 

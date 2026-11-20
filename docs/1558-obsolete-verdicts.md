@@ -29,7 +29,7 @@ Points: 261 plan "yes" (253 agreed + 8 resolved yes: 330, 464, 857, 956, 972,
 
 | archive | backlog | drop |
 |---|---|---|
-| 5 | 250 | 6 |
+| 4 | 250 | 7 |
 
 Backlog entries: 53 plan "yes" (38 agreed + 15 resolved), all 53 mapped to a
 `## ` heading of today's `docs/backlog.md`. The 109 headings match A's §6 order
@@ -38,9 +38,11 @@ cleanup"); no ambiguous mapping.
 
 | delete | keep | drop |
 |---|---|---|
-| 5 | 48 | 0 |
+| 3 | 50 | 0 |
 
-Deleted: B1, B32, B47, B63, B71. B28 stays: its retry half is void, but the
+Deleted: B1, B47, B63. B32 stays: the closed 1199/1111 fixed the
+live-history gather cases (B47), not its `bootstrapBase` case. B71 stays: which
+run forms still write logs into a worktree is unresolved. B28 stays: its retry half is void, but the
 polish expectation is still 340900 ms against a ~28-min run. B12 stays: the
 leftover carrier file and its header sit on the host and cannot be checked here.
 
@@ -50,6 +52,8 @@ leftover carrier file and its header sit on the host and cannot be checked here.
 - 1101: reproducible false approval today; `ci-gate-verdict.mjs` outside a
   runner still prints "CI gate passed." and exits 0.
 - 330: stays open; 303 does not yet carry its assurance requirement.
+- 932: the handover brake shows the fence can refuse, not that the
+  observe-mode arming question is resolved.
 - 1467: real blockade still reproducible; the doctor's quarantine stash does
   not protect `.claude/closing-state.json` and aborts a live closing LARGE.
 
