@@ -368,7 +368,7 @@ export const en: Strings = {
     abortHint: 'Esc aborts the benchmark and restores every setting.',
     doneTitle: 'Benchmark Finished',
     abortedNote: 'The run was aborted — the report covers the completed settings only.',
-    invalidNote: (reason) => `The run is INVALID and recorded no measurements: the graphics device stopped drawing (${reason}). Reload the page before measuring again.`,
+    invalidNote: (reason) => `The run is INVALID and recorded no measurements — ${reason}. Reload the page before measuring again.`,
     headline: {
       gpu: 'Read the GPU column: these are real GPU times from the graphics driver, unaffected by the display refresh rate.',
       cpu: (reason) =>

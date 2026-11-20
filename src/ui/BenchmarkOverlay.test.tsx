@@ -170,6 +170,17 @@ describe('benchmark overlay (design.md §21.1, §17.4)', () => {
     expect(document.querySelector('.bench-invalid')?.textContent).toBe(de.benchmark.invalidNote(reason))
   })
 
+  it('the INVALID note leaves the cause to the supplied reason, claiming no device failure itself', () => {
+    // A phase with zero draw calls invalidates the run without proving that
+    // the graphics device stopped.
+    const reason = 'a measured phase drew nothing (0 draw calls)'
+    for (const strings of [en, de]) {
+      const note = strings.benchmark.invalidNote(reason)
+      expect(note).toContain(reason)
+      expect(note.replace(reason, '')).not.toMatch(/device|Grafikger|stopped|aufgehört/i)
+    }
+  })
+
   it('names the trustworthy series — GPU where measured, in both languages', () => {
     render(<BenchmarkOverlay />)
     act(() => useUi.getState().setBenchReport(reportFile()))

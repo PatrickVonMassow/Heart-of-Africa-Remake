@@ -367,7 +367,7 @@ export const de: Strings = {
     abortHint: 'Esc bricht den Benchmark ab und stellt alle Einstellungen wieder her.',
     doneTitle: 'Benchmark abgeschlossen',
     abortedNote: 'Der Lauf wurde abgebrochen – der Bericht enthält nur die fertigen Einstellungen.',
-    invalidNote: (reason) => `Der Lauf ist UNGÜLTIG und enthält keine Messwerte: Das Grafikgerät hat aufgehört zu zeichnen (${reason}). Vor einer neuen Messung die Seite neu laden.`,
+    invalidNote: (reason) => `Der Lauf ist UNGÜLTIG und enthält keine Messwerte – ${reason}. Vor einer neuen Messung die Seite neu laden.`,
     headline: {
       gpu: 'Maßgeblich ist die GPU-Spalte: echte GPU-Zeiten vom Grafiktreiber, unabhängig von der Bildwiederholrate.',
       cpu: (reason) =>
