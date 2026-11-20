@@ -110,10 +110,21 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 // written. A frame that deliberately photographs a general view says so.
 const shot = frameShutter(page, OUT)
 const errors = []
+// The message alone did not locate a per-frame TypeError (point 1495): the
+// first few page and console errors also print their stack.
+let stacksPrinted = 0
 page.on('console', (m) => {
-  if (m.type() === 'error') errors.push(m.text())
+  if (m.type() !== 'error') return
+  errors.push(m.text())
+  if (stacksPrinted++ < 3) {
+    Promise.all(m.args().map((a) => a.evaluate((v) => v?.stack ?? String(v)).catch(() => '?')))
+      .then((st) => console.log(`# console error stack (${m.text().slice(0, 120)}):\n${st.join('\n')}`))
+  }
 })
-page.on('pageerror', (e) => errors.push(String(e)))
+page.on('pageerror', (e) => {
+  errors.push(String(e))
+  if (stacksPrinted++ < 3) console.log(`# pageerror stack:\n${e.stack}`)
+})
 
 // A pixel clip placed relative to the traveller's PROJECTED figure, not the
 // screen centre: the south-reach camera (design.md §2.1) lifts him above the
@@ -411,6 +422,22 @@ if (section('settlement-sizes')) {
   await page.waitForFunction(() => window.__placeBackdropInfo, null, { timeout: 30000 })
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   await page.waitForTimeout(1200)
+  // Point 1495: three.js skips every object whose shader pipeline is still
+  // compiling, so on WebGL 2 the frame showed floating roofs over fog — walls,
+  // ground and villagers not yet drawable. Wait until the pipeline set stays
+  // warm for a few frames (the same wait as _polish.mjs awaitPlaceDrawn).
+  const berberWarm = await page.evaluate(async () => {
+    let run = 0
+    const t0 = Date.now()
+    while (Date.now() - t0 < 120000) {
+      const s = window.__shaderPipelines?.() ?? null
+      run = !s || (s.pending === 0 && s.queued === 0) ? run + 1 : 0
+      if (run >= 3) return { ok: true, ms: Date.now() - t0 }
+      await new Promise((r) => requestAnimationFrame(() => r()))
+    }
+    return { ok: false, state: window.__shaderPipelines?.() ?? null }
+  })
+  check('Berber Village: the shader pipelines settle before the backdrop shot', berberWarm.ok, JSON.stringify(berberWarm))
   const berber = await page.evaluate(() => window.__placeBackdropInfo)
   check(
     'Berber Village: mountainous backdrop stays a distant range (no looming/clipping)',
