@@ -6,7 +6,7 @@
 // initial state from it and startBenchmark.ts imports state/ui.ts.
 // Pure: no store, no window. The caller passes the search string.
 
-import { DETAIL_LEVELS, type DetailLevel } from './quality'
+import { DETAIL_LEVELS, WEAK_ADAPTER_RULES, type DetailLevel } from './quality'
 
 export const QUALITY_PARAM = 'quality'
 
@@ -16,4 +16,17 @@ export const QUALITY_PARAM = 'quality'
 export function startQualityFromUrl(search: string): DetailLevel | null {
   const value = new URLSearchParams(search).get(QUALITY_PARAM)?.toLowerCase()
   return DETAIL_LEVELS.find((level) => level === value) ?? null
+}
+
+/** Whether the first start should treat this adapter as weak (point 1562). */
+export function isWeakAdapter(adapter: string, dpr: number, rules = WEAK_ADAPTER_RULES): boolean {
+  return rules.some(
+    (r) => r.pattern.test(adapter) && !(r.unless?.test(adapter) ?? false) && dpr >= (r.minDpr ?? 0),
+  )
+}
+
+/** The level a first start without a URL-given or player-chosen level opens
+ *  at: LOW on a weak adapter, MEDIUM (the ordinary default) otherwise. */
+export function startDetailLevelForAdapter(adapter: string, dpr: number): DetailLevel {
+  return isWeakAdapter(adapter, dpr) ? 'low' : 'medium'
 }

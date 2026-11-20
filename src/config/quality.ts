@@ -352,3 +352,31 @@ export function nextDetailLevel(level: DetailLevel): DetailLevel {
       return 'medium'
   }
 }
+
+/** One weak-adapter rule: an adapter string matching `pattern` (and not
+ *  `unless`) counts as weak, on a screen of at least `minDpr` when given. */
+export interface WeakAdapterRule {
+  pattern: RegExp
+  unless?: RegExp
+  minDpr?: number
+}
+
+/**
+ * Adapters the first start puts on LOW instead of MEDIUM (point 1562). Matched
+ * against `describeBackend().adapter`: WebGPU gives "<vendor> <architecture>"
+ * ("amd rdna-2", "intel gen-8"), WebGL 2 the unmasked renderer string.
+ * CALIBRATABLE — educated guesses from the user's two weak notebooks (AMD
+ * RDNA-2 iGPU at dpr 1.75: Medium ~30 fps, Low ~55 fps; Intel Gen-8: 5 fps in
+ * Cairo on Medium). Software renderers stay out on purpose: the browser suites
+ * run on them and assert the Medium default.
+ */
+export const WEAK_ADAPTER_RULES: readonly WeakAdapterRule[] = [
+  // Intel integrated graphics; Arc (xe-hpg) is a discrete card.
+  { pattern: /\bintel\b/i, unless: /\barc\b|xe-hpg/i },
+  // AMD APU strings as WebGL names them ("AMD Radeon(TM) Graphics", Vega 8).
+  { pattern: /radeon(\(tm\))? graphics|\bvega \d+\b/i },
+  // WebGPU names only the AMD architecture, shared by iGPUs and desktop cards;
+  // a high-dpr screen marks the notebook/handheld. OPEN: no iGPU/dGPU signal in
+  // GPUAdapterInfo — a laptop with a discrete RDNA-2 card also lands on Low.
+  { pattern: /\bamd (rdna-[12]|gcn-\d)\b/i, minDpr: 1.25 },
+]
