@@ -233,6 +233,7 @@ export const de: Strings = {
     webglFallback: 'Grafik-Hinweis: WebGPU ist nicht verfügbar – das Spiel läuft im WebGL-2-Kompatibilitätsmodus.',
     webglFallbackDismiss: 'Verstanden',
     rendererUnavailable: 'Grafik-Hinweis: Dieses Gerät oder dieser Browser bietet weder WebGPU noch WebGL 2 – die Spielwelt kann nicht gezeichnet werden.',
+    deviceLost: 'Grafik-Hinweis: Das Grafikgerät ist ausgefallen, das Bild steht still. Die Seite neu laden, um vom letzten Hafen-Spielstand weiterzuspielen; tritt es wiederholt auf, eine niedrigere Grafikstufe wählen.',
     fps: (fps) => `${fps} FPS`,
     healthBar: 'Gesundheit',
     movementPenalty: {
@@ -366,6 +367,7 @@ export const de: Strings = {
     abortHint: 'Esc bricht den Benchmark ab und stellt alle Einstellungen wieder her.',
     doneTitle: 'Benchmark abgeschlossen',
     abortedNote: 'Der Lauf wurde abgebrochen – der Bericht enthält nur die fertigen Einstellungen.',
+    invalidNote: (reason) => `Der Lauf ist UNGÜLTIG und enthält keine Messwerte – ${reason}. Vor einer neuen Messung die Seite neu laden.`,
     headline: {
       gpu: 'Maßgeblich ist die GPU-Spalte: echte GPU-Zeiten vom Grafiktreiber, unabhängig von der Bildwiederholrate.',
       cpu: (reason) =>

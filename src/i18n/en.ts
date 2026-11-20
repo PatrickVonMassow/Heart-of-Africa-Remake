@@ -234,6 +234,7 @@ export const en: Strings = {
     webglFallback: 'Graphics notice: WebGPU is unavailable — the game is running in WebGL 2 compatibility mode.',
     webglFallbackDismiss: 'Got it',
     rendererUnavailable: 'Graphics notice: this device or browser offers neither WebGPU nor WebGL 2 — the game world cannot be drawn.',
+    deviceLost: 'Graphics notice: the graphics device was lost and the picture has stopped. Reload the page to continue from your last port checkpoint; if it keeps happening, choose a lower graphics level.',
     fps: (fps) => `${fps} FPS`,
     healthBar: 'Health',
     movementPenalty: {
@@ -367,6 +368,7 @@ export const en: Strings = {
     abortHint: 'Esc aborts the benchmark and restores every setting.',
     doneTitle: 'Benchmark Finished',
     abortedNote: 'The run was aborted — the report covers the completed settings only.',
+    invalidNote: (reason) => `The run is INVALID and recorded no measurements — ${reason}. Reload the page before measuring again.`,
     headline: {
       gpu: 'Read the GPU column: these are real GPU times from the graphics driver, unaffected by the display refresh rate.',
       cpu: (reason) =>

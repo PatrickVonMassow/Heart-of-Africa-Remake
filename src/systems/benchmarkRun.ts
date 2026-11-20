@@ -28,6 +28,7 @@ import { getStrings } from '../i18n'
 import { asyncPipelineHandle, type PipelineBackend } from '../render/asyncPipelines'
 import { describeBackend } from '../render/backendInfo'
 import { getRenderContext } from '../render/renderContext'
+import { gpuHealthSnapshot, isDeviceLost } from '../render/gpuHealth'
 import { getTerrainRefine, resetTerrainRefine, setTerrainRefine } from '../scenes/travel/terrainLod'
 import { setClimateHazeEnabled } from '../scenes/travel/Climate'
 import { useGame } from '../state/store'
@@ -47,6 +48,7 @@ import {
   benchNativePixelRatio,
   PRESET_CONFIG_NAMES,
   benchFilename,
+  benchInvalidReason,
   benchFrameCounts,
   benchFrameReady,
   benchReadinessPush,
@@ -86,6 +88,15 @@ interface FrameSample {
 
 /** Raised when Esc aborts the run; unwinds to the restore block. */
 class BenchAborted extends Error {}
+
+/** Raised when the measurement cannot be trusted (a lost device, a measured
+ *  phase that drew nothing): the run ends INVALID and writes no rows. */
+class BenchInvalid extends Error {}
+
+/** The invalid reason from the GPU health record alone (a lost device). */
+function deviceLostReason(): string | null {
+  return isDeviceLost() ? benchInvalidReason({ deviceLost: gpuHealthSnapshot().deviceLost }) : null
+}
 
 /** A run that stops receiving frames (backgrounded tab, lost context) must not
  *  hang the overlay forever. */
@@ -327,6 +338,9 @@ function runFrames(
       // The first frame has no interval to measure against.
       if (collect !== null && seen > 1) collect.push({ frameMs, cpuMs: now - cpuStart })
       onFrame()
+      // A lost device renders nothing from here on — stop at the loss.
+      const lost = deviceLostReason()
+      if (lost !== null) return finish(new BenchInvalid(lost))
       if (useUi.getState().benchAbort) return finish(new BenchAborted())
       if (seen >= count || (until !== undefined && until())) finish(null)
     })
@@ -481,6 +495,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   const rows: BenchRow[] = []
   let framesDone = 0
   let aborted = false
+  let invalidReason: string | null = null
 
   const publish = (config: string | null, configIndex: number, phase: string): void => {
     useUi.getState().setBenchProgress({
@@ -548,11 +563,21 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
       }
       gpuSink = measured ? gpuSamples : null
       const samples: FrameSample[] = []
-      await runFrames(counts.sample, samples, tick)
+      // The render counters of the LAST sampled frame: the flush below can let
+      // later frames draw, so the live counters are read before it.
+      let render: { drawCalls?: number; triangles?: number } = {}
+      await runFrames(counts.sample, samples, () => {
+        tick()
+        render = { ...renderInfo() }
+      })
       // Drain the last in-flight resolve so the phase's GPU sample is complete.
       await gpu.flush(gpuSink)
       if (!measured) return
-      const render = renderInfo()
+      const invalid = benchInvalidReason({
+        deviceLost: gpuHealthSnapshot().deviceLost,
+        drawCalls: render.drawCalls ?? 0,
+      })
+      if (invalid !== null) throw new BenchInvalid(invalid)
       const frame = frameStats(samples.map((s) => s.frameMs))
       const game = useGame.getState()
       rows.push({
@@ -627,9 +652,19 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
       const presetConfig: BenchConfig = { name: PRESET_CONFIG_NAMES[level], flags: {} }
       for (const phase of BENCH_PHASES) await runPhase(presetConfig, BENCH_CONFIGS.length + i + 1, phase, true)
     }
-  } catch (error) {
+  } catch (caught) {
     aborted = true
-    if (!(error instanceof BenchAborted)) {
+    // A lost device can stop the frame callbacks altogether: the watchdog's
+    // "no frames", an Esc that raced the loss, or any other failure then
+    // still ends the run INVALID.
+    const lost = caught instanceof BenchInvalid ? null : deviceLostReason()
+    const error = lost !== null ? new BenchInvalid(lost) : caught
+    if (error instanceof BenchInvalid) {
+      // Rows measured before the loss are dropped too: the loss's onset is
+      // unknown, so none of them is known to have drawn the scene.
+      invalidReason = error.message
+      rows.length = 0
+    } else if (!(error instanceof BenchAborted)) {
       useGame.getState().setToast(getStrings().benchmark.failed(error instanceof Error ? error.message : String(error)))
     }
   } finally {
@@ -644,7 +679,10 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     balance.randomEventsEnabled = balanceSnapshot.randomEventsEnabled
     balance.deadline.enabled = balanceSnapshot.deadlineEnabled
     useGame.setState(gameSnapshot)
-    useUi.setState(uiSnapshot)
+    // A device lost during the run outlives it: the restore keeps the live
+    // loss notice and its dismissal instead of the pre-run values.
+    const { deviceLost, deviceLostDismissed } = useUi.getState()
+    useUi.setState({ ...uiSnapshot, deviceLost, deviceLostDismissed })
     useUi.getState().setBenchProgress(null)
     useUi.getState().clearBenchAbort()
     running = false
@@ -685,13 +723,15 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     rows,
     // The low-preset cost ranking (point 293): where the frame cost still sits
     // at the low graphics level, so the player can decide the next reduction.
-    lowProfile: buildLowProfile(rows),
+    lowProfile: invalidReason === null ? buildLowProfile(rows) : null,
     durationMs: Math.round(performance.now() - t0),
     aborted,
+    ...(invalidReason !== null ? { invalidReason } : {}),
   }
   useUi.getState().setBenchReport({
     filename: benchFilename(backend, startedAt),
     json: benchReportJson(report),
     aborted,
+    ...(invalidReason !== null ? { invalidReason } : {}),
   })
 }

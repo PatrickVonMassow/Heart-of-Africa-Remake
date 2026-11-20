@@ -2,7 +2,8 @@
 // must return valid JSON capturing EVERY data field of the store (not just the
 // §18 snapshot fields) plus the balance object and the self-describing header,
 // drop every store action, and be deterministic given a state and a date.
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { GPU_ERROR_CAP, recordDeviceLost, recordGpuError, resetGpuHealth, type GpuHealth } from '../render/gpuHealth'
 import {
   dumpFilename,
   dumpGameState,
@@ -410,5 +411,32 @@ describe('dumpGameState placeLife section', () => {
 describe('dumpFilename (design.md §21.1)', () => {
   it('names the file hoa-state-<YYYY-MM-DD>-<seed>.json with padded parts', () => {
     expect(dumpFilename(4711, new Date(2026, 6, 3))).toBe('hoa-state-2026-07-03-4711.json')
+  })
+})
+
+describe('the gpu section (point 507)', () => {
+  afterEach(() => resetGpuHealth())
+
+  it('carries the device-lost reason and the uncaptured errors, capped with the omitted count', () => {
+    resetGpuHealth()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    for (let i = 0; i < GPU_ERROR_CAP + 2; i++) {
+      recordGpuError({ api: 'WebGPU', type: 'GPUValidationError', message: `invalid pipeline ${i}` })
+    }
+    recordDeviceLost({ api: 'WebGPU', reason: 'unknown', message: 'Instance dropped in popErrorScope' })
+    errors.mockRestore()
+    const gpu = (JSON.parse(dumpGameState(useGame.getState(), { generatedAt: '2026-11-20T00:00:00.000Z' })) as {
+      gpu: GpuHealth
+    }).gpu
+    expect(gpu.deviceLost).toMatchObject({ api: 'WebGPU', reason: 'unknown', message: 'Instance dropped in popErrorScope' })
+    expect(gpu.uncapturedErrors).toHaveLength(GPU_ERROR_CAP)
+    expect(gpu.uncapturedErrors[0]).toMatchObject({ type: 'GPUValidationError', message: 'invalid pipeline 0' })
+    expect(gpu.omittedErrors).toBe(2)
+  })
+
+  it('reads healthy when nothing went wrong', () => {
+    resetGpuHealth()
+    const gpu = (JSON.parse(dumpGameState(useGame.getState())) as { gpu: GpuHealth }).gpu
+    expect(gpu).toEqual({ deviceLost: null, uncapturedErrors: [], omittedErrors: 0 })
   })
 })

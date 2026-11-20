@@ -12,6 +12,7 @@ import { setRenderContext } from './render/renderContext'
 import { describeBackend, startProbeName } from './render/backendInfo'
 import { enableAsyncPipelineCompile, type PipelineBackend } from './render/asyncPipelines'
 import { hasWebgpuAdapter, renderSupportNow } from './render/renderSupport'
+import { armGpuHealth } from './render/gpuHealth'
 import { Hud } from './ui/Hud'
 import { AmbienceController } from './ui/AmbienceController'
 
@@ -102,6 +103,10 @@ export default function App() {
               ...(props as ConstructorParameters<typeof THREE.WebGPURenderer>[0]),
               antialias: true,
             })
+            // A lost device asserts, raises the player notice and marks the
+            // benchmark and state dump (render/gpuHealth.ts) — before init, so
+            // a loss during startup is caught too.
+            armGpuHealth(renderer)
             await renderer.init()
             // Surface the automatic WebGL 2 fallback to the player (CLAUDE.md §3).
             const backend = (renderer as unknown as { backend?: { isWebGPUBackend?: boolean } }).backend

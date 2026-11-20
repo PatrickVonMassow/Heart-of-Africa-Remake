@@ -88,8 +88,12 @@ export function BenchmarkOverlay() {
       <div className="dialog-backdrop bench-backdrop">
         <div className="dialog bench-report">
           <h3>{t.benchmark.doneTitle}</h3>
-          {report.aborted && <p className="bench-aborted">{t.benchmark.abortedNote}</p>}
-          {headlineNote && <p className="bench-headline">{headlineNote}</p>}
+          {report.invalidReason ? (
+            <p className="bench-aborted bench-invalid">{t.benchmark.invalidNote(report.invalidReason)}</p>
+          ) : (
+            report.aborted && <p className="bench-aborted">{t.benchmark.abortedNote}</p>
+          )}
+          {headlineNote && !report.invalidReason && <p className="bench-headline">{headlineNote}</p>}
           {digest.lowProfile && digest.lowProfile.dominant.length > 0 && (
             <div className="bench-low-profile">
               <p className="bench-low-title">{t.benchmark.lowProfile.title}</p>
