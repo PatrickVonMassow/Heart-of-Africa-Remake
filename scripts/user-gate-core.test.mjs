@@ -506,6 +506,18 @@ describe('the user-input act — the user must run, measure or hand in something
     expect(parseGateLine(r.text.split('\n')[0]).classification).toMatchObject({ verdict: 'confirmation', act: 'user-input' })
   })
 
+  it('reads the answer appended after an unclosed gate as the state', () => {
+    const line = '- [ ] 1543. Hitches AWAITING-CONFIRMATION(2026-11-20; user-input: run it USER-ANSWERED(2026-11-21)'
+    expect(parseGateLine(line)).toMatchObject({ point: 1543, gated: false, answered: true, at: '2026-11-21' })
+    expect(parseUserGates(tasks(line)).answered).toEqual([{ point: 1543, at: '2026-11-21' }])
+  })
+
+  it('re-stamps over an unclosed gate only with ok when the new gate holds', () => {
+    const r = markGated(tasks('- [ ] 1543. Hitches AWAITING-CONFIRMATION(2026-11-20; user-input: run it'), 1543, { since: '2026-11-21', act: 'user-input', detail, prepared })
+    expect(r.ok).toBe(true)
+    expect(parseUserGates(r.text).gated.map((g) => g.point)).toEqual([1543])
+  })
+
   it('refuses empty labelled values, marker delimiters and a detail that would not round-trip', () => {
     expect(markGated(tasks('- [ ] 1. A'), 1, { act: 'user-input', detail: 'run the local check, hand back: , where: chat', prepared })).toMatchObject({ ok: false })
     expect(markGated(tasks('- [ ] 1. A'), 1, { act: 'user-input', detail: 'run the local check, hand back: log, where:', prepared })).toMatchObject({ ok: false })

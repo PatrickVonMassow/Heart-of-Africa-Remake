@@ -87,10 +87,11 @@ describe('derivedUserWaitCards — one card per open gate, all four acts', () =>
       expect(card.title).toBe(`Punkt ${point} wartet auf dich – Marker fehlerhaft`)
       expect(card.paragraphs.join(' ')).toContain('Roher Text: AWAITING-CONFIRMATION(')
     }
-    // An unclosed gate does not swallow a later answer into its prepared state.
+    // An unclosed gate does not swallow a later answer: the answer is the state.
     const swallowing = tasks('- [ ] 81. X AWAITING-CONFIRMATION(2026-11-20; release-tag: push the v1 tag, safe prepared state: the build is verified USER-ANSWERED(2026-11-21)')
     expect(gateSets(swallowing).gated.has(81)).toBe(false)
-    expect(derivedUserWaitCards(swallowing).map((c) => c.kind)).toEqual(['malformed'])
+    expect(gateSets(swallowing).answered.has(81)).toBe(true)
+    expect(derivedUserWaitCards(swallowing)).toEqual([])
     // THE LAST MARKER IS THE STATE: a gate followed by its answer is answered, not malformed.
     const answeredAfter = tasks('- [ ] 80. Done AWAITING-CONFIRMATION(2026-11-20; release-tag: push the v1 tag, safe prepared state: the build is verified) USER-ANSWERED(2026-11-21)')
     expect(derivedUserWaitCards(answeredAfter)).toEqual([])

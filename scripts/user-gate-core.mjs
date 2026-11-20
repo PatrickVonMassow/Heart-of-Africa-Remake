@@ -477,22 +477,27 @@ export function parseGateLine(line) {
   const point = Number(head[2])
   const open = head[1] === ' '
   const deferred = /\bDEFERRED\b/.test(text)
-  const hit = text.match(MARKER_TAIL_RE)
-  if (!hit) {
+  let token = text.match(MARKER_TAIL_RE)?.[1]
+  if (!token) {
     return { point, open, gated: false, answered: false, since: '', at: '', reason: '', reasonMissing: false, stale: false }
   }
   // The LAST marker on the line is the state — a gate written after an answer
   // gates again, an answer written after a gate answers. No precedence rule.
-  const { marker, payload } = readMarkerToken(hit[1])
+  // AN UNCLOSED MARKER DOES NOT SWALLOW A LATER ONE: the leftmost tail match
+  // spans from the unclosed opening to the later marker's `)`, so the token is
+  // re-matched inside itself until no marker opens in its payload. The
+  // unclosed text is then plain prose, and the later marker is the state.
+  // Each step strictly shortens the token, and a bare legacy marker has no `(`.
+  for (let open = token.indexOf('('); open >= 0; open = token.indexOf('(')) {
+    const inner = token.slice(open + 1).match(MARKER_TAIL_RE)?.[1]
+    if (!inner) break
+    token = inner
+  }
+  const { marker, payload } = readMarkerToken(token)
   const answered = marker === ANSWERED_MARKER
   const selfDecided = marker === SELF_DECIDED_MARKER
   const { stamp, reason } = readPayload(marker, payload)
-  // AN UNCLOSED GATE MUST NOT SWALLOW A LATER MARKER: a marker opening inside
-  // the payload means the gate's own `)` is missing, so the gate does not hold.
-  const swallowed = marker === CONFIRMATION_MARKER && MARKERS.some((m) => payload.includes(`${m}(`))
-  const classification = swallowed
-    ? { verdict: 'advisory', act: '', reason, error: 'another marker opens inside this gate — its closing ) is missing' }
-    : marker === CONFIRMATION_MARKER
+  const classification = marker === CONFIRMATION_MARKER
     ? classifyConfirmationReason(reason)
     : marker === LEGACY_GATE_MARKER
       ? classifyConfirmationReason(reason, { legacy: true })
@@ -648,6 +653,12 @@ export function markGated(tasksText, point, { since = '', act = '', detail = '',
   const { text, hit } = rewriteHead(tasksText, point, (line) => `${stripMarkers(line)} ${marker}`)
   if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order` }
   if (hit === 'ticked') return { text, ok: false, error: `point ${Number(point)} is already ticked — a closed point is not gateable` }
+  // ok ONLY WHEN THE GATE HOLDS: whatever stands on the line (an unclosed
+  // marker included), the rewritten line must read back as this gate.
+  const written = text.split('\n').map(parseGateLine).find((g) => g?.point === Number(point))
+  if (!written?.gated) {
+    return { text: String(tasksText ?? ''), ok: false, error: `point ${Number(point)}: the re-stamped line does not read back as a gate — clear its markers first` }
+  }
   return { text, ok: true, error: '' }
 }
 
