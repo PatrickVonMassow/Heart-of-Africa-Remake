@@ -360,6 +360,7 @@ export const de: Strings = {
       savannaStanding: 'Stehend in dichter Savanne',
       desertStanding: 'Stehend in leerer Wüste',
       savannaDriving: 'Fahrt durch die Savanne',
+      settlementStanding: 'Stehend in der Hafenstadt Kairo',
     },
     remaining: (time) => `Noch etwa ${time}`,
     abortHint: 'Esc bricht den Benchmark ab und stellt alle Einstellungen wieder her.',

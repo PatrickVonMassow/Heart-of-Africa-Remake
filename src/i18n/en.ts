@@ -361,6 +361,7 @@ export const en: Strings = {
       savannaStanding: 'Standing in dense savanna',
       desertStanding: 'Standing in empty desert',
       savannaDriving: 'Travelling through the savanna',
+      settlementStanding: 'Standing in the port city of Cairo',
     },
     remaining: (time) => `About ${time} left`,
     abortHint: 'Esc aborts the benchmark and restores every setting.',

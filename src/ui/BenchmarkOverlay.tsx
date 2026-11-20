@@ -19,6 +19,7 @@ function phaseLabel(t: Strings, phase: string): string {
     'savanna-standing': t.benchmark.phases.savannaStanding,
     'desert-standing': t.benchmark.phases.desertStanding,
     'savanna-driving': t.benchmark.phases.savannaDriving,
+    'settlement-standing': t.benchmark.phases.settlementStanding,
   }
   return map[phase as BenchPhaseName] ?? phase
 }

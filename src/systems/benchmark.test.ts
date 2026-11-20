@@ -13,6 +13,7 @@ import {
   BENCH_SEED,
   BENCH_ZOOM,
   BENCH_PRESET_LEVELS,
+  BENCH_SETTLEMENT_PLACE,
   LOW_CONFIG_NAME,
   PRESET_CONFIG_NAMES,
   benchFilename,
@@ -39,6 +40,7 @@ import {
   type BenchSceneNode,
 } from './benchmark'
 import { DETAIL_LEVELS, QUALITY_PRESETS } from '../config/quality'
+import { placeById } from '../world/geo'
 
 describe('benchmark preset passes (point 1524)', () => {
   it('measures every graphics level once, high to low, under names distinct from the sweep', () => {
@@ -58,9 +60,9 @@ describe('benchmark preset passes (point 1524)', () => {
     expect(benchNativePixelRatio(undefined)).toBe(1)
   })
 
-  it('keeps the full run with all preset passes under ~3 min at 60 Hz', () => {
+  it('keeps the full run with all preset passes and the settlement phase under ~4 min at 60 Hz', () => {
     const total = benchTotalFrames(false, BENCH_CONFIGS.length + BENCH_PRESET_LEVELS.length)
-    expect(total / 60).toBeLessThan(180)
+    expect(total / 60).toBeLessThan(240)
   })
 })
 
@@ -113,13 +115,24 @@ describe('benchmark sweep plan (design.md §21.1)', () => {
   })
 })
 
-describe('benchmark route (the three point-276 states)', () => {
-  it('visits dense savanna, empty desert and the savanna drive, in order', () => {
-    expect(BENCH_PHASES.map((p) => p.name)).toEqual(['savanna-standing', 'desert-standing', 'savanna-driving'])
+describe('benchmark route (the three point-276 states, then the settlement)', () => {
+  it('visits dense savanna, empty desert, the savanna drive and the settlement, in order', () => {
+    expect(BENCH_PHASES.map((p) => p.name)).toEqual(['savanna-standing', 'desert-standing', 'savanna-driving', 'settlement-standing'])
     // The same anchors scripts/perf-bench.mjs measures, so both agree.
     expect(BENCH_PHASES[0]).toMatchObject({ lat: -2.5, lon: 34.0, drive: false })
     expect(BENCH_PHASES[1]).toMatchObject({ lat: 23.0, lon: 15.0, drive: false })
     expect(BENCH_PHASES[2]).toMatchObject({ lat: -2.5, lon: 34.0, drive: true })
+    // Only the settlement phase enters a place; the travel phases stay outside.
+    expect(BENCH_PHASES.slice(0, 3).every((p) => p.placeId === undefined)).toBe(true)
+  })
+
+  it('stands inside a port city, at its own map position, entered last from the bird\'s-eye view (point 1561)', () => {
+    const settlement = BENCH_PHASES.find((p) => p.name === 'settlement-standing')
+    expect(settlement?.placeId).toBe(BENCH_SETTLEMENT_PLACE)
+    const place = placeById(BENCH_SETTLEMENT_PLACE)
+    expect(place.kind).toBe('port')
+    expect(settlement).toMatchObject({ lat: place.lat, lon: place.lon, drive: false })
+    expect(BENCH_PHASES.at(-1)).toBe(settlement)
   })
 
   it('pins the deterministic run state (seed, date, reachable zoom, timestep)', () => {
@@ -140,11 +153,11 @@ describe('benchmark route (the three point-276 states)', () => {
     }
   })
 
-  it('counts the discarded warm-up pass into the total, and stays under ~3 min at 60 Hz', () => {
+  it('counts the discarded warm-up pass into the total, and stays under ~4 min at 60 Hz', () => {
     const c = benchFrameCounts(false)
     const total = benchTotalFrames(false)
     expect(total).toBe((BENCH_CONFIGS.length + 1) * BENCH_PHASES.length * (c.settle + c.sample))
-    expect(total / 60).toBeLessThan(180)
+    expect(total / 60).toBeLessThan(240)
     expect(benchTotalFrames(true)).toBeLessThan(total)
   })
 
@@ -516,6 +529,23 @@ describe('report shaping', () => {
     expect(lines[4]).toContain('gpu')
     expect(lines.some((l) => l.includes('baseline') && l.includes('savanna-standing'))).toBe(true)
     expect(lines).toHaveLength(6) // 3 header lines + headline + table head + one row
+  })
+
+  it('lists the settlement row beside the travel phases, column-aligned (point 1561)', () => {
+    const r = report()
+    const travel = r.rows[0]
+    r.rows.push({ ...travel, phase: 'settlement-standing', place: BENCH_SETTLEMENT_PLACE, frame: frameStats([200, 200, 200]) })
+    const lines = benchSummaryLines(r)
+    const travelLine = lines.find((l) => l.includes('savanna-standing')) ?? ''
+    const settlementLine = lines.find((l) => l.includes('settlement-standing')) ?? ''
+    expect(settlementLine).toMatch(/^baseline\s+settlement-standing\s+5\.0\s/)
+    // The longest phase name keeps a gap, so every column stays aligned.
+    expect(settlementLine.length).toBe(travelLine.length)
+    expect(lines[4].indexOf('fps') + 3).toBe(settlementLine.indexOf('5.0') + 3)
+    // The JSON keeps the row's place as the evidence it stood in the settlement.
+    const parsed = JSON.parse(benchReportJson(r)) as BenchReport
+    expect(parsed.rows.map((row) => row.phase)).toEqual(['savanna-standing', 'settlement-standing'])
+    expect(parsed.rows[1].place).toBe('cairo')
   })
 
   it('prints the GPU column where it exists and a dash where it does not', () => {

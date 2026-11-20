@@ -356,6 +356,20 @@ function resetWorld(phase: BenchPhase): void {
     journalDnd: true,
   })
   useGame.getState().debugJumpTo(phase.lat, phase.lon)
+  if (phase.placeId !== undefined) {
+    // The settlement phase: every config takes the identical LATER-entry path
+    // (already visited and entered, no bounty payout), so no config pays a
+    // first-arrival journal entry another one skips. Then the ordinary entry
+    // runs — the walkable scene with its inhabitants, as a player walks in.
+    const g = useGame.getState()
+    const id = phase.placeId
+    useGame.setState({
+      pendingBounties: [],
+      visitedPlaces: g.visitedPlaces.includes(id) ? g.visitedPlaces : [...g.visitedPlaces, id],
+      enteredPlaces: g.enteredPlaces.includes(id) ? g.enteredPlaces : [...g.enteredPlaces, id],
+    })
+    useGame.getState().enterPlace(id)
+  }
 }
 
 /** Apply one config's levers (the flags reset to their defaults first, so no
@@ -422,8 +436,9 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   running = true
   const short = options.short ?? benchShortMode(typeof location === 'undefined' ? '' : location.search)
   const counts = benchFrameCounts(short)
-  // The sweep configs PLUS the point-293 low-preset profiling pass — one extra
-  // measured config, so the progress bar and the estimate cover it.
+  // The sweep configs PLUS the preset passes (low/medium/high), so the progress
+  // bar and the estimate cover them; every config runs every phase, the
+  // settlement included.
   const measuredConfigs = BENCH_CONFIGS.length + BENCH_PRESET_LEVELS.length
   const framesTotal = benchTotalFrames(short, measuredConfigs)
 
@@ -502,6 +517,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
       if (!measured) return
       const render = (ctx.gl.info as { render?: { drawCalls?: number; triangles?: number } }).render
       const frame = frameStats(samples.map((s) => s.frameMs))
+      const game = useGame.getState()
       rows.push({
         config: config.name,
         phase: phase.name,
@@ -515,6 +531,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
         drawCalls: render?.drawCalls ?? 0,
         pixelRatio: ctx.gl.getPixelRatio(),
         triangles: render?.triangles ?? 0,
+        place: game.mode === 'place' ? game.placeId : null,
         sceneTriangles: sceneTriangleBreakdown(ctx.scene as unknown as BenchSceneNode),
       })
     } finally {

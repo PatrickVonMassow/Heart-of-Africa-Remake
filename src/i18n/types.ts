@@ -321,11 +321,13 @@ export interface Strings {
     warmup: string
     /** Line naming the measured route section. */
     phase: (name: string) => string
-    /** The three route sections (CLAUDE.md §7.1 pt. 20). */
+    /** The route sections (CLAUDE.md §7.1 pt. 20): three travel scenes and
+     *  the settlement. */
     phases: {
       savannaStanding: string
       desertStanding: string
       savannaDriving: string
+      settlementStanding: string
     }
     /** Estimated time left, `m:ss`. */
     remaining: (time: string) => string

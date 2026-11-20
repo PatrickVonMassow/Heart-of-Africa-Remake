@@ -170,8 +170,23 @@ const phases = [...new Set(report.rows.map((r) => r.phase))]
 check('the run completed without an abort', result.aborted === false)
 check(
   'one report row per config and phase',
-  report.rows.length === configs.length * phases.length && configs.length >= 10 && phases.length === 3,
+  report.rows.length === configs.length * phases.length && configs.length >= 10 && phases.length === 4,
   `${report.rows.length} rows, ${configs.length} configs, ${phases.length} phases`,
+)
+// Point 1561: the settlement phase stands INSIDE the port city for every
+// config, the presets included — judged by the state the row recorded at the
+// end of its sample, not by the phase name.
+const settlementRows = report.rows.filter((r) => r.phase === 'settlement-standing')
+check(
+  'every config, the low preset included, has a settlement row measured inside Cairo',
+  settlementRows.length === configs.length && configs.includes('low-preset') &&
+    settlementRows.every((r) => r.place === 'cairo') &&
+    report.rows.filter((r) => r.phase !== 'settlement-standing').every((r) => r.place === null),
+  `${settlementRows.length}/${configs.length} rows, places ${JSON.stringify([...new Set(report.rows.map((r) => r.place))])}`,
+)
+check(
+  'the digest lists the settlement rows beside the travel phases',
+  report.summary.filter((l) => /^\S+\s+settlement-standing\s/.test(l)).length === configs.length,
 )
 check(
   'every row carries frame-time statistics, draw calls and triangles',
