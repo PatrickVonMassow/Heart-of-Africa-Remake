@@ -535,6 +535,8 @@ put it is the mistake this line exists to stop.
   frame shows the textured place ground on both backends.
   Criticality: medium — possibly the first view of the game has no ground texture.
   Test: flow picture check of 06-start-journal on WebGL 2 and WebGPU.
+  Also measured 21.11.2026 (flow, WebGL 2, branch of the device-loss point at 04cd7a1b7): the
+  whole place grey, only name labels, 1 FPS; WebGPU on the same commit drew the full place.
   Refs: the place scene ground material, scripts/verify/flow.mjs start-journal shutter.
   Bundle: Siedlungsgeometrie.
 
