@@ -566,6 +566,11 @@ describe('the main-write ownership fence', () => {
     // An expanded target is not the text the guard resolved.
     expect(shell(`D=${pad}; sed -n 1,90p scripts/a.mjs > $D/m1.txt`).writes).toBe(true)
     expect(shell(`head scripts/a.mjs > ${pad}/*.txt`).writes).toBe(true)
+    // …also with every path outside: no fallback to the operand check.
+    expect(shell(`head /tmp/a > /tmp/*.txt`).writes).toBe(true)
+    expect(shell(`cat /tmp/a > /tmp/$N.txt`).writes).toBe(true)
+    expect(shell(`sed -n 1p /tmp/a > /tmp/?.txt`).writes).toBe(true)
+    expect(shell(`tail /tmp/* > /tmp/b`).writes).toBe(true)
     // Read/write and descriptor redirects into the checkout stay refused.
     expect(shell(`head /tmp/a 1<>TASKS.md`).writes).toBe(true)
     expect(shell(`cat scripts/a.mjs > ${pad}/m.txt 3>TASKS.md`).writes).toBe(true)

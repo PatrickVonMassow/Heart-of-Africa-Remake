@@ -852,7 +852,9 @@ export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRo
   const sed = String(head) === 'sed' ? sedInvocation(args) : null
   // Unreadable sed syntax (`--expression=…`, `-f`, a w/W/e script) earns no exemption.
   if (sed && !sed.safe) return false
-  const reader = (sed ? !sed.inPlace : PLAIN_STREAM_READERS.has(String(head))) && literalCall(segment, args)
+  // An expansion is final, not a fallback: a glob may resolve to a link into the checkout.
+  if ((sed || PLAIN_STREAM_READERS.has(String(head))) && !literalCall(segment, args)) return false
+  const reader = sed ? !sed.inPlace : PLAIN_STREAM_READERS.has(String(head))
   if (!reader && !FILE_TOOLS.has(String(head))) return false
   const candidates = [
     // `/dev/null` alone is no destination: it discards, whoever opens it.
