@@ -34,3 +34,29 @@ export function describeBackend(gl: unknown): BackendInfo {
   }
   return { backend: isWebGpu ? 'webgpu' : 'webgl2', adapter }
 }
+
+/** The unmasked WebGL renderer name from a throwaway context, or '' where the
+ *  browser masks or refuses it. WebGPU names only vendor and architecture, so
+ *  the first-start pick (point 1562) reads this to tell an APU ("AMD Radeon(TM)
+ *  Graphics") from a discrete card of the same architecture ("Radeon RX 6800"). */
+export function probeWebglRendererName(): string {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2')
+    if (!gl) return ''
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info')
+    const name = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : ''
+    gl.getExtension('WEBGL_lose_context')?.loseContext()
+    return name
+  } catch {
+    return ''
+  }
+}
+
+/** The adapter text the first-start pick matches: the backend's own name, plus
+ *  the probed WebGL name on WebGPU (where the backend name is architecture only). */
+export function startAdapterName(info: BackendInfo, probe: () => string = probeWebglRendererName): string {
+  if (info.backend !== 'webgpu') return info.adapter
+  const webgl = probe()
+  if (!webgl) return info.adapter
+  return info.adapter === 'unknown' ? webgl : `${info.adapter} | ${webgl}`
+}

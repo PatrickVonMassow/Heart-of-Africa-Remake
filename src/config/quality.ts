@@ -373,10 +373,11 @@ export interface WeakAdapterRule {
 export const WEAK_ADAPTER_RULES: readonly WeakAdapterRule[] = [
   // Intel integrated graphics; Arc (xe-hpg) is a discrete card.
   { pattern: /\bintel\b/i, unless: /\barc\b|xe-hpg/i },
-  // AMD APU strings as WebGL names them ("AMD Radeon(TM) Graphics", Vega 8).
-  { pattern: /radeon(\(tm\))? graphics|\bvega \d+\b/i },
-  // WebGPU names only the AMD architecture, shared by iGPUs and desktop cards;
-  // a high-dpr screen marks the notebook/handheld. OPEN: no iGPU/dGPU signal in
-  // GPUAdapterInfo — a laptop with a discrete RDNA-2 card also lands on Low.
-  { pattern: /\bamd (rdna-[12]|gcn-\d)\b/i, minDpr: 1.25 },
+  // AMD APU strings as WebGL names them ("AMD Radeon(TM) Graphics",
+  // "Radeon(TM) Vega 8 Graphics"); a discrete "RX Vega 64" carries no "Graphics".
+  { pattern: /radeon(\(tm\))? graphics|\bvega \d+ graphics/i },
+  // WebGPU names only the AMD architecture, shared by iGPUs and desktop cards.
+  // The WebGL name probed beside it (startAdapterName) exempts a discrete
+  // RX/Pro card; without one, a high-dpr screen marks the notebook/handheld.
+  { pattern: /\bamd (rdna-[12]|gcn-\d)\b/i, unless: /radeon(\(tm\))? (rx|pro)\b/i, minDpr: 1.25 },
 ]

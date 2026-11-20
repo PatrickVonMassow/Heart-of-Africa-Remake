@@ -49,6 +49,15 @@ describe('startDetailLevelForAdapter (point 1562)', () => {
     expect(startDetailLevelForAdapter('ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)', 1)).toBe('medium')
   })
 
+  it('keeps discrete AMD cards on medium', () => {
+    expect(startDetailLevelForAdapter('ANGLE (AMD, Radeon RX Vega 64 Direct3D11 vs_5_0 ps_5_0, D3D11)', 1)).toBe('medium')
+    expect(startDetailLevelForAdapter('ANGLE (AMD, AMD Radeon(TM) Vega 8 Graphics Direct3D11)', 1)).toBe('low')
+    // WebGPU architecture plus the probed WebGL name of a discrete card
+    expect(startDetailLevelForAdapter('amd rdna-2 | ANGLE (AMD, AMD Radeon RX 6800 XT Direct3D11)', 2)).toBe('medium')
+    expect(startDetailLevelForAdapter('amd rdna-2 | ANGLE (AMD, AMD Radeon(TM) RX 6700M Direct3D11)', 1.5)).toBe('medium')
+    expect(startDetailLevelForAdapter('amd rdna-2 | ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11)', 1)).toBe('low')
+  })
+
   it('needs a notebook-like dpr for an architecture-only AMD name', () => {
     expect(startDetailLevelForAdapter('amd rdna-2', 1)).toBe('medium')
     expect(startDetailLevelForAdapter('amd rdna-2', 1.25)).toBe('low')

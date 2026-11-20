@@ -9,7 +9,7 @@ import { TravelScene } from './scenes/travel/TravelScene'
 import { PlaceScene } from './scenes/place/PlaceScene'
 import { Effects } from './render/Effects'
 import { setRenderContext } from './render/renderContext'
-import { describeBackend } from './render/backendInfo'
+import { describeBackend, startAdapterName } from './render/backendInfo'
 import { enableAsyncPipelineCompile, type PipelineBackend } from './render/asyncPipelines'
 import { hasWebgpuAdapter, renderSupportNow } from './render/renderSupport'
 import { Hud } from './ui/Hud'
@@ -36,7 +36,8 @@ function RenderContextBridge() {
   useEffect(() => {
     setRenderContext({ gl: gl as unknown as THREE.WebGPURenderer, scene, camera, clock })
     // First start on a weak GPU opens at LOW (point 1562); no-op after any choice.
-    useUi.getState().pickStartDetailLevel(describeBackend(gl).adapter, window.devicePixelRatio || 1)
+    const ui = useUi.getState()
+    if (ui.detailLevelSource === 'default') ui.pickStartDetailLevel(startAdapterName(describeBackend(gl)), window.devicePixelRatio || 1)
     return () => setRenderContext(null)
   }, [gl, scene, camera, clock])
   return null

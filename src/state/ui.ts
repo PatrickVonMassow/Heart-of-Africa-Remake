@@ -259,7 +259,8 @@ interface UiState {
    *  medium → low → high → medium. */
   cycleDetailLevel: () => void
   /** First start only: pick LOW for a weak adapter (point 1562). A no-op once
-   *  the level came from the URL, the player, or an earlier pick. */
+   *  the level came from the URL, the player, or an earlier pick, and for an
+   *  unreadable adapter (which leaves a later remount free to decide). */
   pickStartDetailLevel: (adapter: string, dpr: number) => void
   setSsaoEnabled: (enabled: boolean) => void
   setShadowMapHalf: (half: boolean) => void
@@ -393,7 +394,7 @@ export const useUi = create<UiState>()((set) => ({
   cycleDetailLevel: () => set((s) => ({ detailLevel: nextDetailLevel(s.detailLevel), detailLevelSource: 'player' })),
   pickStartDetailLevel: (adapter, dpr) =>
     set((s) =>
-      s.detailLevelSource === 'default' && s.benchProgress === null
+      s.detailLevelSource === 'default' && s.benchProgress === null && adapter !== 'unknown' && adapter !== ''
         ? { detailLevel: startDetailLevelForAdapter(adapter, dpr), detailLevelSource: 'auto' }
         : {},
     ),

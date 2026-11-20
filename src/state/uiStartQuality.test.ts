@@ -67,6 +67,14 @@ describe('first-start adapter pick (point 1562)', () => {
     expect(second.getState().detailLevelSource).toBe('player')
   })
 
+  it('leaves an unreadable adapter undecided for a later remount', async () => {
+    const { useUi } = await storeAt('')
+    useUi.getState().pickStartDetailLevel('unknown', 2)
+    expect(useUi.getState().detailLevelSource).toBe('default')
+    useUi.getState().pickStartDetailLevel('intel gen-8', 1)
+    expect(useUi.getState().detailLevel).toBe('low')
+  })
+
   it('picks only once, so a remount does not re-decide', async () => {
     const { useUi } = await storeAt('')
     useUi.getState().pickStartDetailLevel('nvidia lovelace', 1)
