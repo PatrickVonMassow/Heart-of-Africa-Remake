@@ -39,7 +39,7 @@ import {
   summaryPoint,
 } from './board-core.mjs'
 import { DERIVED_STATE_KIND } from './board-state-core.mjs'
-import { expectedSections } from './dashboard-guard-core.mjs'
+import { backlogOutsideErledigt, expectedSections } from './dashboard-guard-core.mjs'
 
 /** The five sections, in the order the user's mandate fixes them — the decision
  *  log last, below Erledigt (user order 22.09.2026). */
@@ -99,6 +99,9 @@ export function structureViolations(html) {
       code: 'sections-wrong',
       msg: `expected the five sections ${expected.join(' | ')} - found ${seen.join(' | ') || '<none>'}`,
     })
+  }
+  if (!backlogOutsideErledigt(m)) {
+    out.push({ code: 'sections-wrong', msg: 'the Backlog section stands inside Erledigt - it belongs directly below it' })
   }
   const wrappers = count(m, /<details class="sect">/g)
   if (wrappers !== expected.length) {

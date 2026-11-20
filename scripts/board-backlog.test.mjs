@@ -15,7 +15,14 @@ import {
 } from './board-core.mjs'
 import { BACKLOG_PAGE_URL } from './board-currency-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
-import { BACKLOG_TITLE, auditDashboard, expectedSections, parseCards, sliceSections } from './dashboard-guard-core.mjs'
+import {
+  BACKLOG_TITLE,
+  auditDashboard,
+  backlogOutsideErledigt,
+  expectedSections,
+  parseCards,
+  sliceSections,
+} from './dashboard-guard-core.mjs'
 
 const BACKLOG = `# Backlog (non-blocking)
 
@@ -178,5 +185,51 @@ describe('structure gates', () => {
     expect(structureViolations(misplaced).map((v) => v.code)).toContain('sections-wrong')
     expect(auditDashboard(misplaced, {}).map((v) => v.code)).toContain('structure')
     expect(expectedSections(['Erledigt'])).not.toContain(BACKLOG_TITLE)
+  })
+})
+
+describe('cross-vendor review findings', () => {
+  const titles = (text) => parseBacklog(text).entries.map((e) => e.title)
+
+  it('skips a lowercase closed marker and keeps a title that only names a status word', () => {
+    const text = '- 2026-11-01 old probe (closed 02.11.2026)\n## Explain the CLOSED badge (19.11.2026)\n'
+    expect(titles(text)).toEqual(['Explain the CLOSED badge'])
+  })
+
+  it('ignores entries inside tilde and longer backtick fences', () => {
+    const text = [
+      '~~~',
+      '## inside tilde fence (01.01.2026)',
+      '~~~',
+      '````',
+      '```',
+      '- 2026-01-02 inside a four-backtick fence',
+      '````',
+      '- 2026-01-03 real entry',
+    ].join('\n')
+    expect(titles(text)).toEqual(['real entry'])
+  })
+
+  it("dates a heading by its trailing date, not a date in its prose", () => {
+    const { entries } = parseBacklog('## Review the 2025-01-01 migration (19.11.2026)\n')
+    expect(entries[0]).toEqual({ title: 'Review the 2025-01-01 migration', date: '2026-11-19' })
+  })
+
+  it('places and replaces the section past a closer written with a space', () => {
+    const spaced = applyBacklogSection(board(), BACKLOG).replace(/<\/details>(\n<details class="sect">\s*<summary><h2>Backlog)/, '</details >$1')
+    expect(spaced).toContain('</details >')
+    const once = applyBacklogSection(spaced, BACKLOG)
+    expect(headings(once)).toEqual(headings(applyBacklogSection(board(), BACKLOG)))
+    expect(applyBacklogSection(once, BACKLOG)).toBe(once)
+  })
+
+  it('refuses a Backlog nested inside the Erledigt wrapper', () => {
+    const good = applyBacklogSection(board(), BACKLOG)
+    const section = renderBacklogSection(null)
+    const nested = board().replace(`${ERLEDIGT_ANCHOR}\n`, `${ERLEDIGT_ANCHOR}\n${section}\n`)
+    expect(backlogOutsideErledigt(good)).toBe(true)
+    expect(backlogOutsideErledigt(nested)).toBe(false)
+    expect(structureViolations(nested).map((v) => v.code)).toContain('sections-wrong')
+    expect(auditDashboard(nested, {}).map((v) => v.code)).toContain('structure')
   })
 })

@@ -176,6 +176,27 @@ export function expectedSections(seen = []) {
   return [...SECTION_TITLES.slice(0, at), BACKLOG_TITLE, ...SECTION_TITLES.slice(at)]
 }
 
+/** False when the Backlog heading stands INSIDE the Erledigt wrapper rather
+ *  after its closer (cross-vendor review of 1559): heading order alone cannot
+ *  tell a nested Backlog from a sibling. The closer is found by counting the
+ *  <details> nesting, as board-core's sectionBounds does. */
+export function backlogOutsideErledigt(html) {
+  const text = String(html ?? '')
+  const backlog = text.indexOf(`<h2>${BACKLOG_TITLE}</h2>`)
+  const done = text.indexOf('<h2>Erledigt</h2>')
+  if (backlog < 0 || done < 0) return true
+  const opener = text.lastIndexOf('<details', done)
+  if (opener < 0) return true
+  const tag = /<details\b[^>]*>|<\/details\s*>/g
+  tag.lastIndex = opener
+  let depth = 0
+  for (let m = tag.exec(text); m; m = tag.exec(text)) {
+    depth += m[0].startsWith('</') ? -1 : 1
+    if (depth === 0) return backlog > m.index
+  }
+  return false
+}
+
 /** The board keeps only the newest finished cards; the rest live on their own
  *  published page (user 27.07.2026). Measured reason: at 214 cards the archive
  *  was three quarters of the file, so every review of the board grew with every
@@ -541,6 +562,9 @@ export function auditDashboard(html, input = {}) {
       code: 'structure',
       msg: `section headers are [${order.join(' | ') || '<none>'}] — the binding structure is [${expected.join(' | ')}]`,
     })
+  }
+  if (!backlogOutsideErledigt(html)) {
+    v.push({ code: 'structure', msg: `the ${BACKLOG_TITLE} section stands inside Erledigt — it belongs directly below it` })
   }
 
   // NO AUTO-OPEN — user mandate 23.07.2026 (dashboard-no-auto-open): no card

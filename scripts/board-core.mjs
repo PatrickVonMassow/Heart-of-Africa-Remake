@@ -3481,15 +3481,22 @@ export function runCardTimesBackfill({
  */
 export const BACKLOG_ON_BOARD = 10 // ESTIMATE, calibratable: the section is collapsed
 
-/** A resolution marker in an entry's head line (uppercase only: "Erledigt-Karte" is prose). */
-const BACKLOG_RESOLVED_HEAD = /\b(?:FIXED|ERLEDIGT|CLOSED|WONTFIX)\b|(?<!NICHT )\bEINGEREIHT\b/
+/** A resolution marker in an entry's head line: the status word in a marker
+ *  position (line start, after a bullet's leading date, or after "(", "—", "–",
+ *  ",", ";", ":"), so a title that
+ *  merely names the word ("Explain the CLOSED badge") stays open. */
+const BACKLOG_RESOLVED_HEAD = /(?:^(?:\d{4}-\d{2}-\d{2}\s+)?|[(—–,;:]\s*)(?:FIXED|ERLEDIGT|CLOSED|WONTFIX|EINGEREIHT|closed)\b/
 /** A body line opening with a resolution marker ("ERLEDIGT (17.09.2026): …"). */
-const BACKLOG_RESOLVED_LINE = /^\s*(?:FIXED|ERLEDIGT|CLOSED|EINGEREIHT)\b/
+const BACKLOG_RESOLVED_LINE = /^\s*(?:FIXED|ERLEDIGT|CLOSED|EINGEREIHT|WONTFIX|[Cc]losed)\b/
 const BACKLOG_TITLE_MAX = 120
 
-/** The first date in `text` as ISO `YYYY-MM-DD`, or ''. Both house forms count. */
-function backlogDate(text) {
-  const m = /\b(\d{4})-(\d{2})-(\d{2})\b|\b(\d{2})\.(\d{2})\.(\d{4})\b/.exec(text)
+const DATE_RE = /\b(\d{4})-(\d{2})-(\d{2})\b|\b(\d{2})\.(\d{2})\.(\d{4})\b/
+
+/** An entry's date as ISO `YYYY-MM-DD`, or ''. A heading's trailing
+ *  "(DD.MM.YYYY)" and a bullet's leading ISO date win over a date in the prose. */
+function backlogDate(head, form) {
+  const own = form === 'heading' ? /\((\d{2}\.\d{2}\.\d{4})\)\s*$/.exec(head) : /^(\d{4}-\d{2}-\d{2})\b/.exec(head)
+  const m = DATE_RE.exec(own ? own[1] : head)
   if (!m) return ''
   return m[1] ? `${m[1]}-${m[2]}-${m[3]}` : `${m[6]}-${m[5]}-${m[4]}`
 }
@@ -3515,10 +3522,17 @@ export function parseBacklog(text) {
   if (typeof text !== 'string') throw new Error('backlog: not readable')
   const raw = []
   let cur = null
-  let fenced = false
+  let fence = null // the open fence's run (``` or ~~~, any length), CommonMark-style
   for (const line of normaliseLineEndings(text).split('\n')) {
-    if (/^\s*```/.test(line)) fenced = !fenced
-    if (fenced) continue
+    const run = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1]
+    if (fence) {
+      if (run && run[0] === fence[0] && run.length >= fence.length && !line.slice(line.indexOf(run) + run.length).trim()) fence = null
+      continue
+    }
+    if (run) {
+      fence = run
+      continue
+    }
     const head = /^## +(\S.*)$/.exec(line) ?? /^- +(\S.*)$/.exec(line)
     if (head) {
       const form = line.startsWith('## ') ? 'heading' : 'bullet'
@@ -3532,7 +3546,7 @@ export function parseBacklog(text) {
   }
   const entries = raw
     .filter((e) => !e.resolved)
-    .map((e) => ({ title: backlogEntryTitle(e.head, e.form), date: backlogDate(e.head), at: e.at }))
+    .map((e) => ({ title: backlogEntryTitle(e.head, e.form), date: backlogDate(e.head, e.form), at: e.at }))
     .sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : b.at - a.at))
     .map(({ title, date }) => ({ title, date }))
   return { count: entries.length, entries }
@@ -3573,13 +3587,14 @@ export function applyBacklogSection(html, backlogText, options = {}) {
     backlog = null
   }
   let text = String(html ?? '')
+  // Past the section's own closer, as sectionBounds counted it (`</details >` included).
+  const pastCloser = (t, end) => end + /^\n?<\/details\s*>/.exec(t.slice(end))[0].length
   if (text.includes(`<h2>${BACKLOG_TITLE}</h2>`)) {
     const { from, end } = sectionBounds(text, 'backlog')
     const start = text.lastIndexOf(SECT_OPEN, from)
-    const stop = text.indexOf('</details>', end) + '</details>'.length
-    text = `${text.slice(0, start).replace(/\n$/, '')}${text.slice(stop)}`
+    text = `${text.slice(0, start).replace(/\n$/, '')}${text.slice(pastCloser(text, end))}`
   }
   const { end } = sectionBounds(text, 'done')
-  const after = text.indexOf('</details>', end) + '</details>'.length
+  const after = pastCloser(text, end)
   return `${text.slice(0, after)}\n${renderBacklogSection(backlog, options)}${text.slice(after)}`
 }
