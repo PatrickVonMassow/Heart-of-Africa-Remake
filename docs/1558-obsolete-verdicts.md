@@ -86,5 +86,5 @@ closed as delivered) and 1 backlog entry deleted (B1); 9 point verdicts dropped
 on re-validation. Open points 447 → 194; points in the infrastructure bundles
 252 → 75, unbundled 103 → 46. The first infrastructure point behind the game
 work stays 1447 at position 10 of the work order (its rank, not the cleanup,
-places it there); behind it, the infrastructure share of the queue falls from
-252 of 447 to 75 of 194.
+places it there); across the whole open queue, the infrastructure share falls
+from 252 of 447 to 75 of 194.
