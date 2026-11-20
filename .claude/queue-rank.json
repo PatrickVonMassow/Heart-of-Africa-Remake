@@ -749,12 +749,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1520": {
-      "at": "2026-11-14T08:50:30.597Z",
-      "why": "Sonne & Himmel bundle member; worked after 344-346, leak is not player-visible short-term",
-      "origin": "machine",
-      "place": "last"
-    },
     "1521": {
       "at": "2026-11-14T18:41:21.205Z",
       "why": "Settlement architecture, not communication mechanic; it is worked with its bundle Siedlungsgeometrie, which orders it, so its place in the file order does not decide when it runs.",
@@ -842,7 +836,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-20T18:31:42.177Z",
+    "at": "2026-11-20T20:19:06.969Z",
     "points": [
       184,
       200,
@@ -1017,7 +1011,6 @@
       1515,
       1517,
       1519,
-      1520,
       1521,
       1522,
       1525,
