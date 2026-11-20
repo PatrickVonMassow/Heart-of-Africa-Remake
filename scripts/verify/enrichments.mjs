@@ -110,10 +110,21 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 // written. A frame that deliberately photographs a general view says so.
 const shot = frameShutter(page, OUT)
 const errors = []
+// The message alone did not locate a per-frame TypeError (point 1495): the
+// first few page and console errors also print their stack.
+let stacksPrinted = 0
 page.on('console', (m) => {
-  if (m.type() === 'error') errors.push(m.text())
+  if (m.type() !== 'error') return
+  errors.push(m.text())
+  if (stacksPrinted++ < 3) {
+    Promise.all(m.args().map((a) => a.evaluate((v) => v?.stack ?? String(v)).catch(() => '?')))
+      .then((st) => console.log(`# console error stack (${m.text().slice(0, 120)}):\n${st.join('\n')}`))
+  }
 })
-page.on('pageerror', (e) => errors.push(String(e)))
+page.on('pageerror', (e) => {
+  errors.push(String(e))
+  if (stacksPrinted++ < 3) console.log(`# pageerror stack:\n${e.stack}`)
+})
 
 // A pixel clip placed relative to the traveller's PROJECTED figure, not the
 // screen centre: the south-reach camera (design.md §2.1) lifts him above the
