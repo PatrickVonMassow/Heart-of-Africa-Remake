@@ -53,9 +53,14 @@ describe('startDetailLevelForAdapter (point 1562)', () => {
     expect(startDetailLevelForAdapter('ANGLE (AMD, Radeon RX Vega 64 Direct3D11 vs_5_0 ps_5_0, D3D11)', 1)).toBe('medium')
     expect(startDetailLevelForAdapter('ANGLE (AMD, AMD Radeon(TM) Vega 8 Graphics Direct3D11)', 1)).toBe('low')
     // WebGPU architecture plus the probed WebGL name of a discrete card
-    expect(startDetailLevelForAdapter('amd rdna-2 | ANGLE (AMD, AMD Radeon RX 6800 XT Direct3D11)', 2)).toBe('medium')
-    expect(startDetailLevelForAdapter('amd rdna-2 | ANGLE (AMD, AMD Radeon(TM) RX 6700M Direct3D11)', 1.5)).toBe('medium')
-    expect(startDetailLevelForAdapter('amd rdna-2 | ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11)', 1)).toBe('low')
+    expect(startDetailLevelForAdapter('amd rdna-2', 2, 'ANGLE (AMD, AMD Radeon RX 6800 XT Direct3D11)')).toBe('medium')
+    expect(startDetailLevelForAdapter('amd rdna-2', 1.5, 'ANGLE (AMD, AMD Radeon(TM) RX 6700M Direct3D11)')).toBe('medium')
+    expect(startDetailLevelForAdapter('amd rdna-2', 1.75, 'ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11)')).toBe('low')
+  })
+
+  it('never lets a probed name of another GPU declare the active one weak', () => {
+    // hybrid notebook: WebGPU runs on NVIDIA, the WebGL probe lands on Intel
+    expect(startDetailLevelForAdapter('nvidia lovelace', 1.5, 'ANGLE (Intel, Intel(R) UHD Graphics 620 Direct3D11)')).toBe('medium')
   })
 
   it('needs a notebook-like dpr for an architecture-only AMD name', () => {

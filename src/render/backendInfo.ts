@@ -40,23 +40,26 @@ export function describeBackend(gl: unknown): BackendInfo {
  *  the first-start pick (point 1562) reads this to tell an APU ("AMD Radeon(TM)
  *  Graphics") from a discrete card of the same architecture ("Radeon RX 6800"). */
 export function probeWebglRendererName(): string {
+  let gl: WebGL2RenderingContext | null = null
   try {
-    const gl = document.createElement('canvas').getContext('webgl2')
-    if (!gl) return ''
-    const dbg = gl.getExtension('WEBGL_debug_renderer_info')
-    const name = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : ''
-    gl.getExtension('WEBGL_lose_context')?.loseContext()
-    return name
+    gl = document.createElement('canvas').getContext('webgl2')
+    const dbg = gl?.getExtension('WEBGL_debug_renderer_info')
+    return gl && dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : ''
   } catch {
     return ''
+  } finally {
+    try {
+      gl?.getExtension('WEBGL_lose_context')?.loseContext()
+    } catch {
+      // the context is dropped with the canvas anyway
+    }
   }
 }
 
-/** The adapter text the first-start pick matches: the backend's own name, plus
- *  the probed WebGL name on WebGPU (where the backend name is architecture only). */
-export function startAdapterName(info: BackendInfo, probe: () => string = probeWebglRendererName): string {
-  if (info.backend !== 'webgpu') return info.adapter
-  const webgl = probe()
-  if (!webgl) return info.adapter
-  return info.adapter === 'unknown' ? webgl : `${info.adapter} | ${webgl}`
+/** The probed WebGL name for the first-start pick: only on WebGPU, whose own
+ *  adapter name is architecture-only. On a hybrid machine it may name a
+ *  different GPU than WebGPU's, so the pick uses it to EXEMPT a discrete card,
+ *  never to declare one weak (WEAK_ADAPTER_RULES `unless`). */
+export function startProbeName(info: BackendInfo, probe: () => string = probeWebglRendererName): string {
+  return info.backend === 'webgpu' ? probe() : ''
 }

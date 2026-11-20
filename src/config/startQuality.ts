@@ -18,15 +18,18 @@ export function startQualityFromUrl(search: string): DetailLevel | null {
   return DETAIL_LEVELS.find((level) => level === value) ?? null
 }
 
-/** Whether the first start should treat this adapter as weak (point 1562). */
-export function isWeakAdapter(adapter: string, dpr: number, rules = WEAK_ADAPTER_RULES): boolean {
+/** Whether the first start should treat this adapter as weak (point 1562).
+ *  A rule fires on the active backend's own name; `unless` also sees the probed
+ *  WebGL name, which can only exempt (it may belong to another GPU). */
+export function isWeakAdapter(adapter: string, dpr: number, rules = WEAK_ADAPTER_RULES, probed = ''): boolean {
+  const exemptText = probed ? `${adapter} | ${probed}` : adapter
   return rules.some(
-    (r) => r.pattern.test(adapter) && !(r.unless?.test(adapter) ?? false) && dpr >= (r.minDpr ?? 0),
+    (r) => r.pattern.test(adapter) && !(r.unless?.test(exemptText) ?? false) && dpr >= (r.minDpr ?? 0),
   )
 }
 
 /** The level a first start without a URL-given or player-chosen level opens
  *  at: LOW on a weak adapter, MEDIUM (the ordinary default) otherwise. */
-export function startDetailLevelForAdapter(adapter: string, dpr: number): DetailLevel {
-  return isWeakAdapter(adapter, dpr) ? 'low' : 'medium'
+export function startDetailLevelForAdapter(adapter: string, dpr: number, probed = ''): DetailLevel {
+  return isWeakAdapter(adapter, dpr, WEAK_ADAPTER_RULES, probed) ? 'low' : 'medium'
 }

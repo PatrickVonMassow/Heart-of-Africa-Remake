@@ -377,7 +377,9 @@ export const WEAK_ADAPTER_RULES: readonly WeakAdapterRule[] = [
   // "Radeon(TM) Vega 8 Graphics"); a discrete "RX Vega 64" carries no "Graphics".
   { pattern: /radeon(\(tm\))? graphics|\bvega \d+ graphics/i },
   // WebGPU names only the AMD architecture, shared by iGPUs and desktop cards.
-  // The WebGL name probed beside it (startAdapterName) exempts a discrete
+  // The WebGL name probed beside it (startProbeName) exempts a discrete
   // RX/Pro card; without one, a high-dpr screen marks the notebook/handheld.
+  // OPEN: with no probed name a discrete RDNA-2 card on a dpr >= 1.25 screen
+  // still starts at Low — GPUAdapterInfo carries no iGPU/dGPU signal.
   { pattern: /\bamd (rdna-[12]|gcn-\d)\b/i, unless: /radeon(\(tm\))? (rx|pro)\b/i, minDpr: 1.25 },
 ]
