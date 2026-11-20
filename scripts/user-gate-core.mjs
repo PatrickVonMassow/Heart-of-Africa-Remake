@@ -151,11 +151,34 @@ const peelTrailingMarkers = (line) => {
   let head = String(line)
   const markers = []
   for (;;) {
-    const hit = head.match(MARKER_TAIL_RE)
+    const hit = lastMarker(head)
     if (!hit) return { head, markers }
-    markers.unshift(hit[1])
+    markers.unshift(hit.token)
     head = head.slice(0, hit.index).replace(/[ \t]+$/, '')
   }
+}
+
+/**
+ * The LAST marker ending `text`, as { token, index } (index = where the token
+ * starts), or null. AN UNCLOSED MARKER DOES NOT SWALLOW A LATER ONE: the
+ * leftmost tail match spans from the unclosed opening to the later marker's
+ * `)`, so the token is re-matched inside itself until no marker opens in its
+ * payload; the unclosed text is then prose. Each step strictly shortens the
+ * token, and a bare legacy marker has no `(`.
+ */
+function lastMarker(text) {
+  const hit = String(text).match(MARKER_TAIL_RE)
+  if (!hit) return null
+  let token = hit[1]
+  let index = hit.index + hit[0].indexOf(token)
+  for (let open = token.indexOf('('); open >= 0; open = token.indexOf('(')) {
+    const rest = token.slice(open + 1)
+    const inner = rest.match(MARKER_TAIL_RE)
+    if (!inner) break
+    index += open + 1 + inner.index + inner[0].indexOf(inner[1])
+    token = inner[1]
+  }
+  return { token, index }
 }
 
 /**
@@ -477,23 +500,13 @@ export function parseGateLine(line) {
   const point = Number(head[2])
   const open = head[1] === ' '
   const deferred = /\bDEFERRED\b/.test(text)
-  let token = text.match(MARKER_TAIL_RE)?.[1]
-  if (!token) {
+  const last = lastMarker(text)
+  if (!last) {
     return { point, open, gated: false, answered: false, since: '', at: '', reason: '', reasonMissing: false, stale: false }
   }
   // The LAST marker on the line is the state — a gate written after an answer
   // gates again, an answer written after a gate answers. No precedence rule.
-  // AN UNCLOSED MARKER DOES NOT SWALLOW A LATER ONE: the leftmost tail match
-  // spans from the unclosed opening to the later marker's `)`, so the token is
-  // re-matched inside itself until no marker opens in its payload. The
-  // unclosed text is then plain prose, and the later marker is the state.
-  // Each step strictly shortens the token, and a bare legacy marker has no `(`.
-  for (let open = token.indexOf('('); open >= 0; open = token.indexOf('(')) {
-    const inner = token.slice(open + 1).match(MARKER_TAIL_RE)?.[1]
-    if (!inner) break
-    token = inner
-  }
-  const { marker, payload } = readMarkerToken(token)
+  const { marker, payload } = readMarkerToken(last.token)
   const answered = marker === ANSWERED_MARKER
   const selfDecided = marker === SELF_DECIDED_MARKER
   const { stamp, reason } = readPayload(marker, payload)
@@ -655,8 +668,9 @@ export function markGated(tasksText, point, { since = '', act = '', detail = '',
   if (hit === 'ticked') return { text, ok: false, error: `point ${Number(point)} is already ticked — a closed point is not gateable` }
   // ok ONLY WHEN THE GATE HOLDS: whatever stands on the line (an unclosed
   // marker included), the rewritten line must read back as this gate.
-  const written = text.split('\n').map(parseGateLine).find((g) => g?.point === Number(point))
-  if (!written?.gated) {
+  // EVERY open head of the point was rewritten, so every one must hold.
+  const written = text.split('\n').map(parseGateLine).filter((g) => g?.point === Number(point) && g.open)
+  if (!written.length || !written.every((g) => g.gated)) {
     return { text: String(tasksText ?? ''), ok: false, error: `point ${Number(point)}: the re-stamped line does not read back as a gate — clear its markers first` }
   }
   return { text, ok: true, error: '' }

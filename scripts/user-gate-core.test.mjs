@@ -518,6 +518,19 @@ describe('the user-input act — the user must run, measure or hand in something
     expect(parseUserGates(r.text).gated.map((g) => g.point)).toEqual([1543])
   })
 
+  it('refuses a re-stamp that does not read back as a holding gate on every head, returning the original text', () => {
+    const deferred = tasks('- [ ] 1543. Hitches DEFERRED')
+    expect(markGated(deferred, 1543, { since: '2026-11-21', act: 'user-input', detail, prepared })).toMatchObject({ ok: false, text: deferred })
+    const twoHeads = tasks('- [ ] 1543. Hitches', '- [ ] 1543. Hitches again DEFERRED')
+    expect(markGated(twoHeads, 1543, { since: '2026-11-21', act: 'user-input', detail, prepared })).toMatchObject({ ok: false, text: twoHeads })
+  })
+
+  it('migrates a legacy gate left unclosed before an answer without losing the answer', () => {
+    const line = '- [ ] 1543. Hitches AWAITING-USER(2026-11-20; choose a colour USER-ANSWERED(2026-11-21)'
+    const { text } = migrateLegacyGates(tasks(line), { at: '2026-11-22' })
+    expect(parseUserGates(text).answered).toEqual([{ point: 1543, at: '2026-11-21' }])
+  })
+
   it('refuses empty labelled values, marker delimiters and a detail that would not round-trip', () => {
     expect(markGated(tasks('- [ ] 1. A'), 1, { act: 'user-input', detail: 'run the local check, hand back: , where: chat', prepared })).toMatchObject({ ok: false })
     expect(markGated(tasks('- [ ] 1. A'), 1, { act: 'user-input', detail: 'run the local check, hand back: log, where:', prepared })).toMatchObject({ ok: false })
