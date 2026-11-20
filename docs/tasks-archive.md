@@ -47524,3 +47524,15 @@ to land than a mechanism that needs a review.
   Source: finding of the 1508 session, 13.11.2026 15:34.
   Bundle: Steuerung & Performance.
   Closed 20.11.2026 by 1560 as a duplicate of 551: same hint element; acceptance criterion 9 keeps the hint centred inside the bar, so 551's remedy holds and 551 carries this evidence (docs/1560-reorder-dispositions.md).
+
+- [x] 1560. Finish the reorder dispositions: confirm 1013, re-check 1059/1328/1289, consolidate 1516 with 551
+  Split off point 1557 (the user-approved work-order reorder of 19.11.2026) because these parts need measurement runs, not queue edits.
+
+  Final state:
+  1. 1013 (cheetah in central Africa): one confirming run shows the start-region fix of archived point 1063 (d0a27cfc3) delivers it; then 1013 closes as delivered by 1063. Otherwise it stays open as a verification-only item.
+  2. 1059, 1328, 1289: each reproduction re-checked once. Whatever still reproduces as a real blockade moves directly behind 1555; the post-release Stop failure shared by 1328 and 1289 is consolidated into one point if reproduced. Non-reproducing ones stay in place with the re-check result noted.
+  3. 1516 and 551 (duplicate symptom: canoe hint colliding with status-bar text) become one point; their conflicting remedies are resolved against acceptance criterion 9. 1215 stays separate.
+  Test: the 1013 run as a screenshot/scene check on WebGPU; reproduction notes for 1059/1328/1289; unit tests for any TASKS consumer touched.
+  Bundle: Session- & Repo-Hygiene.
+  Source: split from 1557 on 19.11.2026 (user approval of the reorder, 20:42).
+  Criticality: high.

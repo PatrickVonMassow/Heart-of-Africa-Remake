@@ -107,18 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1560. Finish the reorder dispositions: confirm 1013, re-check 1059/1328/1289, consolidate 1516 with 551
-  Split off point 1557 (the user-approved work-order reorder of 19.11.2026) because these parts need measurement runs, not queue edits.
-
-  Final state:
-  1. 1013 (cheetah in central Africa): one confirming run shows the start-region fix of archived point 1063 (d0a27cfc3) delivers it; then 1013 closes as delivered by 1063. Otherwise it stays open as a verification-only item.
-  2. 1059, 1328, 1289: each reproduction re-checked once. Whatever still reproduces as a real blockade moves directly behind 1555; the post-release Stop failure shared by 1328 and 1289 is consolidated into one point if reproduced. Non-reproducing ones stay in place with the re-check result noted.
-  3. 1516 and 551 (duplicate symptom: canoe hint colliding with status-bar text) become one point; their conflicting remedies are resolved against acceptance criterion 9. 1215 stays separate.
-  Test: the 1013 run as a screenshot/scene check on WebGPU; reproduction notes for 1059/1328/1289; unit tests for any TASKS consumer touched.
-  Bundle: Session- & Repo-Hygiene.
-  Source: split from 1557 on 19.11.2026 (user approval of the reorder, 20:42).
-  Criticality: high.
-
 - [ ] 1495. The continent zoom stops drawing — a TypeError fires every frame
   Final state: `npm test -- enrichments --section=seasons` is green on both backends: frame 87-continent-zoom is drawn at the unlocked wide zoom, and the page logs no "TypeError: undefined is not iterable (cannot read property Symbol(Symbol.iterator))".
   Observed problem: at the continent zoom the scene draws nothing ("no frame has been drawn yet (0 draw calls)") and the TypeError repeats every frame. Measured 09.11.2026 on main ca908ee7d (`--section=seasons`, WebGPU, 277 errors, log local/verify-logs/2026-11-09T19-49-07-979-enrichments.log) and on feat/565-buried-drinking-calf 313289975 (full enrichments, WebGPU 5600 and WebGL 2 406 errors). No enrichments run up to 31.10.2026 logged it. Point 565's diff only moves wildlife body heights, so the red is owned by no point. The suite logs only the message text, so the first step is the stack (pageerror `e.stack`).
