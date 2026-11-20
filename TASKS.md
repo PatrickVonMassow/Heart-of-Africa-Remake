@@ -5305,3 +5305,26 @@ put it is the mistake this line exists to stop.
   every catcher in line.
   Source: finding of the 1164 session, 19.11.2026 16:30.
   Bundle: Dorfleben.
+
+- [ ] 1563. Graphics notices cover the open journal's header
+  Measured 20.11.2026 on both backends (point 507 picture check, 1440x900, journal open at start):
+  `.renderer-warning` (top 56px, centred, max-width 80vw, above `.journal` by design per
+  src/ui/overlayOrder.test.ts) puts its "Got it" button over the journal title. Affects the WebGL 2
+  fallback notice and the device-lost notice alike.
+  Player impact: the journal's title and the notice's own button collide; the header reads broken.
+  Final state: on wide viewports a graphics notice sits in the space left of the open journal and
+  never overlaps it; its z-order above the journal stays.
+  Test: Playwright layout case (journal open, notice raised) asserting the two boxes do not intersect.
+  Picture check: the notice with the journal open, BOTH backends.
+  Source: finding of the 507 session, 20.11.2026 23:00.
+  Bundle: Steuerung & Performance.
+
+- [ ] 1564. The FPS counter keeps reading 60 FPS after the GPU device is lost
+  Measured 20.11.2026 (point 507 probe, CDP Browser.crashGpuProcess, both backends): after the loss
+  three's render() returns early, the picture is black and the device-lost notice shows, yet the
+  corner counter still reads "60 FPS" — the empty-frame rate the benchmark now refuses to report.
+  Player impact: a dead picture is labelled as running smoothly.
+  Final state: while `isDeviceLost()` the counter shows that drawing stopped instead of a rate.
+  Test: Vitest (HUD counter with a simulated lost device).
+  Source: finding of the 507 session, 20.11.2026 23:00.
+  Bundle: Steuerung & Performance.
