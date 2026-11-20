@@ -5,6 +5,7 @@ import {
   ANSWERED_MARKER,
   CONFIRMATION_MARKER,
   SELF_DECIDED_MARKER,
+  USER_INPUT_ACT,
   advisoryDecisionCard,
   CONFIRMATION_ACTS,
   clearMarkers,
@@ -22,6 +23,7 @@ import {
   parseUserGates,
   prepareAdvisoryDecision,
   sanitiseReason,
+  userInputDetailError,
 } from './user-gate-core.mjs'
 
 const tasks = (...lines) => lines.join('\n')
@@ -36,7 +38,8 @@ describe('classifyConfirmationReason — the TYPED form is exact', () => {
   // to name an outward act, and each widening produced the next. A typed
   // confirmation now SELECTS its act, so no sentence can be mistaken for one.
   it.each(Object.keys(CONFIRMATION_ACTS))('recognises the composed form for act %s', (act) => {
-    const composed = formatConfirmationReason({ act, detail: 'do the concrete thing', prepared: 'nothing is out yet' })
+    const detail = act === USER_INPUT_ACT ? 'do the concrete thing, hand back: the file, where: the chat' : 'do the concrete thing'
+    const composed = formatConfirmationReason({ act, detail, prepared: 'nothing is out yet' })
     expect(composed.ok).toBe(true)
     expect(classifyConfirmationReason(composed.reason)).toMatchObject({ verdict: 'confirmation', act })
   })
@@ -472,5 +475,50 @@ describe('advisory decision record and legacy migration', () => {
     expect(migrated.text.split('\n')[0]).toBe('- [ ] 1. A SELF-DECIDED(2026-08-23; choose a colour) USER-ANSWERED(2026-08-07)')
     expect(gateSets(migrated.text).answered.has(1)).toBe(true)
     expect(migrated.text.split('\n')[2]).toBe('- [x] 3. C')
+  })
+})
+
+describe('the user-input act — the user must run, measure or hand in something', () => {
+  const detail =
+    'run the F8 detail benchmark natively on Windows Chrome WebGPU, hand back: local/f8-detail-notebook.json plus a chat note, where: the Windows checkout'
+  const prepared = 'the measuring branch is pushed and waits unchanged'
+
+  it('is a selectable act', () => {
+    expect(Object.keys(CONFIRMATION_ACTS)).toContain('user-input')
+  })
+
+  it('validates at write time that the detail names action, result and destination', () => {
+    expect(userInputDetailError(detail)).toBe('')
+    expect(userInputDetailError('run the benchmark on the notebook')).toMatch(/must read/)
+    expect(userInputDetailError('run the benchmark, where: the chat')).toMatch(/must read/)
+    expect(userInputDetailError('run the benchmark, hand back: the file')).toMatch(/must read/)
+    expect(userInputDetailError('run it, hand back: the file, where: the chat')).toMatch(/action/)
+    expect(markGated(tasks('- [ ] 1543. Hitches'), 1543, { act: 'user-input', detail: 'run the benchmark please now', prepared })).toMatchObject({ ok: false })
+  })
+
+  it('writes a gate that holds, with a reason longer than one ordinary line', () => {
+    const r = markGated(tasks('- [ ] 1543. Hitches'), 1543, { since: '2026-11-20', act: 'user-input', detail, prepared })
+    expect(r.ok).toBe(true)
+    const [gate] = parseUserGates(r.text).gated
+    expect(gate).toMatchObject({ point: 1543, since: '2026-11-20' })
+    expect(gate.reason.length).toBeGreaterThan(160)
+    expect(parseGateLine(r.text.split('\n')[0]).classification).toMatchObject({ verdict: 'confirmation', act: 'user-input' })
+  })
+
+  it('still refuses a user-input reason that would be clipped', () => {
+    const r = formatConfirmationReason({ act: 'user-input', detail: `${detail} ${'word '.repeat(60)}`, prepared })
+    expect(r.ok).toBe(false)
+  })
+
+  it('answering it only re-queues: the answer carries no act and approves nothing', () => {
+    const gated = markGated(tasks('- [ ] 1543. Hitches'), 1543, { act: 'user-input', detail, prepared }).text
+    const answered = markAnswered(gated, 1543, { at: '2026-11-21' })
+    expect(answered).toMatchObject({ ok: true, wasGated: true, wasUserInput: true })
+    const line = parseGateLine(answered.text.split('\n')[0])
+    expect(line).toMatchObject({ answered: true, gated: false, classification: null })
+    expect(gateSets(answered.text).answered.has(1543)).toBe(true)
+    // A release-tag gate answered the same way is reported as no user-input hand-in.
+    const tag = markGated(tasks('- [ ] 9. Tag'), 9, { act: 'release-tag', detail: 'push the v1 tag', prepared })
+    expect(markAnswered(tag.text, 9)).toMatchObject({ wasGated: true, wasUserInput: false })
   })
 })

@@ -32,9 +32,13 @@
 //   prose, not state. Only the legacy marker may appear without them.
 // * `AWAITING-CONFIRMATION(<since>; <act>: <what>, safe prepared state: <what
 //   stands prepared>)` is the only gate, and `<act>` is SELECTED from
-//   `CONFIRMATION_ACTS` — `release-tag`, `public-release`, `board-contract` —
-//   never described. `formatConfirmationReason` is the only way to build one and
-//   demands at least three words in each field.
+//   `CONFIRMATION_ACTS` — `release-tag`, `public-release`, `board-contract`,
+//   `user-input` — never described. `formatConfirmationReason` is the only way
+//   to build one and demands at least three words in each field. A `user-input`
+//   detail must also read `<action>, hand back: <result>, where: <place>`.
+//   ITS ANSWER IS A HAND-IN, NOT AN APPROVAL: `USER-ANSWERED` carries no act, so
+//   answering a user-input gate only re-queues the point and never stands in
+//   for a release-tag, public-release or board-contract confirmation.
 //   WHY SELECTED RATHER THAN DESCRIBED (three cross-vendor rounds,
 //   23.08.2026): reading a free sentence for "is this an outward act" is a
 //   bag-of-words guess, and each widening of the patterns produced the next
@@ -86,6 +90,13 @@ export const ANSWERED_MARKER = 'USER-ANSWERED'
 
 /** How long a recorded reason may be before it is cut (a work-order line, not an essay). */
 const REASON_MAX = 160
+/**
+ * A user-input gate names three facts (action, result, where it goes), which do
+ * not fit 160 characters; it alone gets a second line's worth.
+ */
+const USER_INPUT_REASON_MAX = 320
+/** What a reader accepts back — never less than any writer's cap. */
+const READ_MAX = 1000
 
 const MARKERS = [CONFIRMATION_MARKER, LEGACY_GATE_MARKER, SELF_DECIDED_MARKER, ANSWERED_MARKER]
 /**
@@ -125,7 +136,9 @@ const readPayload = (marker, payload) => {
   const answered = marker === ANSWERED_MARKER
   const stamp = leadingStamp(payload)
   const rest = payload.slice(stamp.length).replace(/^\s*;\s*/, '').trim()
-  return { stamp, reason: answered ? '' : sanitiseReason(rest || (stamp ? '' : payload)) }
+  // READ WITHOUT THE WRITE CAP: clipping is the writer's concern, and a reader
+  // that clipped a longer user-input reason would turn its gate advisory.
+  return { stamp, reason: answered ? '' : sanitiseReason(rest || (stamp ? '' : payload), { max: READ_MAX }) }
 }
 
 /**
@@ -258,6 +271,27 @@ export const CONFIRMATION_ACTS = {
   'release-tag': 'create, move, push or delete a version/poc/release tag',
   'public-release': 'dispatch or withdraw the public release',
   'board-contract': 'change the published four-section board contract',
+  'user-input': 'the user must run, measure or hand in something only they can',
+}
+
+/** The act whose answer is a hand-in, never an approval of any other act. */
+export const USER_INPUT_ACT = 'user-input'
+
+/**
+ * The detail a user-input gate must carry, checked at write time:
+ * `<action>, hand back: <result>, where: <place it is submitted>`.
+ */
+const USER_INPUT_DETAIL_RE = /^(.+?),?\s+hand back:\s*(.+?),?\s+where:\s*(.+)$/i
+export const USER_INPUT_DETAIL_FORM = '"<action>, hand back: <result>, where: <where to submit it>"'
+
+/** '' when a user-input detail names action, result and destination; else the defect. */
+export function userInputDetailError(detail) {
+  const m = String(detail ?? '').trim().match(USER_INPUT_DETAIL_RE)
+  if (!m) return `a user-input detail must read ${USER_INPUT_DETAIL_FORM}`
+  if (wordsIn(m[1]) < 3) return 'a user-input detail must name the action in at least three words'
+  if (wordsIn(m[2]) < 1) return 'a user-input detail must name the result to hand back'
+  if (wordsIn(m[3]) < 1) return 'a user-input detail must name where to submit the result'
+  return ''
 }
 
 /** The stored shape of a typed confirmation reason. */
@@ -286,6 +320,12 @@ export function formatConfirmationReason({ act = '', detail = '', prepared = '' 
   const [what, safe] = [clean(detail), clean(prepared)]
   if (wordsIn(what) < 3) return { ok: false, error: 'detail must name the concrete act in at least three words', reason: '' }
   if (wordsIn(safe) < 3) return { ok: false, error: 'prepared must name the safe prepared state in at least three words', reason: '' }
+  const userInput = key === USER_INPUT_ACT
+  if (userInput) {
+    const defect = userInputDetailError(what)
+    if (defect) return { ok: false, error: defect, reason: '' }
+  }
+  const max = userInput ? USER_INPUT_REASON_MAX : REASON_MAX
   // A FIELD THAT ASKS IS NOT A FIELD THAT ACTS: selecting an act key does not
   // turn "choose blue or green" into one.
   for (const [name, value] of [['detail', what], ['prepared', safe]]) {
@@ -293,14 +333,14 @@ export function formatConfirmationReason({ act = '', detail = '', prepared = '' 
       return { ok: false, error: `${name} asks a question — decide it and record SELF-DECIDED instead`, reason: '' }
     }
   }
-  const reason = sanitiseReason(`${key}: ${what}, safe prepared state: ${safe}`)
+  const reason = sanitiseReason(`${key}: ${what}, safe prepared state: ${safe}`, { max })
   const back = reason.match(STRUCTURED_RE)
   // A CLIPPED RECORD IS ALSO A REFUSAL: `sanitiseReason` marks a cut with an
   // ellipsis, and half a prepared state is not the state.
   if (reason.endsWith('…') || !back || wordsIn(back[2]) < 3 || wordsIn(back[3]) < 3) {
     return {
       ok: false,
-      error: `the composed reason does not survive one work-order line (${REASON_MAX} characters) — shorten detail or prepared`,
+      error: `the composed reason does not survive one work-order line (${max} characters) — shorten detail or prepared`,
       reason: '',
     }
   }
@@ -746,7 +786,7 @@ export function migrateLegacyGates(tasksText, { at = '' } = {}) {
 /**
  * Record the user's answer: the gate becomes `USER-ANSWERED(<when>)`, which is
  * what returns the point to the HEAD of the queue. Returns { text, ok, error,
- * wasGated }.
+ * wasGated, wasUserInput }.
  */
 export function markAnswered(tasksText, point, { at = '' } = {}) {
   const before = parseGateLine(
@@ -760,11 +800,13 @@ export function markAnswered(tasksText, point, { at = '' } = {}) {
   const stamp = leadingStamp(at)
   const marker = `${ANSWERED_MARKER}(${stamp})`
   const { text, hit } = rewriteHead(tasksText, point, (line) => `${stripMarkers(line)} ${marker}`)
-  if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order`, wasGated: false }
+  if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order`, wasGated: false, wasUserInput: false }
   if (hit === 'ticked') {
-    return { text, ok: false, error: `point ${Number(point)} is already ticked — nothing to answer`, wasGated: false }
+    return { text, ok: false, error: `point ${Number(point)} is already ticked — nothing to answer`, wasGated: false, wasUserInput: false }
   }
-  return { text, ok: true, error: '', wasGated: Boolean(before?.gated) }
+  // A user-input answer is a hand-in: reported so the CLI can say it approves nothing.
+  const wasUserInput = Boolean(before?.gated) && before?.classification?.act === USER_INPUT_ACT
+  return { text, ok: true, error: '', wasGated: Boolean(before?.gated), wasUserInput }
 }
 
 /**
