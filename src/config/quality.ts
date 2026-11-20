@@ -352,3 +352,45 @@ export function nextDetailLevel(level: DetailLevel): DetailLevel {
       return 'medium'
   }
 }
+
+/** One weak-adapter rule: an adapter string matching `pattern` (and not
+ *  `unless`) counts as weak, on a screen of at least `minDpr` when given. */
+export interface WeakAdapterRule {
+  pattern: RegExp
+  unless?: RegExp
+  minDpr?: number
+  /** Rules for an architecture-only WebGPU name also consult the probed WebGL
+   *  name, whose `unless` can only exempt a discrete card. Other rules never
+   *  read the probe, and no rule lets it trigger Low — it may name a second
+   *  GPU (hybrid machine). */
+  readsProbe?: boolean
+}
+
+/**
+ * Adapters the first start puts on LOW instead of MEDIUM (point 1562). Matched
+ * against `describeBackend().adapter`: WebGPU gives "<vendor> <architecture>"
+ * ("amd rdna-2", "intel gen-8"), WebGL 2 the unmasked renderer string.
+ * CALIBRATABLE — educated guesses from the user's two weak notebooks (AMD
+ * RDNA-2 iGPU at dpr 1.75: Medium ~30 fps, Low ~55 fps; Intel Gen-8: 5 fps in
+ * Cairo on Medium). Software renderers stay out on purpose: the browser suites
+ * run on them and assert the Medium default.
+ */
+export const WEAK_ADAPTER_RULES: readonly WeakAdapterRule[] = [
+  // Intel integrated graphics; Arc (xe-hpg) is a discrete card.
+  { pattern: /\bintel\b/i, unless: /\barc\b|xe-hpg/i },
+  // AMD APU strings as WebGL names them ("AMD Radeon(TM) Graphics",
+  // "Radeon(TM) Vega 8 Graphics"); a discrete "RX Vega 64" carries no "Graphics".
+  { pattern: /radeon(\(tm\))? graphics|\bvega \d+ graphics/i },
+  // WebGPU names only the AMD architecture, shared by iGPUs and desktop cards.
+  // The WebGL name probed beside it (startProbeName) exempts a discrete
+  // RX/Pro card; without one, a high-dpr screen marks the notebook/handheld.
+  // OPEN: with no probed name a discrete RDNA-2 card on a dpr >= 1.25 screen
+  // still starts at Low, and an APU on a dpr-1 screen stays at Medium —
+  // GPUAdapterInfo carries no iGPU/dGPU signal.
+  {
+    pattern: /\bamd (rdna-[12]|gcn-\d)\b/i,
+    readsProbe: true,
+    unless: /radeon(\(tm\))? (rx|pro)\b/i,
+    minDpr: 1.25,
+  },
+]
