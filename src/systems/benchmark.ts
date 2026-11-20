@@ -217,6 +217,12 @@ export function benchTrisStable(history: readonly number[], stableFrames: number
  *  holds flat at a half-built value (WebGL 2 first Cairo entry: 6031 triangles
  *  against ~254k). So stability only counts frames drawn with a warm pipeline
  *  set — a cold frame clears the history. Pure (point 1561). */
+/** Whether a readiness frame counts: the outgoing travel scene is gone and
+ *  no pipeline is pending or queued (absent handle = synchronous compile). */
+export function benchFrameReady(travelMounted: boolean, pipelines: { pending: number; queued: number } | null): boolean {
+  return !travelMounted && (!pipelines || (pipelines.pending === 0 && pipelines.queued === 0))
+}
+
 export function benchReadinessPush(history: number[], triangles: number, pipelinesWarm: boolean): number[] {
   if (!pipelinesWarm) return []
   history.push(triangles)

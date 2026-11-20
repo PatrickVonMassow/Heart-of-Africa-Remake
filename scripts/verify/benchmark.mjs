@@ -314,14 +314,15 @@ for (const config of ['terrain-refine-off', 'terrain-cap-84']) {
 // dpr-1's Cairo row, and TravelScene's remount rewrites the refine setting —
 // its FIRST phase, savanna-standing, must already show the cut.
 const savannaRow = (config) => report.rows.find((r) => r.config === config && r.phase === 'savanna-standing')
-// Both rows must carry the terrain group: a missing or renamed group reads 0
-// and would pass as a cut.
-const hasTerrain = (row) => typeof row?.sceneTriangles?.[heaviest?.[0]]?.tris === 'number'
+// Both rows must carry the terrain group: a missing or renamed group would
+// otherwise pass as a cut.
+// The group is named, not inferred from the largest one.
+const savannaTerrain = (row) => row?.sceneTriangles?.['travel-terrain']?.tris
+const [savBase, savCut] = [savannaTerrain(savannaRow('baseline')), savannaTerrain(savannaRow('terrain-refine-off'))]
 check(
   'terrain-refine-off also cuts the savanna terrain right after the settlement',
-  hasTerrain(savannaRow('baseline')) && hasTerrain(savannaRow('terrain-refine-off')) &&
-    terrainTris(savannaRow('baseline')) - terrainTris(savannaRow('terrain-refine-off')) > 0,
-  `${terrainTris(savannaRow('baseline'))} -> ${terrainTris(savannaRow('terrain-refine-off'))} (${heaviest?.[0]})`,
+  typeof savBase === 'number' && typeof savCut === 'number' && savBase - savCut > 0,
+  `${savBase} -> ${savCut} (travel-terrain)`,
 )
 
 check(

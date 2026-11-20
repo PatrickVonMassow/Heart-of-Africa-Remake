@@ -48,6 +48,7 @@ import {
   PRESET_CONFIG_NAMES,
   benchFilename,
   benchFrameCounts,
+  benchFrameReady,
   benchReadinessPush,
   benchReadyBudget,
   benchRemainingMs,
@@ -537,8 +538,8 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
             const p = pipelines?.state()
             // A frame counts only once the outgoing travel scene is gone and the
             // settlement's pipelines are warm.
-            const swapped = sceneNodes.getObjectByName('travel-terrain') === undefined
-            tris = benchReadinessPush(tris, renderInfo().triangles ?? 0, swapped && (!p || (p.pending === 0 && p.queued === 0)))
+            const travelMounted = sceneNodes.getObjectByName('travel-terrain') !== undefined
+            tris = benchReadinessPush(tris, renderInfo().triangles ?? 0, benchFrameReady(travelMounted, p ?? null))
             ready = benchTrisStable(tris, budget.stableFrames, budget.tolerance)
           },
           () => ready,

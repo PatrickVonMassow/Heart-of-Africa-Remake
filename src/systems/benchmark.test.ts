@@ -24,6 +24,7 @@ import {
   benchFrameCounts,
   benchReadyBudget,
   benchTrisStable,
+  benchFrameReady,
   benchReadinessPush,
   benchRemainingMs,
   benchReportJson,
@@ -661,6 +662,20 @@ describe('settlement readiness and the later-entry path (point 1561)', () => {
     for (let i = 1; i < stableFrames; i++) h = benchReadinessPush(h, 254000, true)
     expect(benchTrisStable(h, stableFrames, tolerance)).toBe(true)
     expect(benchReadinessPush(h, 254000, false)).toEqual([])
+  })
+
+  it('counts no readiness frame while the outgoing travel scene is still mounted', () => {
+    const { stableFrames, tolerance } = benchReadyBudget(true)
+    const idle = { pending: 0, queued: 0 }
+    let h: number[] = []
+    // Stable travel triangles with idle pipelines must not open the gate.
+    for (let i = 0; i < stableFrames * 3; i++) h = benchReadinessPush(h, 1668873, benchFrameReady(true, idle))
+    expect(benchTrisStable(h, stableFrames, tolerance)).toBe(false)
+    for (let i = 0; i < stableFrames; i++) h = benchReadinessPush(h, 718139, benchFrameReady(false, idle))
+    expect(benchTrisStable(h, stableFrames, tolerance)).toBe(true)
+    expect(benchFrameReady(false, { pending: 1, queued: 0 })).toBe(false)
+    expect(benchFrameReady(false, { pending: 0, queued: 2 })).toBe(false)
+    expect(benchFrameReady(false, null)).toBe(true)
   })
 
   it('caps the readiness wait, the short run tighter than the full one', () => {
