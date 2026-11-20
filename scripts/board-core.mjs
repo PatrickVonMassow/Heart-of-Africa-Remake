@@ -684,7 +684,7 @@ const SLOT_TAIL_RE = /^(?:<span class="slots">[^<]*<\/span>)?<\/summary>/
  * heading, in ANY amount (eighth cross-review): a 32-character lookback cap
  * rejected a legitimately deep indent, and formatting depth is not damage.
  */
-function sectionBounds(html, key) {
+export function sectionBounds(html, key) {
   const head = HEAD[key]
   const text = String(html ?? '')
   // The heading may carry the derived slot line below its <h2> (board-slots-core).
