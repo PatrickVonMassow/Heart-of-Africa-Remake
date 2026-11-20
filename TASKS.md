@@ -130,6 +130,16 @@ put it is the mistake this line exists to stop.
   back: local/f8-detail-notebook.json plus a chat note, where: the Windows checkout" --prepared "the branch is
   pushed, steps in docs/perf-1543-driving-hitches.md" followed by node scripts/board-queue.mjs. Also owed on main:
   the WebGL enrichments run for the desert-haze render change (section calf-predation-drama re-ran green 01:45).
+  HAND-OVER 20.11.2026 02:23: full unit suite green locally on 0ba72c2 (19627). Review of 0ba72c2 (3 passes,
+  GPT-6.2 Sol) answered in 1f4545f; its confirming pass is do-not-merge, still owed: (1) a gated current-work
+  point now has two owning cards (now card + derived) — drop it from the now card or keep the gate card only
+  outside now, with a rebuilt-board test; (2) the question check strips from the first `where:` — judge the
+  action and hand-back fields as parsed by userInputDetailError instead; (3) a where: holding DEFERRED (or any
+  status token) breaks the gate — refuse status tokens in the detail; (4) the malformed fallback must apply the
+  last-marker rule (gate then USER-ANSWERED is fine) and must not be silenced by skip; (5) delete a manual
+  card of an answered point only in the one-off transition, not on every rebuild (e.g. only when its title
+  matches the old manual gate-card form, or drop the answered sweep and say so); (6) doc: the advisory needs an
+  in-flight focus; test focus-vs-secondary selection and ampersand/paragraph escaping.
 
 - [ ] 1543. Smooth the CPU hitches while driving on medium and high
   Observed: The user's notebook benchmark shows CPU p95 of 41 ms (medium) and 52 ms (high) during the drive against medians of 9-12 ms: periodic hitches that the player feels as stutter even when the GPU average would be fine. The user requires medium to be clearly smoother on mid-range notebooks.
