@@ -190,7 +190,8 @@ describe('template-function callability (de and en behave alike)', () => {
     // with them). A drift here means a template was added/removed and this
     // suite should follow. Minus the one the murmured pointer at the knowing
     // people took with it on 07.09.2026, and the two obsolete chief hint templates.
-    expect(FUNCTION_PATHS.length).toBe(69)
+    // Plus the point-507 invalid-benchmark note.
+    expect(FUNCTION_PATHS.length).toBe(70)
   })
 
   it.each(FUNCTION_PATHS)('%s: renders in both languages (or throws in both)', (path) => {

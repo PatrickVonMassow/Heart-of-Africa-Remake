@@ -93,6 +93,7 @@ export const NON_RENDER_VERIFY = new Set([
   'baseline-classify-core.mjs',
   'baseline-classify.mjs',
   'carriedJar.mjs', // the carried-jar projection and pixel verdict; polish-villagers.mjs hands it its page
+  'device-loss-core.mjs', // the device-loss FAIL rule _browser.mjs arms on every suite page; drives no browser itself
   'childMotionMetric.mjs', // the children's shuffle/rescue verdict over a recorded trace; the polish-* suites and the replay test record it
   'colliderProbe.mjs', // the collider geometry the suites read with; collision.mjs and the polish-* suites hand it their page
   'communicationAudio.mjs', // PCM analysis and WAV encoding; no browser
