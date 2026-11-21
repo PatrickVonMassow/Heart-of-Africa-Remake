@@ -451,6 +451,13 @@ describe('place-to-place hop', () => {
     expect(r.evaluation!.detail).toMatch(/one hop left its pipelines behind/)
   })
 
+  it('passes the measured hop from a small port city into a full village', () => {
+    const s = judgePlaceHop(PLACE_HOP_START, at('giza', 60, 40)).state
+    const r = judgePlaceHop(s, at('bambara-village', 60, 103))
+    expect(r.evaluation!.verdict).toBe('ok')
+    expect(r.evaluation!.delta.pipelines).toBe(63)
+  })
+
   it('fails soft on an unreadable counter', () => {
     const s = judgePlaceHop(PLACE_HOP_START, at('a', null, null)).state
     const r = judgePlaceHop(s, at('b', 500, 900))

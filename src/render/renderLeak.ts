@@ -148,14 +148,17 @@ export function judgePipelineReturn(
  *  from one settled settlement to the next one entered without travel between:
  *  - step: one hop. Two villages legitimately differ (fires, materials, the
  *    figures' morph textures), and the first settled reading can land while a
- *    place still builds, so the step is generous.
+ *    place still builds, so the step is generous. Measured 21.11.2026 (seed 42,
+ *    WebGPU, fresh boot): bambara-village settles at 103-104 pipelines whether
+ *    entered after zulu-village (78) or after giza (40), so the small port city
+ *    before it makes a legitimate +63 hop; 72 leaves that margin.
  *  - total: the net growth summed over the hops, floored at zero, so village
  *    differences cancel while a steady leak (~7 textures per village, owner
  *    measurement 21.11.2026) trips within about seven villages. */
 export type PlaceHopBounds = { pipelines: PipelineReturnBounds; textures: PipelineReturnBounds }
 
 export const PLACE_HOP_BOUNDS: PlaceHopBounds = {
-  pipelines: { step: 48, total: 120 },
+  pipelines: { step: 72, total: 120 },
   textures: { step: 24, total: 48 },
 }
 

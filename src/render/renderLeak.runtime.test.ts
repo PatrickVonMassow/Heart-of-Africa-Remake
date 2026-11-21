@@ -125,14 +125,14 @@ describe('render leak watch, live', () => {
     h.go('place', 'a')
     h.tick()
     h.go('place', 'b')
-    h.gl._pipelines!.caches.size += 60 // the hop left its pipelines behind
+    h.gl._pipelines!.caches.size += 90 // the hop left its pipelines behind
     // render targets stand; the textures stream for the whole watch
     h.tick(700, () => {
       h.gl.info.memory.textures++
     })
     const hops = h.state().placeHop.history as Array<{ delta: { textures: number | null; pipelines: number | null } }>
     expect(hops).toHaveLength(1)
-    expect(hops[0].delta).toEqual({ textures: null, pipelines: 60 })
+    expect(hops[0].delta).toEqual({ textures: null, pipelines: 90 })
     expect(h.asserts()).toContain('render-place-hop-leak')
   })
 
@@ -141,7 +141,7 @@ describe('render leak watch, live', () => {
     h.go('place', 'a')
     h.tick()
     h.go('place', 'b')
-    h.gl._pipelines!.caches.size += 60 // the hop left its pipelines behind
+    h.gl._pipelines!.caches.size += 90 // the hop left its pipelines behind
     // render targets stand at once; textures stream until the player leaves at frame 80
     h.tick(80, () => {
       h.gl.info.memory.textures++
@@ -149,7 +149,7 @@ describe('render leak watch, live', () => {
     h.go('place', 'c')
     h.tick()
     const hops = h.state().placeHop.history as Array<{ from: string; to: string; delta: { textures: number | null; pipelines: number | null } }>
-    expect(hops[0]).toMatchObject({ from: 'a', to: 'b', delta: { textures: null, pipelines: 60 } })
+    expect(hops[0]).toMatchObject({ from: 'a', to: 'b', delta: { textures: null, pipelines: 90 } })
     expect(h.asserts()).toContain('render-place-hop-leak')
   })
 
@@ -181,7 +181,7 @@ describe('render leak watch, live', () => {
     h.tick()
     h.go('travel')
     h.go('place', 'a') // no frame in between: the bird's-eye view never settles
-    h.gl._pipelines!.caches.size += 60
+    h.gl._pipelines!.caches.size += 90
     h.tick()
     expect(h.state().placeHop.history).toHaveLength(1)
     expect(h.asserts()).toContain('render-place-hop-leak')
