@@ -468,19 +468,34 @@ export interface Watch {
   frames: number
   stable: number
   last: number | null
+  /** Repeats of the texture reading, after the first. */
+  texStable: number
+  texLast: number | null
+  /** The render-target half has settled and been judged; the watch now waits
+   *  only for the texture count to settle for the return and hop judgements. */
+  targetsSettled: boolean
 }
 
 /** A fresh settle watch for a signature. */
 export function newWatch(signature: string): Watch {
-  return { signature, frames: 0, stable: 0, last: null }
+  return { signature, frames: 0, stable: 0, last: null, texStable: 0, texLast: null, targetsSettled: false }
 }
 
 export interface StepResult {
   /** The watch to carry into the next frame; null once it is finished. */
   watch: Watch | null
-  /** Set when the reading settled and may be judged. */
+  /** Set when the render-target count settled: the reading the strict
+   *  same-signature judgement (evaluateReading) takes. */
   settled?: LeakCounts
-  /** Set when the watch gave up — judge nothing (fail-soft on a stalled page). */
+  /** Set once the TEXTURE count has settled too (at the same frame or later):
+   *  the reading the return and hop judgements take. They compare textures
+   *  across states, and a place's textures can still climb while its render
+   *  targets stand (Cairo's first settled reading sat 19 textures under its
+   *  steady state, probe 07.08.2026) — read there, a hop out of a still-building
+   *  place against a built one spends most of the hop bound on the build. */
+  texturesSettled?: LeakCounts
+  /** Set when the watch gave up — judge nothing more (fail-soft on a stalled
+   *  page); a watch whose render targets had settled has been judged already. */
   unsettled?: true
 }
 
@@ -495,20 +510,27 @@ export function stepWatch(
   policy: SettlePolicy = SETTLE_POLICY,
 ): StepResult {
   const frames = w.frames + 1
-  let stable = w.stable
-  let last = w.last
+  let { stable, last, texStable, texLast } = w
   if (counts) {
     if (counts.renderTargets === last) stable++
     else {
       stable = 0
       last = counts.renderTargets
     }
-    if (frames >= policy.minFrames && stable >= policy.stableFrames) {
-      return { watch: null, settled: counts }
+    if (counts.textures === texLast) texStable++
+    else {
+      texStable = 0
+      texLast = counts.textures
     }
+    const texturesSettled = texStable >= policy.stableFrames ? counts : undefined
+    if (!w.targetsSettled && frames >= policy.minFrames && stable >= policy.stableFrames) {
+      if (texturesSettled) return { watch: null, settled: counts, texturesSettled }
+      return { watch: { signature: w.signature, frames, stable, last, texStable, texLast, targetsSettled: true }, settled: counts }
+    }
+    if (w.targetsSettled && texturesSettled) return { watch: null, texturesSettled }
   }
   if (frames >= policy.maxFrames) return { watch: null, unsettled: true }
-  return { watch: { signature: w.signature, frames, stable, last } }
+  return { watch: { signature: w.signature, frames, stable, last, texStable, texLast, targetsSettled: w.targetsSettled } }
 }
 
 let baselines: Baselines = {}
@@ -522,7 +544,7 @@ let forced: THREE.RenderTarget[] = []
 /** The counters read when the player last left the bird's-eye view for a
  *  place; null while no return is pending. Either counter may be unreadable
  *  (null) without cancelling the other's judgement. */
-let pendingVisit: { pipelines: number | null; textures: number | null } | null = null
+let pendingVisit: { signature: string; pipelines: number | null; textures: number | null } | null = null
 let lastMode: string | null = null
 let pipelineState: PipelineReturnState = PIPELINE_RETURN_START
 let pipelineHistory: PipelineReturnEvaluation[] = []
@@ -539,14 +561,19 @@ function readPipelines(): number | null {
   return typeof size === 'number' ? size : null
 }
 
-/** A settled bird's-eye reading closes a pending place visit. */
-function judgePendingReturn(signature: string): void {
+/** A settled bird's-eye reading closes a pending place visit — compared only
+ *  like for like: a return under another bird's-eye signature than the one
+ *  left (a graphics setting changed during the visit) holds a different
+ *  resident set, so the visit is dropped unjudged. */
+function judgePendingReturn(signature: string, counts: LeakCounts): void {
   if (pendingVisit === null || !signature.startsWith('travel|')) return
-  const back = readPipelines()
-  const { pipelines: entry, textures: texEntry } = pendingVisit
+  const visit = pendingVisit
   pendingVisit = null
-  const texBack = readCounts()?.textures ?? null
-  if (texBack !== null && texEntry !== null) {
+  if (visit.signature !== signature) return
+  const back = readPipelines()
+  const { pipelines: entry, textures: texEntry } = visit
+  const texBack = counts.textures
+  if (texEntry !== null) {
     const t = judgePipelineReturn(textureState, texEntry, texBack, TEXTURE_RETURN_BOUNDS, 'textures')
     textureState = t.state
     textureHistory.push(t.evaluation)
@@ -563,7 +590,7 @@ function judgePendingReturn(signature: string): void {
 
 /** A settled reading feeds the place-to-place hop chain: a settlement reading
  *  is judged against the previous settlement's, a bird's-eye one ends the chain. */
-function judgeHop(signature: string): void {
+function judgeHop(signature: string, counts: LeakCounts): void {
   if (signature.startsWith('travel|')) {
     // A chain ends here, and its growth with it: the return judgement owns
     // what a visit leaves behind in the bird's-eye view.
@@ -575,7 +602,7 @@ function judgeHop(signature: string): void {
   const { evaluation, state } = judgePlaceHop(hopState, {
     placeId,
     pipelines: readPipelines(),
-    textures: readCounts()?.textures ?? null,
+    textures: counts.textures,
   })
   hopState = state
   if (!evaluation) return
@@ -599,12 +626,13 @@ function push(entry: HistoryEntry): void {
   }
 }
 
-/** Current render signature, read from the live stores. */
-export function currentRenderSignature(): string {
+/** Current render signature, read from the live stores; `mode` overrides the
+ *  store's (the bird's-eye signature being left, read at the store change). */
+export function currentRenderSignature(mode?: string): string {
   const g = useGame.getState()
   const u = useUi.getState()
   return renderSignature({
-    mode: g.mode,
+    mode: mode ?? g.mode,
     placeId: g.placeId,
     detailLevel: u.detailLevel,
     traa: effectiveTraa(u),
@@ -638,22 +666,26 @@ function settleStep(): void {
     // (console.error + window.__assertLog), so every headless suite's
     // console-error gate fails on it and every manual session shows it.
     devAssert(evaluation.verdict !== 'leak', 'render-resource-leak', () => evaluation.detail)
-    judgePendingReturn(w.signature)
-    judgeHop(w.signature)
-    return
+  }
+  if (step.texturesSettled) {
+    judgePendingReturn(w.signature, step.texturesSettled)
+    judgeHop(w.signature, step.texturesSettled)
   }
   if (step.unsettled) {
     push({
       signature: w.signature,
       outcome: 'unsettled',
       counts: counts ?? undefined,
-      detail: counts
-        ? `no settled reading within ${SETTLE_POLICY.maxFrames} frames (last ${counts.renderTargets} render targets)`
-        : `no renderer within ${SETTLE_POLICY.maxFrames} frames`,
+      detail: w.targetsSettled
+        ? `textures did not settle within ${SETTLE_POLICY.maxFrames} frames: return and hop not judged`
+        : counts
+          ? `no settled reading within ${SETTLE_POLICY.maxFrames} frames (last ${counts.renderTargets} render targets)`
+          : `no renderer within ${SETTLE_POLICY.maxFrames} frames`,
       frames,
     })
     return
   }
+  if (!step.watch) return
   schedule()
 }
 
@@ -682,7 +714,11 @@ function onStateChange(): void {
   // Read at the store change itself, before React unmounts the bird's-eye view.
   const mode = useGame.getState().mode
   if (lastMode === 'travel' && mode === 'place' && pendingVisit === null) {
-    pendingVisit = { pipelines: readPipelines(), textures: readCounts()?.textures ?? null }
+    pendingVisit = {
+      signature: currentRenderSignature('travel'),
+      pipelines: readPipelines(),
+      textures: readCounts()?.textures ?? null,
+    }
   }
   lastMode = mode
   const sig = currentRenderSignature()

@@ -236,12 +236,14 @@ describe('stepWatch', () => {
   /** Run the watch over a fixed reading sequence. */
   const run = (readings: Array<LeakCounts | null>) => {
     let w = newWatch('sig')
+    let settled: LeakCounts | undefined
     for (const r of readings) {
       const step = stepWatch(w, r, policy)
-      if (!step.watch) return step
+      settled ??= step.settled
+      if (!step.watch) return { ...step, settled }
       w = step.watch
     }
-    return { watch: w }
+    return { watch: w, settled }
   }
 
   it('waits the minimum frames even when the count never moves', () => {
@@ -267,6 +269,22 @@ describe('stepWatch', () => {
     let t = 300
     const readings = Array.from({ length: policy.minFrames + policy.stableFrames }, () => counts(44, (t += 7)))
     expect(run(readings).settled?.renderTargets).toBe(44)
+  })
+
+  it('reports the texture-settled reading only once the texture count repeats too', () => {
+    // The return and hop judgements compare textures across states, so they
+    // wait past the render-target settle while a place's textures still climb.
+    let t = 300
+    const climbing = Array.from({ length: policy.minFrames + 10 }, () => counts(44, (t += 1)))
+    const steady = Array.from({ length: policy.stableFrames + 1 }, () => counts(44, t))
+    const end = run([...climbing, ...steady])
+    expect(end.settled).toEqual(counts(44, 300 + policy.minFrames))
+    expect(end.texturesSettled).toEqual(counts(44, t))
+    expect(run(climbing).texturesSettled).toBeUndefined()
+    // steady from the start: both on the same frame
+    const both = run(Array.from({ length: policy.minFrames }, () => counts(44, 300)))
+    expect(both.settled).toEqual(counts(44, 300))
+    expect(both.texturesSettled).toEqual(counts(44, 300))
   })
 
   it('gives up without judging when the count never settles', () => {

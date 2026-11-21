@@ -22,8 +22,9 @@ async function harness() {
   setRenderContext({ gl, scene: null, camera: null, clock: null } as never)
   useGame.setState({ mode: 'travel', placeId: null })
   leak.armRenderLeakWatch()
-  const tick = (n = 40) => {
+  const tick = (n = 80, each?: () => void) => {
     for (let i = 0; i < n; i++) {
+      each?.()
       const due = frames
       frames = []
       for (const cb of due) cb(0)
@@ -78,5 +79,44 @@ describe('render leak watch, live', () => {
     h.tick()
     expect(h.state().textureReturn.history).toHaveLength(1)
     expect(h.asserts()).toContain('render-texture-return-leak')
+  })
+
+  it('compares a return only with an entry under the same bird\'s-eye signature', async () => {
+    const h = await harness()
+    const level = h.useUi.getState().detailLevel
+    h.go('place', 'a')
+    h.tick()
+    h.useUi.getState().setDetailLevel(level === 'high' ? 'low' : 'high') // a graphics change mid-visit
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75 + 30 // a different resident set, legitimately
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(0)
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+    // the next visit under one signature is judged again
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 105 + 30
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(1)
+    expect(h.asserts()).toContain('render-texture-return-leak')
+  })
+
+  it('judges a hop on the texture count once it has settled, not while the place still builds', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.gl.info.memory.textures = 60
+    // render targets stand still at once; the place's textures climb for 40 frames
+    h.tick(100, () => {
+      if (h.gl.info.memory.textures < 100) h.gl.info.memory.textures++
+    })
+    h.go('place', 'b')
+    h.gl.info.memory.textures = 110
+    h.tick()
+    const hops = h.state().placeHop.history as Array<{ delta: { textures: number } }>
+    expect(hops).toHaveLength(1)
+    expect(hops[0].delta.textures).toBe(10)
+    expect(h.asserts()).not.toContain('render-place-hop-leak')
   })
 })
