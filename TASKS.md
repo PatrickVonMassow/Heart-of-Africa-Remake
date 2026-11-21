@@ -5312,3 +5312,11 @@ put it is the mistake this line exists to stop.
   Observed problem: on feat/1447 (pipelines already bounded at ~70-90), `polish-villagers --section=villager-dress`, WebGPU, 21.11.2026 11:31-11:35 UTC, 9 villages after a fresh page (`gpu-load` and `texture-census` rows): renderer-tracked textures 55 -> 115, JS heap 374 -> 993 MB; the DEV texture census (`src/render/renderLeak.ts`) attributes the texture growth to morph `DataArrayTexture` 4096x4x6 and 4096x5x6 (three's `nodes/accessors/Morph.js`, freed only on its geometry's `dispose`), +5..+12 per village, never falling. Plain place hops without the dress checks did NOT grow (10 villages, worktree probe of 1447): suspect the dress section's per-village lineup (`__dressLineup`, `dressLineup.tsx`, `stageRow`) — geometry not released by `skinnedFigure.tsx` or not recorded by `PlaceReleaseTracker.attach`. Repro (~6 min): `DRESS_PEOPLES=zulu,pedi,san,wayeyi,bemba,lunda,bambundu,maasai DRESS_COST=zulu npm test -- polish-villagers --section=villager-dress`.
   Source: split from point 1447, 21.11.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 1447, 285.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1569. Board-claim guard and request-drain gate deadlock each other
+  Final state: with the idle card standing and pending user requests, the session can drain the requests (TASKS append, commit) without a hand edit of .batch-dashboard.html; either the board-claim guard lets the drain mutations through or `board.mjs now <N>` no longer requires the drain first.
+  Observed problem: 21.11.2026 13:52, session 6baf3b27: with the idle card standing and two pending user requests naming 1447, `board.mjs now <N>` refused (requests must be drained first) while the board-claim PreToolUse guard refused every Bash mutation needed to drain them (TASKS append). Escaped only by editing .batch-dashboard.html with the Edit tool.
+  Spec: Switch off whichever of the two refusals is redundant in that state (CLAUDE.md §2 infrastructure freeze: switch off an obstructing rule, do not rebuild it).
+  Test: Vitest case reproducing the state (idle card + pending request): the drain mutation is allowed.
+  Source: agent finding of 21.11.2026 13:16 UTC via the findings carrier (session unknown); real blockade (CLAUDE.md §2).
+  Bundle: Session- & Repo-Hygiene.
