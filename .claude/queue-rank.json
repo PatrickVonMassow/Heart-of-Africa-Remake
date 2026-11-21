@@ -856,6 +856,12 @@
       "why": "guard deadlock with a known escape (hand edit of the board); tail of the hygiene bundle is right",
       "origin": "machine",
       "place": "last"
+    },
+    "1570": {
+      "at": "2026-11-21T22:59:29.377Z",
+      "why": "WebGL-2-only residual of 1447; CLAUDE.md 7.2 lets WebGL-2-only defects wait, WebGPU meets the bound",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -866,7 +872,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-21T15:33:55.170Z",
+    "at": "2026-11-21T22:59:29.381Z",
     "points": [
       184,
       200,
@@ -1057,7 +1063,8 @@
       1565,
       1566,
       1568,
-      1569
+      1569,
+      1570
     ]
   }
 }
