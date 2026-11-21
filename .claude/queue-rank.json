@@ -838,6 +838,12 @@
       "why": "re-measure first on a quiet machine; no player-blocking urgency ahead of the bundle front",
       "origin": "machine",
       "place": "last"
+    },
+    "1566": {
+      "at": "2026-11-21T11:52:52.680Z",
+      "why": "continues the leak hunt right after 1447 lands; nothing ahead of it depends on it",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -848,7 +854,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-21T03:20:45.069Z",
+    "at": "2026-11-21T11:52:52.684Z",
     "points": [
       184,
       200,
@@ -1036,7 +1042,8 @@
       1553,
       1563,
       1564,
-      1565
+      1565,
+      1566
     ]
   }
 }
