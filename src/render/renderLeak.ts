@@ -210,7 +210,10 @@ export function judgePlaceHop(
   const hops = state.hops + 1
   let counter: 'pipelines' | 'textures' | undefined
   let why = ''
-  for (const c of ['textures', 'pipelines'] as const) {
+  // Only the pipelines leg judges (point 1447). The textures leg is reported in
+  // the detail but does not trip: the figures' morph textures still grow in the
+  // villager-dress chain, which point 1566 owns; it re-arms this leg.
+  for (const c of ['pipelines'] as const) {
     const d = delta[c]
     if (d === null || counter) continue
     if (d > bounds[c].step) {

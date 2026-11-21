@@ -400,20 +400,31 @@ describe('place-to-place hop', () => {
     expect(r.state.last).toEqual(at('a', 64))
   })
 
-  it('reproduces the measured ~7 textures per village hop as a leak within about seven villages', () => {
+  it('reports the measured ~7 textures per village hop without tripping: that leg belongs to point 1566', () => {
     let state = judgePlaceHop(PLACE_HOP_START, at('v0', 57)).state
-    const verdicts: string[] = []
     for (let i = 1; i <= 8; i++) {
       const r = judgePlaceHop(state, at(`v${i}`, 57 + 7 * i))
       state = r.state
+      expect(r.evaluation!.verdict).toBe('ok')
+      expect(r.evaluation!.detail).toMatch(/textures \d+ -> \d+ \(\+7/)
+    }
+    expect(state.growth.textures).toBe(56)
+  })
+
+  it('reproduces the measured ~40 pipelines per village hop as a leak within a few villages', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, at('v0', 60, 64)).state
+    const verdicts: string[] = []
+    for (let i = 1; i <= 5; i++) {
+      const r = judgePlaceHop(state, at(`v${i}`, 60, 64 + 40 * i))
+      state = r.state
       verdicts.push(r.evaluation!.verdict)
       if (r.evaluation!.verdict === 'leak') {
-        expect(r.evaluation!.counter).toBe('textures')
+        expect(r.evaluation!.counter).toBe('pipelines')
         expect(r.evaluation!.detail).toMatch(/grow with the villages visited/)
       }
     }
-    expect(verdicts.slice(0, 6)).toEqual(Array(6).fill('ok'))
-    expect(verdicts[6]).toBe('leak')
+    expect(verdicts.slice(0, 3)).toEqual(Array(3).fill('ok'))
+    expect(verdicts[3]).toBe('leak')
   })
 
   it('lets village differences cancel, flooring the net growth at zero', () => {
