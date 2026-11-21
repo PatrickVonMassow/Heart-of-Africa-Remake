@@ -2124,7 +2124,10 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   devAssert(
     wayOut !== null,
     'way-out-missing',
-    () => `${place.id}: the built fabric leaves no crossing of the boundary free`,
+    // Says what the picker measured: a null means no corridor of the full way-out
+    // width off the bank, not that a walker cannot get out (work-order 1144 found
+    // narrower gaps walkable in every layout it flood-filled).
+    () => `${place.id}@${seed}: no bearing off the bank keeps a ${2 * WAY_OUT_HALF_WIDTH} m corridor through the boundary band; narrower gaps are not measured here`,
   )
 
   const flora: PlaceLayout['flora'] = []
