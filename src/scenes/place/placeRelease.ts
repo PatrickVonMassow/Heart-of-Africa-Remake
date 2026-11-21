@@ -118,7 +118,16 @@ function addDrawable(d: Drawable, into: ReleaseSet): void {
   } else if (m?.isMaterial) {
     addMaterial(m, into)
   }
-  if (d.geometry?.isBufferGeometry) into.geometries.add(d.geometry)
+  if (d.geometry?.isBufferGeometry && !interleaved(d.geometry)) into.geometries.add(d.geometry)
+}
+
+/** An interleaved geometry stays with its owner (review 21.11.2026): r185's
+ *  WebGPU attribute destroy frees the shared InterleavedBuffer's GPU buffer but
+ *  drops only the attribute view's entry, so the next draw of a shared glTF
+ *  geometry would reuse the destroyed buffer and draw nothing. */
+function interleaved(g: THREE.BufferGeometry): boolean {
+  const views = [...Object.values(g.attributes), ...Object.values(g.morphAttributes).flat()]
+  return views.some((a) => (a as { isInterleavedBufferAttribute?: boolean }).isInterleavedBufferAttribute === true)
 }
 
 /** Add every material, geometry and bound texture drawn under `root` to `into`. */

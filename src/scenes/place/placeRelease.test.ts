@@ -175,20 +175,48 @@ describe('PlaceReleaseTracker on the renderer draw path', () => {
     expect(passing.n()).toBe(1)
   })
 
-  it('drops a released geometry from the renderer bookkeeping so a later leave frees it again', () => {
+  it('frees a shared geometry on every leave, not only the first (r185 geometry bookkeeping)', () => {
     const s = scene()
     const { gl, objects } = renderer()
-    const deleted: unknown[] = []
-    const withGeometries = { ...gl, _geometries: { delete: (o: unknown) => deleted.push(o) } }
-    const tracker = new PlaceReleaseTracker(() => s.root)
-    const detach = tracker.attach(withGeometries)
-    tracker.frame()
+    // Faithful to three r185 Geometries: a draw adds the dispose listener only
+    // while the geometry's entry is not marked initialized; dispose leaves it marked.
+    const data = new Map<object, { initialized: boolean }>()
+    let frees = 0
+    const draw = (g: THREE.BufferGeometry) => {
+      if (data.get(g)?.initialized) return
+      data.set(g, { initialized: true })
+      const onDispose = () => {
+        frees++
+        g.removeEventListener('dispose', onDispose)
+      }
+      g.addEventListener('dispose', onDispose)
+    }
+    const withGeometries = { ...gl, _geometries: { delete: (o: object) => data.delete(o) } }
+    const geo = new THREE.BufferGeometry() // a cached asset both visits draw
+    for (let visit = 1; visit <= 2; visit++) {
+      const tracker = new PlaceReleaseTracker(() => s.root)
+      const detach = tracker.attach(withGeometries)
+      tracker.frame()
+      const mesh = new THREE.Mesh(geo, s.mats[0].o)
+      objects.get(mesh, mesh.material, s.root, null)
+      draw(geo)
+      detach()
+      tracker.leave()
+      expect(frees).toBe(visit)
+    }
+  })
+
+  it('leaves an interleaved geometry to its owner', () => {
+    const buffer = new THREE.InterleavedBuffer(new Float32Array(12), 6)
     const geo = new THREE.BufferGeometry()
-    const mesh = new THREE.Mesh(geo, s.mats[0].o)
-    objects.get(mesh, mesh.material, s.root, null)
-    detach()
-    tracker.leave()
-    expect(deleted).toContain(geo)
+    geo.setAttribute('position', new THREE.InterleavedBufferAttribute(buffer, 3, 0))
+    geo.setAttribute('normal', new THREE.InterleavedBufferAttribute(buffer, 3, 3))
+    const root = new THREE.Group()
+    root.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial()))
+    const set = newReleaseSet()
+    collectSceneResources(root, set)
+    expect(set.geometries.size).toBe(0)
+    expect(set.materials.size).toBe(1)
   })
 })
 
