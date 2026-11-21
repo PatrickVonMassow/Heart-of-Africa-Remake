@@ -48,8 +48,8 @@
 import * as THREE from 'three/webgpu'
 
 /** Frames between two samples of the scene graph (the first rendered frame is
- *  sampled at once). An object that mounts and unmounts between two samples is
- *  missed only if no sampled object shares its material. */
+ *  sampled at once) where the tracker cannot record the renderer's draws: an
+ *  object that mounts and unmounts between two samples is then missed. */
 export const PLACE_RELEASE_SAMPLE_FRAMES = 30
 
 export interface ReleaseSet {
@@ -111,19 +111,22 @@ function addMaterial(m: THREE.Material, into: ReleaseSet): void {
   collectMaterialTextures(m, into.textures)
 }
 
+function addDrawable(d: Drawable, into: ReleaseSet): void {
+  const m = d.material
+  if (Array.isArray(m)) {
+    for (const one of m) if (one?.isMaterial) addMaterial(one, into)
+  } else if (m?.isMaterial) {
+    addMaterial(m, into)
+  }
+  if (d.geometry?.isBufferGeometry) into.geometries.add(d.geometry)
+}
+
 /** Add every material, geometry and bound texture drawn under `root` to `into`. */
 export function collectSceneResources(root: THREE.Object3D, into: ReleaseSet): void {
-  root.traverse((o) => {
-    const d = o as Drawable
-    const m = d.material
-    if (Array.isArray(m)) {
-      for (const one of m) if (one?.isMaterial) addMaterial(one, into)
-    } else if (m?.isMaterial) {
-      addMaterial(m, into)
-    }
-    if (d.geometry?.isBufferGeometry) into.geometries.add(d.geometry)
-  })
+  root.traverse((o) => addDrawable(o as Drawable, into))
 }
+
+type RenderObjectsLike = { get?: (...args: unknown[]) => unknown }
 
 /** Dispose everything in `set` and empty it. Returns what was disposed. */
 export function releaseSceneResources(set: ReleaseSet): ReleaseCounts {
@@ -139,7 +142,13 @@ export function releaseSceneResources(set: ReleaseSet): ReleaseCounts {
 
 /**
  * The scene-side lifecycle as a small state holder, so it is testable without
- * a renderer: `frame()` on every rendered frame, `leave()` on unmount.
+ * a renderer: `attach(renderer)` on mount, `frame()` on every rendered frame,
+ * `leave()` on unmount.
+ * Attached, it records every object the renderer requests a render object for
+ * in this scene — three's RenderObjects.get(object, material, scene, ...), the
+ * one call every draw (shadow passes included) makes — so a mesh drawn and
+ * removed between two samples is released too, at a Set lookup per draw. Where
+ * that internal is missing it falls back to sampling the scene graph.
  * A leave before any rendered frame releases nothing — React StrictMode's
  * simulated unmount right after the first mount must not dispose the scene it
  * is about to keep.
@@ -147,6 +156,7 @@ export function releaseSceneResources(set: ReleaseSet): ReleaseCounts {
 export class PlaceReleaseTracker {
   private readonly set = newReleaseSet()
   private frames = 0
+  private attached = false
 
   private readonly root: () => THREE.Object3D | null
   private readonly every: number
@@ -156,8 +166,32 @@ export class PlaceReleaseTracker {
     this.every = every
   }
 
+  /** Record this scene's draws on `renderer` (three internals, read
+   *  defensively). Returns the detach, which restores the renderer. */
+  attach(renderer: unknown): () => void {
+    const objects = (renderer as { _objects?: RenderObjectsLike | null } | null | undefined)?._objects
+    const original = objects?.get
+    if (!objects || typeof original !== 'function') return () => {}
+    const set = this.set
+    const root = this.root
+    const wrapped = function (this: unknown, ...args: unknown[]): unknown {
+      const [object, material, scene] = args as [Drawable | undefined, THREE.Material | undefined, unknown]
+      if (scene && scene === root()) {
+        if (material?.isMaterial) addMaterial(material, set)
+        if (object?.geometry?.isBufferGeometry) set.geometries.add(object.geometry)
+      }
+      return original.apply(this, args)
+    }
+    objects.get = wrapped
+    this.attached = true
+    return () => {
+      if (objects.get === wrapped) objects.get = original
+      this.attached = false
+    }
+  }
+
   frame(): void {
-    if (this.frames++ % this.every !== 0) return
+    if (this.frames++ % this.every !== 0 || this.attached) return
     const r = this.root()
     if (r) collectSceneResources(r, this.set)
   }

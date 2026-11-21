@@ -2584,21 +2584,22 @@ export function PlaceScene() {
   const camera = useThree((s) => s.camera)
   const r3fScene = useThree((s) => s.scene)
   const gl = useThree((s) => s.gl)
-  // Leaving the settlement disposes every material and geometry its frames drew
-  // (placeRelease.ts): shared module materials otherwise keep each villager's
+  // Leaving the settlement disposes every material and geometry the renderer
+  // drew in it (placeRelease.ts): shared module materials otherwise keep each villager's
   // render object and pipeline for the session.
   const release = useMemo(() => new PlaceReleaseTracker(() => r3fScene), [r3fScene])
   useFrame(() => release.frame())
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const detach = release.attach(gl)
+    return () => {
+      detach()
       release.leave()
       releaseFigureCaches()
       releaseRenderLists(gl)
       // after the release above destroyed this visit's bind groups
       pruneDeadBindGroups(gl)
-    },
-    [release, gl],
-  )
+    }
+  }, [release, gl])
   const placeId = useGame((s) => s.placeId)
   const seed = useGame((s) => s.seed)
   const orientationGiven = useGame((s) => s.orientationGiven)

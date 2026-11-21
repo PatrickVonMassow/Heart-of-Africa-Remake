@@ -84,6 +84,62 @@ describe('PlaceReleaseTracker', () => {
   })
 })
 
+describe('PlaceReleaseTracker on the renderer draw path', () => {
+  /** three r185's RenderObjects.get(object, material, scene, camera, ...): the
+   *  call every draw — shadow passes included — makes for its render object. */
+  function renderer() {
+    const drawn: unknown[] = []
+    const objects = {
+      get(object: unknown, material: unknown, scene: unknown, camera: unknown) {
+        drawn.push([object, material, scene, camera])
+        return drawn.length
+      },
+    }
+    return { gl: { _objects: objects }, objects, drawn }
+  }
+
+  it('releases a mesh drawn and removed between two scene samples, its own geometry under a shared material too', () => {
+    const s = scene()
+    const { gl, objects } = renderer()
+    const tracker = new PlaceReleaseTracker(() => s.root, 30)
+    const detach = tracker.attach(gl)
+    tracker.frame() // the sample: the flash below is not in the graph yet
+    const flashMat = track(new THREE.MeshBasicNodeMaterial())
+    const flashGeo = track(new THREE.BufferGeometry())
+    const flash = new THREE.Mesh(flashGeo.o, flashMat.o)
+    const sharedGeo = track(new THREE.BufferGeometry())
+    const sharer = new THREE.Mesh(sharedGeo.o, s.mats[0].o)
+    for (const m of [flash, sharer]) {
+      s.group.add(m)
+      expect(objects.get(m, m.material, s.root, null)).toBeGreaterThan(0) // drawn, result passed through
+      s.group.remove(m)
+    }
+    tracker.frame()
+    tracker.leave()
+    detach()
+    expect(flashMat.n()).toBe(1)
+    expect(flashGeo.n()).toBe(1)
+    expect(sharedGeo.n()).toBe(1)
+  })
+
+  it('records only draws of its own scene and restores the renderer on detach', () => {
+    const s = scene()
+    const { gl, objects } = renderer()
+    const original = objects.get
+    const tracker = new PlaceReleaseTracker(() => s.root)
+    const detach = tracker.attach(gl)
+    tracker.frame()
+    const quad = track(new THREE.MeshBasicNodeMaterial()) // a post pass draws its own quad "scene"
+    const q = new THREE.Mesh(new THREE.BufferGeometry(), quad.o)
+    objects.get(q, quad.o, q, null)
+    detach()
+    expect(objects.get).toBe(original)
+    tracker.leave()
+    expect(quad.n()).toBe(0)
+    expect(tracker.attach(null)).toBeTypeOf('function') // fails soft without the internals
+  })
+})
+
 describe('textures bound by released materials', () => {
   it('disposes map properties and TSL texture nodes once, sharing included', () => {
     const map = track(new THREE.DataTexture(new Uint8Array(4), 1, 1))
