@@ -74,10 +74,13 @@ export class PlaceReleaseTracker {
   private readonly set = newReleaseSet()
   private frames = 0
 
-  constructor(
-    private readonly root: () => THREE.Object3D | null,
-    private readonly every: number = PLACE_RELEASE_SAMPLE_FRAMES,
-  ) {}
+  private readonly root: () => THREE.Object3D | null
+  private readonly every: number
+
+  constructor(root: () => THREE.Object3D | null, every: number = PLACE_RELEASE_SAMPLE_FRAMES) {
+    this.root = root
+    this.every = every
+  }
 
   frame(): void {
     if (this.frames++ % this.every !== 0) return
