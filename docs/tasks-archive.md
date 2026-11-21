@@ -47555,3 +47555,49 @@ to land than a mechanism that needs a review.
   Source: finding of the 344 session, 14.11.2026 07:35.
   Remeasured 15.11.2026: `npm test -- settings --section=render-leak-watch` reds identically on main dcf4949c7 and feat/357 6a1071735 (travel|medium|traa/-/bloom/sun/fire/band 25 -> 29, +4, allowed +2), so the settings leak watch shows the same leak.
   Bundle: Sonne & Himmel.
+
+- [x] 507. A lost WebGPU device ends the run quietly and the picture black
+  (measured 05.08.2026, both quiet runs of `invariants` on the software WebGPU
+  lane). The suite ends `2 pass, 0 fail` with 9 and 2 console errors —
+  `AbortError: Failed to execute 'mapAsync' on 'GPUBuffer': A valid external
+  Instance reference no longer exists`, `THREE.WebGPURenderer: WebGPU Device
+  Lost: Reason: unknown`, `OperationError: Instance dropped in popErrorScope`.
+  The checks after the loss never run at all; only the console-error gate turns
+  the suite red, so the count reads like a partial pass and the loss itself is
+  named nowhere. The same loss in the shipped game is what point 493 photographed
+  on the mispinned lane: a black canvas behind a live HUD.
+  FINAL STATE:
+  1. The renderer NOTICES a lost device: `device.lost` is awaited, and the loss
+     goes to the dev-mode assert channel with its reason, so every test run and
+     every manual session detects it at the moment it happens.
+  2. A suite whose device dies FAILS AT THE LOSS, naming it, instead of reporting
+     the checks it managed before — a check count that stops early may never read
+     as a pass.
+  3. The player is told rather than left with a black picture: a lost device
+     raises the same localized, dismissible notice path as the WebGL 2 fallback
+     (both languages, from the language files), naming that the picture stopped
+     and what to do — never a silent black canvas behind a live HUD.
+  4. Whether the loss is the software lane's device giving up under a long run or
+     a teardown racing an in-flight readback is decided BY THE EVIDENCE the first
+     step now produces, and the answer is written into
+     `docs/host-environment.md`'s lane section.
+  "THE SOFTWARE WEBGPU LANE" IN THIS POINT'S HEADING IS DEAD (carried 20.08.2026 from the
+  10.08.2026 four-eyes work-order analysis, whose one premise to re-measure this was, and it
+  was measured that day at `622f5113`): `node scripts/verify/backend-lane-check.mjs` reports
+  BOTH lanes drawing the game on the card — `ANGLE (Microsoft, D3D12 (NVIDIA GeForce RTX
+  4070 Ti))` — with the WebGPU chain at `level=compatibility`. The device loss recorded here
+  therefore cannot be charged to a software device giving up under a long run, which removes
+  one of item 4's two candidates before the work starts: what is left to decide between is
+  the compatibility chain itself and a teardown racing an in-flight readback.
+  VERIFIABLE: a Vitest case proves the loss handler fires the assert and the
+  localized notice from a simulated `device.lost` in both languages; a browser
+  case proves a suite that loses its device reports the loss as its failure
+  rather than a truncated pass; and `VERIFY_GL=webgpu npm test -- invariants`
+  either completes on this host or names the device loss as its verdict.
+  AMENDMENT TO POINT 507 (append to its text; do not open a new point). Placement: user order 20.11.2026 "A umsetzen" — work it as a user-ordered point.
+  Field evidence (20.11.2026, user's very weak notebook: Intel Gen-8 adapter, Chrome 140, WebGPU, build 0fdb5b5): the F8 render benchmark `local/Sehr schwaches Notebook - hoa-bench-2026-11-20-webgpu.json` reports drawCalls 0 and triangles 0 in ALL 42 rows and a vsync-capped 60 fps even for high-preset with SSAO — impossible on that GPU. three's Renderer returns early from render() once `_isDeviceLost` is set (node_modules/three/src/renderers/common/Renderer.js:886), so the device was lost and the benchmark measured empty frames and published them as valid. The device loss of 507 therefore happens on a real player device, not only on a test lane.
+  Additional final states:
+  5. The render benchmark (src/systems/benchmarkRun.ts) detects a lost device (or a measured phase with drawCalls 0) and ends the run as INVALID, naming the reason in its summary and JSON (`aborted`/reason), instead of writing rows; it never reports fps for frames that drew nothing.
+  6. The bug report / state dump (src/state/stateDump.ts) carries the renderer's GPU health: device-lost flag with reason, and the WebGPU uncaptured errors (validation/pipeline errors, capped list with count of omitted) seen in the session, so a report from a player device names GPU failures without DevTools.
+  Test: Vitest — the benchmark run with a simulated lost device (or drawCalls 0) yields an invalid result with the reason and no rows; the state dump includes a simulated uncaptured error and the device-lost reason. Both language files if any player-visible text is added.
+  Source: user benchmark and bug report of 20.11.2026 (local/Sehr schwaches Notebook - *).
