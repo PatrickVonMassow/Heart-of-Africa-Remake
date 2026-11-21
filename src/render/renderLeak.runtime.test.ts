@@ -162,10 +162,17 @@ describe('render leak watch, live', () => {
     h.tick(80, () => {
       h.gl.info.memory.textures++
     })
-    h.go('place', 'b')
+    h.go('place', 'b') // the next visit's entry is recorded after the old return closed
     h.tick()
     expect(h.state().pipelines.history).toHaveLength(1)
     expect(h.asserts()).toContain('render-pipeline-leak')
+    const entry = h.gl._pipelines!.caches.size
+    h.gl._pipelines!.caches.size += 5
+    h.go('travel')
+    h.tick()
+    const returns = h.state().pipelines.history as Array<{ entry: number; back: number }>
+    expect(returns).toHaveLength(2)
+    expect(returns[1]).toMatchObject({ entry, back: entry + 5 })
   })
 
   it('judges a leave and re-entry of the same place in one tick as a hop', async () => {

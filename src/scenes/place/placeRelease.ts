@@ -198,7 +198,7 @@ export class PlaceReleaseTracker {
       const [object, material, scene] = args as [Drawable | undefined, THREE.Material | undefined, unknown]
       if (scene && scene === root()) {
         if (material?.isMaterial) addMaterial(material, set)
-        if (object?.geometry?.isBufferGeometry) set.geometries.add(object.geometry)
+        if (object?.geometry?.isBufferGeometry && !interleaved(object.geometry)) set.geometries.add(object.geometry)
       }
       return original.apply(this, args)
     }

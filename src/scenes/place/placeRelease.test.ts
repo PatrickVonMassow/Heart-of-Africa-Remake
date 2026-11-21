@@ -218,6 +218,24 @@ describe('PlaceReleaseTracker on the renderer draw path', () => {
     expect(set.geometries.size).toBe(0)
     expect(set.materials.size).toBe(1)
   })
+
+  it('does not dispose an interleaved geometry drawn through the renderer hook', () => {
+    const s = scene()
+    const { gl, objects } = renderer()
+    const buffer = new THREE.InterleavedBuffer(new Float32Array(12), 6)
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.InterleavedBufferAttribute(buffer, 3, 0))
+    let disposed = 0
+    geo.addEventListener('dispose', () => disposed++)
+    const tracker = new PlaceReleaseTracker(() => s.root)
+    const detach = tracker.attach(gl)
+    tracker.frame()
+    const mesh = new THREE.Mesh(geo, s.mats[0].o)
+    objects.get(mesh, mesh.material, s.root, null)
+    detach()
+    tracker.leave()
+    expect(disposed).toBe(0)
+  })
 })
 
 describe('textures bound by released materials', () => {
