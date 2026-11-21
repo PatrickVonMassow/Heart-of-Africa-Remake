@@ -14,6 +14,7 @@ import { placeSection } from '../systems/placeDump'
 import { placeLifeSection } from '../systems/placeLifeDump'
 import { wildlifeSection, type WildlifeDump } from '../systems/wildlifeDump'
 import { placePlayerPosition } from '../scenes/place/playerPosition'
+import { gpuHealthSnapshot } from '../render/gpuHealth'
 import { regionAt, worldToLatLon, type RegionId } from '../world/geo'
 import type { GameState } from './store'
 
@@ -136,6 +137,10 @@ export function dumpGameState(game: GameState, opts: DumpOptions = {}): string {
     // Before the bulk: what reproduces the report (see DumpSummary).
     summary: dumpSummary(game, opts.detailLevel),
     env: opts.env,
+    // Renderer health (point 507): a lost device with its reason and the
+    // uncaptured WebGPU errors (capped, with the omitted count), so a report
+    // from a player's machine names GPU failures without DevTools.
+    gpu: gpuHealthSnapshot(),
     game,
     wildlife: wildlifeSection(game.pos),
     place: placeSection(placeOrigin),

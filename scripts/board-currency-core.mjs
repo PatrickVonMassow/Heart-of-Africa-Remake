@@ -62,6 +62,9 @@ export const BOARD_PAGE_URL = `https://${BOARD_OWNER.toLowerCase()}.github.io/${
 /** The archive page the board's two archive links point at (public/board/archive/). */
 export const ARCHIVE_PAGE_URL = `${BOARD_PAGE_URL}archive/`
 
+/** The full backlog in the repository view, linked below the board's Backlog section. */
+export const BACKLOG_PAGE_URL = `https://github.com/${BOARD_OWNER}/${BOARD_REPO}/blob/main/docs/backlog.md`
+
 /**
  * The floor of "current" (delta D sub-decision). raw.githubusercontent answers
  * with `cache-control: max-age=300`, so a reader can legitimately see content up
@@ -231,12 +234,16 @@ export function syncedPublishPatch({ state, fileHash, fingerprint, at = Date.now
  */
 export function boardMissingPoints(html, open) {
   const doc = String(html ?? '')
+  const wanted = normaliseOpenSet(open)
+  // Title parsers drop a four-digit number as a possible year unless it is a
+  // known point; the open set is exactly the provenance they need.
+  const titleOptions = { knownPoints: new Set(wanted) }
   const seen = new Set([
-    ...parseNowCardPoints(doc),
+    ...parseNowCardPoints(doc, titleOptions),
     ...parseQueuePoints(doc),
-    ...parseKlaerungPoints(doc),
+    ...parseKlaerungPoints(doc, titleOptions),
   ])
-  return normaliseOpenSet(open).filter((n) => !seen.has(n))
+  return wanted.filter((n) => !seen.has(n))
 }
 
 /**

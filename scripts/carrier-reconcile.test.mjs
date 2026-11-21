@@ -35,6 +35,15 @@ const planes = ({ remote = [], archive = [], head = remote, headArchive = archiv
 })
 const check = (text, p, aliases = {}) => reconcileCarrier({ carriers: [{ path: 'c', text }], ...p, mainShas: MAIN, aliases })
 
+describe('titleAnchor — a gate marker is not part of the identity', () => {
+  it('a deferred point keeps the anchor it was queued with', () => {
+    const t = 'Smooth the CPU hitches while driving on medium and high'
+    expect(titleAnchor(`${t} AWAITING-CONFIRMATION(2026-11-20; user-input: run it, hand back: json, where: local/)`)).toBe(titleAnchor(t))
+    expect(titleAnchor(`${t} SELF-DECIDED(2026-11-20; x)`)).toBe(titleAnchor(t))
+    expect(titleAnchor(`${t} renamed`)).not.toBe(titleAnchor(t))
+  })
+})
+
 describe('reconcileCarrier — a queued point without its work-order point is RED', () => {
   it('queued 1402 with a parseable TASKS.md and archive lacking 1402 is not ok and never formats as green', () => {
     const r = check(tick(1402), planes({ remote: [1400, 1401], archive: [1399] }))

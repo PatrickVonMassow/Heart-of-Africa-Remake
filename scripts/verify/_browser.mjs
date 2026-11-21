@@ -10,6 +10,7 @@
 // (the guardrail, the whole point of the lane).
 import { chromium } from 'playwright'
 import { armRunRecorder, markBackendAsserted } from '../render-verify-recorder.mjs'
+import { armDeviceLossGate } from './device-loss-core.mjs'
 import { featureLevelOf } from '../render-verify-core.mjs'
 import { verifyLaunchOptions, webgpuLaneVerdict } from './launch-args-core.mjs'
 import { findSystemChrome, hasHardwareGlChain } from './system-chrome.mjs'
@@ -80,7 +81,9 @@ export async function launchVerifyBrowser({ platform = process.platform, systemC
   // (point 557): every page this launcher hands out navigates to the seeded URL, so no
   // suite can silently fall out of the pin the way collision.mjs had. A suite that
   // cannot be seeded (verify-seed.mjs `UNSEEDED_SUITES`) says so in its own output.
-  return applySeedRoute(browser)
+  // A lost GPU device fails the suite AT the loss, naming it (point 507) —
+  // never a truncated check count that reads as a partial pass.
+  return armDeviceLossGate(applySeedRoute(browser))
 }
 
 /** Guardrail (point 184): throw if the backend that actually initialised is not the

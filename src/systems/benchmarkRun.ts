@@ -25,11 +25,14 @@ import { addAfterEffect, addEffect } from '@react-three/fiber'
 import { balance } from '../config/balance'
 import { QUALITY_PRESETS, type DetailLevel } from '../config/quality'
 import { getStrings } from '../i18n'
+import { asyncPipelineHandle, type PipelineBackend } from '../render/asyncPipelines'
 import { describeBackend } from '../render/backendInfo'
 import { getRenderContext } from '../render/renderContext'
+import { gpuHealthSnapshot, isDeviceLost } from '../render/gpuHealth'
 import { getTerrainRefine, resetTerrainRefine, setTerrainRefine } from '../scenes/travel/terrainLod'
 import { setClimateHazeEnabled } from '../scenes/travel/Climate'
 import { useGame } from '../state/store'
+import { benchEnterPlace } from './benchmarkEntry'
 import { effectiveDprCap, useUi } from '../state/ui'
 import { mulberry32 } from '../world/noise'
 import {
@@ -45,11 +48,16 @@ import {
   benchNativePixelRatio,
   PRESET_CONFIG_NAMES,
   benchFilename,
+  benchInvalidReason,
   benchFrameCounts,
+  benchFrameReady,
+  benchReadinessPush,
+  benchReadyBudget,
   benchRemainingMs,
   benchReportJson,
   benchShortMode,
   benchTotalFrames,
+  benchTrisStable,
   buildLowProfile,
   frameStats,
   headlineSeries,
@@ -80,6 +88,15 @@ interface FrameSample {
 
 /** Raised when Esc aborts the run; unwinds to the restore block. */
 class BenchAborted extends Error {}
+
+/** Raised when the measurement cannot be trusted (a lost device, a measured
+ *  phase that drew nothing): the run ends INVALID and writes no rows. */
+class BenchInvalid extends Error {}
+
+/** The invalid reason from the GPU health record alone (a lost device). */
+function deviceLostReason(): string | null {
+  return isDeviceLost() ? benchInvalidReason({ deviceLost: gpuHealthSnapshot().deviceLost }) : null
+}
 
 /** A run that stops receiving frames (backgrounded tab, lost context) must not
  *  hang the overlay forever. */
@@ -289,7 +306,17 @@ function createGpuTimer(gl: unknown): GpuTimer {
  * so their difference is the CPU cost of the frame, uncapped by vsync, while
  * the before-to-before interval is the wall-clock frame time.
  */
-function runFrames(count: number, collect: FrameSample[] | null, onFrame: () => void): Promise<void> {
+/** Cap on the unmeasured frames that wait for TravelScene to remount after
+ *  the settlement phase (its `travel-terrain` node, plus one frame for the
+ *  mount effect). Calibratable. */
+const BENCH_REMOUNT_MAX_FRAMES = 300
+
+function runFrames(
+  count: number,
+  collect: FrameSample[] | null,
+  onFrame: () => void,
+  until?: () => boolean,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     let seen = 0
     let previous = 0
@@ -311,8 +338,11 @@ function runFrames(count: number, collect: FrameSample[] | null, onFrame: () => 
       // The first frame has no interval to measure against.
       if (collect !== null && seen > 1) collect.push({ frameMs, cpuMs: now - cpuStart })
       onFrame()
+      // A lost device renders nothing from here on — stop at the loss.
+      const lost = deviceLostReason()
+      if (lost !== null) return finish(new BenchInvalid(lost))
       if (useUi.getState().benchAbort) return finish(new BenchAborted())
-      if (seen >= count) finish(null)
+      if (seen >= count || (until !== undefined && until())) finish(null)
     })
     const watchdog = window.setInterval(() => {
       if (performance.now() - lastFrameAt > FRAME_STALL_MS) finish(new Error('benchmark: no frames'))
@@ -330,7 +360,7 @@ function runFrames(count: number, collect: FrameSample[] | null, onFrame: () => 
 }
 
 /** Reset every state a config must not inherit (determinism rule 2). */
-function resetWorld(phase: BenchPhase): void {
+function resetWorld(phase: BenchPhase): { journal: number; money: number } | undefined {
   balance.randomEventsEnabled = false
   balance.deadline.enabled = false
   balance.travelSpeed = BENCH_TRAVEL_SPEED
@@ -356,6 +386,12 @@ function resetWorld(phase: BenchPhase): void {
     journalDnd: true,
   })
   useGame.getState().debugJumpTo(phase.lat, phase.lon)
+  if (phase.placeId !== undefined) {
+    // The settlement phase: every config takes the identical, silent
+    // LATER-entry path (benchmarkEntry.ts) into the walkable scene.
+    return benchEnterPlace(phase.placeId)
+  }
+  return undefined
 }
 
 /** Apply one config's levers (the flags reset to their defaults first, so no
@@ -422,8 +458,9 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   running = true
   const short = options.short ?? benchShortMode(typeof location === 'undefined' ? '' : location.search)
   const counts = benchFrameCounts(short)
-  // The sweep configs PLUS the point-293 low-preset profiling pass — one extra
-  // measured config, so the progress bar and the estimate cover it.
+  // The sweep configs PLUS the preset passes (low/medium/high), so the progress
+  // bar and the estimate cover them; every config runs every phase, the
+  // settlement included.
   const measuredConfigs = BENCH_CONFIGS.length + BENCH_PRESET_LEVELS.length
   const framesTotal = benchTotalFrames(short, measuredConfigs)
 
@@ -447,6 +484,8 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   // Real GPU milliseconds where the backend can measure them — the only series
   // that answers the geometry question under vsync.
   const gpu = createGpuTimer(ctx.gl)
+  const renderInfo = (): { drawCalls?: number; triangles?: number } =>
+    (ctx.gl.info as { render?: { drawCalls?: number; triangles?: number } }).render ?? {}
   Math.random = mulberry32(BENCH_SEED)
 
   ui.clearBenchAbort()
@@ -456,6 +495,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   const rows: BenchRow[] = []
   let framesDone = 0
   let aborted = false
+  let invalidReason: string | null = null
 
   const publish = (config: string | null, configIndex: number, phase: string): void => {
     useUi.getState().setBenchProgress({
@@ -476,7 +516,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     phase: BenchPhase,
     measured: boolean,
   ): Promise<void> => {
-    resetWorld(phase)
+    const entryCost = resetWorld(phase)
     publish(measured ? config.name : null, configIndex, phase.name)
     let sinceUpdate = 0
     // GPU durations of the measured frames. During the settle the queries are
@@ -494,14 +534,52 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     if (phase.drive) pressKey('KeyW', true)
     try {
       await runFrames(counts.settle, null, tick)
+      // A settlement is sampled only once its scene stands (unmeasured,
+      // uncounted frames; the GPU pool is drained, its samples discarded).
+      let readyTimeout: boolean | undefined
+      if (phase.placeId !== undefined) {
+        const budget = benchReadyBudget(short)
+        let tris: number[] = []
+        let ready = false
+        const sceneNodes = ctx.scene as unknown as { getObjectByName(name: string): unknown }
+        const pipelines = asyncPipelineHandle(
+          (ctx.gl as unknown as { backend?: PipelineBackend }).backend,
+        )
+        await runFrames(
+          budget.maxFrames,
+          null,
+          () => {
+            gpu.poll(null)
+            const p = pipelines?.state()
+            // A frame counts only once the outgoing travel scene is gone and the
+            // settlement's pipelines are warm.
+            const travelMounted = sceneNodes.getObjectByName('travel-terrain') !== undefined
+            tris = benchReadinessPush(tris, renderInfo().triangles ?? 0, benchFrameReady(travelMounted, p ?? null))
+            ready = benchTrisStable(tris, budget.stableFrames, budget.tolerance)
+          },
+          () => ready,
+        )
+        readyTimeout = !ready
+      }
       gpuSink = measured ? gpuSamples : null
       const samples: FrameSample[] = []
-      await runFrames(counts.sample, samples, tick)
+      // The render counters of the LAST sampled frame: the flush below can let
+      // later frames draw, so the live counters are read before it.
+      let render: { drawCalls?: number; triangles?: number } = {}
+      await runFrames(counts.sample, samples, () => {
+        tick()
+        render = { ...renderInfo() }
+      })
       // Drain the last in-flight resolve so the phase's GPU sample is complete.
       await gpu.flush(gpuSink)
       if (!measured) return
-      const render = (ctx.gl.info as { render?: { drawCalls?: number; triangles?: number } }).render
+      const invalid = benchInvalidReason({
+        deviceLost: gpuHealthSnapshot().deviceLost,
+        drawCalls: render.drawCalls ?? 0,
+      })
+      if (invalid !== null) throw new BenchInvalid(invalid)
       const frame = frameStats(samples.map((s) => s.frameMs))
+      const game = useGame.getState()
       rows.push({
         config: config.name,
         phase: phase.name,
@@ -512,9 +590,12 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
         // The per-pass split of those same frames (point 1549).
         gpuPasses: gpu.available && gpu.passesAvailable ? passBreakdown(gpuSamples.passes) : null,
         vsyncLikely: vsyncLikely(frame),
-        drawCalls: render?.drawCalls ?? 0,
+        drawCalls: render.drawCalls ?? 0,
         pixelRatio: ctx.gl.getPixelRatio(),
-        triangles: render?.triangles ?? 0,
+        triangles: render.triangles ?? 0,
+        place: game.mode === 'place' ? game.placeId : null,
+        ...(readyTimeout !== undefined ? { readyTimeout } : {}),
+        ...(entryCost !== undefined ? { entryCost } : {}),
         sceneTriangles: sceneTriangleBreakdown(ctx.scene as unknown as BenchSceneNode),
       })
     } finally {
@@ -522,6 +603,28 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
       // leave the traveller walking.
       if (phase.drive) pressKey('KeyW', false)
     }
+  }
+
+  /** Back to the bird's-eye view BEFORE the next config's levers apply. The
+   *  settlement phase runs last, and TravelScene's mount effect writes the
+   *  player's terrain-refine setting over the global override — so the levers
+   *  must land after the remount, or `terrain-refine-off` measures nothing.
+   *  The frames are unmeasured and uncounted (only the GPU pool is drained). */
+  const leaveSettlement = async (): Promise<void> => {
+    if (useGame.getState().mode !== 'place') return
+    useGame.setState({ mode: 'travel', placeId: null })
+    const scene = ctx.scene as unknown as { getObjectByName(name: string): unknown }
+    let mountedFrames = 0
+    await runFrames(
+      BENCH_REMOUNT_MAX_FRAMES,
+      null,
+      () => {
+        gpu.poll(null)
+        if (scene.getObjectByName('travel-terrain') !== undefined) mountedFrames++
+      },
+      () => mountedFrames >= 2,
+    )
+    if (mountedFrames < 2) throw new Error('benchmark: the travel scene did not remount after the settlement')
   }
 
   try {
@@ -533,6 +636,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
 
     for (let i = 0; i < BENCH_CONFIGS.length; i++) {
       const config = BENCH_CONFIGS[i]
+      await leaveSettlement()
       applyConfig(config, nativePixelRatio)
       for (const phase of BENCH_PHASES) await runPhase(config, i + 1, phase, true)
     }
@@ -543,13 +647,24 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     // same baseline and `buildLowProfile` can rank where LOW's cost still sits.
     for (let i = 0; i < BENCH_PRESET_LEVELS.length; i++) {
       const level = BENCH_PRESET_LEVELS[i]
+      await leaveSettlement()
       applyPreset(level, nativePixelRatio)
       const presetConfig: BenchConfig = { name: PRESET_CONFIG_NAMES[level], flags: {} }
       for (const phase of BENCH_PHASES) await runPhase(presetConfig, BENCH_CONFIGS.length + i + 1, phase, true)
     }
-  } catch (error) {
+  } catch (caught) {
     aborted = true
-    if (!(error instanceof BenchAborted)) {
+    // A lost device can stop the frame callbacks altogether: the watchdog's
+    // "no frames", an Esc that raced the loss, or any other failure then
+    // still ends the run INVALID.
+    const lost = caught instanceof BenchInvalid ? null : deviceLostReason()
+    const error = lost !== null ? new BenchInvalid(lost) : caught
+    if (error instanceof BenchInvalid) {
+      // Rows measured before the loss are dropped too: the loss's onset is
+      // unknown, so none of them is known to have drawn the scene.
+      invalidReason = error.message
+      rows.length = 0
+    } else if (!(error instanceof BenchAborted)) {
       useGame.getState().setToast(getStrings().benchmark.failed(error instanceof Error ? error.message : String(error)))
     }
   } finally {
@@ -564,7 +679,10 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     balance.randomEventsEnabled = balanceSnapshot.randomEventsEnabled
     balance.deadline.enabled = balanceSnapshot.deadlineEnabled
     useGame.setState(gameSnapshot)
-    useUi.setState(uiSnapshot)
+    // A device lost during the run outlives it: the restore keeps the live
+    // loss notice and its dismissal instead of the pre-run values.
+    const { deviceLost, deviceLostDismissed } = useUi.getState()
+    useUi.setState({ ...uiSnapshot, deviceLost, deviceLostDismissed })
     useUi.getState().setBenchProgress(null)
     useUi.getState().clearBenchAbort()
     running = false
@@ -605,13 +723,15 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     rows,
     // The low-preset cost ranking (point 293): where the frame cost still sits
     // at the low graphics level, so the player can decide the next reduction.
-    lowProfile: buildLowProfile(rows),
+    lowProfile: invalidReason === null ? buildLowProfile(rows) : null,
     durationMs: Math.round(performance.now() - t0),
     aborted,
+    ...(invalidReason !== null ? { invalidReason } : {}),
   }
   useUi.getState().setBenchReport({
     filename: benchFilename(backend, startedAt),
     json: benchReportJson(report),
     aborted,
+    ...(invalidReason !== null ? { invalidReason } : {}),
   })
 }

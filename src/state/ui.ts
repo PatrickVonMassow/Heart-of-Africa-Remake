@@ -7,7 +7,7 @@ import type { UtteranceId } from '../communication/lexicon'
 import type { DrumMessageId, DrumMessagePlan } from '../communication/drumMessage'
 import type { TreasureId } from '../systems/economy'
 import { QUALITY_PRESETS, nextDetailLevel, type DetailLevel } from '../config/quality'
-import { startQualityFromUrl } from '../config/startQuality'
+import { startDetailLevelForAdapter, startQualityFromUrl } from '../config/startQuality'
 
 export type BuildingType = 'shop' | 'weapons' | 'tools' | 'market' | 'bazaar' | 'agency' | 'chief'
 
@@ -43,6 +43,9 @@ interface BenchReportFile {
   filename: string
   json: string
   aborted: boolean
+  /** Set when the run was declared invalid (a lost GPU device, a phase that
+   *  drew nothing) — the report then carries no rows. */
+  invalidReason?: string
 }
 
 /** Building types trading with the flat goods list (design.md §9). */
@@ -100,6 +103,11 @@ interface UiState {
   rendererUnavailable: boolean
   /** The no-renderer notice stays until the player dismisses it. */
   rendererUnavailableDismissed: boolean
+  /** True once the GPU device was lost mid-session (src/render/gpuHealth.ts):
+   *  the renderer draws nothing more, so the player is told. */
+  deviceLost: boolean
+  /** The device-lost notice stays until the player dismisses it. */
+  deviceLostDismissed: boolean
   /** Frame counter (FPS) in the screen corner; toggled in the debug menu. */
   fpsVisible: boolean
   /**
@@ -166,6 +174,11 @@ interface UiState {
    * docs/perf-277-user-hardware.md): fill-rate first (dpr, post), geometry last.
    */
   detailLevel: DetailLevel
+  /** Who set `detailLevel` (point 1562): the plain default, the `?quality=`
+   *  link, the player (F9 / debug picker), or the first-start adapter pick.
+   *  Only 'default' lets the adapter pick run; a player's choice is never
+   *  overridden. */
+  detailLevelSource: 'default' | 'url' | 'player' | 'auto'
   /** Screen-space ambient occlusion allow-flag (design.md §2.7): a suppressor
    *  over the level's preset (a level with SSAO on can be tuned off here). */
   ssaoEnabled: boolean
@@ -236,6 +249,8 @@ interface UiState {
   dismissWebglWarning: () => void
   setRendererUnavailable: (unavailable: boolean) => void
   dismissRendererUnavailable: () => void
+  setDeviceLost: (lost: boolean) => void
+  dismissDeviceLost: () => void
   setFpsVisible: (visible: boolean) => void
   setSpeechConceptLabels: (on: boolean) => void
   setTraaEnabled: (enabled: boolean) => void
@@ -253,6 +268,10 @@ interface UiState {
   /** Step the graphics level one DOWN, wrapping the bottom to the top (F9):
    *  medium → low → high → medium. */
   cycleDetailLevel: () => void
+  /** First start only: pick LOW for a weak adapter (point 1562). A no-op once
+   *  the level came from the URL, the player, or an earlier pick, and for an
+   *  unreadable adapter (which leaves a later remount free to decide). */
+  pickStartDetailLevel: (adapter: string, dpr: number, probed?: string) => void
   setSsaoEnabled: (enabled: boolean) => void
   setShadowMapHalf: (half: boolean) => void
   setShadowsEnabled: (enabled: boolean) => void
@@ -274,6 +293,9 @@ interface UiState {
 // unlock opens the wider range. Zooming in (down to 0.125) is always available.
 export const DEFAULT_TRAVEL_ZOOM = 0.5
 
+// Seeded from ?quality= so the first frame already renders at the linked level (point 347)
+const urlDetailLevel = typeof window !== 'undefined' ? startQualityFromUrl(window.location.search) : null
+
 export const useUi = create<UiState>()((set) => ({
   dialog: null,
   prompt: null,
@@ -286,6 +308,8 @@ export const useUi = create<UiState>()((set) => ({
   webglWarningDismissed: false,
   rendererUnavailable: false,
   rendererUnavailableDismissed: false,
+  deviceLost: false,
+  deviceLostDismissed: false,
   fpsVisible: true,
   speechConceptLabels: false,
   traaEnabled: true,
@@ -296,8 +320,8 @@ export const useUi = create<UiState>()((set) => ({
   journalDnd: false,
   travelZoom: DEFAULT_TRAVEL_ZOOM,
   touchActive: false,
-  // Seeded from ?quality= so the first frame already renders at the linked level (point 347)
-  detailLevel: (typeof window !== 'undefined' ? startQualityFromUrl(window.location.search) : null) ?? 'medium',
+  detailLevel: urlDetailLevel ?? 'medium',
+  detailLevelSource: urlDetailLevel ? 'url' : 'default',
   ssaoEnabled: true,
   shadowMapHalf: false,
   shadowsEnabled: true,
@@ -347,6 +371,8 @@ export const useUi = create<UiState>()((set) => ({
   dismissWebglWarning: () => set({ webglWarningDismissed: true }),
   setRendererUnavailable: (rendererUnavailable) => set({ rendererUnavailable }),
   dismissRendererUnavailable: () => set({ rendererUnavailableDismissed: true }),
+  setDeviceLost: (deviceLost) => set({ deviceLost }),
+  dismissDeviceLost: () => set({ deviceLostDismissed: true }),
   setFpsVisible: (fpsVisible) => set({ fpsVisible }),
   setSpeechConceptLabels: (speechConceptLabels) => set({ speechConceptLabels }),
   setTraaEnabled: (traaEnabled) => set({ traaEnabled }),
@@ -378,8 +404,14 @@ export const useUi = create<UiState>()((set) => ({
   // unlike activateTouch — changing it writes ONLY the level and never touches
   // the player's individual debug flags, which stay available to tune within a
   // level. The F9 cycle steps DOWN (medium → low → high → medium).
-  setDetailLevel: (detailLevel) => set({ detailLevel }),
-  cycleDetailLevel: () => set((s) => ({ detailLevel: nextDetailLevel(s.detailLevel) })),
+  setDetailLevel: (detailLevel) => set({ detailLevel, detailLevelSource: 'player' }),
+  cycleDetailLevel: () => set((s) => ({ detailLevel: nextDetailLevel(s.detailLevel), detailLevelSource: 'player' })),
+  pickStartDetailLevel: (adapter, dpr, probed = '') =>
+    set((s) =>
+      s.detailLevelSource === 'default' && s.benchProgress === null && adapter !== 'unknown' && adapter !== ''
+        ? { detailLevel: startDetailLevelForAdapter(adapter, dpr, probed), detailLevelSource: 'auto' }
+        : {},
+    ),
   setSsaoEnabled: (ssaoEnabled) => set({ ssaoEnabled }),
   setShadowMapHalf: (shadowMapHalf) => set({ shadowMapHalf }),
   setShadowsEnabled: (shadowsEnabled) => set({ shadowsEnabled }),

@@ -50,11 +50,11 @@ import {
   QUEUE_STUB_META,
   TRANSLITERATION_STEMS,
 } from './dashboard-guard-core.mjs'
-import { normaliseLineEndings, QUEUE_STATUS_TEXT, renderStatusSection } from './board-core.mjs'
+import { normaliseLineEndings, QUEUE_STATUS_TEXT, renderStatusSection, sectionBounds } from './board-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
-import { gateSets } from './user-gate-core.mjs'
+import { CONFIRMATION_MARKER, USER_INPUT_ACT, gateSets, parseGateLine, parseUserGates, parseUserInputDetail } from './user-gate-core.mjs'
 import { INHERITED_ESTIMATE_NOTE, inheritedEstimate } from './queue-calibration-core.mjs'
-import { pointNumbersFromChip } from './dashboard-point-reader-core.mjs'
+import { pointNumbersFromChip, pointOwnershipFromTitle } from './dashboard-point-reader-core.mjs'
 // The pool cap is the width of the queue's front (point 712) — one candidate
 // per slot. It is IMPORTED rather than restated: a second 3 in this file
 // would be a second home for the number CLAUDE.md §6 states.
@@ -521,6 +521,26 @@ export function blockedCardTitle(title) {
 }
 
 /**
+ * One paragraph of card BODY prose made safe for a board the owner publishes:
+ * paths, section references and revisions survive; only the two point-reference
+ * shapes the topic guard reads are neutralised (plus the shell transliterations
+ * the board audit rejects).
+ */
+export function neutralizeCardParagraph(paragraph) {
+  const protectedTokens = []
+  const prose = String(paragraph).replace(
+    /\b[a-z][a-z0-9+.-]*:\/\/[^\s]+|(?:\b[A-Za-z]:)?(?:[\wÄÖÜäöüß.-]+[\\/])+[\wÄÖÜäöüß.-]+|\b[\wÄÖÜäöüß-]+\.(?:mjs|cjs|ts|tsx|js|md)\b/gi,
+    (token) => `\uE000${protectedTokens.push(token) - 1}\uE001`,
+  )
+  return prose
+    .replace(/[A-Za-zÄÖÜäöüß]+/g, repairTransliteration)
+    .replace(/\b(punkt|point)\s+(\d+)\b/gi, '$1 Nr. $2')
+    .replace(/\((\d{2,})\)/g, '[$1]')
+    .replace(/\uE000(\d+)\uE001/g, (_marker, index) => protectedTokens[Number(index)])
+    .trim()
+}
+
+/**
  * The body of that same card. It carries the typed authority the board's
  * admissibility rule demands: whether a deposited finding becomes a work-order
  * point is an EXTENSION OF THE COMMISSIONED SCOPE, which is one of the closed
@@ -535,23 +555,10 @@ export function blockedCardBody(why) {
   // topic guard are neutralised (plus the shell transliterations the board
   // audit rejects). A title-shaped whitespace collapse here once fused a
   // deposited multi-paragraph reason back into the wall the prose guards ban.
-  const neutralizeParagraph = (paragraph) => {
-    const protectedTokens = []
-    const prose = String(paragraph).replace(
-      /\b[a-z][a-z0-9+.-]*:\/\/[^\s]+|(?:\b[A-Za-z]:)?(?:[\wÄÖÜäöüß.-]+[\\/])+[\wÄÖÜäöüß.-]+|\b[\wÄÖÜäöüß-]+\.(?:mjs|cjs|ts|tsx|js|md)\b/gi,
-      (token) => `\uE000${protectedTokens.push(token) - 1}\uE001`,
-    )
-    return prose
-      .replace(/[A-Za-zÄÖÜäöüß]+/g, repairTransliteration)
-      .replace(/\b(punkt|point)\s+(\d+)\b/gi, '$1 Nr. $2')
-      .replace(/\((\d{2,})\)/g, '[$1]')
-      .replace(/\uE000(\d+)\uE001/g, (_marker, index) => protectedTokens[Number(index)])
-      .trim()
-  }
   const safeWhy = String(why ?? '')
     .trim()
     .split(/\r?\n[ \t\r]*\n+/)
-    .map(neutralizeParagraph)
+    .map(neutralizeCardParagraph)
     .filter(Boolean)
     .join('\n\n')
   return (
@@ -1086,4 +1093,233 @@ export function commissionRefusal(decision = {}) {
     `The reason is stored with the point and printed by \`${COMMISSION_STATUS_CMD}\`, so an override stays ` +
     'visible afterwards — overriding is allowed, taking it silently is not.'
   return `COMMISSIONING POINT ${n} ANSWERS TO NOTHING: ${where}, while ${front}. ${remedy}`
+}
+
+// ---- the derived "Von dir zu klären" cards (user-wait) ---------------------
+//
+// THE CARD FOLLOWS THE GATE, NOT A MANUAL STEP. Every open AWAITING-CONFIRMATION
+// gate (all four acts) yields one card, derived anew on every queue rebuild from
+// the same TASKS.md snapshot the queue reads: a cleared gate loses its card on
+// the next build, and nothing can be doubled because nothing is remembered.
+// Two weaker cards stand beside it, and none of the three refuses anything:
+//   · a gate marker that does not parse renders a fallback card with its raw
+//     text, so the board still publishes;
+//   · an OPEN, UNGATED point whose text names a wait on the user renders a
+//     visibly different "vielleicht" card (text match only, never a demand to
+//     rewrite prose). Setting the gate replaces it; closing the point removes it.
+// The derived cards are NOT routed through vdzk-add: its admissibility judge is
+// for hand-written questions, and a gate is already the typed record.
+
+/** The attribute that marks a card as derived, so the next build replaces it. */
+export const DERIVED_VDZK_ATTR = 'data-derived="user-wait"'
+
+/** The phrases that make an ungated point a "vielleicht" card (user 19.11.2026). */
+export const TEXT_WAIT_PHRASES = [/\bWAITS FOR\b/, /\bwaits (?:for|on) the user\b/i, /\bWAITING ON\b/, /from the user\./]
+
+/** The German label of each confirmation act, as the reader sees it. */
+export const ACT_LABELS_DE = {
+  'release-tag': 'einen Versions-Tag setzen, verschieben oder löschen',
+  'public-release': 'die öffentliche Veröffentlichung auslösen oder zurückziehen',
+  'board-contract': 'den veröffentlichten Vier-Abschnitt-Vertrag der Tafel ändern',
+  [USER_INPUT_ACT]: 'etwas ausführen, messen oder abgeben, das nur du kannst',
+}
+
+const HEAD_LINE_RE = /^- \[( |x)\] (\d+)\./
+
+/** Each point's text block — head line plus its continuation lines. */
+export function pointBlocks(tasksText) {
+  const blocks = []
+  let current = null
+  for (const raw of String(tasksText ?? '').split('\n')) {
+    const line = raw.replace(/\r+$/, '')
+    const head = line.match(HEAD_LINE_RE)
+    if (head) {
+      current = { point: Number(head[2]), open: head[1] === ' ', head: line, lines: [line] }
+      blocks.push(current)
+    } else if (/^#/.test(line) || /^- \[[ x]\]/.test(line)) {
+      current = null
+    } else if (current) {
+      current.lines.push(line)
+    }
+  }
+  return blocks.map((b) => ({ ...b, text: b.lines.join('\n'), deferred: /\bDEFERRED\b/.test(b.head) }))
+}
+
+const dayOf = (stamp) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(stamp ?? ''))
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : ''
+}
+
+/** A typed reason split into its act, the act's fields and the prepared state. */
+function readGateReason(reason) {
+  const m = String(reason ?? '').match(/^([a-z-]+): (.+?), safe prepared state: (.+)$/i)
+  if (!m) return { act: '', detail: String(reason ?? ''), prepared: '' }
+  const [, act, detail, prepared] = m
+  const fields = act.toLowerCase() === USER_INPUT_ACT ? parseUserInputDetail(detail) : null
+  return { act: act.toLowerCase(), detail, prepared, ...(fields ?? {}) }
+}
+
+/** The excerpt around the first phrase hit, one sentence's worth. */
+function phraseExcerpt(text, re) {
+  const flat = String(text ?? '').replace(/\s+/g, ' ')
+  const hit = flat.match(re)
+  if (!hit) return ''
+  const from = Math.max(0, hit.index - 90)
+  const to = Math.min(flat.length, hit.index + hit[0].length + 90)
+  return `${from > 0 ? '…' : ''}${flat.slice(from, to).trim()}${to < flat.length ? '…' : ''}`
+}
+
+/**
+ * The derived cards, in work-order order: [{ point, kind, title, paragraphs, owns }].
+ * `kind` is 'gate', 'malformed' or 'maybe'; `owns` says the card's title claims
+ * the point (only a real gate does — the point then leaves the queue).
+ * `titles` maps a point to its German board title; `skip` holds the points a
+ * current-work card already shows. ONE OWNER PER POINT: a gated point on the
+ * current-work card gets no gate card while it stands there — the now card owns
+ * it, and its gate card appears on the first rebuild after the card moves on.
+ * A malformed marker is never skipped: it owns nothing and must stay visible.
+ */
+export function derivedUserWaitCards(tasksText, { titles = {}, skip = [] } = {}) {
+  const skipSet = new Set([...skip].map(Number))
+  const gates = new Map(parseUserGates(tasksText).gated.map((g) => [Number(g.point), g]))
+  const cards = []
+  for (const block of pointBlocks(tasksText)) {
+    const { point } = block
+    if (!block.open || block.deferred) continue
+    const name = boardSafeTitle(titles[point] || `Punkt ${point}`)
+    const gate = gates.get(point)
+    const line = parseGateLine(block.head)
+    const tail = block.head.trimEnd()
+    // THE LAST MARKER IS THE STATE (user-gate-core): a gate followed by
+    // USER-ANSWERED is answered, not malformed. Malformed is a last marker that
+    // is a gate yet does not gate, or a gate opening no marker reading found.
+    const brokenTyped = line?.marker === CONFIRMATION_MARKER && !line.gated
+    const unquotedHead = tail.replace(/`[^`]*`/g, ' ')
+    const unparsed = !line?.marker && unquotedHead.includes(`${CONFIRMATION_MARKER}(`)
+    if (!gate && (brokenTyped || unparsed)) {
+      const raw = tail.slice(tail.lastIndexOf(CONFIRMATION_MARKER))
+      cards.push({
+        point,
+        kind: 'malformed',
+        owns: false,
+        title: `Punkt ${point} wartet auf dich – Marker fehlerhaft`,
+        paragraphs: [
+          `${name}: der Warte-Marker dieses Punkts lässt sich nicht lesen, der Punkt bleibt deshalb in der Warteschlange.`,
+          `Roher Text: ${raw}`,
+          ...(line?.classification?.error ? [`Fehler: ${line.classification.error}`] : []),
+          'Der Batch setzt den Marker neu, sobald er das bemerkt; du musst nichts tun, außer der Punkt wartet wirklich auf dich.',
+        ],
+      })
+      continue
+    }
+    if (skipSet.has(point)) continue
+    if (gate) {
+      const r = readGateReason(gate.reason)
+      const since = dayOf(gate.since)
+      const paragraphs = [
+        `Wartet${since ? ` seit ${since}` : ''} auf dich: ${ACT_LABELS_DE[r.act] ?? r.act}.`,
+        ...(r.action
+          ? [`Aufgabe: ${r.action}.`, `Zurückgeben: ${r.handBack}.`, `Wohin: ${r.where}.`]
+          : [`Was genau: ${r.detail}.`]),
+        ...(r.prepared ? [`Vorbereitet: ${r.prepared}.`] : []),
+        r.act === USER_INPUT_ACT
+          ? 'Sobald du es abgegeben hast, sag im Chat Bescheid; der Punkt kehrt dann an die Spitze der Warteschlange zurück, und diese Karte verschwindet.'
+          : 'Deine Möglichkeiten: den Schritt freigeben oder ablehnen; mit deiner Antwort verschwindet diese Karte.',
+      ]
+      cards.push({ point, kind: 'gate', owns: true, title: `${point} — Wartet auf dich: ${name}`, paragraphs })
+      continue
+    }
+    // A phrase QUOTED in backticks or double quotes is mentioned, not meant —
+    // a point that specifies this very fallback would otherwise match itself.
+    const unquoted = block.text.replace(/`[^`\n]*`|"[^"\n]*"|“[^”\n]*”/g, ' ')
+    const re = TEXT_WAIT_PHRASES.find((phrase) => phrase.test(unquoted))
+    if (re) {
+      cards.push({
+        point,
+        kind: 'maybe',
+        owns: false,
+        title: `Punkt ${point} wartet vielleicht auf dich (nur aus dem Text erkannt, nicht bestätigt)`,
+        paragraphs: [
+          `${name}: der Text dieses Punkts klingt, als warte er auf dich. Ein Warte-Gate ist nicht gesetzt, der Punkt bleibt in der Warteschlange.`,
+          `Fundstelle: ${phraseExcerpt(unquoted, re)}`,
+          'Wartet er wirklich auf dich, setzt der Batch das Gate und diese Karte wird zur echten Karte; sonst kannst du sie übergehen.',
+        ],
+      })
+    }
+  }
+  return cards
+}
+
+/** One derived card in the markup the board parsers read; 'maybe' is visibly set apart. */
+export function renderDerivedVdzkCard({ kind, title, paragraphs }) {
+  const cls = kind === 'gate' ? 'body' : `body derived-${kind}`
+  const mark = kind === 'maybe' ? '❔ ' : kind === 'malformed' ? '⚠ ' : ''
+  return (
+    `<details ${DERIVED_VDZK_ATTR}>\n  <summary><span class="t">${esc(`${mark}${title}`)}</span></summary>\n` +
+    `  <div class="${cls}">\n${paragraphs.map((p) => `    <p>${esc(neutralizeCardParagraph(p))}</p>\n`).join('')}  </div>\n</details>\n`
+  )
+}
+
+const DERIVED_CARD_RE = new RegExp(`<details ${DERIVED_VDZK_ATTR}>[\\s\\S]*?</details>\\s*`, 'g')
+const MANUAL_CARD_RE = /<details>\s*<summary><span class="t">([^<]*)<\/span>[\s\S]*?<\/details>\s*/g
+
+/**
+ * Rewrite the "Von dir zu klären" section: the previous build's derived cards go,
+ * the new ones stand at the top, and a MANUAL card owning exactly one carded
+ * gated point is removed (its derived card replaces it — two owners would
+ * double the point). An ANSWERED point's manual card is left alone: deleting it
+ * on every rebuild would also delete a later, legitimate manual card, and no
+ * answered gate stood on the board when the derived cards took over
+ * (20.11.2026). Returns { html, removed:[title] }. A board without the section
+ * comes back unchanged.
+ */
+export function applyDerivedVdzk(html, cards, { knownPoints = [], gated = [] } = {}) {
+  const doc = String(html ?? '')
+  let bounds
+  try {
+    bounds = sectionBounds(doc, 'vdzk')
+  } catch {
+    return { html: doc, removed: [] }
+  }
+  // Every GATED point is stale for a manual card — the carded ones and a gated
+  // point on the current-work card, which the now card already owns.
+  const stale = new Set([...(cards ?? []).filter((c) => c.owns).map((c) => Number(c.point)), ...[...gated].map(Number)])
+  const removed = []
+  const section = doc
+    .slice(bounds.from, bounds.end)
+    .replace(DERIVED_CARD_RE, '')
+    .replace(MANUAL_CARD_RE, (card, title) => {
+      const { points } = pointOwnershipFromTitle(title, { knownPoints: [...knownPoints, ...stale] })
+      if (points.length === 1 && stale.has(points[0])) {
+        removed.push(title.trim())
+        return ''
+      }
+      return card
+    })
+  const rendered = (cards ?? []).map(renderDerivedVdzkCard).join('')
+  const rest = section.replace(/^\n+/, '')
+  return { html: `${doc.slice(0, bounds.from)}\n${rendered}${rest}${doc.slice(bounds.end)}`, removed }
+}
+
+/**
+ * The in-flight points the advisory may count: only the FOCUS (spec 3b). A
+ * secondary in-flight point must not silence it, and an unreadable source
+ * (ok false) yields none, which silences the advisory (fail-soft).
+ */
+export function advisoryInFlight(source) {
+  return source?.ok && source.focusPoint ? [Number(source.focusPoint)] : []
+}
+
+/**
+ * The stateless head-skip advisory (layer 3b): the first workable point of the
+ * work order is ungated, something else is in flight, and it is not. Advisory
+ * only — a legitimate skip makes it noise, never a block. Returns '' or the line.
+ */
+export function headSkipAdvisory({ open = [], gates = null, inFlight = [] } = {}) {
+  const active = new Set([...inFlight].map(Number).filter((n) => Number.isInteger(n) && n > 0))
+  if (!active.size) return ''
+  const g = normaliseGates(gates)
+  const head = queueOrder(open, g).find((n) => !g.gated.has(n))
+  if (head === undefined || active.has(head)) return ''
+  return `head point ${head} skipped without gate: work it or defer-for-user --act user-input`
 }

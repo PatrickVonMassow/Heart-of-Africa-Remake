@@ -1696,53 +1696,6 @@ export const RED_CHARGES = [
       + 'host, and the charge now dies with the fix of that shuffle.',
   },
   {
-    point: 1010,
-    suite: 'polish-speech',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^no two Ctrl labels fuse in the village crowd/i,
-    // WHAT 1067 SETTLED, 07.09.2026: the fusion is real motion, never a placement
-    // — `declutterLabels` cannot put two boxes into each other — and the depth bar
-    // it reddened on had no cushion at all, so ONE drifted frame in ninety carried
-    // a whole run. The bar now reads the same cushion as the count, and the detail
-    // below is the wording from before that restatement: the shape this entry
-    // owns can no longer be printed. It stays until point 1010 closes, because it
-    // is 1010's record of its own red and not this table's to retire.
-    // DETAIL-SCOPED 30.08.2026 (cross-vendor review, do-not-merge on
-    // ffc9c23): the name alone charged EVERY future failure of this check — a
-    // SUSTAINED fusion regression, where most frames hold a fused pair, would have
-    // been swallowed as the single-frame observation 1010 owns. What was measured
-    // is one frame out of the sample, deep enough to cross the unreadable bar, with
-    // the retry green. A red on more than one frame, a red without the deep bar, or
-    // a crowd that never held stays a real red. The whole printed line is spelled
-    // out rather than left to a wildcard (cross-vendor review, round 2): the words
-    // `unreadable bar` can also appear inside the label pair the detail quotes.
-    // The retry's own verdict is NOT in this detail and cannot be constrained here;
-    // it is part of the record this charge cites, not of the red it reads.
-    // THE SAMPLE AND THE PAIR ARE BOTH MANDATORY 30.08.2026 (cross-vendor review,
-    // do-not-merge on a333f20): `1/\d+` accepted the impossible
-    // `1/0 frames`, and the optional `( \[…\])?` accepted a detail that has LOST
-    // the pair identity. `worstDepth` and `worstPair` come from the same reading in
-    // labelFusion.mjs, so a line printing a depth without its pair is a broken
-    // measurement — a different red from the one 1010 owns.
-    // AND THE PAIR IS SPELLED OUT, NOT MERELY BRACKETED (same review, round 2):
-    // `\[[^\]]*\]` matches an EMPTY bracket, so the identity was still optional in
-    // substance. polish.mjs writes `"<a>"×"<b>" <across>×<down> px`, and that is
-    // the only shape excused here.
-    detailMatch:
-      /^1\/[1-9]\d* frames held a pair fused beyond \d+ px \(allowed \d+\), deepest \d+ px \["[^"]+"×"[^"]+" \d+×\d+ px\], \d+–\d+ labels across the sample — as deep as the \d+ px unreadable bar$/i,
-    why:
-      'THE RED WHOSE CHECK NAMES A TICKED POINT, filed as point 1010 on 29.08.2026. The check '
-      + 'prints "(point 628)", 628 is ticked and lives in docs/tasks-archive.md, and a charge dies '
-      + 'with its point by construction — so the red had no owner at all. Measured in the '
-      + '29.08.2026 LARGE run on feat/687-roam-bound-fixes, WebGL 2: 1/90 frames held a pair fused '
-      + 'beyond 6 px, deepest 19 px, and the retry passed with 200 checks, so the record is '
-      + 'SUSPECT and covers nothing. '
-      + 'This entry gives the red an owner that can CLOSE it; it does not decide the cause. Point '
-      + '1010 owes closing it — point 1067 settled the cause as real motion (see above) rather than a '
-      + 'loaded host, and the charge dies with it.',
-  },
-  {
     point: 1050,
     suite: 'polish-settlement',
     backend: 'webgpu',
@@ -1841,6 +1794,16 @@ export const RED_CHARGES = [
       + 'machine at 487ad8d4f was 14 pass / 0 fail — a load flake of point 200\'s class. MEASURED AGAIN '
       + '28.09.2026 on webgpu in the closing LARGE on 53b168c14 (under load), identical signature; '
       + 'continuous-route alone on webgpu at 53b168c14 on a quiet machine was GREEN. The charge dies with 200.',
+  },
+  {
+    point: 200,
+    suite: 'enrichments',
+    kind: 'check',
+    match: /the parent holds itself between the hunter and the fleeing calf \(living shield\)|the hunter takes the blocking parent in the calf's place before any catch/i,
+    why:
+      'OBSERVED 18.11.2026 in a full enrichments run (webgpu, feat/336 5f15007e4): calf-predation-drama '
+      + 'living shield red twice, green in isolation; point 200 names exactly this red as a cross-section '
+      + 'state-leak flake. Recurred unaccounted 19./20.11.2026 on webgpu. The charge dies with 200.',
   },
   {
     point: 1265,
@@ -2003,7 +1966,7 @@ export const RED_CHARGES = [
     backend: 'webgl',
     kind: 'check',
     match: /^no two Ctrl labels fuse in the village crowd/i,
-    // The sustained shape only (two or more fused frames); the single-frame shape stays 1010's.
+    // The sustained shape only (two or more fused frames); the single-frame shape lost its owner when 1010 left the queue.
     detailMatch:
       /^(?:[2-9]|[1-9]\d+)\/[1-9]\d* frames held a pair fused beyond \d+ px \(allowed \d+\), \d+ of them at the \d+ px unreadable bar, deepest \d+ px \["[^"]+"×"[^"]+" \d+×\d+ px\], \d+–\d+ labels across the sample — the unreadable overlap STANDS$/i,
     why:
@@ -2029,25 +1992,6 @@ export const RED_CHARGES = [
     why:
       'MEASURED 30.10.2026, communication --section=continuous-route alone on aed84aa2f (webgpu): the errand '
       + 'assert fired for a Bambara water-back pair forced after 240 s. Filed as point 1473. The charge dies with point 1473.',
-  },
-  {
-    point: 1495,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^frame 87-continent-zoom\b/i,
-    why:
-      'MEASURED 09.11.2026 on both backends: enrichments on main ca908ee7d (webgpu, --section=seasons) and on '
-      + 'feat/565 313289975 (webgpu and webgl, whole suite): the continent zoom never draws (0 draw calls). '
-      + 'Filed as point 1495. The charge dies with point 1495.',
-  },
-  {
-    point: 1495,
-    suite: 'enrichments',
-    kind: 'console',
-    match: /^console error: TypeError: undefined is not iterable \(cannot read property Symbol\(Symbol\.iterator\)\)/i,
-    why:
-      'MEASURED 09.11.2026 beside the frame 87-continent-zoom red on both backends, the per-frame TypeError '
-      + 'point 1495 names. The charge dies with point 1495.',
   },
   {
     point: 1496,
@@ -2090,24 +2034,6 @@ export const RED_CHARGES = [
   },
 
   {
-    point: 1520,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^(solar sun|eye adaptation and glare): no console errors\b/i,
-    why:
-      'MEASURED 14.11.2026 on WebGPU (main 33db311fd) and WebGL 2 (feat/344 b9082f151): render-resource-leak asserts '
-      + 'at travel|medium, renderTargets 45 -> 370; both sections are green alone. Filed as point 1520. The charge dies with point 1520.',
-  },
-  {
-    point: 1520,
-    suite: 'settings',
-    kind: 'check',
-    match: /^a normal session of switches, detail levels and toggles trips nothing\b/i,
-    why:
-      'MEASURED 15.11.2026 on WebGPU, main d4be6047b: renderTargets 24 -> 28 at travel|medium|traa/-/bloom/sun/fire/band, '
-      + 'the same rebuild leak point 1520 owns (remeasured there with the render-leak-watch section). The charge dies with point 1520.',
-  },
-  {
     point: 1522,
     suite: 'settings',
     kind: 'check',
@@ -2116,63 +2042,6 @@ export const RED_CHARGES = [
       'MEASURED 15.11.2026 on WebGPU, main dcf4949c7 and d4be6047b: every proximity level reads 0; filed as point 1522 '
       + 'before this run. The charge dies with point 1522.',
   },
-  {
-    point: 1495,
-    suite: 'enrichments',
-    kind: 'check',
-    match: /^the Congo basin does NOT swing\b/i,
-    why:
-      'MEASURED 14.11.2026 on WebGL 2, feat/344 b9082f151: congo swing 7.2 vs savanna 10.7 in the whole pass; point 1495 '
-      + 'owns the seasons section until it is green on both backends. The charge dies with point 1495.',
-  },
-  {
-    point: 1520,
-    suite: 'polish-settlement',
-    kind: 'console',
-    match: /^console error: \[ASSERT\] render-resource-leak — renderTargets grew back at place:/i,
-    why:
-      'MEASURED 14.11.2026 on WebGPU, main cfe6b27f1: renderTargets 52 -> 58 at place:bambara-village|medium bloom/sun '
-      + 'band — the same rebuild leak since the solar sun that point 1520 owns at travel. The charge dies with point 1520.',
-  },
-  {
-    point: 1520,
-    suite: 'polish-settlement',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^frame 1490-porter-tangier-webgl2 — the scene never finished drawing\b/i,
-    why:
-      'MEASURED 14.11.2026 on WebGL 2, feat/353 251379676: after 24 min of settlement rebuilds (renderTargets 63 -> 69, '
-      + 'textures 176 -> 200) the WebGL device is lost and the last frame draws nothing; the porter section is green '
-      + 'alone (16 pass). The cumulative rebuild leak is point 1520\'s. The charge dies with point 1520.',
-  },
-  {
-    point: 1520,
-    suite: 'polish-settlement',
-    backend: 'webgl',
-    kind: 'console',
-    match: /^console error: THREE\.THREE\.WebGPURenderer: WebGL Device Lost\b/i,
-    why:
-      'MEASURED 14.11.2026 on WebGL 2, feat/353 251379676: the device loss at the end of the full suite that follows the '
-      + 'rebuild leak point 1520 owns; the porter section is green alone. The charge dies with point 1520.',
-  },
-  ...[
-    { kind: 'check', match: /^frame 1490-porter-(cairo|tangier) — the scene never finished drawing\b/i },
-    { kind: 'check', match: /^the cook-shelter roof is still standable AND reads as a surface from below — no hut-roof\b/i },
-    { kind: 'console', match: /^console error: THREE\.THREE\.WebGPURenderer: WebGPU Device Lost\b/i },
-    { kind: 'console', match: /^console error: OperationError: Instance dropped in popErrorScope\b/i },
-    { kind: 'console', match: /^console error: An error occurred during model execution: "RangeError: Failed to execute 'createBuffer' on 'GPUDevice'/i },
-    { kind: 'console', match: /^console error: Inputs given to model:/i },
-  ].map((charge) => ({
-    point: 1520,
-    suite: 'polish-settlement',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    ...charge,
-    why:
-      'MEASURED 15.11.2026 on WebGPU, main 7b1a2d8a5: after 45 min of settlement rebuilds (renderTargets 53 -> 67) the '
-      + 'WebGPU device is lost; roof-clearance (8 pass) and porter-head-load (16 pass) are green alone. The cumulative '
-      + 'rebuild leak is point 1520\'s. The charge dies with point 1520.',
-  })),
   ...[
     /^every ending resolves on a bank within the crossing deadline\b/i,
     /^the forced drive-off leaves parent and calf alive, both on a bank\b/i,

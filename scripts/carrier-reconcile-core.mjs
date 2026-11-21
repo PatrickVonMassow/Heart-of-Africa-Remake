@@ -10,6 +10,7 @@
 //     archive — on origin/main, HEAD and the working tree — and anything missing,
 //     unpushed or unproven is RED, never "consistent".
 // Side-effect free: texts and sha lists go in, data comes out.
+import { ANSWERED_MARKER, CONFIRMATION_MARKER, SELF_DECIDED_MARKER } from './user-gate-core.mjs'
 
 /** Every point head in a work-order text: number → normalised title (first wins). */
 export function pointHeads(text = '') {
@@ -35,9 +36,15 @@ export function unionHeads({ tasks = '', archive = '' } = {}) {
   return { heads, duplicates: [...new Set(duplicates)].sort((a, b) => a - b) }
 }
 
-/** A title's content anchor: FNV-1a over its letters and digits, 8 hex chars. */
+/** Typed user-gate markers appended to a work-order line; not part of its identity. */
+const GATE_MARKER_TAIL = new RegExp(`\\s+(?:${[CONFIRMATION_MARKER, SELF_DECIDED_MARKER, ANSWERED_MARKER].join('|')})\\b.*$`, 's')
+
+/**
+ * A title's content anchor: FNV-1a over its letters and digits, 8 hex chars.
+ * A trailing gate marker is dropped first, so deferring a point never reads as a renumbering.
+ */
 export function titleAnchor(title = '') {
-  const norm = String(title ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')
+  const norm = String(title ?? '').replace(GATE_MARKER_TAIL, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')
   let h = 0x811c9dc5
   for (const ch of norm) {
     h ^= ch.codePointAt(0)
