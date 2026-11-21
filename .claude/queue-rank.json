@@ -840,10 +840,10 @@
       "place": "last"
     },
     "1566": {
-      "at": "2026-11-21T11:52:52.680Z",
-      "why": "continues the leak hunt right after 1447 lands; nothing ahead of it depends on it",
-      "origin": "machine",
-      "place": "last"
+      "at": "2026-11-21T13:59:22.608Z",
+      "why": "split from 1447; continues the leak hunt right after 1447 lands",
+      "origin": "user",
+      "place": "ahead"
     },
     "1567": {
       "at": "2026-11-21T12:54:14.680Z",
@@ -863,13 +863,6 @@
       "origin": "machine",
       "place": "last"
     }
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      733
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
     "at": "2026-11-21T13:48:09.958Z",
@@ -1066,5 +1059,12 @@
       1568,
       1569
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      733
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

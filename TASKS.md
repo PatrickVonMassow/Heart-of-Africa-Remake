@@ -113,11 +113,10 @@ put it is the mistake this line exists to stop.
   Source: measurement of point 1446, 25.10.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 285 (accumulation and leak hunt).
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 1567. Place split point 1566 directly behind 1447
-  Final state: 1566 is the next open point after 1447 in the work order; queue-rank --status shows no held or unranked entry for it.
-  Observed problem: User question 21.11.2026 13:05: why was 1566 placed so far back. Cause: the split rule (point 1551, splitPriorityOf in scripts/queue-rank-core.mjs) inherits a place only from a parent whose entry is `ahead` or a block stating `Criticality: high`; 1447 carries an old `last` entry and stands at position 2 only because everything ahead of it closed, so the split was appended at the tail. User approved the fix in chat.
-  Spec: Move point 1566 (split from 1447 on 21.11.2026) in TASKS.md directly behind point 1447 and re-rank it with `node scripts/queue-rank.mjs --ahead 1566 --origin user --why "split from 1447; continues the leak hunt right after 1447 lands"`. Its current entry (`place: "last"`, commit c52ddd397) put it at position 188 of 188 although its own reason says "right after 1447 lands".
-  Source: user request of 21.11.2026 12:48 UTC via the findings carrier (session unknown); approved: "Ja, beide mit diesen Titeln freigegeben."
+- [ ] 1566. Settlement visits still leave morph textures and heap behind
+  Final state: after entering and leaving N different villages the renderer-tracked textures (`renderer.info.memory.textures`), the JS heap and Chrome's GPU-process memory return to a bounded level instead of growing with N (the cause named: what retains the figures' morph `DataArrayTexture`s and the heap); a dev invariant or browser check pins the bound; the villager-dress fresh-page staging of point 1446 (`DRESS_REBOOT_EVERY`) may then be lifted.
+  Observed problem: on feat/1447 (pipelines already bounded at ~70-90), `polish-villagers --section=villager-dress`, WebGPU, 21.11.2026 11:31-11:35 UTC, 9 villages after a fresh page (`gpu-load` and `texture-census` rows): renderer-tracked textures 55 -> 115, JS heap 374 -> 993 MB; the DEV texture census (`src/render/renderLeak.ts`) attributes the texture growth to morph `DataArrayTexture` 4096x4x6 and 4096x5x6 (three's `nodes/accessors/Morph.js`, freed only on its geometry's `dispose`), +5..+12 per village, never falling. Plain place hops without the dress checks did NOT grow (10 villages, worktree probe of 1447): suspect the dress section's per-village lineup (`__dressLineup`, `dressLineup.tsx`, `stageRow`) — geometry not released by `skinnedFigure.tsx` or not recorded by `PlaceReleaseTracker.attach`. Repro (~6 min): `DRESS_PEOPLES=zulu,pedi,san,wayeyi,bemba,lunda,bambundu,maasai DRESS_COST=zulu npm test -- polish-villagers --section=villager-dress`.
+  Source: split from point 1447, 21.11.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 1447, 285.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1568. Split rule: inherit the place of a parent standing before the release boundary
@@ -5306,12 +5305,6 @@ put it is the mistake this line exists to stop.
   Test: Vitest for the restore-on-abort path; `benchmark` suite on both backends.
   Source: agent finding via the findings carrier, 21.11.2026 01:06 UTC.
   Bundle: Steuerung & Performance.
-
-- [ ] 1566. Settlement visits still leave morph textures and heap behind
-  Final state: after entering and leaving N different villages the renderer-tracked textures (`renderer.info.memory.textures`), the JS heap and Chrome's GPU-process memory return to a bounded level instead of growing with N (the cause named: what retains the figures' morph `DataArrayTexture`s and the heap); a dev invariant or browser check pins the bound; the villager-dress fresh-page staging of point 1446 (`DRESS_REBOOT_EVERY`) may then be lifted.
-  Observed problem: on feat/1447 (pipelines already bounded at ~70-90), `polish-villagers --section=villager-dress`, WebGPU, 21.11.2026 11:31-11:35 UTC, 9 villages after a fresh page (`gpu-load` and `texture-census` rows): renderer-tracked textures 55 -> 115, JS heap 374 -> 993 MB; the DEV texture census (`src/render/renderLeak.ts`) attributes the texture growth to morph `DataArrayTexture` 4096x4x6 and 4096x5x6 (three's `nodes/accessors/Morph.js`, freed only on its geometry's `dispose`), +5..+12 per village, never falling. Plain place hops without the dress checks did NOT grow (10 villages, worktree probe of 1447): suspect the dress section's per-village lineup (`__dressLineup`, `dressLineup.tsx`, `stageRow`) — geometry not released by `skinnedFigure.tsx` or not recorded by `PlaceReleaseTracker.attach`. Repro (~6 min): `DRESS_PEOPLES=zulu,pedi,san,wayeyi,bemba,lunda,bambundu,maasai DRESS_COST=zulu npm test -- polish-villagers --section=villager-dress`.
-  Source: split from point 1447, 21.11.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 1447, 285.
-  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 1569. Board-claim guard and request-drain gate deadlock each other
   Final state: with the idle card standing and pending user requests, the session can drain the requests (TASKS append, commit) without a hand edit of .batch-dashboard.html; either the board-claim guard lets the drain mutations through or `board.mjs now <N>` no longer requires the drain first.

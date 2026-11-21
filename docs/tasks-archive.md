@@ -47607,3 +47607,10 @@ to land than a mechanism that needs a review.
   Done when: the cause is measured on WebGL 2 (mesh visibility/material compile vs. staging timing), the lion and its prey render on WebGL 2 as on WebGPU, and the section asserts the rendered animals, not only their poses; frame picture-checked on both backends.
   Bundle: Tierverhalten.
   Criticality: medium — a player on the fallback backend sees a feeding scene without animals.
+
+- [x] 1567. Place split point 1566 directly behind 1447
+  Final state: 1566 is the next open point after 1447 in the work order; queue-rank --status shows no held or unranked entry for it.
+  Observed problem: User question 21.11.2026 13:05: why was 1566 placed so far back. Cause: the split rule (point 1551, splitPriorityOf in scripts/queue-rank-core.mjs) inherits a place only from a parent whose entry is `ahead` or a block stating `Criticality: high`; 1447 carries an old `last` entry and stands at position 2 only because everything ahead of it closed, so the split was appended at the tail. User approved the fix in chat.
+  Spec: Move point 1566 (split from 1447 on 21.11.2026) in TASKS.md directly behind point 1447 and re-rank it with `node scripts/queue-rank.mjs --ahead 1566 --origin user --why "split from 1447; continues the leak hunt right after 1447 lands"`. Its current entry (`place: "last"`, commit c52ddd397) put it at position 188 of 188 although its own reason says "right after 1447 lands".
+  Source: user request of 21.11.2026 12:48 UTC via the findings carrier (session unknown); approved: "Ja, beide mit diesen Titeln freigegeben."
+  Bundle: Session- & Repo-Hygiene.
