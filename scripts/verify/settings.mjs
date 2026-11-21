@@ -637,6 +637,73 @@ if (section('lion-feeding')) {
   check('feeding: prey lies on its side', feedA.preyOnSide > 1.0, `${feedA.preyOnSide?.toFixed(2)}`)
   check('feeding: stain beneath the carcass', feedA.stainActive === true && feedA.stainRadius > 0.3,
     `radius ${feedA.stainRadius?.toFixed(2)}`)
+  // RENDERED, not only posed (point 1290): on WebGL 2 the poses read right while
+  // neither mesh reached the picture (only the stain and a shadow did). Per animal,
+  // photograph its projected screen box with the mesh drawn and with it taken out of
+  // the camera's layers; the box must change. Shadow casting is off for both shots,
+  // so a shadow alone cannot pass for the animal. The lion covers much of the
+  // carcass (prey measured 11.5 %, lion 16.8 % on WebGL 2), hence a 4 % floor.
+  const renderedAnimal = async (key) => {
+    const box = await page.evaluate((k) => {
+      const m = window.__lionHunt?.[k].current?.children[0]
+      if (!m?.geometry) return null
+      if (!m.geometry.boundingBox) m.geometry.computeBoundingBox()
+      const { min, max } = m.geometry.boundingBox
+      m.updateWorldMatrix(true, false)
+      const v = m.position.clone()
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+      for (let i = 0; i < 8; i++) {
+        v.set(i & 1 ? max.x : min.x, i & 2 ? max.y : min.y, i & 4 ? max.z : min.z).applyMatrix4(m.matrixWorld)
+        const n = window.__camera.ndc(v.x, v.z, v.y)
+        x0 = Math.min(x0, ((n.x + 1) / 2) * innerWidth)
+        x1 = Math.max(x1, ((n.x + 1) / 2) * innerWidth)
+        y0 = Math.min(y0, ((1 - n.y) / 2) * innerHeight)
+        y1 = Math.max(y1, ((1 - n.y) / 2) * innerHeight)
+      }
+      const x = Math.max(0, Math.floor(x0))
+      const y = Math.max(0, Math.floor(y0))
+      const width = Math.min(innerWidth, Math.ceil(x1)) - x
+      const height = Math.min(innerHeight, Math.ceil(y1)) - y
+      return width >= 4 && height >= 4 ? { x, y, width, height } : null
+    }, key)
+    if (!box) return { box, changed: 0 }
+    const capture = async (drawn) => {
+      const f0 = await page.evaluate(({ k, d }) => {
+        const m = window.__lionHunt[k].current.children[0]
+        window.__lionCastShadow ??= m.castShadow
+        m.castShadow = false
+        if (d) m.layers.set(0)
+        else m.layers.disableAll()
+        return window.__wildlife?.frames?.() ?? null
+      }, { k: key, d: drawn })
+      await page
+        .waitForFunction((f) => f == null || (window.__wildlife?.frames?.() ?? f) >= f + 3, f0, { polling: 'raf', timeout: 15000 })
+        .catch(() => {})
+      const png = await capturePixels(page, `feeding ${key} rendered`, { clip: box })
+      return sharp(png).removeAlpha().raw().toBuffer()
+    }
+    const hidden = await capture(false)
+    const shown = await capture(true)
+    await page.evaluate((k) => {
+      const m = window.__lionHunt[k].current.children[0]
+      m.layers.set(0)
+      m.castShadow = window.__lionCastShadow
+      delete window.__lionCastShadow
+    }, key)
+    // A pixel changes when any channel moves by more than 12 levels: a zebra's white
+    // stripes sit close to the sand in luma alone.
+    let changed = 0
+    for (let i = 0; i < shown.length; i += 3) {
+      const d = Math.max(Math.abs(shown[i] - hidden[i]), Math.abs(shown[i + 1] - hidden[i + 1]), Math.abs(shown[i + 2] - hidden[i + 2]))
+      if (d > 12) changed++
+    }
+    return { box, changed: changed / (shown.length / 3) }
+  }
+  for (const key of ['lion', 'prey']) {
+    const r = await renderedAnimal(key)
+    check(`feeding: the ${key} mesh reaches the picture`, r.changed > 0.04,
+      `${(r.changed * 100).toFixed(1)} % of its ${r.box ? `${r.box.width}x${r.box.height}` : 'missing'} screen box changes when it is drawn`)
+  }
   const lionAt = await page.evaluate(() => {
     const l = window.__lionHunt?.lion.current
     return l ? { x: l.position.x, z: l.position.z } : null
