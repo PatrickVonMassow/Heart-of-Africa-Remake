@@ -639,10 +639,14 @@ if (section('lion-feeding')) {
     `radius ${feedA.stainRadius?.toFixed(2)}`)
   // RENDERED, not only posed (point 1290): on WebGL 2 the poses read right while
   // neither mesh reached the picture (only the stain and a shadow did). Per animal,
-  // photograph its projected screen box with the mesh drawn and with it taken out of
-  // the camera's layers; the box must change. Shadow casting is off for both shots,
-  // so a shadow alone cannot pass for the animal. The lion covers much of the
-  // carcass (prey measured 11.5 %, lion 16.8 % on WebGL 2), hence a 4 % floor.
+  // photograph its projected screen box twice with the mesh out of the camera's
+  // layers and once between them with its own layer mask back; the drawn shot must
+  // differ from both hidden ones by more than they differ from each other. The
+  // other animal is out of the layers for all three shots (the lion's head bob read
+  // 7.2 % noise in the carcass box), and neither casts a shadow, so neither a
+  // neighbour nor a shadow can pass for the animal. Each shot waits for 3 drawn
+  // frames or fails. 4 % floor: measured lion 10.9/12.1 %, carcass 14.0/14.7 %
+  // (WebGL 2/WebGPU), noise 0.0 %.
   const renderedAnimal = async (key) => {
     const box = await page.evaluate((k) => {
       const m = window.__lionHunt?.[k].current?.children[0]
@@ -660,49 +664,68 @@ if (section('lion-feeding')) {
         y0 = Math.min(y0, ((1 - n.y) / 2) * innerHeight)
         y1 = Math.max(y1, ((1 - n.y) / 2) * innerHeight)
       }
-      const x = Math.max(0, Math.floor(x0))
-      const y = Math.max(0, Math.floor(y0))
-      const width = Math.min(innerWidth, Math.ceil(x1)) - x
-      const height = Math.min(innerHeight, Math.ceil(y1)) - y
+      // Pad a tenth each side: the head bob moves the body inside a fixed crop.
+      const px = (x1 - x0) * 0.1
+      const py = (y1 - y0) * 0.1
+      const x = Math.max(0, Math.floor(x0 - px))
+      const y = Math.max(0, Math.floor(y0 - py))
+      const width = Math.min(innerWidth, Math.ceil(x1 + px)) - x
+      const height = Math.min(innerHeight, Math.ceil(y1 + py)) - y
       return width >= 4 && height >= 4 ? { x, y, width, height } : null
     }, key)
-    if (!box) return { box, changed: 0 }
-    const capture = async (drawn) => {
-      const f0 = await page.evaluate(({ k, d }) => {
-        const m = window.__lionHunt[k].current.children[0]
-        window.__lionCastShadow ??= m.castShadow
-        m.castShadow = false
-        if (d) m.layers.set(0)
-        else m.layers.disableAll()
-        return window.__wildlife?.frames?.() ?? null
-      }, { k: key, d: drawn })
-      await page
-        .waitForFunction((f) => f == null || (window.__wildlife?.frames?.() ?? f) >= f + 3, f0, { polling: 'raf', timeout: 15000 })
-        .catch(() => {})
-      const png = await capturePixels(page, `feeding ${key} rendered`, { clip: box })
-      return sharp(png).removeAlpha().raw().toBuffer()
-    }
-    const hidden = await capture(false)
-    const shown = await capture(true)
+    if (!box) return { box, verdict: 'no screen box' }
     await page.evaluate((k) => {
+      const meshes = ['lion', 'prey'].map((a) => window.__lionHunt[a].current.children[0])
       const m = window.__lionHunt[k].current.children[0]
-      m.layers.set(0)
-      m.castShadow = window.__lionCastShadow
-      delete window.__lionCastShadow
+      const other = meshes.find((o) => o !== m)
+      window.__feedProbe = { m, mask: m.layers.mask, other, otherMask: other.layers.mask, meshes, shadow: meshes.map((o) => o.castShadow) }
+      for (const o of meshes) o.castShadow = false
+      other.layers.disableAll()
     }, key)
-    // A pixel changes when any channel moves by more than 12 levels: a zebra's white
-    // stripes sit close to the sand in luma alone.
-    let changed = 0
-    for (let i = 0; i < shown.length; i += 3) {
-      const d = Math.max(Math.abs(shown[i] - hidden[i]), Math.abs(shown[i + 1] - hidden[i + 1]), Math.abs(shown[i + 2] - hidden[i + 2]))
-      if (d > 12) changed++
+    try {
+      const capture = async (drawn) => {
+        const f0 = await page.evaluate((d) => {
+          const p = window.__feedProbe
+          if (d) p.m.layers.mask = p.mask
+          else p.m.layers.disableAll()
+          return window.__wildlife?.frames?.() ?? null
+        }, drawn)
+        if (f0 == null) throw new Error('no wildlife frame counter')
+        await page.waitForFunction((f) => window.__wildlife.frames() >= f + 3, f0, { polling: 'raf', timeout: 15000 })
+        const png = await capturePixels(page, `feeding ${key} rendered`, { clip: box })
+        return sharp(png).removeAlpha().raw().toBuffer()
+      }
+      const hiddenA = await capture(false)
+      const shown = await capture(true)
+      const hiddenB = await capture(false)
+      // A pixel changes when any channel moves by more than 12 levels: a zebra's
+      // white stripes sit close to the sand in luma alone.
+      const frac = (a, b) => {
+        let n = 0
+        for (let i = 0; i < a.length; i += 3) {
+          if (Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])) > 12) n++
+        }
+        return n / (a.length / 3)
+      }
+      const noise = frac(hiddenA, hiddenB)
+      return { box, changed: Math.min(frac(shown, hiddenA), frac(shown, hiddenB)) - noise, noise }
+    } catch (e) {
+      return { box, verdict: String(e?.message ?? e).split('\n')[0] }
+    } finally {
+      await page.evaluate(() => {
+        const p = window.__feedProbe
+        p.m.layers.mask = p.mask
+        p.other.layers.mask = p.otherMask
+        p.meshes.forEach((m, i) => (m.castShadow = p.shadow[i]))
+        delete window.__feedProbe
+      })
     }
-    return { box, changed: changed / (shown.length / 3) }
   }
   for (const key of ['lion', 'prey']) {
     const r = await renderedAnimal(key)
-    check(`feeding: the ${key} mesh reaches the picture`, r.changed > 0.04,
-      `${(r.changed * 100).toFixed(1)} % of its ${r.box ? `${r.box.width}x${r.box.height}` : 'missing'} screen box changes when it is drawn`)
+    const size = r.box ? `${r.box.width}x${r.box.height}` : 'missing'
+    check(`feeding: the ${key} mesh reaches the picture`, !r.verdict && r.changed > 0.04,
+      r.verdict ?? `${(r.changed * 100).toFixed(1)} % of its ${size} screen box changes when it is drawn (noise ${(r.noise * 100).toFixed(1)} %)`)
   }
   const lionAt = await page.evaluate(() => {
     const l = window.__lionHunt?.lion.current
