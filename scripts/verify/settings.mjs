@@ -640,19 +640,28 @@ if (section('lion-feeding')) {
   // RENDERED, not only posed (point 1290): on WebGL 2 the poses read right while
   // neither mesh reached the picture (only the stain and a shadow did). Per animal,
   // photograph its projected screen box twice with the mesh out of the camera's
-  // layers and once between them with its own layer mask back; the drawn shot must
-  // differ from both hidden ones by more than they differ from each other. The
-  // other animal is out of the layers for all three shots (the lion's head bob read
-  // 7.2 % noise in the carcass box), and neither casts a shadow, so neither a
-  // neighbour nor a shadow can pass for the animal. Each shot waits for 3 drawn
-  // frames or fails. 4 % floor: measured lion 10.9/12.1 %, carcass 14.0/14.7 %
-  // (WebGL 2/WebGPU), noise 0.0 %.
+  // layers and twice with its own layer mask back, alternating; only pixels that
+  // change in every drawn/hidden pair count, so a mover crossing one shot (the
+  // vultures circling the kill read 11 % in the hidden pair) cannot pass for the
+  // animal. The other animal is out of the layers for all four shots (the lion's
+  // head bob read 7.2 % in the carcass box), and neither casts a shadow. Each shot
+  // waits for 3 drawn frames, pumped by a tiny capture when headless rAF stalls,
+  // or fails. 4 % floor: measured lion 9.6-10.0 %, carcass 13.7-14.2 % over two
+  // runs per backend.
   const renderedAnimal = async (key) => {
     const box = await page.evaluate((k) => {
       const m = window.__lionHunt?.[k].current?.children[0]
       if (!m?.geometry) return null
-      if (!m.geometry.boundingBox) m.geometry.computeBoundingBox()
-      const { min, max } = m.geometry.boundingBox
+      // Bounds from the position attribute: the shared geometry is left untouched.
+      const pos = m.geometry.attributes.position
+      const min = { x: Infinity, y: Infinity, z: Infinity }
+      const max = { x: -Infinity, y: -Infinity, z: -Infinity }
+      for (let i = 0; i < pos.count; i++) {
+        for (const [a, val] of [['x', pos.getX(i)], ['y', pos.getY(i)], ['z', pos.getZ(i)]]) {
+          min[a] = Math.min(min[a], val)
+          max[a] = Math.max(max[a], val)
+        }
+      }
       m.updateWorldMatrix(true, false)
       const v = m.position.clone()
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
@@ -691,24 +700,35 @@ if (section('lion-feeding')) {
           return window.__wildlife?.frames?.() ?? null
         }, drawn)
         if (f0 == null) throw new Error('no wildlife frame counter')
-        await page.waitForFunction((f) => window.__wildlife.frames() >= f + 3, f0, { polling: 'raf', timeout: 15000 })
+        let drawnFrames = false
+        for (let i = 0; i < 10 && !drawnFrames; i++) {
+          drawnFrames = await page
+            .waitForFunction((f) => window.__wildlife.frames() >= f + 3, f0, { polling: 'raf', timeout: 1500 })
+            .then(() => true, () => false)
+          if (!drawnFrames) await forceFrame()
+        }
+        if (!drawnFrames) throw new Error('3 drawn frames did not arrive within 10 pumped waits')
         const png = await capturePixels(page, `feeding ${key} rendered`, { clip: box })
         return sharp(png).removeAlpha().raw().toBuffer()
       }
       const hiddenA = await capture(false)
-      const shown = await capture(true)
+      const shownA = await capture(true)
       const hiddenB = await capture(false)
-      // A pixel changes when any channel moves by more than 12 levels: a zebra's
-      // white stripes sit close to the sand in luma alone.
-      const frac = (a, b) => {
-        let n = 0
-        for (let i = 0; i < a.length; i += 3) {
-          if (Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])) > 12) n++
-        }
-        return n / (a.length / 3)
+      const shownB = await capture(true)
+      // A pixel changes when any channel moves by more than 12 levels (a zebra's
+      // white stripes sit close to the sand in luma alone). It counts for the animal
+      // only when it changes in all four drawn/hidden pairs: a mover in one shot
+      // changes it in two pairs at most.
+      const moved = (a, b, i) =>
+        Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])) > 12
+      let drawn = 0
+      let noise = 0
+      for (let i = 0; i < hiddenA.length; i += 3) {
+        if ([shownA, shownB].every((sh) => moved(sh, hiddenA, i) && moved(sh, hiddenB, i))) drawn++
+        if (moved(hiddenA, hiddenB, i)) noise++
       }
-      const noise = frac(hiddenA, hiddenB)
-      return { box, changed: Math.min(frac(shown, hiddenA), frac(shown, hiddenB)) - noise, noise }
+      const n = hiddenA.length / 3
+      return { box, changed: drawn / n, noise: noise / n }
     } catch (e) {
       return { box, verdict: String(e?.message ?? e).split('\n')[0] }
     } finally {
