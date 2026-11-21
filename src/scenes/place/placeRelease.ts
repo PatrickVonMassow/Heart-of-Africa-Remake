@@ -18,8 +18,11 @@
 // Textures: a material's dispose does not free them, so the textures those
 // materials bind — as map properties or as TSL texture nodes — are disposed
 // too and re-upload from their source on the next draw. Render-target and depth
-// textures (shadow maps, the panorama capture) and ImageBitmap sources (which
-// a loader may already have closed) are left alone.
+// textures (shadow maps, the panorama capture), GPU-written storage and
+// framebuffer textures, and ImageBitmap sources (which a loader may already
+// have closed) are left alone. A material or geometry the next scene shares is
+// disposed too and rebuilt on its next draw: a recompile, no state loss — the
+// uniforms and node graph live on the CPU object.
 //
 // RENDER LISTS. three keeps one render list per (scene, camera) and keeps the
 // items of its LAST render until that pair renders again. A settlement's
@@ -65,12 +68,19 @@ export function newReleaseSet(): ReleaseSet {
   return { materials: new Set(), geometries: new Set(), textures: new Set() }
 }
 
-type TextureLike = THREE.Texture & { isRenderTargetTexture?: boolean; isDepthTexture?: boolean }
+type TextureLike = THREE.Texture & {
+  isRenderTargetTexture?: boolean
+  isDepthTexture?: boolean
+  isStorageTexture?: boolean
+  isFramebufferTexture?: boolean
+}
 
-/** A texture this sweep may dispose: it re-uploads from data it still holds. */
+/** A texture this sweep may dispose: it re-uploads from data it still holds.
+ *  GPU-written ones (storage, framebuffer copies) hold none and are kept. */
 export function releasableTexture(t: unknown): t is THREE.Texture {
   const tex = t as TextureLike | null
   if (!tex?.isTexture || tex.isRenderTargetTexture || tex.isDepthTexture) return false
+  if (tex.isStorageTexture || tex.isFramebufferTexture) return false
   const image = tex.image as unknown
   return !(typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap)
 }

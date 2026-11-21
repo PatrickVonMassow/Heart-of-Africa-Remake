@@ -110,6 +110,17 @@ describe('textures bound by released materials', () => {
     expect(releasableTexture(new THREE.DataTexture(new Uint8Array(4), 1, 1))).toBe(true)
     expect(releasableTexture(null)).toBe(false)
   })
+
+  it('leaves GPU-written textures alone: their contents cannot re-upload from a source', () => {
+    expect(releasableTexture(new THREE.StorageTexture(4, 4))).toBe(false)
+    expect(releasableTexture(new THREE.FramebufferTexture(4, 4))).toBe(false)
+    const tex = new THREE.StorageTexture(4, 4)
+    const m = new THREE.MeshBasicNodeMaterial()
+    m.colorNode = texture(tex)
+    const set = newReleaseSet()
+    collectSceneResources(new THREE.Mesh(new THREE.BufferGeometry(), m), set)
+    expect(set.textures.size).toBe(0)
+  })
 })
 
 describe('render lists on leaving a place', () => {
