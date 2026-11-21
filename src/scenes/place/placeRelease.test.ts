@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three/webgpu'
-import { collectSceneResources, newReleaseSet, releaseSceneResources, PlaceReleaseTracker } from './placeRelease'
+import { texture } from 'three/tsl'
+import { collectSceneResources, newReleaseSet, releaseSceneResources, releasableTexture, PlaceReleaseTracker } from './placeRelease'
 
 /** Counts 'dispose' events — the signal three's render objects release on. */
 function track<T extends THREE.EventDispatcher<{ dispose: object }>>(o: T): { o: T; n: () => number } {
@@ -41,9 +42,9 @@ describe('place release set', () => {
     const s = scene()
     const set = newReleaseSet()
     collectSceneResources(s.root, set)
-    expect(releaseSceneResources(set)).toEqual({ materials: 4, geometries: 2 })
+    expect(releaseSceneResources(set)).toEqual({ materials: 4, geometries: 2, textures: 0 })
     for (const t of [...s.mats, ...s.geos]) expect(t.n()).toBe(1)
-    expect(releaseSceneResources(set)).toEqual({ materials: 0, geometries: 0 })
+    expect(releaseSceneResources(set)).toEqual({ materials: 0, geometries: 0, textures: 0 })
     for (const t of [...s.mats, ...s.geos]) expect(t.n()).toBe(1)
   })
 })
@@ -76,9 +77,37 @@ describe('PlaceReleaseTracker', () => {
   it('releases nothing on a leave before the first rendered frame (StrictMode remount)', () => {
     const s = scene()
     const tracker = new PlaceReleaseTracker(() => s.root)
-    expect(tracker.leave()).toEqual({ materials: 0, geometries: 0 })
+    expect(tracker.leave()).toEqual({ materials: 0, geometries: 0, textures: 0 })
     for (const t of [...s.mats, ...s.geos]) expect(t.n()).toBe(0)
     tracker.frame()
     expect(tracker.leave().materials).toBe(4)
+  })
+})
+
+describe('textures bound by released materials', () => {
+  it('disposes map properties and TSL texture nodes once, sharing included', () => {
+    const map = track(new THREE.DataTexture(new Uint8Array(4), 1, 1))
+    const viaNode = track(new THREE.CanvasTexture(document.createElement('canvas')))
+    const a = new THREE.MeshStandardNodeMaterial()
+    a.map = map.o
+    const b = new THREE.MeshStandardNodeMaterial()
+    b.colorNode = texture(viaNode.o).rgb.mul(0.5)
+    const c = new THREE.MeshBasicNodeMaterial()
+    c.colorNode = texture(viaNode.o)
+    const root = new THREE.Group()
+    for (const m of [a, b, c]) root.add(new THREE.Mesh(new THREE.BufferGeometry(), m))
+    const set = newReleaseSet()
+    collectSceneResources(root, set)
+    expect(releaseSceneResources(set).textures).toBe(2)
+    expect(map.n()).toBe(1)
+    expect(viaNode.n()).toBe(1)
+  })
+
+  it('leaves render-target and depth textures alone', () => {
+    const rt = new THREE.RenderTarget(4, 4)
+    expect(releasableTexture(rt.texture)).toBe(false)
+    expect(releasableTexture(new THREE.DepthTexture(4, 4))).toBe(false)
+    expect(releasableTexture(new THREE.DataTexture(new Uint8Array(4), 1, 1))).toBe(true)
+    expect(releasableTexture(null)).toBe(false)
   })
 })

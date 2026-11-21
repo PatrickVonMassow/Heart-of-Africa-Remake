@@ -15,8 +15,11 @@
 // Disposing a shared (cached) material or geometry is safe: three rebuilds the
 // GPU side on the next draw that uses it, so a later visit re-compiles and
 // re-uploads instead of the first visit's set staying resident for ever.
-// Textures are not touched: a material's dispose does not free them, and the
-// shared ones have no owner here.
+// Textures: a material's dispose does not free them, so the textures those
+// materials bind — as map properties or as TSL texture nodes — are disposed
+// too and re-upload from their source on the next draw. Render-target and depth
+// textures (shadow maps, the panorama capture) and ImageBitmap sources (which
+// a loader may already have closed) are left alone.
 
 import * as THREE from 'three/webgpu'
 
@@ -28,10 +31,42 @@ export const PLACE_RELEASE_SAMPLE_FRAMES = 30
 export interface ReleaseSet {
   materials: Set<THREE.Material>
   geometries: Set<THREE.BufferGeometry>
+  textures: Set<THREE.Texture>
+}
+
+export interface ReleaseCounts {
+  materials: number
+  geometries: number
+  textures: number
 }
 
 export function newReleaseSet(): ReleaseSet {
-  return { materials: new Set(), geometries: new Set() }
+  return { materials: new Set(), geometries: new Set(), textures: new Set() }
+}
+
+type TextureLike = THREE.Texture & { isRenderTargetTexture?: boolean; isDepthTexture?: boolean }
+
+/** A texture this sweep may dispose: it re-uploads from data it still holds. */
+export function releasableTexture(t: unknown): t is THREE.Texture {
+  const tex = t as TextureLike | null
+  if (!tex?.isTexture || tex.isRenderTargetTexture || tex.isDepthTexture) return false
+  const image = tex.image as unknown
+  return !(typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap)
+}
+
+type NodeLike = { isNode?: boolean; isTextureNode?: boolean; value?: unknown; traverse?: (cb: (n: NodeLike) => void) => void }
+
+/** The textures a material binds: texture properties and TSL texture nodes. */
+function collectMaterialTextures(m: THREE.Material, into: Set<THREE.Texture>): void {
+  for (const v of Object.values(m) as unknown[]) {
+    if (releasableTexture(v)) into.add(v)
+    const node = v as NodeLike | null
+    if (node?.isNode && typeof node.traverse === 'function') {
+      node.traverse((n) => {
+        if (n.isTextureNode && releasableTexture(n.value)) into.add(n.value)
+      })
+    }
+  }
 }
 
 type Drawable = THREE.Object3D & {
@@ -39,27 +74,35 @@ type Drawable = THREE.Object3D & {
   geometry?: THREE.BufferGeometry | null
 }
 
-/** Add every material and geometry drawn under `root` to `into`. */
+function addMaterial(m: THREE.Material, into: ReleaseSet): void {
+  if (into.materials.has(m)) return
+  into.materials.add(m)
+  collectMaterialTextures(m, into.textures)
+}
+
+/** Add every material, geometry and bound texture drawn under `root` to `into`. */
 export function collectSceneResources(root: THREE.Object3D, into: ReleaseSet): void {
   root.traverse((o) => {
     const d = o as Drawable
     const m = d.material
     if (Array.isArray(m)) {
-      for (const one of m) if (one?.isMaterial) into.materials.add(one)
+      for (const one of m) if (one?.isMaterial) addMaterial(one, into)
     } else if (m?.isMaterial) {
-      into.materials.add(m)
+      addMaterial(m, into)
     }
     if (d.geometry?.isBufferGeometry) into.geometries.add(d.geometry)
   })
 }
 
 /** Dispose everything in `set` and empty it. Returns what was disposed. */
-export function releaseSceneResources(set: ReleaseSet): { materials: number; geometries: number } {
-  const counts = { materials: set.materials.size, geometries: set.geometries.size }
+export function releaseSceneResources(set: ReleaseSet): ReleaseCounts {
+  const counts = { materials: set.materials.size, geometries: set.geometries.size, textures: set.textures.size }
   for (const m of set.materials) m.dispose()
   for (const g of set.geometries) g.dispose()
+  for (const t of set.textures) t.dispose()
   set.materials.clear()
   set.geometries.clear()
+  set.textures.clear()
   return counts
 }
 
@@ -88,10 +131,10 @@ export class PlaceReleaseTracker {
     if (r) collectSceneResources(r, this.set)
   }
 
-  leave(): { materials: number; geometries: number } {
+  leave(): ReleaseCounts {
     // No traverse here: the unmount commit may already have attached the next
     // scene's objects, which are not this visit's to release.
-    if (this.frames === 0) return { materials: 0, geometries: 0 }
+    if (this.frames === 0) return { materials: 0, geometries: 0, textures: 0 }
     this.frames = 0
     return releaseSceneResources(this.set)
   }

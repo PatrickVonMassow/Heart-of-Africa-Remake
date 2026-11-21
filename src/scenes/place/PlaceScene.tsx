@@ -21,6 +21,7 @@ import {
 import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setGroundWetness, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
 import { useGame } from '../../state/store'
 import { PlaceReleaseTracker } from './placeRelease'
+import { releaseFigureCaches } from './skinnedFigure'
 import {
   useUi,
   effectiveShadows,
@@ -2588,7 +2589,13 @@ export function PlaceScene() {
   // render object and pipeline for the session.
   const release = useMemo(() => new PlaceReleaseTracker(() => r3fScene), [r3fScene])
   useFrame(() => release.frame())
-  useEffect(() => () => void release.leave(), [release])
+  useEffect(
+    () => () => {
+      release.leave()
+      releaseFigureCaches()
+    },
+    [release],
+  )
   const placeId = useGame((s) => s.placeId)
   const seed = useGame((s) => s.seed)
   const orientationGiven = useGame((s) => s.orientationGiven)

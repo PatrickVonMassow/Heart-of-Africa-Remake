@@ -168,6 +168,27 @@ function releaseGeometry(g: THREE.BufferGeometry): void {
   g.dispose()
 }
 
+/** Forget every cached figure geometry and person (point 1447). The caches are
+ *  keyed per person, dress layer and village palette, so across a journey they
+ *  only grew (~120 MB of heap per village). Called when a settlement scene
+ *  unmounts: nothing is disposed here — mounted figures keep their own
+ *  references and GPU release stays with releaseGeometry / the place sweep —
+ *  the maps just stop pinning the CPU arrays. Returns the entries dropped. */
+export function releaseFigureCaches(): number {
+  const maps: Map<string, unknown>[] = [bodyCache, layerCache, figureCache, personCache, gltfFigureCache, gltfLayerCache]
+  let n = 0
+  for (const m of maps) {
+    n += m.size
+    m.clear()
+  }
+  return n
+}
+
+/** Entries held by the figure caches (verification and tests). */
+export function figureCacheSize(): number {
+  return bodyCache.size + layerCache.size + figureCache.size + personCache.size + gltfFigureCache.size + gltfLayerCache.size
+}
+
 /** The figure's whole scene graph, built once per identity and look. */
 interface Rig {
   p: BodyProportions
