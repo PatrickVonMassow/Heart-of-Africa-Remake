@@ -20,6 +20,16 @@
 // too and re-upload from their source on the next draw. Render-target and depth
 // textures (shadow maps, the panorama capture) and ImageBitmap sources (which
 // a loader may already have closed) are left alone.
+//
+// RENDER LISTS. three keeps one render list per (scene, camera) and keeps the
+// items of its LAST render until that pair renders again. A settlement's
+// lights stay reachable after it is left (three's node-builder caches hold
+// their shadow nodes), so the lists of their shadow cameras — never rendered
+// again — pinned every figure the last shadow pass drew, and with each figure
+// its rig and geometry: measured, ~23 skinned figures and ~50-100 MB of heap
+// per village hop (heap-snapshot retainer path Scene -> render-list WeakMap ->
+// [shadow camera] -> RenderList.opaque -> item.object -> SkinnedMesh). Leaving
+// the place drops every list; the next frame rebuilds the ones still drawn.
 
 import * as THREE from 'three/webgpu'
 
@@ -138,4 +148,16 @@ export class PlaceReleaseTracker {
     this.frames = 0
     return releaseSceneResources(this.set)
   }
+}
+
+type RendererLike = { _renderLists?: { dispose?: () => void } } | null | undefined
+
+/** Drop the renderer's render lists (three internals, read defensively): the
+ *  ones of cameras that no longer render stop pinning what they last drew.
+ *  Returns whether there was anything to drop. */
+export function releaseRenderLists(renderer: unknown): boolean {
+  const lists = (renderer as RendererLike)?._renderLists
+  if (!lists || typeof lists.dispose !== 'function') return false
+  lists.dispose()
+  return true
 }

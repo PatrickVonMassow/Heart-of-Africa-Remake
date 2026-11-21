@@ -20,7 +20,7 @@ import {
 } from 'three/tsl'
 import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setGroundWetness, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
 import { useGame } from '../../state/store'
-import { PlaceReleaseTracker } from './placeRelease'
+import { PlaceReleaseTracker, releaseRenderLists } from './placeRelease'
 import { releaseFigureCaches } from './skinnedFigure'
 import {
   useUi,
@@ -2593,8 +2593,9 @@ export function PlaceScene() {
     () => () => {
       release.leave()
       releaseFigureCaches()
+      releaseRenderLists(gl)
     },
-    [release],
+    [release, gl],
   )
   const placeId = useGame((s) => s.placeId)
   const seed = useGame((s) => s.seed)

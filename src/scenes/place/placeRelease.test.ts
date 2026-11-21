@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three/webgpu'
 import { texture } from 'three/tsl'
-import { collectSceneResources, newReleaseSet, releaseSceneResources, releasableTexture, PlaceReleaseTracker } from './placeRelease'
+import { collectSceneResources, newReleaseSet, releaseRenderLists, releaseSceneResources, releasableTexture, PlaceReleaseTracker } from './placeRelease'
 
 /** Counts 'dispose' events — the signal three's render objects release on. */
 function track<T extends THREE.EventDispatcher<{ dispose: object }>>(o: T): { o: T; n: () => number } {
@@ -109,5 +109,44 @@ describe('textures bound by released materials', () => {
     expect(releasableTexture(new THREE.DepthTexture(4, 4))).toBe(false)
     expect(releasableTexture(new THREE.DataTexture(new Uint8Array(4), 1, 1))).toBe(true)
     expect(releasableTexture(null)).toBe(false)
+  })
+})
+
+describe('render lists on leaving a place', () => {
+  type List = { begin(): List; finish(): void; push(...a: unknown[]): void; renderItems: Array<{ object: unknown }> }
+  type Lists = { get(scene: unknown, camera: unknown): List; dispose(): void }
+  async function renderLists(): Promise<Lists> {
+    const listsPath = 'three/src/renderers/common/RenderLists.js'
+    const lightingPath = 'three/src/renderers/common/Lighting.js'
+    const { default: RenderLists } = (await import(/* @vite-ignore */ listsPath)) as { default: new (l: unknown) => Lists }
+    const { default: Lighting } = (await import(/* @vite-ignore */ lightingPath)) as { default: new () => unknown }
+    return new RenderLists(new Lighting())
+  }
+  /** One shadow pass of a village: its sun's shadow camera draws a figure. */
+  function shadowPass(lists: Lists, scene: THREE.Scene, camera: THREE.Camera, figure: THREE.Mesh) {
+    const list = lists.get(scene, camera).begin()
+    list.push(figure, figure.geometry, figure.material, 0, 0, null, null)
+    list.finish()
+  }
+  const pinned = (lists: Lists, scene: THREE.Scene, camera: THREE.Camera, figure: THREE.Mesh) =>
+    lists.get(scene, camera).renderItems.some((i) => i.object === figure)
+
+  it('a shadow camera that never renders again pins the figure it last drew, until the lists are released', async () => {
+    const lists = await renderLists()
+    const scene = new THREE.Scene()
+    // the left village's sun: still reachable (three's node caches hold its shadow node)
+    const oldShadowCamera = new THREE.OrthographicCamera()
+    const oldFigure = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicNodeMaterial())
+    shadowPass(lists, scene, oldShadowCamera, oldFigure)
+    // the next village renders with its own lights; the old camera is never drawn again
+    shadowPass(lists, scene, new THREE.OrthographicCamera(), new THREE.Mesh())
+    expect(pinned(lists, scene, oldShadowCamera, oldFigure)).toBe(true) // the retention
+    expect(releaseRenderLists({ _renderLists: lists })).toBe(true)
+    expect(pinned(lists, scene, oldShadowCamera, oldFigure)).toBe(false)
+  })
+
+  it('fails soft on a renderer without render lists', () => {
+    expect(releaseRenderLists(null)).toBe(false)
+    expect(releaseRenderLists({})).toBe(false)
   })
 })
