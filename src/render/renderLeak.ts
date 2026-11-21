@@ -297,7 +297,7 @@ export function textureCensus(
     k.bytes += typeof size === 'number' ? size : 0
     kinds.set(kind, k)
   }
-  for (const [kind, count] of previous) if (!kinds.has(kind)) kinds.set(kind, { kind, count: 0, bytes: 0, delta: 0 })
+  for (const kind of previous.keys()) if (!kinds.has(kind)) kinds.set(kind, { kind, count: 0, bytes: 0, delta: 0 })
   for (const k of kinds.values()) k.delta = k.count - (previous.get(k.kind) ?? (previous.size ? 0 : k.count))
   return [...kinds.values()].sort((a, b) => b.delta - a.delta || b.count - a.count)
 }
