@@ -7,7 +7,7 @@
 // was released (src/scenes/place/placeRelease.ts). The key counts entries as
 // the store makes them, so a leave and re-entry of the SAME place in one tick
 // remounts too, although React sees the same mode and place id before and after
-(the counter: state/placeVisit.ts).
+// (the counter: state/placeVisit.ts).
 
 import { useSyncExternalStore } from 'react'
 import { useGame } from '../state/store'
