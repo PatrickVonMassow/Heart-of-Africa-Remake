@@ -7,6 +7,7 @@ import {
   LEAK_BOUNDS,
   PIPELINE_RETURN_BOUNDS,
   PIPELINE_RETURN_START,
+  TEXTURE_RETURN_BOUNDS,
   SETTLE_POLICY,
   currentRenderSignature,
   evaluateReading,
@@ -337,5 +338,31 @@ describe('pipeline return after a place visit', () => {
   it('reproduces the measured unreleased growth (~40 per village) as a leak under the default bounds', () => {
     expect(judgePipelineReturn(PIPELINE_RETURN_START, 64, 104).evaluation.verdict).toBe('leak')
     expect(PIPELINE_RETURN_BOUNDS.step).toBeLessThan(40)
+  })
+})
+
+describe('texture return after a place visit', () => {
+  it('reproduces the measured ~3-4 textures per village as a leak within a few villages', () => {
+    let state = PIPELINE_RETURN_START
+    let entry = 75
+    const verdicts: string[] = []
+    for (let i = 0; i < 8; i++) {
+      const r = judgePipelineReturn(state, entry, entry + 3.5, TEXTURE_RETURN_BOUNDS, 'textures')
+      state = r.state
+      entry += 3.5
+      verdicts.push(r.evaluation.verdict)
+      if (r.evaluation.verdict === 'leak') expect(r.evaluation.detail).toMatch(/^textures after place visit/)
+    }
+    expect(verdicts.slice(0, 6)).toEqual(Array(6).fill('ok'))
+    expect(verdicts[7]).toBe('leak')
+  })
+
+  it('passes a released place whose textures come back to the entry count', () => {
+    let state = PIPELINE_RETURN_START
+    for (const back of [76, 74, 75, 77, 75]) {
+      const r = judgePipelineReturn(state, 75, back, TEXTURE_RETURN_BOUNDS, 'textures')
+      state = r.state
+      expect(r.evaluation.verdict).toBe('ok')
+    }
   })
 })

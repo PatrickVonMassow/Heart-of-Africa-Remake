@@ -91,6 +91,12 @@ export const PIPELINE_RETURN_BOUNDS = { step: 24, total: 72 }
 
 export type PipelineReturnBounds = typeof PIPELINE_RETURN_BOUNDS
 
+/** The same judgement on `renderer.info.memory.textures`. Calibratable,
+ *  dev-only: an unreleased place left ~3-4 textures per village (owner
+ *  measurement 21.11.2026, 75 -> 115 over 12 villages); a step of 8 passes
+ *  return noise, a total of 24 trips a steady leak within a few villages. */
+export const TEXTURE_RETURN_BOUNDS: PipelineReturnBounds = { step: 8, total: 24 }
+
 export interface PipelineReturnState {
   /** Visits judged so far. */
   visits: number
@@ -115,6 +121,7 @@ export function judgePipelineReturn(
   entry: number,
   back: number,
   bounds: PipelineReturnBounds = PIPELINE_RETURN_BOUNDS,
+  what: 'pipelines' | 'textures' = 'pipelines',
 ): { evaluation: PipelineReturnEvaluation; state: PipelineReturnState } {
   const delta = back - entry
   const next: PipelineReturnState = { visits: state.visits + 1, growth: Math.max(0, state.growth + delta) }
@@ -122,9 +129,9 @@ export function judgePipelineReturn(
   const overTotal = next.growth > bounds.total
   const verdict = overStep || overTotal ? 'leak' : 'ok'
   const detail =
-    `pipelines after place visit ${next.visits}: ${entry} -> ${back} (${delta >= 0 ? '+' : ''}${delta}, ` +
+    `${what} after place visit ${next.visits}: ${entry} -> ${back} (${delta >= 0 ? '+' : ''}${delta}, ` +
     `allowed +${bounds.step}); net growth over all visits ${next.growth} (allowed ${bounds.total})` +
-    (verdict === 'leak' ? (overStep ? ' — one visit left its pipelines behind' : ' — pipelines grow with the villages visited') : '')
+    (verdict === 'leak' ? (overStep ? ` — one visit left its ${what} behind` : ` — ${what} grow with the villages visited`) : '')
   return { evaluation: { verdict, entry, back, delta, detail }, state: next }
 }
 
@@ -420,6 +427,9 @@ let pipelineEntry: number | null = null
 let lastMode: string | null = null
 let pipelineState: PipelineReturnState = PIPELINE_RETURN_START
 let pipelineHistory: PipelineReturnEvaluation[] = []
+let textureEntry: number | null = null
+let textureState: PipelineReturnState = PIPELINE_RETURN_START
+let textureHistory: PipelineReturnEvaluation[] = []
 
 /** `renderer._pipelines.caches.size` — three internals, so read defensively;
  *  null where the renderer or the field is missing (fail soft). */
@@ -435,6 +445,16 @@ function judgePendingReturn(signature: string): void {
   const back = readPipelines()
   const entry = pipelineEntry
   pipelineEntry = null
+  const texBack = readCounts()?.textures ?? null
+  const texEntry = textureEntry
+  textureEntry = null
+  if (texBack !== null && texEntry !== null) {
+    const t = judgePipelineReturn(textureState, texEntry, texBack, TEXTURE_RETURN_BOUNDS, 'textures')
+    textureState = t.state
+    textureHistory.push(t.evaluation)
+    if (textureHistory.length > HISTORY_CAP) textureHistory.splice(0, textureHistory.length - HISTORY_CAP)
+    devAssert(t.evaluation.verdict !== 'leak', 'render-texture-return-leak', () => t.evaluation.detail)
+  }
   if (back === null) return
   const { evaluation, state } = judgePipelineReturn(pipelineState, entry, back)
   pipelineState = state
@@ -539,7 +559,10 @@ function startWatch(signature: string): void {
 function onStateChange(): void {
   // Read at the store change itself, before React unmounts the bird's-eye view.
   const mode = useGame.getState().mode
-  if (lastMode === 'travel' && mode === 'place' && pipelineEntry === null) pipelineEntry = readPipelines()
+  if (lastMode === 'travel' && mode === 'place' && pipelineEntry === null) {
+    pipelineEntry = readPipelines()
+    textureEntry = readCounts()?.textures ?? null
+  }
   lastMode = mode
   const sig = currentRenderSignature()
   if (sig === currentSignature) return
@@ -556,6 +579,9 @@ function reset(): void {
   pipelineEntry = null
   pipelineState = PIPELINE_RETURN_START
   pipelineHistory = []
+  textureEntry = null
+  textureState = PIPELINE_RETURN_START
+  textureHistory = []
   currentSignature = currentRenderSignature()
   startWatch(currentSignature)
 }
@@ -626,6 +652,12 @@ export function armRenderLeakWatch(): void {
         bounds: PIPELINE_RETURN_BOUNDS,
         state: pipelineState,
         history: pipelineHistory,
+      },
+      textureReturn: {
+        entry: textureEntry,
+        bounds: TEXTURE_RETURN_BOUNDS,
+        state: textureState,
+        history: textureHistory,
       },
     }),
     reset,
