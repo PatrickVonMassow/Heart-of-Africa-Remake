@@ -46,6 +46,17 @@ describe('SceneSwitch', () => {
     expect(life.mounts).toEqual(['cairo', 'tuareg-village'])
   })
 
+  it('remounts the settlement scene on a leave and re-entry of the same place in one tick', () => {
+    act(() => g().enterPlace('cairo'))
+    render(<SceneSwitch />)
+    act(() => {
+      g().leavePlace()
+      g().enterPlace('cairo')
+    })
+    expect(life.unmounts).toEqual(['cairo'])
+    expect(life.mounts).toEqual(['cairo', 'cairo'])
+  })
+
   it('unmounts the settlement scene when the player returns to the bird\'s-eye view', () => {
     act(() => g().enterPlace('cairo'))
     render(<SceneSwitch />)
