@@ -519,13 +519,13 @@ let watch: Watch | null = null
 let rafHandle: number | null = null
 /** Render targets deliberately leaked by the forceLeak() probe (verification). */
 let forced: THREE.RenderTarget[] = []
-/** Pipeline count when the player last left the bird's-eye view for a place;
- *  null while no return is pending. */
-let pipelineEntry: number | null = null
+/** The counters read when the player last left the bird's-eye view for a
+ *  place; null while no return is pending. Either counter may be unreadable
+ *  (null) without cancelling the other's judgement. */
+let pendingVisit: { pipelines: number | null; textures: number | null } | null = null
 let lastMode: string | null = null
 let pipelineState: PipelineReturnState = PIPELINE_RETURN_START
 let pipelineHistory: PipelineReturnEvaluation[] = []
-let textureEntry: number | null = null
 let textureState: PipelineReturnState = PIPELINE_RETURN_START
 let textureHistory: PipelineReturnEvaluation[] = []
 let hopState: PlaceHopState = PLACE_HOP_START
@@ -541,13 +541,11 @@ function readPipelines(): number | null {
 
 /** A settled bird's-eye reading closes a pending place visit. */
 function judgePendingReturn(signature: string): void {
-  if (pipelineEntry === null || !signature.startsWith('travel|')) return
+  if (pendingVisit === null || !signature.startsWith('travel|')) return
   const back = readPipelines()
-  const entry = pipelineEntry
-  pipelineEntry = null
+  const { pipelines: entry, textures: texEntry } = pendingVisit
+  pendingVisit = null
   const texBack = readCounts()?.textures ?? null
-  const texEntry = textureEntry
-  textureEntry = null
   if (texBack !== null && texEntry !== null) {
     const t = judgePipelineReturn(textureState, texEntry, texBack, TEXTURE_RETURN_BOUNDS, 'textures')
     textureState = t.state
@@ -555,7 +553,7 @@ function judgePendingReturn(signature: string): void {
     if (textureHistory.length > HISTORY_CAP) textureHistory.splice(0, textureHistory.length - HISTORY_CAP)
     devAssert(t.evaluation.verdict !== 'leak', 'render-texture-return-leak', () => t.evaluation.detail)
   }
-  if (back === null) return
+  if (back === null || entry === null) return
   const { evaluation, state } = judgePipelineReturn(pipelineState, entry, back)
   pipelineState = state
   pipelineHistory.push(evaluation)
@@ -683,9 +681,8 @@ function startWatch(signature: string): void {
 function onStateChange(): void {
   // Read at the store change itself, before React unmounts the bird's-eye view.
   const mode = useGame.getState().mode
-  if (lastMode === 'travel' && mode === 'place' && pipelineEntry === null) {
-    pipelineEntry = readPipelines()
-    textureEntry = readCounts()?.textures ?? null
+  if (lastMode === 'travel' && mode === 'place' && pendingVisit === null) {
+    pendingVisit = { pipelines: readPipelines(), textures: readCounts()?.textures ?? null }
   }
   lastMode = mode
   const sig = currentRenderSignature()
@@ -700,10 +697,9 @@ function reset(): void {
   baselines = {}
   history = []
   violations = []
-  pipelineEntry = null
+  pendingVisit = null
   pipelineState = PIPELINE_RETURN_START
   pipelineHistory = []
-  textureEntry = null
   textureState = PIPELINE_RETURN_START
   textureHistory = []
   hopState = PLACE_HOP_START
@@ -774,13 +770,13 @@ export function armRenderLeakWatch(): void {
       forced: forced.length,
       pipelines: {
         current: readPipelines(),
-        entry: pipelineEntry,
+        entry: pendingVisit?.pipelines ?? null,
         bounds: PIPELINE_RETURN_BOUNDS,
         state: pipelineState,
         history: pipelineHistory,
       },
       textureReturn: {
-        entry: textureEntry,
+        entry: pendingVisit?.textures ?? null,
         bounds: TEXTURE_RETURN_BOUNDS,
         state: textureState,
         history: textureHistory,

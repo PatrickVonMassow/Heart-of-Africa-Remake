@@ -66,4 +66,17 @@ describe('render leak watch, live', () => {
     expect(h.state().placeHop.history).toHaveLength(4)
     expect(h.asserts()).not.toContain('render-place-hop-leak')
   })
+
+  it('still judges the texture return when the pipeline counter is unreadable', async () => {
+    const h = await harness()
+    h.gl._pipelines = undefined
+    h.go('place', 'a')
+    h.gl.info.memory.textures = 120
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75 + 30 // the visit left 30 textures behind
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(1)
+    expect(h.asserts()).toContain('render-texture-return-leak')
+  })
 })
