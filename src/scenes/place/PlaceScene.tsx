@@ -20,6 +20,7 @@ import {
 } from 'three/tsl'
 import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setGroundWetness, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
 import { useGame } from '../../state/store'
+import { PlaceReleaseTracker } from './placeRelease'
 import {
   useUi,
   effectiveShadows,
@@ -277,7 +278,7 @@ const PATH_MASK_EXTENT = 44
 
 /** Renders the path polylines into a soft grayscale mask (canvas texture). */
 function usePathTexture(paths: PathDef[] | null): THREE.CanvasTexture | null {
-  return useMemo(() => {
+  const texture = useMemo(() => {
     if (!paths || paths.length === 0) return null
     const size = 512
     const canvas = document.createElement('canvas')
@@ -310,6 +311,9 @@ function usePathTexture(paths: PathDef[] | null): THREE.CanvasTexture | null {
     tex.flipY = false
     return tex
   }, [paths])
+  // Built per settlement: released with it instead of staying resident.
+  useEffect(() => () => texture?.dispose(), [texture])
+  return texture
 }
 
 function usePlaceMaterials(
@@ -321,7 +325,7 @@ function usePlaceMaterials(
   // Debug diagnosis (point 111): swap the ground for a plain material to see
   // whether a WebGPU-only black patch comes from the TSL ground node material.
   const flatGround = useUi((s) => s.groundDebugFlat)
-  return useMemo(() => {
+  const mats = useMemo(() => {
     // Wall/roof materials carry real micro-relief and weathering (design.md
     // §2.6) from the baked tileable maps: fine plaster grain, coarser mud
     // daub, deep anisotropic thatch, wood grain — each with a darkened base
@@ -351,6 +355,16 @@ function usePlaceMaterials(
     const groundOpen = groundSurface(...palette, sand)
     return { plaster, plasterDark, mud, thatch, wood, cloth, ground, groundOpen }
   }, [isPort, isMonument, style, pathTex, flatGround])
+  // Seven node materials per settlement (its own wall, thatch and ground
+  // colours): a rebuild or leaving the place disposes them, which releases
+  // their render objects and pipelines (point 1447).
+  useEffect(
+    () => () => {
+      for (const m of [mats.plaster, mats.plasterDark, mats.mud, mats.thatch, mats.wood, mats.cloth, mats.ground]) m.dispose()
+    },
+    [mats],
+  )
+  return mats
 }
 
 type PlaceMaterials = ReturnType<typeof usePlaceMaterials>
@@ -2569,6 +2583,12 @@ export function PlaceScene() {
   const camera = useThree((s) => s.camera)
   const r3fScene = useThree((s) => s.scene)
   const gl = useThree((s) => s.gl)
+  // Leaving the settlement disposes every material and geometry its frames drew
+  // (placeRelease.ts): shared module materials otherwise keep each villager's
+  // render object and pipeline for the session.
+  const release = useMemo(() => new PlaceReleaseTracker(() => r3fScene), [r3fScene])
+  useFrame(() => release.frame())
+  useEffect(() => () => void release.leave(), [release])
   const placeId = useGame((s) => s.placeId)
   const seed = useGame((s) => s.seed)
   const orientationGiven = useGame((s) => s.orientationGiven)
