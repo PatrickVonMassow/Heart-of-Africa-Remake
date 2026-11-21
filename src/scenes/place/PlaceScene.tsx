@@ -20,7 +20,7 @@ import {
 } from 'three/tsl'
 import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setGroundWetness, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
 import { useGame } from '../../state/store'
-import { PlaceReleaseTracker, releaseRenderLists } from './placeRelease'
+import { PlaceReleaseTracker, pruneDeadBindGroups, releaseRenderLists } from './placeRelease'
 import { releaseFigureCaches } from './skinnedFigure'
 import {
   useUi,
@@ -2594,6 +2594,8 @@ export function PlaceScene() {
       release.leave()
       releaseFigureCaches()
       releaseRenderLists(gl)
+      // after the release above destroyed this visit's bind groups
+      pruneDeadBindGroups(gl)
     },
     [release, gl],
   )

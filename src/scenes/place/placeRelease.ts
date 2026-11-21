@@ -30,6 +30,17 @@
 // per village hop (heap-snapshot retainer path Scene -> render-list WeakMap ->
 // [shadow camera] -> RenderList.opaque -> item.object -> SkinnedMesh). Leaving
 // the place drops every list; the next frame rebuilds the ones still drawn.
+//
+// BIND GROUPS. three r185 records, per sampled texture, every bind group that
+// samples it (Textures data `bindGroups`, used to invalidate them when the
+// texture is destroyed) and never removes a bind group when it is destroyed
+// (Bindings._destroyBindings). A texture that lives for the session — the PBR
+// DFG lookup, the environment, the post chain's targets — so kept every
+// figure's bind group ever drawn, and through its texture nodes the figure's
+// morph DataArrayTexture with its CPU data (~2 MB each): measured, live
+// morph textures 15 -> 31 -> 49 over three hops while the GPU held 14-18.
+// Leaving the place prunes, from every texture the renderer still holds, the
+// bind groups the renderer has already destroyed.
 
 import * as THREE from 'three/webgpu'
 
@@ -160,4 +171,35 @@ export function releaseRenderLists(renderer: unknown): boolean {
   if (!lists || typeof lists.dispose !== 'function') return false
   lists.dispose()
   return true
+}
+
+type DataMapLike<V> = { has?: (o: object) => boolean; get?: (o: object) => V }
+type PruneRenderer = {
+  info?: { memoryMap?: Map<object, unknown> }
+  _textures?: DataMapLike<{ bindGroups?: Set<object> }>
+  _bindings?: DataMapLike<unknown>
+} | null | undefined
+
+/** Remove destroyed bind groups from the bind-group sets of every texture the
+ *  renderer still holds (three internals, read defensively; a renderer without
+ *  them prunes nothing). A bind group counts as destroyed once the renderer's
+ *  bindings no longer hold data for it. Returns the entries removed. */
+export function pruneDeadBindGroups(renderer: unknown): number {
+  const r = renderer as PruneRenderer
+  const live = r?.info?.memoryMap
+  const textures = r?._textures
+  const bindings = r?._bindings
+  if (!live || typeof textures?.has !== 'function' || typeof textures.get !== 'function' || typeof bindings?.has !== 'function') return 0
+  let removed = 0
+  for (const t of live.keys()) {
+    if (!(t as { isTexture?: boolean }).isTexture || !textures.has(t)) continue
+    const groups = textures.get(t)?.bindGroups
+    if (!groups) continue
+    for (const g of groups) {
+      if (bindings.has(g)) continue
+      groups.delete(g)
+      removed++
+    }
+  }
+  return removed
 }

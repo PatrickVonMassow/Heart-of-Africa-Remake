@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three/webgpu'
 import { texture } from 'three/tsl'
-import { collectSceneResources, newReleaseSet, releaseRenderLists, releaseSceneResources, releasableTexture, PlaceReleaseTracker } from './placeRelease'
+import { collectSceneResources, newReleaseSet, pruneDeadBindGroups, releaseRenderLists, releaseSceneResources, releasableTexture, PlaceReleaseTracker } from './placeRelease'
 
 /** Counts 'dispose' events — the signal three's render objects release on. */
 function track<T extends THREE.EventDispatcher<{ dispose: object }>>(o: T): { o: T; n: () => number } {
@@ -148,5 +148,54 @@ describe('render lists on leaving a place', () => {
   it('fails soft on a renderer without render lists', () => {
     expect(releaseRenderLists(null)).toBe(false)
     expect(releaseRenderLists({})).toBe(false)
+  })
+})
+
+describe('bind groups three never forgets', () => {
+  /** three r185's bookkeeping, reduced to what the leak is made of: each
+   *  sampled texture's data keeps a Set of the bind groups sampling it, and
+   *  destroying a bind group deletes its bindings data but not those entries. */
+  function renderer() {
+    const textureData = new WeakMap<object, { bindGroups: Set<object> }>()
+    const bindingData = new WeakMap<object, object>()
+    const memoryMap = new Map<object, number>()
+    const map = <V,>(m: WeakMap<object, V>) => ({ has: (o: object) => m.has(o), get: (o: object) => m.get(o) })
+    const r = { info: { memoryMap }, _textures: map(textureData), _bindings: map(bindingData) }
+    const upload = (t: THREE.Texture) => {
+      memoryMap.set(t, 0)
+      textureData.set(t, { bindGroups: new Set() })
+    }
+    const draw = (samples: THREE.Texture[]) => {
+      const group = { bindings: samples.map((t) => ({ texture: t })) }
+      bindingData.set(group, {})
+      for (const t of samples) textureData.get(t)!.bindGroups.add(group)
+      return group
+    }
+    const destroy = (group: object) => bindingData.delete(group) // what _destroyBindings does
+    // a disposed texture leaves the renderer (geometry dispose frees a morph texture)
+    const release = (t: THREE.Texture) => memoryMap.delete(t)
+    return { r, upload, draw, destroy, release, groups: (t: THREE.Texture) => textureData.get(t)!.bindGroups }
+  }
+
+  it('a session texture keeps every destroyed figure bind group, and with it the figure morph texture, until pruned', () => {
+    const { r, upload, draw, destroy, release, groups } = renderer()
+    const dfg = new THREE.DataTexture() // lives for the session, never disposed
+    upload(dfg)
+    const kept = draw([dfg])
+    for (let village = 0; village < 3; village++) {
+      const morph = new THREE.DataArrayTexture()
+      upload(morph)
+      destroy(draw([dfg, morph])) // the village's figure, left again
+      release(morph)
+    }
+    expect(groups(dfg).size).toBe(4) // the leak: three destroyed groups still referenced
+    expect(pruneDeadBindGroups(r)).toBe(3)
+    expect([...groups(dfg)]).toEqual([kept]) // a live group is never touched
+    expect(pruneDeadBindGroups(r)).toBe(0)
+  })
+
+  it('fails soft on a renderer without the bookkeeping', () => {
+    expect(pruneDeadBindGroups(null)).toBe(0)
+    expect(pruneDeadBindGroups({ info: {} })).toBe(0)
   })
 })
