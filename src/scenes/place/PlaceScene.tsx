@@ -3082,8 +3082,9 @@ export function PlaceScene() {
   // hand's breadth away — the flicker TARGET_HOLD exists to stop. A press writes
   // only the history of the input it came from; `pressKey` owns that rule.
   const keyPicks = useRef<KeyPicks>(NO_KEY_PICKS)
-  // PlaceScene stays mounted across placeId changes and the handler's effect
-  // only re-subscribes on setPrompt, so read the CURRENT layout through a ref.
+  // The handler's effect only re-subscribes on setPrompt, so read the CURRENT
+  // layout through a ref. (A placeId change remounts PlaceScene: SceneSwitch
+  // keys it per visit.)
   const layoutRef = useRef(layout)
   layoutRef.current = layout
   // The escape from a wedge (work-order 604): U frees the traveller wherever the
