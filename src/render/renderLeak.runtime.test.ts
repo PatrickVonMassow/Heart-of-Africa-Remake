@@ -136,6 +136,38 @@ describe('render leak watch, live', () => {
     expect(h.asserts()).toContain('render-place-hop-leak')
   })
 
+  it('judges a hop on pipelines when the player moves on while the place\'s textures still stream', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('place', 'b')
+    h.gl._pipelines!.caches.size += 60 // the hop left its pipelines behind
+    // render targets stand at once; textures stream until the player leaves at frame 80
+    h.tick(80, () => {
+      h.gl.info.memory.textures++
+    })
+    h.go('place', 'c')
+    h.tick()
+    const hops = h.state().placeHop.history as Array<{ from: string; to: string; delta: { textures: number | null; pipelines: number | null } }>
+    expect(hops[0]).toMatchObject({ from: 'a', to: 'b', delta: { textures: null, pipelines: 60 } })
+    expect(h.asserts()).toContain('render-place-hop-leak')
+  })
+
+  it('judges a return on pipelines when the player leaves the bird\'s-eye view while its textures still stream', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl._pipelines!.caches.size += 200 // the visit left its pipelines behind
+    h.tick(80, () => {
+      h.gl.info.memory.textures++
+    })
+    h.go('place', 'b')
+    h.tick()
+    expect(h.state().pipelines.history).toHaveLength(1)
+    expect(h.asserts()).toContain('render-pipeline-leak')
+  })
+
   it('judges a leave and re-entry of the same place in one tick as a hop', async () => {
     const h = await harness()
     h.go('place', 'a')

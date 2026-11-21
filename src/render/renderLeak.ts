@@ -629,7 +629,9 @@ let textureHistory: PipelineReturnEvaluation[] = []
 let hopState: PlaceHopState = PLACE_HOP_START
 let hopHistory: PlaceHopEvaluation[] = []
 let lastCensus: ReadonlyMap<string, number> = new Map()
-let watchedVisit = -1
+/** The place and visit the running watch belongs to, captured at its start: a
+ *  superseded watch is judged after the store has already moved on. */
+let watchPlace: { placeId: string | null; visit: number } = { placeId: null, visit: 0 }
 
 /** `renderer._pipelines.caches.size` — three internals, so read defensively;
  *  null where the renderer or the field is missing (fail soft). */
@@ -674,11 +676,11 @@ function judgeHop(signature: string, textures: number | null): void {
     hopState = { ...PLACE_HOP_START, hops: hopState.hops }
     return
   }
-  const placeId = useGame.getState().placeId
+  const { placeId, visit } = watchPlace
   if (!signature.startsWith('place:') || !placeId) return
   const { evaluation, state } = judgePlaceHop(hopState, {
     placeId,
-    visit: currentPlaceVisit(),
+    visit,
     pipelines: readPipelines(),
     textures,
   })
@@ -786,17 +788,35 @@ function startWatch(signature: string): void {
     push({
       signature: watch.signature,
       outcome: 'superseded',
-      detail: `superseded by ${signature} after ${watch.frames} frames`,
+      detail: `superseded by ${signature} after ${watch.frames} frames`
+        + (watch.targetsSettled ? ': return and hop judged on pipelines only' : ''),
       frames: watch.frames,
     })
   }
+  const g = useGame.getState()
+  watchPlace = { placeId: g.mode === 'place' ? g.placeId : null, visit: currentPlaceVisit() }
   watch = newWatch(signature)
   schedule()
+}
+
+/** A watch left while its render targets stood but textures still streamed —
+ *  the player moving on within the texture settle (review 21.11.2026): its
+ *  pipeline legs judge on the reading it leaves, before the store change
+ *  records the next visit's entry. */
+function judgeStreamingWatch(): void {
+  if (!watch?.targetsSettled) return
+  judgePendingReturn(watch.signature, null)
+  judgeHop(watch.signature, null)
 }
 
 function onStateChange(): void {
   // Read at the store change itself, before React unmounts the bird's-eye view.
   const mode = useGame.getState().mode
+  const sig = currentRenderSignature()
+  // A visit only counts on a mode or place change (state/placeVisit.ts), which
+  // always changes the signature, so the signature alone tells a new watch.
+  const changed = sig !== currentSignature
+  if (changed) judgeStreamingWatch()
   if (lastMode === 'travel' && mode === 'place' && pendingVisit === null) {
     pendingVisit = {
       signature: currentRenderSignature('travel'),
@@ -805,13 +825,8 @@ function onStateChange(): void {
     }
   }
   lastMode = mode
-  const sig = currentRenderSignature()
-  // A same-place re-entry in one store change keeps the signature, yet is a
-  // new visit (a remount, state/placeVisit.ts): it is watched and hop-judged.
-  const visit = currentPlaceVisit()
-  if (sig === currentSignature && visit === watchedVisit) return
+  if (!changed) return
   currentSignature = sig
-  watchedVisit = visit
   startWatch(sig)
 }
 
