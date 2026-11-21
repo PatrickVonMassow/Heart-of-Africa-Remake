@@ -856,10 +856,23 @@
       "why": "user-approved request 21.11.2026: closes the split-rule false approval that misplaced 1566",
       "origin": "user",
       "place": "ahead"
+    },
+    "1569": {
+      "at": "2026-11-21T13:48:09.955Z",
+      "why": "guard deadlock with a known escape (hand edit of the board); tail of the hygiene bundle is right",
+      "origin": "machine",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      733
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-11-21T12:54:14.684Z",
+    "at": "2026-11-21T13:48:09.958Z",
     "points": [
       184,
       200,
@@ -1050,14 +1063,8 @@
       1565,
       1566,
       1567,
-      1568
+      1568,
+      1569
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      733
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
