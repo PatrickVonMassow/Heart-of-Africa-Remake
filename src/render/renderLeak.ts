@@ -135,6 +135,103 @@ export function judgePipelineReturn(
   return { evaluation: { verdict, entry, back, delta, detail }, state: next }
 }
 
+// --- Place-to-place hop (point 1447) -------------------------------------------
+// The return judgement above needs the bird's-eye view in between. A walk from
+// one settlement straight into the next (leavePlace + enterPlace in one tick —
+// the villager-dress suite's goToPlace, or a save loaded inside a place) never
+// settles in travel, so it was judged by nothing while the owner measured ~7
+// textures per village. This half compares each place's settled reading with
+// the previous place's, and bounds the net growth over consecutive hops.
+
+/** Calibratable dev-only bounds (not gameplay balance values) on the growth
+ *  from one settled settlement to the next one entered without travel between:
+ *  - step: one hop. Two villages legitimately differ (fires, materials, the
+ *    figures' morph textures), and the first settled reading can land while a
+ *    place still builds, so the step is generous.
+ *  - total: the net growth summed over the hops, floored at zero, so village
+ *    differences cancel while a steady leak (~7 textures per village, owner
+ *    measurement 21.11.2026) trips within about seven villages. */
+export type PlaceHopBounds = { pipelines: PipelineReturnBounds; textures: PipelineReturnBounds }
+
+export const PLACE_HOP_BOUNDS: PlaceHopBounds = {
+  pipelines: { step: 48, total: 120 },
+  textures: { step: 24, total: 48 },
+}
+
+/** One settled reading inside a settlement; a null counter is unreadable. */
+export interface PlaceHopReading {
+  placeId: string
+  pipelines: number | null
+  textures: number | null
+}
+
+export interface PlaceHopState {
+  /** The last settled settlement reading of the current hop chain, or null
+   *  once the bird's-eye view has settled (a chain needs no travel between). */
+  last: PlaceHopReading | null
+  hops: number
+  /** Net growth summed over the judged hops, floored at zero. */
+  growth: { pipelines: number; textures: number }
+}
+
+export const PLACE_HOP_START: PlaceHopState = { last: null, hops: 0, growth: { pipelines: 0, textures: 0 } }
+
+export interface PlaceHopEvaluation {
+  verdict: 'ok' | 'leak'
+  from: string
+  to: string
+  /** Per counter: the change across this hop (null when either side is unreadable). */
+  delta: { pipelines: number | null; textures: number | null }
+  counter?: 'pipelines' | 'textures'
+  detail: string
+}
+
+/**
+ * Judge one settled settlement reading against the previous one, pure. A reading
+ * of the SAME place (a settings toggle re-settling it) only replaces the chain's
+ * last reading; the first reading of a chain judges nothing.
+ */
+export function judgePlaceHop(
+  state: PlaceHopState,
+  reading: PlaceHopReading,
+  bounds: PlaceHopBounds = PLACE_HOP_BOUNDS,
+): { evaluation: PlaceHopEvaluation | null; state: PlaceHopState } {
+  const prev = state.last
+  if (!prev || prev.placeId === reading.placeId) return { evaluation: null, state: { ...state, last: reading } }
+  const delta = {
+    pipelines: prev.pipelines !== null && reading.pipelines !== null ? reading.pipelines - prev.pipelines : null,
+    textures: prev.textures !== null && reading.textures !== null ? reading.textures - prev.textures : null,
+  }
+  const growth = {
+    pipelines: delta.pipelines === null ? state.growth.pipelines : Math.max(0, state.growth.pipelines + delta.pipelines),
+    textures: delta.textures === null ? state.growth.textures : Math.max(0, state.growth.textures + delta.textures),
+  }
+  const hops = state.hops + 1
+  let counter: 'pipelines' | 'textures' | undefined
+  let why = ''
+  for (const c of ['textures', 'pipelines'] as const) {
+    const d = delta[c]
+    if (d === null || counter) continue
+    if (d > bounds[c].step) {
+      counter = c
+      why = ` — one hop left its ${c} behind`
+    } else if (growth[c] > bounds[c].total) {
+      counter = c
+      why = ` — ${c} grow with the villages visited`
+    }
+  }
+  const part = (c: 'pipelines' | 'textures') => {
+    const d = delta[c]
+    if (d === null) return `${c} unreadable`
+    return `${c} ${prev[c]} -> ${reading[c]} (${d >= 0 ? '+' : ''}${d}, allowed +${bounds[c].step}; net ${growth[c]}, allowed ${bounds[c].total})`
+  }
+  const detail = `place hop ${hops} ${prev.placeId} -> ${reading.placeId}: ${part('textures')}; ${part('pipelines')}${why}`
+  return {
+    evaluation: { verdict: counter ? 'leak' : 'ok', from: prev.placeId, to: reading.placeId, delta, counter, detail },
+    state: { last: reading, hops, growth },
+  }
+}
+
 /** The levers that legitimately change the resident GPU set. Everything not in
  *  here must NOT move the render-target count, and may move the texture count
  *  only within its bounds (streaming) — that is what makes a rise a leak. */
@@ -430,6 +527,8 @@ let pipelineHistory: PipelineReturnEvaluation[] = []
 let textureEntry: number | null = null
 let textureState: PipelineReturnState = PIPELINE_RETURN_START
 let textureHistory: PipelineReturnEvaluation[] = []
+let hopState: PlaceHopState = PLACE_HOP_START
+let hopHistory: PlaceHopEvaluation[] = []
 
 /** `renderer._pipelines.caches.size` — three internals, so read defensively;
  *  null where the renderer or the field is missing (fail soft). */
@@ -461,6 +560,27 @@ function judgePendingReturn(signature: string): void {
   pipelineHistory.push(evaluation)
   if (pipelineHistory.length > HISTORY_CAP) pipelineHistory.splice(0, pipelineHistory.length - HISTORY_CAP)
   devAssert(evaluation.verdict !== 'leak', 'render-pipeline-leak', () => evaluation.detail)
+}
+
+/** A settled reading feeds the place-to-place hop chain: a settlement reading
+ *  is judged against the previous settlement's, a bird's-eye one ends the chain. */
+function judgeHop(signature: string): void {
+  if (signature.startsWith('travel|')) {
+    hopState = { ...hopState, last: null }
+    return
+  }
+  const placeId = useGame.getState().placeId
+  if (!signature.startsWith('place:') || !placeId) return
+  const { evaluation, state } = judgePlaceHop(hopState, {
+    placeId,
+    pipelines: readPipelines(),
+    textures: readCounts()?.textures ?? null,
+  })
+  hopState = state
+  if (!evaluation) return
+  hopHistory.push(evaluation)
+  if (hopHistory.length > HISTORY_CAP) hopHistory.splice(0, hopHistory.length - HISTORY_CAP)
+  devAssert(evaluation.verdict !== 'leak', 'render-place-hop-leak', () => evaluation.detail)
 }
 
 function readCounts(): LeakCounts | null {
@@ -518,6 +638,7 @@ function settleStep(): void {
     // console-error gate fails on it and every manual session shows it.
     devAssert(evaluation.verdict !== 'leak', 'render-resource-leak', () => evaluation.detail)
     judgePendingReturn(w.signature)
+    judgeHop(w.signature)
     return
   }
   if (step.unsettled) {
@@ -582,6 +703,8 @@ function reset(): void {
   textureEntry = null
   textureState = PIPELINE_RETURN_START
   textureHistory = []
+  hopState = PLACE_HOP_START
+  hopHistory = []
   currentSignature = currentRenderSignature()
   startWatch(currentSignature)
 }
@@ -658,6 +781,11 @@ export function armRenderLeakWatch(): void {
         bounds: TEXTURE_RETURN_BOUNDS,
         state: textureState,
         history: textureHistory,
+      },
+      placeHop: {
+        bounds: PLACE_HOP_BOUNDS,
+        state: hopState,
+        history: hopHistory,
       },
     }),
     reset,

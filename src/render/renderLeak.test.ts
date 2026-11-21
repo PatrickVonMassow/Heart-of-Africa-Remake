@@ -12,6 +12,9 @@ import {
   currentRenderSignature,
   evaluateReading,
   judgePipelineReturn,
+  judgePlaceHop,
+  PLACE_HOP_BOUNDS,
+  PLACE_HOP_START,
   newWatch,
   renderSignature,
   stepWatch,
@@ -364,5 +367,59 @@ describe('texture return after a place visit', () => {
       state = r.state
       expect(r.evaluation.verdict).toBe('ok')
     }
+  })
+})
+
+describe('place-to-place hop', () => {
+  const at = (placeId: string, textures: number | null, pipelines: number | null = 100) => ({ placeId, textures, pipelines })
+
+  it('judges nothing on the first settlement of a chain or a re-settle of the same one', () => {
+    let r = judgePlaceHop(PLACE_HOP_START, at('a', 60))
+    expect(r.evaluation).toBeNull()
+    r = judgePlaceHop(r.state, at('a', 64))
+    expect(r.evaluation).toBeNull()
+    expect(r.state.last).toEqual(at('a', 64))
+  })
+
+  it('reproduces the measured ~7 textures per village hop as a leak within about seven villages', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, at('v0', 57)).state
+    const verdicts: string[] = []
+    for (let i = 1; i <= 8; i++) {
+      const r = judgePlaceHop(state, at(`v${i}`, 57 + 7 * i))
+      state = r.state
+      verdicts.push(r.evaluation!.verdict)
+      if (r.evaluation!.verdict === 'leak') {
+        expect(r.evaluation!.counter).toBe('textures')
+        expect(r.evaluation!.detail).toMatch(/grow with the villages visited/)
+      }
+    }
+    expect(verdicts.slice(0, 6)).toEqual(Array(6).fill('ok'))
+    expect(verdicts[6]).toBe('leak')
+  })
+
+  it('lets village differences cancel, flooring the net growth at zero', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, at('a', 60)).state
+    for (const [id, t] of [['b', 75], ['c', 52], ['d', 70], ['e', 58], ['f', 72], ['g', 61]] as const) {
+      const r = judgePlaceHop(state, at(id, t))
+      state = r.state
+      expect(r.evaluation!.verdict).toBe('ok')
+    }
+    expect(state.growth.textures).toBeLessThanOrEqual(PLACE_HOP_BOUNDS.textures.total)
+  })
+
+  it('flags one hop over the step bound, on pipelines too', () => {
+    const s = judgePlaceHop(PLACE_HOP_START, at('a', 60, 100)).state
+    const r = judgePlaceHop(s, at('b', 60, 100 + PLACE_HOP_BOUNDS.pipelines.step + 1))
+    expect(r.evaluation!.verdict).toBe('leak')
+    expect(r.evaluation!.counter).toBe('pipelines')
+    expect(r.evaluation!.detail).toMatch(/one hop left its pipelines behind/)
+  })
+
+  it('fails soft on an unreadable counter', () => {
+    const s = judgePlaceHop(PLACE_HOP_START, at('a', null, null)).state
+    const r = judgePlaceHop(s, at('b', 500, 900))
+    expect(r.evaluation!.verdict).toBe('ok')
+    expect(r.evaluation!.delta).toEqual({ pipelines: null, textures: null })
+    expect(r.state.growth).toEqual({ pipelines: 0, textures: 0 })
   })
 })
