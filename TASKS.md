@@ -5313,3 +5313,9 @@ put it is the mistake this line exists to stop.
   Test: Vitest case reproducing the state (idle card + pending request): the drain mutation is allowed.
   Source: agent finding of 21.11.2026 13:16 UTC via the findings carrier (session unknown); real blockade (CLAUDE.md §2).
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1570. WebGL 2 pipeline count still drifts per settlement hop
+  Final state: on WebGL 2, consecutive settlement hops (`render-place-hop-leak` chain, `src/render/renderLeak.ts`) hold the renderer's cached pipeline count at a bounded level like WebGPU does (the cause named: which programs or render-object variants WebGL 2 keeps per visit); the hop judge's pipelines leg is then armed on WebGL 2 too (`judgePlaceHop(..., judgePipelines)`, today WebGPU only).
+  Observed problem: `polish-settlement`, WebGL 2, feat/1447 e79992b5f, 21.11.2026 22:14 UTC: places settle at 190-270 pipelines (WebGPU ~40-104), net growth over a 39-hop chain 129 -> 188 (bound 120 calibrated on WebGPU); same-place readings rise slowly (zulu-village 194 -> 257, bemba-village 192 -> 269 over ~30 hops, ~2 per hop). The WebGPU chain stays within the bound. Split 21.11.2026 from point 1447, whose pipelines bound is WebGPU-judged and WebGL-2-reported.
+  Source: split from point 1447 (point did not converge on both backends); reproducible player impact on the WebGL 2 fallback (CLAUDE.md §2 finding intake). Related: 1447, 1566, 285.
+  Bundle: Session- & Repo-Hygiene.
