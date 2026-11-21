@@ -5278,3 +5278,16 @@ put it is the mistake this line exists to stop.
   Test: Vitest (HUD counter with a simulated lost device).
   Source: finding of the 507 session, 20.11.2026 23:00.
   Bundle: Steuerung & Performance.
+
+- [ ] 1565. Benchmark restore checks go red after the measurement dies under load
+  Observed 20.11.2026 (local/verify-logs/2026-11-20T23-02-51-263 and 23-22-27-955, startup..benchmark,
+  both backends): benchmark 44 pass / 6 fail, all six the `restored:` checks (ssaoEnabled, travelZoom,
+  travelSpeed, seed, day, Math.random) — the teardown read unrestored state after the measurement died
+  on a machine busy with leftover point-507 vite servers.
+  Final state: the benchmark restores the player's settings and game state even when its measurement
+  dies mid-run (restore in a finally path); first re-run `benchmark` alone on a quiet machine on both
+  backends to confirm the reds hold before changing code.
+  Player impact: a benchmark that aborts leaves the player's settings, seed and day overwritten.
+  Test: Vitest for the restore-on-abort path; `benchmark` suite on both backends.
+  Source: agent finding via the findings carrier, 21.11.2026 01:06 UTC.
+  Bundle: Steuerung & Performance.
