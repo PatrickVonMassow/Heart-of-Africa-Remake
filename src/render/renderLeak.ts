@@ -72,6 +72,62 @@ export interface LeakCounts {
  *    material set with it; measured worst legitimate step is far below this. */
 export const LEAK_BOUNDS: LeakCounts = { renderTargets: 2, textures: 96 }
 
+// --- Pipeline return (point 1447) ---------------------------------------------
+// The render-target/texture watch above compares a state with ITSELF, and each
+// settlement is its own signature — so a place that left its pipelines behind
+// (three frees a render object, and so its pipeline, only when its material is
+// disposed) was never judged. This half compares the renderer's cached pipeline
+// count (`renderer._pipelines.caches.size`) on RETURNING to the bird's-eye view
+// with the reading taken the moment the player left it for the place.
+
+/** Calibratable dev-only bounds (not gameplay balance values) on the pipelines
+ *  a settlement visit may leave behind once the bird's-eye view has settled:
+ *  - step: one visit's net growth. The unreleased place scene grew ~40 per
+ *    village (point 1446 measurement, 25.10.2026); a released one returns
+ *    near zero, the bird's-eye streaming a few around the return.
+ *  - total: the net growth summed over all visits, so a leak too small for one
+ *    step still trips once it grows with the number of villages visited. */
+export const PIPELINE_RETURN_BOUNDS = { step: 24, total: 72 }
+
+export type PipelineReturnBounds = typeof PIPELINE_RETURN_BOUNDS
+
+export interface PipelineReturnState {
+  /** Visits judged so far. */
+  visits: number
+  /** Net pipeline growth summed over the judged visits, floored at zero. */
+  growth: number
+}
+
+export const PIPELINE_RETURN_START: PipelineReturnState = { visits: 0, growth: 0 }
+
+export interface PipelineReturnEvaluation {
+  verdict: 'ok' | 'leak'
+  /** Pipelines on leaving the bird's-eye view, and on its settled return. */
+  entry: number
+  back: number
+  delta: number
+  detail: string
+}
+
+/** Judge one return to the bird's-eye view against the reading at entry. Pure. */
+export function judgePipelineReturn(
+  state: PipelineReturnState,
+  entry: number,
+  back: number,
+  bounds: PipelineReturnBounds = PIPELINE_RETURN_BOUNDS,
+): { evaluation: PipelineReturnEvaluation; state: PipelineReturnState } {
+  const delta = back - entry
+  const next: PipelineReturnState = { visits: state.visits + 1, growth: Math.max(0, state.growth + delta) }
+  const overStep = delta > bounds.step
+  const overTotal = next.growth > bounds.total
+  const verdict = overStep || overTotal ? 'leak' : 'ok'
+  const detail =
+    `pipelines after place visit ${next.visits}: ${entry} -> ${back} (${delta >= 0 ? '+' : ''}${delta}, ` +
+    `allowed +${bounds.step}); net growth over all visits ${next.growth} (allowed ${bounds.total})` +
+    (verdict === 'leak' ? (overStep ? ' — one visit left its pipelines behind' : ' — pipelines grow with the villages visited') : '')
+  return { evaluation: { verdict, entry, back, delta, detail }, state: next }
+}
+
 /** The levers that legitimately change the resident GPU set. Everything not in
  *  here must NOT move the render-target count, and may move the texture count
  *  only within its bounds (streaming) — that is what makes a rise a leak. */
@@ -358,6 +414,34 @@ let watch: Watch | null = null
 let rafHandle: number | null = null
 /** Render targets deliberately leaked by the forceLeak() probe (verification). */
 let forced: THREE.RenderTarget[] = []
+/** Pipeline count when the player last left the bird's-eye view for a place;
+ *  null while no return is pending. */
+let pipelineEntry: number | null = null
+let lastMode: string | null = null
+let pipelineState: PipelineReturnState = PIPELINE_RETURN_START
+let pipelineHistory: PipelineReturnEvaluation[] = []
+
+/** `renderer._pipelines.caches.size` — three internals, so read defensively;
+ *  null where the renderer or the field is missing (fail soft). */
+function readPipelines(): number | null {
+  const gl = getRenderContext()?.gl as unknown as { _pipelines?: { caches?: { size?: number } } } | undefined
+  const size = gl?._pipelines?.caches?.size
+  return typeof size === 'number' ? size : null
+}
+
+/** A settled bird's-eye reading closes a pending place visit. */
+function judgePendingReturn(signature: string): void {
+  if (pipelineEntry === null || !signature.startsWith('travel|')) return
+  const back = readPipelines()
+  const entry = pipelineEntry
+  pipelineEntry = null
+  if (back === null) return
+  const { evaluation, state } = judgePipelineReturn(pipelineState, entry, back)
+  pipelineState = state
+  pipelineHistory.push(evaluation)
+  if (pipelineHistory.length > HISTORY_CAP) pipelineHistory.splice(0, pipelineHistory.length - HISTORY_CAP)
+  devAssert(evaluation.verdict !== 'leak', 'render-pipeline-leak', () => evaluation.detail)
+}
 
 function readCounts(): LeakCounts | null {
   const memory = getRenderContext()?.gl?.info?.memory as LeakCounts | undefined
@@ -413,6 +497,7 @@ function settleStep(): void {
     // (console.error + window.__assertLog), so every headless suite's
     // console-error gate fails on it and every manual session shows it.
     devAssert(evaluation.verdict !== 'leak', 'render-resource-leak', () => evaluation.detail)
+    judgePendingReturn(w.signature)
     return
   }
   if (step.unsettled) {
@@ -452,6 +537,10 @@ function startWatch(signature: string): void {
 }
 
 function onStateChange(): void {
+  // Read at the store change itself, before React unmounts the bird's-eye view.
+  const mode = useGame.getState().mode
+  if (lastMode === 'travel' && mode === 'place' && pipelineEntry === null) pipelineEntry = readPipelines()
+  lastMode = mode
   const sig = currentRenderSignature()
   if (sig === currentSignature) return
   currentSignature = sig
@@ -464,6 +553,9 @@ function reset(): void {
   baselines = {}
   history = []
   violations = []
+  pipelineEntry = null
+  pipelineState = PIPELINE_RETURN_START
+  pipelineHistory = []
   currentSignature = currentRenderSignature()
   startWatch(currentSignature)
 }
@@ -514,6 +606,7 @@ export function armRenderLeakWatch(): void {
   if (w.__renderLeakArmed) return
   w.__renderLeakArmed = true
   currentSignature = currentRenderSignature()
+  lastMode = useGame.getState().mode
   startWatch(currentSignature)
   useGame.subscribe(onStateChange)
   useUi.subscribe(onStateChange)
@@ -527,6 +620,13 @@ export function armRenderLeakWatch(): void {
       history,
       violations,
       forced: forced.length,
+      pipelines: {
+        current: readPipelines(),
+        entry: pipelineEntry,
+        bounds: PIPELINE_RETURN_BOUNDS,
+        state: pipelineState,
+        history: pipelineHistory,
+      },
     }),
     reset,
     forceLeak,

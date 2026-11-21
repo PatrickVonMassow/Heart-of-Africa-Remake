@@ -5,9 +5,12 @@
 import { describe, it, expect } from 'vitest'
 import {
   LEAK_BOUNDS,
+  PIPELINE_RETURN_BOUNDS,
+  PIPELINE_RETURN_START,
   SETTLE_POLICY,
   currentRenderSignature,
   evaluateReading,
+  judgePipelineReturn,
   newWatch,
   renderSignature,
   stepWatch,
@@ -290,5 +293,49 @@ describe('stepWatch', () => {
     const afterGap = [...blind, ...Array.from({ length: policy.stableFrames + 1 }, () => counts(44, 300))]
     expect(run(afterGap).settled).toEqual(counts(44, 300))
     expect(run(afterGap.slice(0, -1)).settled).toBeUndefined()
+  })
+})
+
+describe('pipeline return after a place visit', () => {
+  const bounds = { step: 10, total: 25 }
+
+  it('passes a visit that returns to the entry reading or near it', () => {
+    const r = judgePipelineReturn(PIPELINE_RETURN_START, 64, 66, bounds)
+    expect(r.evaluation.verdict).toBe('ok')
+    expect(r.evaluation.delta).toBe(2)
+    expect(r.state).toEqual({ visits: 1, growth: 2 })
+  })
+
+  it('flags one visit that leaves more than the step bound behind', () => {
+    const r = judgePipelineReturn(PIPELINE_RETURN_START, 64, 104, bounds)
+    expect(r.evaluation.verdict).toBe('leak')
+    expect(r.evaluation.detail).toMatch(/64 -> 104/)
+  })
+
+  it('flags a leak too small per visit once it grows with the villages visited', () => {
+    let state = PIPELINE_RETURN_START
+    let entry = 64
+    const verdicts: string[] = []
+    for (let i = 0; i < 5; i++) {
+      const r = judgePipelineReturn(state, entry, entry + 6, bounds)
+      state = r.state
+      entry += 6
+      verdicts.push(r.evaluation.verdict)
+    }
+    expect(verdicts).toEqual(['ok', 'ok', 'ok', 'ok', 'leak'])
+    expect(state.growth).toBe(30)
+  })
+
+  it('lets noise cancel and never carries a negative balance', () => {
+    let { state } = judgePipelineReturn(PIPELINE_RETURN_START, 70, 60, bounds)
+    expect(state.growth).toBe(0)
+    ;({ state } = judgePipelineReturn(state, 60, 68, bounds))
+    ;({ state } = judgePipelineReturn(state, 68, 61, bounds))
+    expect(state).toEqual({ visits: 3, growth: 1 })
+  })
+
+  it('reproduces the measured unreleased growth (~40 per village) as a leak under the default bounds', () => {
+    expect(judgePipelineReturn(PIPELINE_RETURN_START, 64, 104).evaluation.verdict).toBe('leak')
+    expect(PIPELINE_RETURN_BOUNDS.step).toBeLessThan(40)
   })
 })
