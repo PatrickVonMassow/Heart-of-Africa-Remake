@@ -5275,7 +5275,7 @@ if (section('villager-dress')) {
     await page
       .evaluate(() => window.__renderLeak?.textureKinds?.().filter((k) => k.delta !== 0).map((k) => `${k.delta > 0 ? '+' : ''}${k.delta} ${k.kind} =${k.count}`) ?? null)
       .then((changed) => record('texture-census', { village: villageOf(people), changed }))
-      .catch(() => {})
+      .catch((e) => record('texture-census', { village: villageOf(people), error: String(e?.message ?? e) }))
     if (!loadRecorded) {
       loadRecorded = true
       await nextFrames(10)
