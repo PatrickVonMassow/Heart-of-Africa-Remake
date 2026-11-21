@@ -107,12 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1290. On WebGL 2 the lion feeding scene shows neither the lion nor its prey, only a shadow and the blood stain
-  Measured 04.10.2026 on feat/1283 (base a13dcae0e), `settings --section=lion-feeding`, VERIFY_GL=webgl: frame 68-lion-feeding without a wait shows only grey haze with place labels (no terrain); with a 4 s wait it shows terrain, the blood stain and one predator shadow, but neither the lion mesh nor the prey mesh. WebGPU shows lion, lying prey and stain in the same section. The section's checks read poses only, so they stay green while the animals are invisible.
-  Done when: the cause is measured on WebGL 2 (mesh visibility/material compile vs. staging timing), the lion and its prey render on WebGL 2 as on WebGPU, and the section asserts the rendered animals, not only their poses; frame picture-checked on both backends.
-  Bundle: Tierverhalten.
-  Criticality: medium — a player on the fallback backend sees a feeding scene without animals.
-
 - [ ] 1447. Every settlement visit leaves its render pipelines and heap behind
   Final state: leaving a place releases what it built: after entering and leaving N different villages the renderer's cached pipeline count (`renderer._pipelines.caches.size`), the JS heap and Chrome's GPU-process memory return to a bounded level instead of growing with N (the cause named: which materials/objects outlive their place); a dev invariant or browser check pins the bound; the villager-dress fresh-page staging of point 1446 (`DRESS_REBOOT_EVERY`) may then be lifted.
   Observed problem: `polish-villagers --section=villager-dress` on feat/1446 6e1622764, 25.10.2026 05:51-05:58 UTC, 22 villages visited in turn (`gpu-load` rows in local/verify-measure/villager-dress.jsonl): pipelines 64 -> 993 (~40 per village, never falling), JS heap 286 -> 1709 MB, renderer-tracked textures 56 -> 156; Chrome's `--type=gpu-process` RSS 0.4 -> 9.7 GB at ~1.35 GB per minute (host has 15 GB). In the full suite the earlier sections add to it and the GPU process was lost around the 16th village (point 1446). A player who travels village to village grows the same load without bound.

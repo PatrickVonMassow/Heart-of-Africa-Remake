@@ -47601,3 +47601,9 @@ to land than a mechanism that needs a review.
   6. The bug report / state dump (src/state/stateDump.ts) carries the renderer's GPU health: device-lost flag with reason, and the WebGPU uncaptured errors (validation/pipeline errors, capped list with count of omitted) seen in the session, so a report from a player device names GPU failures without DevTools.
   Test: Vitest — the benchmark run with a simulated lost device (or drawCalls 0) yields an invalid result with the reason and no rows; the state dump includes a simulated uncaptured error and the device-lost reason. Both language files if any player-visible text is added.
   Source: user benchmark and bug report of 20.11.2026 (local/Sehr schwaches Notebook - *).
+
+- [x] 1290. On WebGL 2 the lion feeding scene shows neither the lion nor its prey, only a shadow and the blood stain
+  Measured 04.10.2026 on feat/1283 (base a13dcae0e), `settings --section=lion-feeding`, VERIFY_GL=webgl: frame 68-lion-feeding without a wait shows only grey haze with place labels (no terrain); with a 4 s wait it shows terrain, the blood stain and one predator shadow, but neither the lion mesh nor the prey mesh. WebGPU shows lion, lying prey and stain in the same section. The section's checks read poses only, so they stay green while the animals are invisible.
+  Done when: the cause is measured on WebGL 2 (mesh visibility/material compile vs. staging timing), the lion and its prey render on WebGL 2 as on WebGPU, and the section asserts the rendered animals, not only their poses; frame picture-checked on both backends.
+  Bundle: Tierverhalten.
+  Criticality: medium — a player on the fallback backend sees a feeding scene without animals.
