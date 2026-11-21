@@ -170,7 +170,8 @@ export interface PlaceHopState {
    *  once the bird's-eye view has settled (a chain needs no travel between). */
   last: PlaceHopReading | null
   hops: number
-  /** Net growth summed over the judged hops, floored at zero. */
+  /** Net growth summed over the judged hops of the current chain, floored at
+   *  zero; a settled bird's-eye reading resets it with the chain. */
   growth: { pipelines: number; textures: number }
 }
 
@@ -566,7 +567,9 @@ function judgePendingReturn(signature: string): void {
  *  is judged against the previous settlement's, a bird's-eye one ends the chain. */
 function judgeHop(signature: string): void {
   if (signature.startsWith('travel|')) {
-    hopState = { ...hopState, last: null }
+    // A chain ends here, and its growth with it: the return judgement owns
+    // what a visit leaves behind in the bird's-eye view.
+    hopState = { ...PLACE_HOP_START, hops: hopState.hops }
     return
   }
   const placeId = useGame.getState().placeId
