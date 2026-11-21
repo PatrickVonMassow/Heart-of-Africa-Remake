@@ -119,4 +119,32 @@ describe('render leak watch, live', () => {
     expect(hops[0].delta.textures).toBe(10)
     expect(h.asserts()).not.toContain('render-place-hop-leak')
   })
+
+  it('still judges a hop on pipelines when the next place\'s textures never settle', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('place', 'b')
+    h.gl._pipelines!.caches.size += 60 // the hop left its pipelines behind
+    // render targets stand; the textures stream for the whole watch
+    h.tick(700, () => {
+      h.gl.info.memory.textures++
+    })
+    const hops = h.state().placeHop.history as Array<{ delta: { textures: number | null; pipelines: number | null } }>
+    expect(hops).toHaveLength(1)
+    expect(hops[0].delta).toEqual({ textures: null, pipelines: 60 })
+    expect(h.asserts()).toContain('render-place-hop-leak')
+  })
+
+  it('judges a leave and re-entry of the same place in one tick as a hop', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.go('place', 'a') // no frame in between: the bird's-eye view never settles
+    h.gl._pipelines!.caches.size += 60
+    h.tick()
+    expect(h.state().placeHop.history).toHaveLength(1)
+    expect(h.asserts()).toContain('render-place-hop-leak')
+  })
 })

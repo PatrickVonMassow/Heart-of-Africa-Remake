@@ -400,6 +400,12 @@ describe('place-to-place hop', () => {
     expect(r.state.last).toEqual(at('a', 64))
   })
 
+  it('judges a re-entry of the same place as a hop when its visit differs', () => {
+    const r = judgePlaceHop(judgePlaceHop(PLACE_HOP_START, { ...at('a', 60), visit: 1 }).state, { ...at('a', 60, 200), visit: 2 })
+    expect(r.evaluation?.verdict).toBe('leak')
+    expect(r.evaluation?.counter).toBe('pipelines')
+  })
+
   it('reports the measured ~7 textures per village hop without tripping: that leg belongs to point 1566', () => {
     let state = judgePlaceHop(PLACE_HOP_START, at('v0', 57)).state
     for (let i = 1; i <= 8; i++) {

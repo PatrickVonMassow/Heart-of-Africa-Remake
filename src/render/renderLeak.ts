@@ -48,6 +48,7 @@ import { devAssert } from '../systems/devAssert'
 import { getRenderContext } from './renderContext'
 import { panoramaCaptureTargetsAllocated } from '../scenes/travel/panoramaCapture'
 import { useGame } from '../state/store'
+import { currentPlaceVisit } from '../state/placeVisit'
 import {
   useUi,
   effectiveTraa,
@@ -161,6 +162,9 @@ export const PLACE_HOP_BOUNDS: PlaceHopBounds = {
 /** One settled reading inside a settlement; a null counter is unreadable. */
 export interface PlaceHopReading {
   placeId: string
+  /** The entry count (state/placeVisit.ts): a leave and re-entry of the same
+   *  place is a new visit and a hop; absent, a same-place reading re-settles. */
+  visit?: number
   pipelines: number | null
   textures: number | null
 }
@@ -198,7 +202,7 @@ export function judgePlaceHop(
   bounds: PlaceHopBounds = PLACE_HOP_BOUNDS,
 ): { evaluation: PlaceHopEvaluation | null; state: PlaceHopState } {
   const prev = state.last
-  if (!prev || prev.placeId === reading.placeId) return { evaluation: null, state: { ...state, last: reading } }
+  if (!prev || (prev.placeId === reading.placeId && prev.visit === reading.visit)) return { evaluation: null, state: { ...state, last: reading } }
   const delta = {
     pipelines: prev.pipelines !== null && reading.pipelines !== null ? reading.pipelines - prev.pipelines : null,
     textures: prev.textures !== null && reading.textures !== null ? reading.textures - prev.textures : null,
@@ -625,6 +629,7 @@ let textureHistory: PipelineReturnEvaluation[] = []
 let hopState: PlaceHopState = PLACE_HOP_START
 let hopHistory: PlaceHopEvaluation[] = []
 let lastCensus: ReadonlyMap<string, number> = new Map()
+let watchedVisit = -1
 
 /** `renderer._pipelines.caches.size` — three internals, so read defensively;
  *  null where the renderer or the field is missing (fail soft). */
@@ -638,15 +643,14 @@ function readPipelines(): number | null {
  *  like for like: a return under another bird's-eye signature than the one
  *  left (a graphics setting changed during the visit) holds a different
  *  resident set, so the visit is dropped unjudged. */
-function judgePendingReturn(signature: string, counts: LeakCounts): void {
+function judgePendingReturn(signature: string, texBack: number | null): void {
   if (pendingVisit === null || !signature.startsWith('travel|')) return
   const visit = pendingVisit
   pendingVisit = null
   if (visit.signature !== signature) return
   const back = readPipelines()
   const { pipelines: entry, textures: texEntry } = visit
-  const texBack = counts.textures
-  if (texEntry !== null) {
+  if (texEntry !== null && texBack !== null) {
     const t = judgePipelineReturn(textureState, texEntry, texBack, TEXTURE_RETURN_BOUNDS, 'textures')
     textureState = t.state
     textureHistory.push(t.evaluation)
@@ -663,7 +667,7 @@ function judgePendingReturn(signature: string, counts: LeakCounts): void {
 
 /** A settled reading feeds the place-to-place hop chain: a settlement reading
  *  is judged against the previous settlement's, a bird's-eye one ends the chain. */
-function judgeHop(signature: string, counts: LeakCounts): void {
+function judgeHop(signature: string, textures: number | null): void {
   if (signature.startsWith('travel|')) {
     // A chain ends here, and its growth with it: the return judgement owns
     // what a visit leaves behind in the bird's-eye view.
@@ -674,8 +678,9 @@ function judgeHop(signature: string, counts: LeakCounts): void {
   if (!signature.startsWith('place:') || !placeId) return
   const { evaluation, state } = judgePlaceHop(hopState, {
     placeId,
+    visit: currentPlaceVisit(),
     pipelines: readPipelines(),
-    textures: counts.textures,
+    textures,
   })
   hopState = state
   if (!evaluation) return
@@ -741,8 +746,14 @@ function settleStep(): void {
     devAssert(evaluation.verdict !== 'leak', 'render-resource-leak', () => evaluation.detail)
   }
   if (step.texturesSettled) {
-    judgePendingReturn(w.signature, step.texturesSettled)
-    judgeHop(w.signature, step.texturesSettled)
+    judgePendingReturn(w.signature, step.texturesSettled.textures)
+    judgeHop(w.signature, step.texturesSettled.textures)
+  }
+  // Render targets stood but textures kept streaming: the pipeline legs still
+  // judge, on an unreadable texture count (review 21.11.2026).
+  if (step.unsettled && w.targetsSettled) {
+    judgePendingReturn(w.signature, null)
+    judgeHop(w.signature, null)
   }
   if (step.unsettled) {
     push({
@@ -750,7 +761,7 @@ function settleStep(): void {
       outcome: 'unsettled',
       counts: counts ?? undefined,
       detail: w.targetsSettled
-        ? `textures did not settle within ${SETTLE_POLICY.maxFrames} frames: return and hop not judged`
+        ? `textures did not settle within ${SETTLE_POLICY.maxFrames} frames: return and hop judged on pipelines only`
         : counts
           ? `no settled reading within ${SETTLE_POLICY.maxFrames} frames (last ${counts.renderTargets} render targets)`
           : `no renderer within ${SETTLE_POLICY.maxFrames} frames`,
@@ -795,8 +806,12 @@ function onStateChange(): void {
   }
   lastMode = mode
   const sig = currentRenderSignature()
-  if (sig === currentSignature) return
+  // A same-place re-entry in one store change keeps the signature, yet is a
+  // new visit (a remount, state/placeVisit.ts): it is watched and hop-judged.
+  const visit = currentPlaceVisit()
+  if (sig === currentSignature && visit === watchedVisit) return
   currentSignature = sig
+  watchedVisit = visit
   startWatch(sig)
 }
 
@@ -902,6 +917,9 @@ export function armRenderLeakWatch(): void {
     /** The resident textures by kind, with the count change since the last call. */
     textureKinds: () => {
       const memoryMap = (getRenderContext()?.gl?.info as { memoryMap?: Map<object, unknown> } | undefined)?.memoryMap
+      // No memory map (three internals moved, no renderer): unreadable, not
+      // "every texture freed" — and the last census stays the baseline.
+      if (!memoryMap) return null
       const census = textureCensus(memoryMap, lastCensus)
       lastCensus = new Map(census.filter((k) => k.count > 0).map((k) => [k.kind, k.count]))
       return census
