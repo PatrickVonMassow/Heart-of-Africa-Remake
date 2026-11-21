@@ -138,6 +138,23 @@ describe('PlaceReleaseTracker on the renderer draw path', () => {
     expect(quad.n()).toBe(0)
     expect(tracker.attach(null)).toBeTypeOf('function') // fails soft without the internals
   })
+
+  it('releases a texture assigned to a material after its first recorded draw', () => {
+    const s = scene()
+    const { gl, objects } = renderer()
+    const tracker = new PlaceReleaseTracker(() => s.root)
+    const detach = tracker.attach(gl)
+    tracker.frame()
+    const mat = new THREE.MeshBasicNodeMaterial()
+    const m = new THREE.Mesh(new THREE.BufferGeometry(), mat)
+    objects.get(m, mat, s.root, null) // first draw: no map yet
+    const late = track(new THREE.DataTexture(new Uint8Array(4), 1, 1))
+    mat.map = late.o // swapped in later; the draw hook does not rescan
+    objects.get(m, mat, s.root, null)
+    detach()
+    tracker.leave()
+    expect(late.n()).toBe(1)
+  })
 })
 
 describe('textures bound by released materials', () => {

@@ -2589,7 +2589,10 @@ export function PlaceScene() {
   // render object and pipeline for the session.
   const release = useMemo(() => new PlaceReleaseTracker(() => r3fScene), [r3fScene])
   useFrame(() => release.frame())
-  useEffect(() => {
+  // A layout effect: attach and leave run in the commit itself, so no frame can
+  // render between a scene switch and this visit's detach and record the
+  // incoming scene's draws through the shared R3F scene.
+  useLayoutEffect(() => {
     const detach = release.attach(gl)
     return () => {
       detach()

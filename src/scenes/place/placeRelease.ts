@@ -201,6 +201,9 @@ export class PlaceReleaseTracker {
     // scene's objects, which are not this visit's to release.
     if (this.frames === 0) return { materials: 0, geometries: 0, textures: 0 }
     this.frames = 0
+    // A material is scanned for textures on its first draw; one assigned to it
+    // later (a swapped map or texture node) is picked up here.
+    for (const m of this.set.materials) collectMaterialTextures(m, this.set.textures)
     return releaseSceneResources(this.set)
   }
 }
