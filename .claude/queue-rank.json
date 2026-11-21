@@ -455,12 +455,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1290": {
-      "at": "2026-10-04T03:04:47.379Z",
-      "why": "Behind the open Tierverhalten point 1284 that touches the same fauna rendering; no user order places it earlier",
-      "origin": "machine",
-      "place": "last"
-    },
     "1292": {
       "at": "2026-10-04T06:57:54.981Z",
       "why": "Low-criticality test-side race with its red charged; behind the user's ordered work is right.",
@@ -838,6 +832,12 @@
       "why": "small HUD counter fix after 507 lands; last is fine",
       "origin": "machine",
       "place": "last"
+    },
+    "1565": {
+      "at": "2026-11-21T03:20:45.062Z",
+      "why": "re-measure first on a quiet machine; no player-blocking urgency ahead of the bundle front",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -848,7 +848,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-20T22:03:36.364Z",
+    "at": "2026-11-21T03:20:45.069Z",
     "points": [
       184,
       200,
@@ -865,7 +865,6 @@
       456,
       460,
       498,
-      507,
       510,
       514,
       518,
@@ -974,7 +973,6 @@
       1268,
       1269,
       1270,
-      1290,
       1292,
       1296,
       1300,
@@ -1037,7 +1035,8 @@
       1543,
       1553,
       1563,
-      1564
+      1564,
+      1565
     ]
   }
 }
