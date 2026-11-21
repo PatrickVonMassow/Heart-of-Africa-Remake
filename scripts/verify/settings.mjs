@@ -637,6 +637,122 @@ if (section('lion-feeding')) {
   check('feeding: prey lies on its side', feedA.preyOnSide > 1.0, `${feedA.preyOnSide?.toFixed(2)}`)
   check('feeding: stain beneath the carcass', feedA.stainActive === true && feedA.stainRadius > 0.3,
     `radius ${feedA.stainRadius?.toFixed(2)}`)
+  // RENDERED, not only posed (point 1290): on WebGL 2 the poses read right while
+  // neither mesh reached the picture (only the stain and a shadow did). Per animal,
+  // photograph its projected screen box twice with the mesh out of the camera's
+  // layers and twice with its own layer mask back, alternating; only pixels that
+  // change in every drawn/hidden pair count, so a mover crossing one shot (the
+  // vultures circling the kill read 11 % in the hidden pair) cannot pass for the
+  // animal. The other animal is out of the layers for all four shots (the lion's
+  // head bob read 7.2 % in the carcass box), and neither casts a shadow. Each shot
+  // waits for 3 drawn frames, pumped by a tiny capture when headless rAF stalls,
+  // or fails. 4 % floor: measured lion 9.6-10.0 %, carcass 13.7-14.2 % over two
+  // runs per backend.
+  const renderedAnimal = async (key) => {
+    const box = await page.evaluate((k) => {
+      const h = window.__lionHunt
+      // Both meshes are mutated during the probe, so both must exist.
+      if (!h?.lion.current?.children[0] || !h?.prey.current?.children[0]) return null
+      const m = h[k].current.children[0]
+      if (!m.geometry) return null
+      // Bounds from the position attribute: the shared geometry is left untouched.
+      const pos = m.geometry.attributes.position
+      const min = { x: Infinity, y: Infinity, z: Infinity }
+      const max = { x: -Infinity, y: -Infinity, z: -Infinity }
+      for (let i = 0; i < pos.count; i++) {
+        for (const [a, val] of [['x', pos.getX(i)], ['y', pos.getY(i)], ['z', pos.getZ(i)]]) {
+          min[a] = Math.min(min[a], val)
+          max[a] = Math.max(max[a], val)
+        }
+      }
+      m.updateWorldMatrix(true, false)
+      const v = m.position.clone()
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+      for (let i = 0; i < 8; i++) {
+        v.set(i & 1 ? max.x : min.x, i & 2 ? max.y : min.y, i & 4 ? max.z : min.z).applyMatrix4(m.matrixWorld)
+        const n = window.__camera.ndc(v.x, v.z, v.y)
+        x0 = Math.min(x0, ((n.x + 1) / 2) * innerWidth)
+        x1 = Math.max(x1, ((n.x + 1) / 2) * innerWidth)
+        y0 = Math.min(y0, ((1 - n.y) / 2) * innerHeight)
+        y1 = Math.max(y1, ((1 - n.y) / 2) * innerHeight)
+      }
+      // Pad a tenth each side: the head bob moves the body inside a fixed crop.
+      const px = (x1 - x0) * 0.1
+      const py = (y1 - y0) * 0.1
+      const x = Math.max(0, Math.floor(x0 - px))
+      const y = Math.max(0, Math.floor(y0 - py))
+      const width = Math.min(innerWidth, Math.ceil(x1 + px)) - x
+      const height = Math.min(innerHeight, Math.ceil(y1 + py)) - y
+      return width >= 4 && height >= 4 ? { x, y, width, height } : null
+    }, key)
+    if (!box) return { box, verdict: 'no screen box (a feed mesh is missing or off screen)' }
+    try {
+      await page.evaluate((k) => {
+        const meshes = ['lion', 'prey'].map((a) => window.__lionHunt[a].current.children[0])
+        const m = window.__lionHunt[k].current.children[0]
+        const other = meshes.find((o) => o !== m)
+        const shadow = meshes.map((o) => o.castShadow)
+        window.__feedProbe = { m, mask: m.layers.mask, other, otherMask: other.layers.mask, meshes, shadow }
+        for (const o of meshes) o.castShadow = false
+        other.layers.disableAll()
+      }, key)
+      const capture = async (drawn) => {
+        const f0 = await page.evaluate((d) => {
+          const p = window.__feedProbe
+          if (d) p.m.layers.mask = p.mask
+          else p.m.layers.disableAll()
+          return window.__wildlife?.frames?.() ?? null
+        }, drawn)
+        if (f0 == null) throw new Error('no wildlife frame counter')
+        let drawnFrames = false
+        for (let i = 0; i < 10 && !drawnFrames; i++) {
+          drawnFrames = await page
+            .waitForFunction((f) => window.__wildlife.frames() >= f + 3, f0, { polling: 'raf', timeout: 1500 })
+            .then(() => true, () => false)
+          if (!drawnFrames) await forceFrame()
+        }
+        if (!drawnFrames) drawnFrames = await page.evaluate((f) => window.__wildlife.frames() >= f + 3, f0)
+        if (!drawnFrames) throw new Error('3 drawn frames did not arrive within 10 pumped waits')
+        const png = await capturePixels(page, `feeding ${key} rendered`, { clip: box })
+        return sharp(png).removeAlpha().raw().toBuffer()
+      }
+      const hiddenA = await capture(false)
+      const shownA = await capture(true)
+      const hiddenB = await capture(false)
+      const shownB = await capture(true)
+      // A pixel changes when any channel moves by more than 12 levels (a zebra's
+      // white stripes sit close to the sand in luma alone). It counts for the animal
+      // only when it changes in all four drawn/hidden pairs: a mover in one shot
+      // changes it in two pairs at most.
+      const moved = (a, b, i) =>
+        Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])) > 12
+      let drawn = 0
+      let noise = 0
+      for (let i = 0; i < hiddenA.length; i += 3) {
+        if ([shownA, shownB].every((sh) => moved(sh, hiddenA, i) && moved(sh, hiddenB, i))) drawn++
+        if (moved(hiddenA, hiddenB, i)) noise++
+      }
+      const n = hiddenA.length / 3
+      return { box, changed: drawn / n, noise: noise / n }
+    } catch (e) {
+      return { box, verdict: String(e?.message ?? e).split('\n')[0] }
+    } finally {
+      await page.evaluate(() => {
+        const p = window.__feedProbe
+        if (!p) return
+        p.m.layers.mask = p.mask
+        p.other.layers.mask = p.otherMask
+        p.meshes.forEach((m, i) => (m.castShadow = p.shadow[i]))
+        delete window.__feedProbe
+      })
+    }
+  }
+  for (const key of ['lion', 'prey']) {
+    const r = await renderedAnimal(key)
+    const size = r.box ? `${r.box.width}x${r.box.height}` : 'missing'
+    check(`feeding: the ${key} mesh reaches the picture`, !r.verdict && r.changed > 0.04,
+      r.verdict ?? `${(r.changed * 100).toFixed(1)} % of its ${size} screen box changes when it is drawn (noise ${(r.noise * 100).toFixed(1)} %)`)
+  }
   const lionAt = await page.evaluate(() => {
     const l = window.__lionHunt?.lion.current
     return l ? { x: l.position.x, z: l.position.z } : null
