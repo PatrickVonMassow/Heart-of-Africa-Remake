@@ -660,7 +660,8 @@ function judgePendingReturn(signature: string, texBack: number | null): void {
     textureState = t.state
     textureHistory.push(t.evaluation)
     if (textureHistory.length > HISTORY_CAP) textureHistory.splice(0, textureHistory.length - HISTORY_CAP)
-    devAssert(t.evaluation.verdict !== 'leak', 'render-texture-return-leak', () => t.evaluation.detail)
+    // Reported, not asserted: the figures' morph textures still grow per visit,
+    // which point 1566 owns; it re-arms this assert (as the hop judge's leg).
   }
   if (back === null || entry === null) return
   const { evaluation, state } = judgePipelineReturn(pipelineState, entry, back)

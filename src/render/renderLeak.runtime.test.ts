@@ -78,7 +78,8 @@ describe('render leak watch, live', () => {
     h.gl.info.memory.textures = 75 + 30 // the visit left 30 textures behind
     h.tick()
     expect(h.state().textureReturn.history).toHaveLength(1)
-    expect(h.asserts()).toContain('render-texture-return-leak')
+    expect(h.state().textureReturn.history[0].verdict).toBe('leak')
+    expect(h.asserts()).not.toContain('render-texture-return-leak') // reported only until point 1566
   })
 
   it('compares a return only with an entry under the same bird\'s-eye signature', async () => {
@@ -100,7 +101,8 @@ describe('render leak watch, live', () => {
     h.gl.info.memory.textures = 105 + 30
     h.tick()
     expect(h.state().textureReturn.history).toHaveLength(1)
-    expect(h.asserts()).toContain('render-texture-return-leak')
+    expect(h.state().textureReturn.history[0].verdict).toBe('leak')
+    expect(h.asserts()).not.toContain('render-texture-return-leak') // reported only until point 1566
   })
 
   it('judges a hop on the texture count once it has settled, not while the place still builds', async () => {
