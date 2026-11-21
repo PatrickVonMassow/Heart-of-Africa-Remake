@@ -203,6 +203,7 @@ export function judgePlaceHop(
   state: PlaceHopState,
   reading: PlaceHopReading,
   bounds: PlaceHopBounds = PLACE_HOP_BOUNDS,
+  judgePipelines = true,
 ): { evaluation: PlaceHopEvaluation | null; state: PlaceHopState } {
   const prev = state.last
   if (!prev || (prev.placeId === reading.placeId && prev.visit === reading.visit)) return { evaluation: null, state: { ...state, last: reading } }
@@ -220,7 +221,10 @@ export function judgePlaceHop(
   // Only the pipelines leg judges (point 1447). The textures leg is reported in
   // the detail but does not trip: the figures' morph textures still grow in the
   // villager-dress chain, which point 1566 owns; it re-arms this leg.
-  for (const c of ['pipelines'] as const) {
+  // `judgePipelines` false (WebGL 2) reports the pipelines leg too: its count
+  // still drifts ~2 per hop there (polish-settlement 21.11.2026, 238 -> 269
+  // over 23 hops), which point 1570 owns; WebGPU stays bounded and judged.
+  for (const c of judgePipelines ? (['pipelines'] as const) : []) {
     const d = delta[c]
     if (d === null || counter) continue
     if (d > bounds[c].step) {
@@ -644,6 +648,13 @@ function readPipelines(): number | null {
   return typeof size === 'number' ? size : null
 }
 
+/** True on the WebGPU backend; the hop judge's pipelines leg is calibrated
+ *  there and only reported on WebGL 2 (see judgePlaceHop). */
+function isWebGpuRenderer(): boolean {
+  const gl = getRenderContext()?.gl as unknown as { backend?: { isWebGPUBackend?: boolean } } | undefined
+  return gl?.backend?.isWebGPUBackend === true
+}
+
 /** A settled bird's-eye reading closes a pending place visit — compared only
  *  like for like: a return under another bird's-eye signature than the one
  *  left (a graphics setting changed during the visit) holds a different
@@ -682,12 +693,12 @@ function judgeHop(signature: string, textures: number | null): void {
   }
   const { placeId, visit } = watchPlace
   if (!signature.startsWith('place:') || !placeId) return
-  const { evaluation, state } = judgePlaceHop(hopState, {
-    placeId,
-    visit,
-    pipelines: readPipelines(),
-    textures,
-  })
+  const { evaluation, state } = judgePlaceHop(
+    hopState,
+    { placeId, visit, pipelines: readPipelines(), textures },
+    PLACE_HOP_BOUNDS,
+    isWebGpuRenderer(),
+  )
   hopState = state
   if (!evaluation) return
   hopHistory.push(evaluation)

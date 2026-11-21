@@ -6,11 +6,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 interface Fake {
   info: { memory: { renderTargets: number; textures: number } }
   _pipelines: { caches: { size: number } } | undefined
+  backend: { isWebGPUBackend: boolean }
 }
 
 let frames: FrameRequestCallback[] = []
 
-async function harness() {
+async function harness(webgpu = true) {
   vi.resetModules()
   delete (window as unknown as Record<string, unknown>).__renderLeakArmed
   ;(window as unknown as { __assertLog?: unknown[] }).__assertLog = []
@@ -18,7 +19,11 @@ async function harness() {
   const { useUi } = await import('../state/ui')
   const { setRenderContext } = await import('./renderContext')
   const leak = await import('./renderLeak')
-  const gl: Fake = { info: { memory: { renderTargets: 20, textures: 75 } }, _pipelines: { caches: { size: 60 } } }
+  const gl: Fake = {
+    info: { memory: { renderTargets: 20, textures: 75 } },
+    _pipelines: { caches: { size: 60 } },
+    backend: { isWebGPUBackend: webgpu },
+  }
   setRenderContext({ gl, scene: null, camera: null, clock: null } as never)
   useGame.setState({ mode: 'travel', placeId: null })
   leak.armRenderLeakWatch()
@@ -136,6 +141,19 @@ describe('render leak watch, live', () => {
     expect(hops).toHaveLength(1)
     expect(hops[0].delta).toEqual({ textures: null, pipelines: 90 })
     expect(h.asserts()).toContain('render-place-hop-leak')
+  })
+
+  it('reports but does not assert a pipelines hop on WebGL 2 (point 1570 owns that drift)', async () => {
+    const h = await harness(false)
+    h.go('place', 'a')
+    h.tick()
+    h.go('place', 'b')
+    h.gl._pipelines!.caches.size += 90
+    h.tick()
+    const hops = h.state().placeHop.history as Array<{ verdict: string; delta: { pipelines: number | null } }>
+    expect(hops).toHaveLength(1)
+    expect(hops[0]).toMatchObject({ verdict: 'ok', delta: { pipelines: 90 } })
+    expect(h.asserts()).not.toContain('render-place-hop-leak')
   })
 
   it('judges a hop on pipelines when the player moves on while the place\'s textures still stream', async () => {

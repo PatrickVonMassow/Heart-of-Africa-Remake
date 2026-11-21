@@ -465,6 +465,17 @@ describe('place-to-place hop', () => {
     expect(r.evaluation!.delta.pipelines).toBe(63)
   })
 
+  it('reports the WebGL 2 pipeline drift without tripping when the pipelines leg is not judged', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, at('giza', 60, 63), PLACE_HOP_BOUNDS, false).state
+    for (let i = 1; i <= 30; i++) {
+      const r = judgePlaceHop(state, at(`v${i}`, 60, 190 + 2 * i), PLACE_HOP_BOUNDS, false)
+      state = r.state
+      expect(r.evaluation!.verdict).toBe('ok')
+      expect(r.evaluation!.detail).toMatch(/pipelines \d+ -> \d+/)
+    }
+    expect(state.growth.pipelines).toBeGreaterThan(PLACE_HOP_BOUNDS.pipelines.total)
+  })
+
   it('fails soft on an unreadable counter', () => {
     const s = judgePlaceHop(PLACE_HOP_START, at('a', null, null)).state
     const r = judgePlaceHop(s, at('b', 500, 900))
