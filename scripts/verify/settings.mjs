@@ -650,8 +650,11 @@ if (section('lion-feeding')) {
   // runs per backend.
   const renderedAnimal = async (key) => {
     const box = await page.evaluate((k) => {
-      const m = window.__lionHunt?.[k].current?.children[0]
-      if (!m?.geometry) return null
+      const h = window.__lionHunt
+      // Both meshes are mutated during the probe, so both must exist.
+      if (!h?.lion.current?.children[0] || !h?.prey.current?.children[0]) return null
+      const m = h[k].current.children[0]
+      if (!m.geometry) return null
       // Bounds from the position attribute: the shared geometry is left untouched.
       const pos = m.geometry.attributes.position
       const min = { x: Infinity, y: Infinity, z: Infinity }
@@ -682,16 +685,17 @@ if (section('lion-feeding')) {
       const height = Math.min(innerHeight, Math.ceil(y1 + py)) - y
       return width >= 4 && height >= 4 ? { x, y, width, height } : null
     }, key)
-    if (!box) return { box, verdict: 'no screen box' }
-    await page.evaluate((k) => {
-      const meshes = ['lion', 'prey'].map((a) => window.__lionHunt[a].current.children[0])
-      const m = window.__lionHunt[k].current.children[0]
-      const other = meshes.find((o) => o !== m)
-      window.__feedProbe = { m, mask: m.layers.mask, other, otherMask: other.layers.mask, meshes, shadow: meshes.map((o) => o.castShadow) }
-      for (const o of meshes) o.castShadow = false
-      other.layers.disableAll()
-    }, key)
+    if (!box) return { box, verdict: 'no screen box (a feed mesh is missing or off screen)' }
     try {
+      await page.evaluate((k) => {
+        const meshes = ['lion', 'prey'].map((a) => window.__lionHunt[a].current.children[0])
+        const m = window.__lionHunt[k].current.children[0]
+        const other = meshes.find((o) => o !== m)
+        const shadow = meshes.map((o) => o.castShadow)
+        window.__feedProbe = { m, mask: m.layers.mask, other, otherMask: other.layers.mask, meshes, shadow }
+        for (const o of meshes) o.castShadow = false
+        other.layers.disableAll()
+      }, key)
       const capture = async (drawn) => {
         const f0 = await page.evaluate((d) => {
           const p = window.__feedProbe
@@ -707,6 +711,7 @@ if (section('lion-feeding')) {
             .then(() => true, () => false)
           if (!drawnFrames) await forceFrame()
         }
+        if (!drawnFrames) drawnFrames = await page.evaluate((f) => window.__wildlife.frames() >= f + 3, f0)
         if (!drawnFrames) throw new Error('3 drawn frames did not arrive within 10 pumped waits')
         const png = await capturePixels(page, `feeding ${key} rendered`, { clip: box })
         return sharp(png).removeAlpha().raw().toBuffer()
@@ -734,6 +739,7 @@ if (section('lion-feeding')) {
     } finally {
       await page.evaluate(() => {
         const p = window.__feedProbe
+        if (!p) return
         p.m.layers.mask = p.mask
         p.other.layers.mask = p.otherMask
         p.meshes.forEach((m, i) => (m.castShadow = p.shadow[i]))
