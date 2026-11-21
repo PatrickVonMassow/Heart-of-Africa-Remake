@@ -1753,7 +1753,7 @@ stand danach als Tatsache im Auftrag, ohne dass die eine Zeile dabeistand, die s
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 21.11.2026, 19:59 · Quellen-Fingerprint: `08db100d471f…`
+Zuletzt aktualisiert: Samstag, 21.11.2026, 21:01 · Quellen-Fingerprint: `b8fa3b6cb51f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1800,7 +1800,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Pure read/search delegations (locate or summarize only) use subagent_type Explore, not general-purpose; writing, committing, verifying, authoring, review and suites keep their agent types | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either ; the main chain authors, the cross lane reviews; switch: lane-switch --lane scarce | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Iterate on the new feature's OWN test first; the full regression runs once at the end, never as the debugging loop | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 208 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 209 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | wait-command-guard.mjs | ✔ Mechanismus |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | \"Gib ab\" / \"abgeben\" means hand the batch to a SUCCESSOR session so the context does not overflow — it never means pause or stop the batch | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1873,8 +1873,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 110 Feedback-/Projekt-/User-Memories · 59 Guard-/Hook-Skripte · 11 Revert-/Reapply-Commits · 187 Prozess-/Meta-TASKS-Punkte (davon 13 offen).
 
-<!-- RETRO-FINGERPRINT: 08db100d471f0c667cce1307a3c744273460064f81598aa38c26c10e910085c1 -->
-<!-- RETRO-LAST-REFRESHED: 2026-11-21T18:59:38.990Z -->
+<!-- RETRO-FINGERPRINT: b8fa3b6cb51f4e69edc87d15d3423893633027318747faaff95f385eae70d193 -->
+<!-- RETRO-LAST-REFRESHED: 2026-11-21T20:01:15.951Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
