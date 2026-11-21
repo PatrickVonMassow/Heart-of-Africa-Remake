@@ -155,6 +155,41 @@ describe('PlaceReleaseTracker on the renderer draw path', () => {
     tracker.leave()
     expect(late.n()).toBe(1)
   })
+
+  it('releases a texture swapped in and out again during the visit', () => {
+    const s = scene()
+    const { gl, objects } = renderer()
+    const tracker = new PlaceReleaseTracker(() => s.root, 30)
+    const detach = tracker.attach(gl)
+    const mat = new THREE.MeshBasicNodeMaterial()
+    const m = new THREE.Mesh(new THREE.BufferGeometry(), mat)
+    objects.get(m, mat, s.root, null)
+    tracker.frame() // frame 0: a sample
+    const passing = track(new THREE.DataTexture(new Uint8Array(4), 1, 1))
+    mat.map = passing.o
+    for (let i = 1; i < 30; i++) tracker.frame()
+    tracker.frame() // frame 30: the next sample sees the map
+    mat.map = null // swapped out before leave
+    detach()
+    tracker.leave()
+    expect(passing.n()).toBe(1)
+  })
+
+  it('drops a released geometry from the renderer bookkeeping so a later leave frees it again', () => {
+    const s = scene()
+    const { gl, objects } = renderer()
+    const deleted: unknown[] = []
+    const withGeometries = { ...gl, _geometries: { delete: (o: unknown) => deleted.push(o) } }
+    const tracker = new PlaceReleaseTracker(() => s.root)
+    const detach = tracker.attach(withGeometries)
+    tracker.frame()
+    const geo = new THREE.BufferGeometry()
+    const mesh = new THREE.Mesh(geo, s.mats[0].o)
+    objects.get(mesh, mesh.material, s.root, null)
+    detach()
+    tracker.leave()
+    expect(deleted).toContain(geo)
+  })
 })
 
 describe('textures bound by released materials', () => {

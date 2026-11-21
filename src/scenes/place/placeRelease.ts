@@ -127,12 +127,20 @@ export function collectSceneResources(root: THREE.Object3D, into: ReleaseSet): v
 }
 
 type RenderObjectsLike = { get?: (...args: unknown[]) => unknown }
+type GeometryDataLike = { delete?: (o: object) => unknown }
 
-/** Dispose everything in `set` and empty it. Returns what was disposed. */
-export function releaseSceneResources(set: ReleaseSet): ReleaseCounts {
+/** Dispose everything in `set` and empty it. Returns what was disposed.
+ *  `geometryData` is the renderer's geometry DataMap (`_geometries`, three
+ *  internals): r185's geometry dispose frees the GPU buffers but leaves the
+ *  geometry marked initialized, so its next draw adds no dispose listener and
+ *  a second leave would free nothing — dropping the entry re-arms it. */
+export function releaseSceneResources(set: ReleaseSet, geometryData?: GeometryDataLike | null): ReleaseCounts {
   const counts = { materials: set.materials.size, geometries: set.geometries.size, textures: set.textures.size }
   for (const m of set.materials) m.dispose()
-  for (const g of set.geometries) g.dispose()
+  for (const g of set.geometries) {
+    g.dispose()
+    if (typeof geometryData?.delete === 'function') geometryData.delete(g)
+  }
   for (const t of set.textures) t.dispose()
   set.materials.clear()
   set.geometries.clear()
@@ -157,6 +165,7 @@ export class PlaceReleaseTracker {
   private readonly set = newReleaseSet()
   private frames = 0
   private attached = false
+  private geometryData: GeometryDataLike | null = null
 
   private readonly root: () => THREE.Object3D | null
   private readonly every: number
@@ -169,7 +178,9 @@ export class PlaceReleaseTracker {
   /** Record this scene's draws on `renderer` (three internals, read
    *  defensively). Returns the detach, which restores the renderer. */
   attach(renderer: unknown): () => void {
-    const objects = (renderer as { _objects?: RenderObjectsLike | null } | null | undefined)?._objects
+    const r = renderer as { _objects?: RenderObjectsLike | null; _geometries?: GeometryDataLike | null } | null | undefined
+    this.geometryData = r?._geometries ?? null
+    const objects = r?._objects
     const original = objects?.get
     if (!objects || typeof original !== 'function') return () => {}
     const set = this.set
@@ -191,7 +202,13 @@ export class PlaceReleaseTracker {
   }
 
   frame(): void {
-    if (this.frames++ % this.every !== 0 || this.attached) return
+    if (this.frames++ % this.every !== 0) return
+    // A texture assigned to a recorded material after its first draw (a map
+    // swapped in, and maybe out again before leave) is picked up here.
+    if (this.attached) {
+      for (const m of this.set.materials) collectMaterialTextures(m, this.set.textures)
+      return
+    }
     const r = this.root()
     if (r) collectSceneResources(r, this.set)
   }
@@ -204,7 +221,7 @@ export class PlaceReleaseTracker {
     // A material is scanned for textures on its first draw; one assigned to it
     // later (a swapped map or texture node) is picked up here.
     for (const m of this.set.materials) collectMaterialTextures(m, this.set.textures)
-    return releaseSceneResources(this.set)
+    return releaseSceneResources(this.set, this.geometryData)
   }
 }
 
