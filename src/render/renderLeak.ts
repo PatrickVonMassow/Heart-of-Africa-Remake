@@ -233,6 +233,75 @@ export function judgePlaceHop(
   }
 }
 
+// --- Texture census (DEV probe, point 1447) -----------------------------------
+// The counters say HOW MANY textures stay resident, not WHICH. This groups the
+// textures the renderer holds (`renderer.info.memoryMap`, three internals) by
+// kind, so a texture that outlives its settlement shows up as a kind whose count
+// grows from one village to the next: `console.table(__renderLeak.textureKinds())`.
+
+type CensusTexture = {
+  isTexture?: boolean
+  constructor?: { name?: string }
+  name?: string
+  image?: { width?: number; height?: number; depth?: number } | null
+  isRenderTargetTexture?: boolean
+  isDepthTexture?: boolean
+  isDataArrayTexture?: boolean
+  isStorageTexture?: boolean
+  isCubeTexture?: boolean
+  isFramebufferTexture?: boolean
+}
+
+export interface TextureKind {
+  kind: string
+  count: number
+  bytes: number
+  /** Change in count since the previous census (0 on the first). */
+  delta: number
+}
+
+/** One texture's census key: class, flags, size and name. */
+export function textureKindOf(t: unknown): string {
+  const tex = t as CensusTexture
+  const flags = (
+    [
+      ['rt', tex.isRenderTargetTexture],
+      ['depth', tex.isDepthTexture],
+      ['array', tex.isDataArrayTexture],
+      ['storage', tex.isStorageTexture],
+      ['cube', tex.isCubeTexture],
+      ['framebuffer', tex.isFramebufferTexture],
+    ] as const
+  )
+    .filter(([, on]) => on)
+    .map(([f]) => f)
+  const img = tex.image
+  const size = img ? `${img.width ?? '?'}x${img.height ?? '?'}${(img.depth ?? 1) > 1 ? `x${img.depth}` : ''}` : 'no-image'
+  return [tex.constructor?.name ?? 'Texture', flags.length ? `[${flags.join(',')}]` : '', size, tex.name ? `"${tex.name}"` : '']
+    .filter(Boolean)
+    .join(' ')
+}
+
+/** Group the textures of a renderer memory map by kind, pure; attributes (the
+ *  map's other entries) are skipped. `previous` (kind -> count) fills `delta`. */
+export function textureCensus(
+  memoryMap: Map<object, unknown> | null | undefined,
+  previous: ReadonlyMap<string, number> = new Map(),
+): TextureKind[] {
+  const kinds = new Map<string, TextureKind>()
+  for (const [t, size] of memoryMap ?? []) {
+    if (!(t as CensusTexture).isTexture) continue
+    const kind = textureKindOf(t)
+    const k = kinds.get(kind) ?? { kind, count: 0, bytes: 0, delta: 0 }
+    k.count++
+    k.bytes += typeof size === 'number' ? size : 0
+    kinds.set(kind, k)
+  }
+  for (const [kind, count] of previous) if (!kinds.has(kind)) kinds.set(kind, { kind, count: 0, bytes: 0, delta: 0 })
+  for (const k of kinds.values()) k.delta = k.count - (previous.get(k.kind) ?? (previous.size ? 0 : k.count))
+  return [...kinds.values()].sort((a, b) => b.delta - a.delta || b.count - a.count)
+}
+
 /** The levers that legitimately change the resident GPU set. Everything not in
  *  here must NOT move the render-target count, and may move the texture count
  *  only within its bounds (streaming) — that is what makes a rise a leak. */
@@ -552,6 +621,7 @@ let textureState: PipelineReturnState = PIPELINE_RETURN_START
 let textureHistory: PipelineReturnEvaluation[] = []
 let hopState: PlaceHopState = PLACE_HOP_START
 let hopHistory: PlaceHopEvaluation[] = []
+let lastCensus: ReadonlyMap<string, number> = new Map()
 
 /** `renderer._pipelines.caches.size` — three internals, so read defensively;
  *  null where the renderer or the field is missing (fail soft). */
@@ -826,5 +896,12 @@ export function armRenderLeakWatch(): void {
     reset,
     forceLeak,
     releaseForced,
+    /** The resident textures by kind, with the count change since the last call. */
+    textureKinds: () => {
+      const memoryMap = (getRenderContext()?.gl?.info as { memoryMap?: Map<object, unknown> } | undefined)?.memoryMap
+      const census = textureCensus(memoryMap, lastCensus)
+      lastCensus = new Map(census.filter((k) => k.count > 0).map((k) => [k.kind, k.count]))
+      return census
+    },
   }
 }

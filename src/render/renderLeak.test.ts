@@ -13,6 +13,7 @@ import {
   evaluateReading,
   judgePipelineReturn,
   judgePlaceHop,
+  textureCensus,
   PLACE_HOP_BOUNDS,
   PLACE_HOP_START,
   newWatch,
@@ -439,5 +440,29 @@ describe('place-to-place hop', () => {
     expect(r.evaluation!.verdict).toBe('ok')
     expect(r.evaluation!.delta).toEqual({ pipelines: null, textures: null })
     expect(r.state.growth).toEqual({ pipelines: 0, textures: 0 })
+  })
+})
+
+describe('texture census', () => {
+  it('groups resident textures by kind, skips attributes and reports the change since the last census', async () => {
+    const THREE = await import('three/webgpu')
+    const morph = () => new THREE.DataArrayTexture(new Uint8Array(4 * 2 * 2 * 3), 2, 2, 3)
+    const rt = new THREE.RenderTarget(8, 8)
+    rt.texture.name = 'shadow'
+    const map = new Map<object, unknown>([
+      [morph(), 48],
+      [morph(), 48],
+      [rt.texture, 256],
+      [new THREE.BufferAttribute(new Float32Array(3), 3), { size: 12, type: 'attributes' }],
+    ])
+    const first = textureCensus(map)
+    expect(first.find((k) => k.kind === 'DataArrayTexture [array] 2x2x3')).toEqual({ kind: 'DataArrayTexture [array] 2x2x3', count: 2, bytes: 96, delta: 0 })
+    expect(first.find((k) => k.kind.includes('"shadow"'))?.kind).toMatch(/\[rt\] 8x8/)
+    expect(first.reduce((n, k) => n + k.count, 0)).toBe(3)
+    map.set(morph(), 48)
+    map.delete(rt.texture)
+    const next = textureCensus(map, new Map(first.map((k) => [k.kind, k.count])))
+    expect(next[0]).toMatchObject({ kind: 'DataArrayTexture [array] 2x2x3', count: 3, delta: 1 })
+    expect(next.find((k) => k.kind.includes('"shadow"'))).toMatchObject({ count: 0, delta: -1 })
   })
 })
