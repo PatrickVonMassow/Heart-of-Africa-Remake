@@ -874,6 +874,12 @@
       "why": "hits only landings of a charged point and has a known one-line hand repair; no charged point is in flight",
       "origin": "machine",
       "place": "last"
+    },
+    "1575": {
+      "at": "2026-11-22T22:38:54.551Z",
+      "why": "a test-noise red already charged in the ledger; it holds no landing now, so it waits behind the open hygiene points",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -884,7 +890,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-22T20:29:08.860Z",
+    "at": "2026-11-22T22:38:54.555Z",
     "points": [
       184,
       200,
@@ -1078,7 +1084,8 @@
       1571,
       1572,
       1573,
-      1574
+      1574,
+      1575
     ]
   }
 }
