@@ -5331,3 +5331,10 @@ put it is the mistake this line exists to stop.
   Test: Vitest case: ticking a charged point leaves no charge for it and the open-points test stays green.
   Source: agent finding of 22.11.2026 20:21 UTC via the findings carrier; real blockade of the landing chain (CLAUDE.md §2 finding intake). Related: 1566.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1575. Walker-dust visibility check reds in the full polish-settlement pass while its section run is green
+  Final state: `polish-settlement` judges walker-dust visibility against a still scene in the full pass as in its section run (the OFF-vs-OFF noise floor stays at the section level, or the comparison is made noise-robust), so the check reds only when the dust is actually invisible; the cause of the full-pass noise is named.
+  Observed problem: full WebGPU pass on feat/1573 86d1f7296 (local/verify-logs/2026-11-22T21-30-21-089-polish-settlement.log): 'the dust is visible' FAIL, ON-vs-OFF 10.12 against OFF-vs-OFF 8.79 mean |ΔRGB| — the OFF-vs-OFF floor shows the scene was not still. `--section=walker-dust` then passed on main 0d8638c33 (2026-11-22T22-31-56-885) and on the same branch head 86d1f7296 (2026-11-22T22-34-39-610); 1573 changes only the DEV leak judge and its report.
+  Test: the full-pass walker-dust block records its OFF-vs-OFF floor; a unit or section case pins the noise-robust comparison.
+  Source: agent finding of 22.11.2026 22:07 UTC via the findings carrier; a red that holds landings (CLAUDE.md §2 finding intake). Related: 358, 1573.
+  Bundle: Session- & Repo-Hygiene.
