@@ -204,6 +204,9 @@ export interface PlaceHopEvaluation {
   detail: string
   /** The census kinds that grew across this hop (filled by the live watch). */
   grew?: string
+  /** The visit (state/placeVisit.ts) of the reading judged, so a caller can
+   *  name the hop by when it started rather than when its verdict appeared. */
+  visit?: number
 }
 
 /**
@@ -269,7 +272,7 @@ export function judgePlaceHop(
   }
   const detail = `place hop ${hops} ${prev.placeId} -> ${reading.placeId}: ${part('textures')}; ${part('pipelines')}${why}`
   return {
-    evaluation: { verdict: counter ? 'leak' : 'ok', from: prev.placeId, to: reading.placeId, delta, counter, detail },
+    evaluation: { verdict: counter ? 'leak' : 'ok', from: prev.placeId, to: reading.placeId, delta, counter, detail, visit: reading.visit },
     state: { hops, chains: { ...state.chains, [key]: { last, growth } } },
   }
 }
@@ -1021,6 +1024,7 @@ export function armRenderLeakWatch(): void {
         history: textureHistory,
       },
       placeHop: {
+        visit: currentPlaceVisit(),
         bounds: PLACE_HOP_BOUNDS,
         state: hopState,
         history: hopHistory,

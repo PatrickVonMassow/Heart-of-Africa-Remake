@@ -14,26 +14,33 @@ import sharp from 'sharp'
 import fs from 'node:fs'
 import { section as sectionGate, check, checkTiming, unmeasured, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
 
-// Which section's place hops are which (point 1566): each running section marks
-// the hop count it starts at, and the suite end prints every hop with its owner.
-const hopMarks = []
-const lastHop = () => page.evaluate(() => {
-  const h = window.__renderLeak?.state().placeHop?.history ?? []
-  return Number(/place hop (\d+)/.exec(h.at(-1)?.detail ?? '')?.[1] ?? 0)
-}).catch(() => null)
+// Which section's place hops are which (point 1566): each running section
+// names itself in the page, and every place entry records the section it
+// started in under its visit number, so a hop still settling when the next
+// section begins stays with the section that made it.
+await page.evaluate(() => {
+  window.__hopSections = new Map()
+  window.__game.subscribe((s, prev) => {
+    if (s.mode !== 'place' || (prev.mode === 'place' && prev.placeId === s.placeId)) return
+    const visit = window.__renderLeak?.state().placeHop?.visit
+    if (visit !== undefined) window.__hopSections.set(visit, window.__hopSection ?? '?')
+  })
+})
 function section(name) {
   const on = sectionGate(name)
-  if (on) hopMarks.push({ name, at: lastHop() })
+  if (on) page.evaluate((n) => { window.__hopSection = n }, name).catch(() => {})
   return on
 }
+/** The place hops of one section (all with none), each with the section it started in. */
+const ownedHops = (only) => page.evaluate((only) => {
+  const hops = window.__renderLeak?.state().placeHop?.history ?? []
+  return hops
+    .map((h) => ({ ...h, owner: window.__hopSections?.get(h.visit) ?? '?' }))
+    .filter((h) => only === null || h.owner === only)
+}, only ?? null).catch(() => [])
+const hopLine = (h) => `hop ${/place hop (\d+)/.exec(h.detail ?? '')?.[1] ?? '?'} ${h.from} -> ${h.to}: textures ${h.delta?.textures ?? '?'}, pipelines ${h.delta?.pipelines ?? '?'}; grew: ${h.grew ?? '?'}`
 async function printHopOwners() {
-  const marks = await Promise.all(hopMarks.map(async (m) => ({ name: m.name, at: await m.at })))
-  const hops = await page.evaluate(() => window.__renderLeak?.state().placeHop?.history ?? []).catch(() => [])
-  const lines = hops.map((h) => {
-    const n = Number(/place hop (\d+)/.exec(h.detail ?? '')?.[1] ?? 0)
-    const owner = marks.filter((m) => m.at !== null && m.at < n).at(-1)?.name ?? '?'
-    return `[${owner}] hop ${n} ${h.from} -> ${h.to}: textures ${h.delta?.textures ?? '?'}, pipelines ${h.delta?.pipelines ?? '?'}; grew: ${h.grew ?? '?'}`
-  })
+  const lines = (await ownedHops()).map((h) => `[${h.owner}] ${hopLine(h)}`)
   // The run digest keeps only a failing suite's tail, so the whole list goes to disk.
   fs.mkdirSync('local', { recursive: true })
   fs.writeFileSync('local/place-hop-owners.txt', lines.join('\n') + '\n')
@@ -2627,8 +2634,7 @@ if (section('kraal-cattle')) {
   check('every beast stands inside its pen, clear of the fence (point 359)', kraals.every((r) => r.published && r.pen && inside(r)), JSON.stringify([zulu1890, maasai1890].map((r) => ({ hold: r.hold, at: r.cattle }))))
   // The place hops of this section with their grown census kinds (point 1566):
   // what a re-entry keeps resident beyond the previous village's reading.
-  const hops = await page.evaluate(() => window.__renderLeak?.state().placeHop?.history?.slice(-8) ?? [])
-  for (const h of hops) console.log(`  hop ${h.from} -> ${h.to}: textures ${h.delta?.textures ?? '?'}, pipelines ${h.delta?.pipelines ?? '?'}; grew: ${h.grew ?? '?'}`)
+  for (const h of await ownedHops('kraal-cattle')) console.log(`  ${hopLine(h)}`)
 }
 
 await printHopOwners()

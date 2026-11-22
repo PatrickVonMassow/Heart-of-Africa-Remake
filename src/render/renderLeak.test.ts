@@ -462,6 +462,7 @@ describe('place-to-place hop', () => {
     const r = judgePlaceHop(judgePlaceHop(PLACE_HOP_START, { ...at('a', 60), visit: 1 }).state, { ...at('a', 60, 200), visit: 2 })
     expect(r.evaluation?.verdict).toBe('leak')
     expect(r.evaluation?.counter).toBe('pipelines')
+    expect(r.evaluation?.visit).toBe(2) // the hop is named by the visit it started
   })
 
   it('reproduces the measured ~7 textures per village hop as a leak within a few villages, on both backends', () => {
