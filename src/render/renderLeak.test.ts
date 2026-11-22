@@ -458,6 +458,29 @@ describe('place-to-place hop', () => {
     expect(r.state.chains.s.growth.textures).toBe(14)
   })
 
+  it('judges a hop whose count was unreadable once its visit re-settles readable', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, { ...at('a', 100), visit: 1, setup: 's' }).state
+    const blind = judgePlaceHop(state, { ...at('b', null), visit: 2, setup: 's' })
+    expect(blind.evaluation?.delta.textures).toBeNull()
+    state = blind.state
+    const r = judgePlaceHop(state, { ...at('b', 130), visit: 2, setup: 's' })
+    expect(r.evaluation).toMatchObject({ verdict: 'leak', counter: 'textures', from: 'a', to: 'b', delta: { textures: 30, pipelines: null } })
+    // judged once: a further re-settle of the same visit is a plain re-settle again
+    expect(judgePlaceHop(r.state, { ...at('b', 131), visit: 2, setup: 's' }).evaluation).toBeNull()
+  })
+
+  it('bounds a delta across an unreadable hop by the step per hop spanned', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, { ...at('a', 100), visit: 1, setup: 's' }).state
+    state = judgePlaceHop(state, { ...at('b', null), visit: 2, setup: 's' }).state
+    const r = judgePlaceHop(state, { ...at('c', 130), visit: 3, setup: 's' }) // two legitimate +15 hops
+    expect(r.evaluation).toMatchObject({ verdict: 'ok', from: 'a', delta: { textures: 30 } })
+    expect(r.evaluation?.detail).toMatch(/allowed \+48 over 2 hops/)
+    expect(r.state.chains.s.growth.textures).toBe(30)
+    // the total bound still applies across the span
+    const far = judgePlaceHop(state, { ...at('c', 100 + PLACE_HOP_BOUNDS.textures.total + 1), visit: 3, setup: 's' })
+    expect(far.evaluation).toMatchObject({ verdict: 'leak', counter: 'textures' })
+  })
+
   it('judges a re-entry of the same place as a hop when its visit differs', () => {
     const r = judgePlaceHop(judgePlaceHop(PLACE_HOP_START, { ...at('a', 60), visit: 1 }).state, { ...at('a', 60, 200), visit: 2 })
     expect(r.evaluation?.verdict).toBe('leak')

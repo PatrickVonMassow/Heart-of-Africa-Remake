@@ -175,11 +175,17 @@ export interface PlaceHopReading {
   textures: number | null
 }
 
+type HopCounter = 'pipelines' | 'textures'
+
 /** One render setup's hop chain: its last usable reading per counter and the
  *  net growth summed over its judged hops, floored at zero. */
 export interface PlaceHopChain {
   last: PlaceHopReading
   growth: { pipelines: number; textures: number }
+  /** Per counter, when `last` CARRIES an older usable value across hops whose
+   *  own reading was unreadable: the place it was read in and the hops it now
+   *  spans. Absent, the value is the reading of `last` itself. */
+  carried?: Partial<Record<HopCounter, { from: string; hops: number }>>
 }
 
 export interface PlaceHopState {
@@ -213,9 +219,14 @@ export interface PlaceHopEvaluation {
  * Judge one settled settlement reading against the previous reading of the same
  * render setup, pure. A reading of the SAME place and visit (a settings toggle
  * re-settling it) only updates its setup's last reading; the first reading of a
- * setup's chain judges nothing. An unreadable (null) counter never replaces the
- * last usable reading of that counter, so a hop left while shaders compiled
- * does not hide the growth across it.
+ * setup's chain judges nothing.
+ *
+ * An unreadable (null) counter never replaces the last usable reading: the
+ * older value is CARRIED under the new visit and marked as such. The next usable
+ * reading of that counter is judged against the carried value — a same-visit
+ * re-settle too, so a hop left while shaders compiled cannot hide its growth.
+ * A delta spanning n hops is bounded by n × step (n legitimate hops may each
+ * differ by up to a step); the total bound applies unchanged.
  */
 export function judgePlaceHop(
   state: PlaceHopState,
@@ -229,25 +240,41 @@ export function judgePlaceHop(
   const key = reading.setup ?? ''
   const chain = state.chains[key]
   const prev = chain?.last
-  const last: PlaceHopReading = {
-    ...reading,
-    pipelines: reading.pipelines ?? prev?.pipelines ?? null,
-    textures: reading.textures ?? prev?.textures ?? null,
-  }
   const growth0 = chain?.growth ?? { pipelines: 0, textures: 0 }
-  if (!prev || (prev.placeId === reading.placeId && prev.visit === reading.visit)) {
-    return { evaluation: null, state: { ...state, chains: { ...state.chains, [key]: { last, growth: growth0 } } } }
+  const sameVisit = !!prev && prev.placeId === reading.placeId && prev.visit === reading.visit
+  const counters = ['pipelines', 'textures'] as const
+  const last: PlaceHopReading = { ...reading }
+  const carried: NonNullable<PlaceHopChain['carried']> = {}
+  const delta: Record<HopCounter, number | null> = { pipelines: null, textures: null }
+  const spanned: Record<HopCounter, number> = { pipelines: 1, textures: 1 }
+  const from: Record<HopCounter, string> = { pipelines: prev?.placeId ?? '', textures: prev?.placeId ?? '' }
+  for (const c of counters) {
+    const was = prev?.[c] ?? null
+    const carry = chain?.carried?.[c]
+    if (reading[c] === null) {
+      last[c] = was
+      // a new hop widens the carry; a same-visit re-settle keeps it as it was
+      if (was !== null) carried[c] = carry ? { ...carry, hops: carry.hops + (sameVisit ? 0 : 1) } : sameVisit ? undefined : { from: prev!.placeId, hops: 1 }
+      if (!carried[c]) delete carried[c]
+      continue
+    }
+    if (was === null || (sameVisit && !carry)) continue
+    delta[c] = reading[c]! - was
+    spanned[c] = carry ? carry.hops + (sameVisit ? 0 : 1) : 1
+    from[c] = carry?.from ?? prev!.placeId
   }
-  const delta = {
-    pipelines: prev.pipelines !== null && reading.pipelines !== null ? reading.pipelines - prev.pipelines : null,
-    textures: prev.textures !== null && reading.textures !== null ? reading.textures - prev.textures : null,
+  const judged = counters.some((c) => delta[c] !== null)
+  if (!prev || (sameVisit && !judged)) {
+    return { evaluation: null, state: { ...state, chains: { ...state.chains, [key]: { last, growth: growth0, carried } } } }
   }
   const growth = {
     pipelines: delta.pipelines === null ? growth0.pipelines : Math.max(0, growth0.pipelines + delta.pipelines),
     textures: delta.textures === null ? growth0.textures : Math.max(0, growth0.textures + delta.textures),
   }
-  const hops = state.hops + 1
-  let counter: 'pipelines' | 'textures' | undefined
+  // a deferred judgement of a same-visit re-settle belongs to the hop already counted
+  const hops = sameVisit ? state.hops : state.hops + 1
+  const step = (c: HopCounter) => bounds[c].step * spanned[c]
+  let counter: HopCounter | undefined
   let why = ''
   // The textures leg judges on both backends (the figures' morph textures are
   // released by the place sweep since point 1566). `judgePipelines` false
@@ -257,7 +284,7 @@ export function judgePlaceHop(
   for (const c of judgePipelines ? (['textures', 'pipelines'] as const) : (['textures'] as const)) {
     const d = delta[c]
     if (d === null || counter) continue
-    if (d > bounds[c].step) {
+    if (d > step(c)) {
       counter = c
       why = ` — one hop left its ${c} behind`
     } else if (growth[c] > bounds[c].total) {
@@ -265,15 +292,18 @@ export function judgePlaceHop(
       why = ` — ${c} grow with the villages visited`
     }
   }
-  const part = (c: 'pipelines' | 'textures') => {
+  const part = (c: HopCounter) => {
     const d = delta[c]
     if (d === null) return `${c} unreadable`
-    return `${c} ${prev[c]} -> ${reading[c]} (${d >= 0 ? '+' : ''}${d}, allowed +${bounds[c].step}; net ${growth[c]}, allowed ${bounds[c].total})`
+    const over = spanned[c] > 1 ? ` over ${spanned[c]} hops from ${from[c]}` : ''
+    return `${c} ${reading[c]! - d} -> ${reading[c]} (${d >= 0 ? '+' : ''}${d}, allowed +${step(c)}${over}; net ${growth[c]}, allowed ${bounds[c].total})`
   }
-  const detail = `place hop ${hops} ${prev.placeId} -> ${reading.placeId}: ${part('textures')}; ${part('pipelines')}${why}`
+  // the place the judged value was read in (a carried one names its own)
+  const origin = delta.textures !== null ? from.textures : delta.pipelines !== null ? from.pipelines : prev.placeId
+  const detail = `place hop ${hops} ${origin} -> ${reading.placeId}: ${part('textures')}; ${part('pipelines')}${why}`
   return {
-    evaluation: { verdict: counter ? 'leak' : 'ok', from: prev.placeId, to: reading.placeId, delta, counter, detail, visit: reading.visit },
-    state: { hops, chains: { ...state.chains, [key]: { last, growth } } },
+    evaluation: { verdict: counter ? 'leak' : 'ok', from: origin, to: reading.placeId, delta, counter, detail, visit: reading.visit },
+    state: { hops, chains: { ...state.chains, [key]: { last, growth, carried } } },
   }
 }
 
