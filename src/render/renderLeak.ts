@@ -175,17 +175,24 @@ export interface PlaceHopReading {
   textures: number | null
 }
 
-export interface PlaceHopState {
-  /** The last settled settlement reading of the current hop chain, or null
-   *  once the bird's-eye view has settled (a chain needs no travel between). */
-  last: PlaceHopReading | null
-  hops: number
-  /** Net growth summed over the judged hops of the current chain, floored at
-   *  zero; a settled bird's-eye reading resets it with the chain. */
+/** One render setup's hop chain: its last usable reading per counter and the
+ *  net growth summed over its judged hops, floored at zero. */
+export interface PlaceHopChain {
+  last: PlaceHopReading
   growth: { pipelines: number; textures: number }
 }
 
-export const PLACE_HOP_START: PlaceHopState = { last: null, hops: 0, growth: { pipelines: 0, textures: 0 } }
+export interface PlaceHopState {
+  /** The hop chain of each render setup seen since the bird's-eye view last
+   *  settled (a chain needs no travel between; a settled bird's-eye reading
+   *  clears them all). A reading is compared only with the previous reading of
+   *  its own setup, so alternating setups cannot hide growth and growth never
+   *  carries from one setup into another. Readings without a setup share ''. */
+  chains: Record<string, PlaceHopChain>
+  hops: number
+}
+
+export const PLACE_HOP_START: PlaceHopState = { chains: {}, hops: 0 }
 
 export interface PlaceHopEvaluation {
   verdict: 'ok' | 'leak'
@@ -200,9 +207,12 @@ export interface PlaceHopEvaluation {
 }
 
 /**
- * Judge one settled settlement reading against the previous one, pure. A reading
- * of the SAME place (a settings toggle re-settling it) only replaces the chain's
- * last reading; the first reading of a chain judges nothing.
+ * Judge one settled settlement reading against the previous reading of the same
+ * render setup, pure. A reading of the SAME place and visit (a settings toggle
+ * re-settling it) only updates its setup's last reading; the first reading of a
+ * setup's chain judges nothing. An unreadable (null) counter never replaces the
+ * last usable reading of that counter, so a hop left while shaders compiled
+ * does not hide the growth across it.
  */
 export function judgePlaceHop(
   state: PlaceHopState,
@@ -210,22 +220,28 @@ export function judgePlaceHop(
   bounds: PlaceHopBounds = PLACE_HOP_BOUNDS,
   judgePipelines = true,
 ): { evaluation: PlaceHopEvaluation | null; state: PlaceHopState } {
-  const prev = state.last
-  if (!prev || (prev.placeId === reading.placeId && prev.visit === reading.visit)) return { evaluation: null, state: { ...state, last: reading } }
   // Like for like only: another detail level or post/shadow setup holds another
-  // resident set (a low-detail reading drew fewer figures at a smaller target),
-  // so a setup change starts a new chain instead of judging the difference
-  // (polish-settlement rain-depth's low/medium/high sweep, point 1566).
-  if (prev.setup !== undefined && reading.setup !== undefined && prev.setup !== reading.setup) {
-    return { evaluation: null, state: { ...PLACE_HOP_START, hops: state.hops, last: reading } }
+  // resident set (a low-detail reading drew fewer figures at a smaller target;
+  // polish-settlement rain-depth's low/medium/high sweep, point 1566).
+  const key = reading.setup ?? ''
+  const chain = state.chains[key]
+  const prev = chain?.last
+  const last: PlaceHopReading = {
+    ...reading,
+    pipelines: reading.pipelines ?? prev?.pipelines ?? null,
+    textures: reading.textures ?? prev?.textures ?? null,
+  }
+  const growth0 = chain?.growth ?? { pipelines: 0, textures: 0 }
+  if (!prev || (prev.placeId === reading.placeId && prev.visit === reading.visit)) {
+    return { evaluation: null, state: { ...state, chains: { ...state.chains, [key]: { last, growth: growth0 } } } }
   }
   const delta = {
     pipelines: prev.pipelines !== null && reading.pipelines !== null ? reading.pipelines - prev.pipelines : null,
     textures: prev.textures !== null && reading.textures !== null ? reading.textures - prev.textures : null,
   }
   const growth = {
-    pipelines: delta.pipelines === null ? state.growth.pipelines : Math.max(0, state.growth.pipelines + delta.pipelines),
-    textures: delta.textures === null ? state.growth.textures : Math.max(0, state.growth.textures + delta.textures),
+    pipelines: delta.pipelines === null ? growth0.pipelines : Math.max(0, growth0.pipelines + delta.pipelines),
+    textures: delta.textures === null ? growth0.textures : Math.max(0, growth0.textures + delta.textures),
   }
   const hops = state.hops + 1
   let counter: 'pipelines' | 'textures' | undefined
@@ -254,7 +270,7 @@ export function judgePlaceHop(
   const detail = `place hop ${hops} ${prev.placeId} -> ${reading.placeId}: ${part('textures')}; ${part('pipelines')}${why}`
   return {
     evaluation: { verdict: counter ? 'leak' : 'ok', from: prev.placeId, to: reading.placeId, delta, counter, detail },
-    state: { last: reading, hops, growth },
+    state: { hops, chains: { ...state.chains, [key]: { last, growth } } },
   }
 }
 

@@ -412,7 +412,7 @@ describe('place-to-place hop', () => {
     expect(r.evaluation).toBeNull()
     r = judgePlaceHop(r.state, at('a', 64))
     expect(r.evaluation).toBeNull()
-    expect(r.state.last).toEqual(at('a', 64))
+    expect(r.state.chains[''].last).toEqual(at('a', 64))
   })
 
   it('starts a new chain instead of judging a hop across a render-setup change', () => {
@@ -421,10 +421,41 @@ describe('place-to-place hop', () => {
     const low = judgePlaceHop(PLACE_HOP_START, { ...at('zulu', 57), visit: 1, setup: 'low|-' }).state
     const r = judgePlaceHop(low, { ...at('zulu', 87, 155), visit: 2, setup: 'medium|-' })
     expect(r.evaluation).toBeNull()
-    expect(r.state.growth).toEqual({ pipelines: 0, textures: 0 })
+    expect(r.state.chains['medium|-'].growth).toEqual({ pipelines: 0, textures: 0 })
     // the same jump under one setup is still a leak
     const same = judgePlaceHop(judgePlaceHop(PLACE_HOP_START, { ...at('zulu', 57), visit: 1, setup: 'medium|-' }).state, { ...at('zulu', 87, 155), visit: 2, setup: 'medium|-' })
     expect(same.evaluation?.verdict).toBe('leak')
+  })
+
+  it('compares each reading with the previous reading of its own setup, so alternating setups cannot hide growth', () => {
+    // low/medium on consecutive hops, every return to a setup +7 textures
+    let state = PLACE_HOP_START
+    const verdicts: string[] = []
+    for (let i = 0; i < 18; i++) {
+      const setup = i % 2 ? 'medium|-' : 'low|-'
+      const base = i % 2 ? 87 : 57
+      const r = judgePlaceHop(state, { ...at(`v${i}`, base + 7 * Math.floor(i / 2)), visit: i + 1, setup })
+      state = r.state
+      if (r.evaluation) verdicts.push(r.evaluation.verdict)
+    }
+    expect(verdicts).toContain('leak')
+  })
+
+  it('never carries one setup\'s accumulated growth into another', () => {
+    let state = PLACE_HOP_START
+    for (let i = 0; i <= 5; i++) state = judgePlaceHop(state, { ...at(`v${i}`, 57 + 8 * i), visit: i + 1, setup: 'low|-' }).state
+    // a settings change within the last visit re-settles it under medium
+    state = judgePlaceHop(state, { ...at('v5', 90), visit: 6, setup: 'medium|-' }).state
+    const r = judgePlaceHop(state, { ...at('w', 100), visit: 7, setup: 'medium|-' })
+    expect(r.evaluation).toMatchObject({ verdict: 'ok', delta: { textures: 10 } })
+  })
+
+  it('keeps the last usable reading of a counter across an unreadable one', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, { ...at('a', 60), visit: 1, setup: 's' }).state
+    state = judgePlaceHop(state, { ...at('b', null), visit: 2, setup: 's' }).state
+    const r = judgePlaceHop(state, { ...at('c', 74), visit: 3, setup: 's' })
+    expect(r.evaluation?.delta.textures).toBe(14)
+    expect(r.state.chains.s.growth.textures).toBe(14)
   })
 
   it('judges a re-entry of the same place as a hop when its visit differs', () => {
@@ -483,7 +514,7 @@ describe('place-to-place hop', () => {
       state = r.state
       expect(r.evaluation!.verdict).toBe('ok')
     }
-    expect(state.growth.textures).toBeLessThanOrEqual(PLACE_HOP_BOUNDS.textures.total)
+    expect(state.chains[''].growth.textures).toBeLessThanOrEqual(PLACE_HOP_BOUNDS.textures.total)
   })
 
   it('flags one hop over the step bound, on pipelines too', () => {
@@ -516,7 +547,7 @@ describe('place-to-place hop', () => {
       expect(r.evaluation!.verdict).toBe('ok')
       expect(r.evaluation!.detail).toMatch(/pipelines \d+ -> \d+/)
     }
-    expect(state.growth.pipelines).toBeGreaterThan(PLACE_HOP_BOUNDS.pipelines.total)
+    expect(state.chains[''].growth.pipelines).toBeGreaterThan(PLACE_HOP_BOUNDS.pipelines.total)
   })
 
   it('fails soft on an unreadable counter', () => {
@@ -524,7 +555,7 @@ describe('place-to-place hop', () => {
     const r = judgePlaceHop(s, at('b', 500, 900))
     expect(r.evaluation!.verdict).toBe('ok')
     expect(r.evaluation!.delta).toEqual({ pipelines: null, textures: null })
-    expect(r.state.growth).toEqual({ pipelines: 0, textures: 0 })
+    expect(r.state.chains[''].growth).toEqual({ pipelines: 0, textures: 0 })
   })
 })
 
