@@ -584,12 +584,19 @@ export interface StepResult {
 /**
  * One frame of the settle watch, pure. `counts` is the reading for this frame,
  * or null when no renderer is available (a torn-down canvas): a missing reading
- * ages the watch towards its give-up point but never settles it.
+ * ages the watch towards its give-up point but never settles it. `compiling`
+ * (shader pipelines still queued or pending) holds the TEXTURE reading back:
+ * three uploads a render object's textures — the figures' morph
+ * DataArrayTextures among them — at its first draw after its pipeline compiled,
+ * so a count read mid-compile stands still under load and misses a whole place's
+ * set (point 1566: polish-settlement's full run read zulu-village at 56
+ * textures / 146 pipelines and its re-entry at 85 / 195).
  */
 export function stepWatch(
   w: Watch,
   counts: LeakCounts | null,
   policy: SettlePolicy = SETTLE_POLICY,
+  compiling = false,
 ): StepResult {
   const frames = w.frames + 1
   let { stable, last, texStable, texLast } = w
@@ -599,7 +606,10 @@ export function stepWatch(
       stable = 0
       last = counts.renderTargets
     }
-    if (counts.textures === texLast) texStable++
+    if (compiling) {
+      texStable = 0
+      texLast = null
+    } else if (counts.textures === texLast) texStable++
     else {
       texStable = 0
       texLast = counts.textures
@@ -649,6 +659,14 @@ function readPipelines(): number | null {
 
 /** True on the WebGPU backend; the hop judge's pipelines leg is calibrated
  *  there and only reported on WebGL 2 (see judgePlaceHop). */
+/** True while the async shader compile (render/asyncPipelines.ts, exposed by
+ *  App.tsx in dev) still has pipelines queued or pending; unreadable → false. */
+function pipelinesCompiling(): boolean {
+  const read = (window as unknown as { __shaderPipelines?: () => { pending: number; queued: number } | null }).__shaderPipelines
+  const s = typeof read === 'function' ? read() : null
+  return !!s && (s.pending > 0 || s.queued > 0)
+}
+
 function isWebGpuRenderer(): boolean {
   const gl = getRenderContext()?.gl as unknown as { backend?: { isWebGPUBackend?: boolean } } | undefined
   return gl?.backend?.isWebGPUBackend === true
@@ -742,7 +760,7 @@ function settleStep(): void {
   const w = watch
   if (!w) return
   const counts = readCounts()
-  const step = stepWatch(w, counts)
+  const step = stepWatch(w, counts, SETTLE_POLICY, pipelinesCompiling())
   const frames = step.watch?.frames ?? w.frames + 1
   watch = step.watch
   if (step.settled) {

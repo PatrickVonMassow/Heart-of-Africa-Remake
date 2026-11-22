@@ -234,12 +234,13 @@ describe('evaluateReading', () => {
 
 describe('stepWatch', () => {
   const policy = SETTLE_POLICY
-  /** Run the watch over a fixed reading sequence. */
-  const run = (readings: Array<LeakCounts | null>) => {
+  /** Run the watch over a fixed reading sequence; `compiling(i)` says whether
+   *  shader pipelines are still compiling at frame i. */
+  const run = (readings: Array<LeakCounts | null>, compiling: (i: number) => boolean = () => false) => {
     let w = newWatch('sig')
     let settled: LeakCounts | undefined
-    for (const r of readings) {
-      const step = stepWatch(w, r, policy)
+    for (const [i, r] of readings.entries()) {
+      const step = stepWatch(w, r, policy, compiling(i))
       settled ??= step.settled
       if (!step.watch) return { ...step, settled }
       w = step.watch
@@ -286,6 +287,19 @@ describe('stepWatch', () => {
     const both = run(Array.from({ length: policy.minFrames }, () => counts(44, 300)))
     expect(both.settled).toEqual(counts(44, 300))
     expect(both.texturesSettled).toEqual(counts(44, 300))
+  })
+
+  it('holds the texture reading while shader pipelines still compile (point 1566)', () => {
+    // Under load the texture count stands still mid-compile, then the compiled
+    // render objects upload their textures at their first draw.
+    const long = policy.minFrames + policy.stableFrames * 2
+    const stalled = Array.from({ length: long }, () => counts(44, 56))
+    const held = run(stalled, () => true)
+    expect(held.settled).toEqual(counts(44, 56))
+    expect(held.texturesSettled).toBeUndefined()
+    const after = Array.from({ length: policy.stableFrames + 1 }, () => counts(44, 85))
+    const end = run([...stalled, ...after], (i) => i < long)
+    expect(end.texturesSettled).toEqual(counts(44, 85))
   })
 
   it('gives up without judging when the count never settles', () => {
