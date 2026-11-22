@@ -679,8 +679,10 @@ let lastCensus: ReadonlyMap<string, number> = new Map()
 /** The place and visit the running watch belongs to, captured at its start: a
  *  superseded watch is judged after the store has already moved on. */
 let watchPlace: { placeId: string | null; visit: number } = { placeId: null, visit: 0 }
-/** The signature whose texture count last settled; cleared by a new watch. */
-let texturesSettledFor: string | null = null
+/** The signature whose texture count last settled, and that settled count;
+ *  cleared by a new watch. The return entry is this count, never a fresh
+ *  reading at departure (a transient dip would read as growth on return). */
+let texturesSettledFor: { signature: string; textures: number } | null = null
 
 /** `renderer._pipelines.caches.size` — three internals, so read defensively;
  *  null where the renderer or the field is missing (fail soft). */
@@ -844,7 +846,7 @@ function settleStep(): void {
     devAssert(evaluation.verdict !== 'leak', 'render-resource-leak', () => evaluation.detail)
   }
   if (step.texturesSettled) {
-    texturesSettledFor = w.signature
+    texturesSettledFor = { signature: w.signature, textures: step.texturesSettled.textures }
     judgePendingReturn(w.signature, step.texturesSettled.textures)
     judgeHop(w.signature, step.texturesSettled.textures)
   }
@@ -919,11 +921,11 @@ function onStateChange(): void {
     // The texture entry under the return's own gate: a bird's-eye count that
     // has settled with no shader compile pending. Read mid-stream, uploads
     // still due at departure would count as left behind on the settled return.
-    const settled = texturesSettledFor === currentSignature && !pipelinesCompiling()
+    const settled = texturesSettledFor?.signature === currentSignature && !pipelinesCompiling()
     pendingVisit = {
       signature: currentRenderSignature('travel'),
       pipelines: readPipelines(),
-      textures: settled ? (readCounts()?.textures ?? null) : null,
+      textures: settled ? texturesSettledFor!.textures : null,
     }
   }
   lastMode = mode

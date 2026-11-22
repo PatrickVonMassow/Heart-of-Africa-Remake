@@ -106,6 +106,24 @@ describe('render leak watch, live', () => {
     expect(h.asserts()).not.toContain('render-texture-return-leak')
   })
 
+  it('takes the texture entry from the settled bird\'s-eye count, not a dip at departure', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 80
+    h.tick() // the bird's-eye view settles at 80
+    h.gl.info.memory.textures = 70 // a transient dip just before the player leaves
+    h.go('place', 'b')
+    h.gl.info.memory.textures = 110
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 80 // back where it settled: nothing left behind
+    h.tick()
+    expect(h.state().textureReturn.history.at(-1)).toMatchObject({ entry: 80, back: 80, verdict: 'ok' })
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
   it('takes no texture entry while shaders compile at departure', async () => {
     const h = await harness()
     let busy = true
