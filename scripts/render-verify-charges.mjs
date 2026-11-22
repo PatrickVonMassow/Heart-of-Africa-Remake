@@ -65,6 +65,14 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1571,
+    suite: 'polish-villagers',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /the river is in the captured frame, read at the projected water points/i,
+    why: 'Red on WebGPU in three polish-villagers runs of 21.11.2026, the last on main baseline e45b6baa7 (pre-existing); all 9 water points inFrame. The charge dies with 1571.',
+  },
+  {
     point: 1533,
     suite: 'polish-settlement',
     backend: 'webgpu',
