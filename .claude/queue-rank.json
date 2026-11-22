@@ -856,6 +856,12 @@
       "why": "WebGL-2-only residual of 1447; CLAUDE.md 7.2 lets WebGL-2-only defects wait, WebGPU meets the bound",
       "origin": "machine",
       "place": "last"
+    },
+    "1571": {
+      "at": "2026-11-22T07:07:27.960Z",
+      "why": "a pre-existing suite red with no reported player sighting; it waits behind the user-reported points, its charge keeps the render gate honest meanwhile",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -866,7 +872,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-22T06:25:01.782Z",
+    "at": "2026-11-22T07:07:27.964Z",
     "points": [
       184,
       200,
@@ -1057,7 +1063,8 @@
       1566,
       1568,
       1569,
-      1570
+      1570,
+      1571
     ]
   }
 }
