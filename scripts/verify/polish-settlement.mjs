@@ -11,6 +11,7 @@ import { READ_GAP_FRAMES, READ_GAP_NET_MS, READ_GAP_MS } from './cropLuma.mjs'
 import { groundSamples as readGroundSamples, bandRatio as readBandRatio } from './edgeBandReading.mjs'
 import { settledEdgeShot } from './edgeBandSettle.mjs'
 import sharp from 'sharp'
+import fs from 'node:fs'
 import { section as sectionGate, check, checkTiming, unmeasured, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
 
 // Which section's place hops are which (point 1566): each running section marks
@@ -28,11 +29,15 @@ function section(name) {
 async function printHopOwners() {
   const marks = await Promise.all(hopMarks.map(async (m) => ({ name: m.name, at: await m.at })))
   const hops = await page.evaluate(() => window.__renderLeak?.state().placeHop?.history ?? []).catch(() => [])
-  for (const h of hops) {
+  const lines = hops.map((h) => {
     const n = Number(/place hop (\d+)/.exec(h.detail ?? '')?.[1] ?? 0)
     const owner = marks.filter((m) => m.at !== null && m.at < n).at(-1)?.name ?? '?'
-    console.log(`  [${owner}] hop ${n} ${h.from} -> ${h.to}: textures ${h.delta?.textures ?? '?'}, pipelines ${h.delta?.pipelines ?? '?'}; grew: ${h.grew ?? '?'}`)
-  }
+    return `[${owner}] hop ${n} ${h.from} -> ${h.to}: textures ${h.delta?.textures ?? '?'}, pipelines ${h.delta?.pipelines ?? '?'}; grew: ${h.grew ?? '?'}`
+  })
+  // The run digest keeps only a failing suite's tail, so the whole list goes to disk.
+  fs.mkdirSync('local', { recursive: true })
+  fs.writeFileSync('local/place-hop-owners.txt', lines.join('\n') + '\n')
+  console.log(`  place hops with their sections: local/place-hop-owners.txt (${lines.length})`)
 }
 
 // --- Settlement plan on the map (design.md §6.1, point 79) --------------------
