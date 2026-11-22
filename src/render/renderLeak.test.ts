@@ -626,10 +626,15 @@ describe('place-to-place hop', () => {
 describe('departure texture entry', () => {
   const settled = { signature: 'travel|medium|pano0', textures: 80 }
 
-  it('takes the settled count under the exact signature, through a transient dip', () => {
+  it('takes the settled count under the exact signature when it reads back unchanged at departure', () => {
     expect(departureTextureEntry('travel|medium|pano0', settled, 80, false)).toBe(80)
-    expect(departureTextureEntry('travel|medium|pano0', settled, 70, false)).toBe(80)
-    expect(departureTextureEntry('travel|medium|pano0', settled, null, false)).toBe(80)
+  })
+
+  it('is unreadable on a dip or an unreadable count at departure', () => {
+    // settled 80, streamed to 100, dipped to 79 at departure, back to 100 on
+    // return: taking 80 would charge the resumed stream (+20) to the visit
+    expect(departureTextureEntry('travel|medium|pano0', settled, 79, false)).toBeNull()
+    expect(departureTextureEntry('travel|medium|pano0', settled, null, false)).toBeNull()
   })
 
   it('is unreadable when a signature lever changed since the settle', () => {

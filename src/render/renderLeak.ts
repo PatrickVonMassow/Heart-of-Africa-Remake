@@ -778,24 +778,26 @@ function judgeHop(signature: string, textures: number | null): void {
     // A chain ends here, and its growth with it: the return judgement owns
     // what a visit leaves behind in the bird's-eye view.
     hopState = { ...PLACE_HOP_START, hops: hopState.hops }
-    hopCensus = null
+    hopCensus = new Map()
     return
   }
   const { placeId, visit } = watchPlace
   if (!signature.startsWith('place:') || !placeId) return
+  const setup = signature.slice(signature.indexOf('|') + 1)
   const { evaluation, state } = judgePlaceHop(
     hopState,
-    { placeId, visit, setup: signature.slice(signature.indexOf('|') + 1), pipelines: readPipelines(), textures },
+    { placeId, visit, setup, pipelines: readPipelines(), textures },
     PLACE_HOP_BOUNDS,
     isWebGpuRenderer(),
   )
   hopState = state
   // The census at this reading, so a leak names the texture kinds that grew
-  // since the previous place reading, not only their count.
+  // since the previous place reading OF THE SAME SETUP (the chain the verdict
+  // compares against), not only their count.
   const memoryMap = readMemoryMap()
   const kinds = memoryMap ? new Map(textureCensus(memoryMap).map((k) => [k.kind, k.count])) : null
-  const before = hopCensus
-  hopCensus = kinds
+  const before = hopCensus.get(setup) ?? null
+  hopCensus.set(setup, kinds)
   if (!evaluation) return
   evaluation.grew = grownKinds(before, kinds)
   hopHistory.push(evaluation)
@@ -803,7 +805,8 @@ function judgeHop(signature: string, textures: number | null): void {
   devAssert(evaluation.verdict !== 'leak', 'render-place-hop-leak', () => `${evaluation.detail}; grew: ${evaluation.grew}`)
 }
 
-let hopCensus: ReadonlyMap<string, number> | null = null
+/** The last place-reading census per render setup (judgePlaceHop's chain key). */
+let hopCensus = new Map<string, ReadonlyMap<string, number> | null>()
 
 function readMemoryMap(): Map<object, unknown> | null {
   return (getRenderContext()?.gl?.info as { memoryMap?: Map<object, unknown> } | undefined)?.memoryMap ?? null
@@ -951,10 +954,11 @@ function judgeStreamingWatch(): void {
  * The texture entry of a place visit, pure: the count settled under EXACTLY the
  * bird's-eye signature the return is compared under (a lever that changed since
  * the settle, such as the panorama capture's targets, holds another resident
- * set), with no shader compile pending, and not exceeded at departure. A count
- * above the settled one means streaming resumed after the settle, so the
- * settled count no longer is the entry; a count below it is a transient dip and
- * keeps it. Otherwise unreadable (null): the texture return goes unjudged.
+ * set), with no shader compile pending, and read back unchanged at departure.
+ * Any other departure count — above it (streaming resumed), below it (a dip
+ * that may follow resumed streaming and rise again), or unreadable — no longer
+ * proves the settled count is the entry: null, the texture return goes
+ * unjudged rather than charging a later stream to the visit.
  */
 export function departureTextureEntry(
   signature: string,
@@ -963,8 +967,7 @@ export function departureTextureEntry(
   compiling: boolean,
 ): number | null {
   if (!settledFor || settledFor.signature !== signature || compiling) return null
-  if (current !== null && current > settledFor.textures) return null
-  return settledFor.textures
+  return current === settledFor.textures ? settledFor.textures : null
 }
 
 function onStateChange(): void {
@@ -1004,7 +1007,7 @@ function reset(): void {
   textureState = PIPELINE_RETURN_START
   textureHistory = []
   hopState = PLACE_HOP_START
-  hopCensus = null
+  hopCensus = new Map()
   hopHistory = []
   currentSignature = currentRenderSignature()
   startWatch(currentSignature)
