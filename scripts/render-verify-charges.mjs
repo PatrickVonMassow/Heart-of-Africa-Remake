@@ -65,6 +65,14 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1575,
+    suite: 'polish-settlement',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /the dust is visible: its crop differs from the same crop with the dust disabled/i,
+    why: 'Red in the full WebGPU pass on feat/1573 86d1f7296, 22.11.2026 21:30 (OFF-vs-OFF floor 8.79, scene not still); --section=walker-dust green on main 0d8638c33 and the same head. The charge dies with 1575.',
+  },
+  {
     point: 1572,
     suite: 'polish-villagers',
     backend: 'webgpu',
