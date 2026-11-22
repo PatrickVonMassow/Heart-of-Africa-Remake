@@ -4,15 +4,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 interface Fake {
-  info: { memory: { renderTargets: number; textures: number } }
+  info: { memory: { renderTargets: number; textures: number }; memoryMap?: Map<object, unknown> }
   _pipelines: { caches: { size: number } } | undefined
   backend: { isWebGPUBackend: boolean }
 }
 
 let frames: FrameRequestCallback[] = []
+/** The panorama capture's target allocation, a signature lever outside the stores. */
+let panoramaAllocated = false
 
 async function harness(webgpu = true) {
   vi.resetModules()
+  vi.doMock('../scenes/travel/panoramaCapture', async (original) => ({
+    ...(await original<typeof import('../scenes/travel/panoramaCapture')>()),
+    panoramaCaptureTargetsAllocated: () => panoramaAllocated,
+  }))
   delete (window as unknown as Record<string, unknown>).__renderLeakArmed
   ;(window as unknown as { __assertLog?: unknown[] }).__assertLog = []
   const { useGame } = await import('../state/store')
@@ -46,6 +52,7 @@ async function harness(webgpu = true) {
 
 beforeEach(() => {
   frames = []
+  panoramaAllocated = false
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => frames.push(cb))
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -84,7 +91,7 @@ describe('render leak watch, live', () => {
     h.gl.info.memory.textures = 75 + 30 // the visit left 30 textures behind
     h.tick()
     expect(h.state().textureReturn.history).toHaveLength(1)
-    expect(h.state().textureReturn.history[0].verdict).toBe('leak')
+    expect(h.state().textureReturn.history[0]).toMatchObject({ verdict: 'leak' })
     expect(h.asserts()).toContain('render-texture-return-leak')
   })
 
@@ -106,14 +113,13 @@ describe('render leak watch, live', () => {
     expect(h.asserts()).not.toContain('render-texture-return-leak')
   })
 
-  it('takes the texture entry from the settled bird\'s-eye count, not a dip at departure', async () => {
+  it('takes the texture entry from the settled bird\'s-eye count when it reads back unchanged at departure', async () => {
     const h = await harness()
     h.go('place', 'a')
     h.tick()
     h.go('travel')
     h.gl.info.memory.textures = 80
     h.tick() // the bird's-eye view settles at 80
-    h.gl.info.memory.textures = 70 // a transient dip just before the player leaves
     h.go('place', 'b')
     h.gl.info.memory.textures = 110
     h.tick()
@@ -121,6 +127,128 @@ describe('render leak watch, live', () => {
     h.gl.info.memory.textures = 80 // back where it settled: nothing left behind
     h.tick()
     expect(h.state().textureReturn.history.at(-1)).toMatchObject({ entry: 80, back: 80, verdict: 'ok' })
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
+  it('takes no texture entry from a dip at departure that follows resumed streaming', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 80
+    h.tick() // settles at 80; streaming then resumes up to 100 with no watch running
+    h.gl.info.memory.textures = 79 // and dips just below the settle at departure
+    h.go('place', 'b')
+    h.gl.info.memory.textures = 110
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 100 // the resumed stream, not the visit
+    h.tick()
+    // only the first trip (entry 75) is judged; the second has no entry
+    expect(h.state().textureReturn.history).toHaveLength(1)
+    expect(h.state().textureReturn.history[0]).toMatchObject({ entry: 75 })
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
+  it('takes no texture entry when the count is unreadable at departure', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 80
+    h.tick() // settles at 80
+    const memory = h.gl.info.memory
+    delete (h.gl.info as { memory?: unknown }).memory // the departure read fails
+    h.go('place', 'b')
+    h.gl.info.memory = { ...memory, textures: 110 }
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 100
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(1)
+    expect(h.state().textureReturn.history[0]).toMatchObject({ entry: 75 })
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
+  it('names the texture kinds a hop grew against the same setup\'s earlier census', async () => {
+    const h = await harness()
+    const tex = (name: string) => ({ isTexture: true, name, image: { width: 1, height: 1 } })
+    const census = (...names: string[]) => (h.gl.info.memoryMap = new Map(names.map((n) => [tex(n), 4] as [object, unknown])))
+    census('m')
+    h.go('place', 'a')
+    h.tick() // medium chain starts at a
+    census('l', 'l', 'l')
+    h.useUi.setState({ detailLevel: 'low' })
+    h.tick() // low setup at a: another resident set
+    h.go('place', 'b')
+    h.tick() // low chain hop a -> b
+    census('m', 'n', 'n')
+    h.useUi.setState({ detailLevel: 'medium' })
+    h.tick() // medium chain hop a -> b, against medium at a
+    const last = h.state().placeHop.history.at(-1) as { setup: string; grew: string }
+    expect(last.setup).toMatch(/^medium/)
+    expect(last.grew).toBe('Object 1x1 "n" +2')
+  })
+
+  it('names no texture growth on a pipelines-only hop and keeps the texture baseline across it', async () => {
+    const h = await harness()
+    const tex = (name: string) => ({ isTexture: true, name, image: { width: 1, height: 1 } })
+    const census = (...names: string[]) => (h.gl.info.memoryMap = new Map(names.map((n) => [tex(n), 4] as [object, unknown])))
+    census('m')
+    h.go('place', 'a')
+    h.tick() // texture-settled at a
+    census('m', 'n', 'n')
+    h.go('place', 'b')
+    h.tick(80, () => h.gl.info.memory.textures++) // textures keep streaming at b
+    census('m', 'n', 'n', 'n')
+    h.go('place', 'c') // leaving b mid-stream: a pipelines-only hop a -> b
+    h.tick()
+    const [ab, bc] = h.state().placeHop.history.slice(-2) as Array<{ placeId: string; grew: string; delta: { textures: number | null } }>
+    expect(ab).toMatchObject({ grew: 'no texture reading', delta: { textures: null } })
+    // c's textures compare against a, the last texture-settled place, census included
+    expect(bc.grew).toBe('Object 1x1 "n" +3')
+    expect(bc.delta.textures).toBe(155 - 75) // c settles at b's last streaming count, against a's 75
+  })
+
+  it('takes no texture entry when streaming resumed after the bird\'s-eye view settled', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75
+    h.tick() // settled at 75, the watch ends
+    h.gl.info.memory.textures = 85 // uploads resume under the same signature: no new watch
+    h.go('place', 'b')
+    h.gl.info.memory.textures = 115
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 85 // back at the departure count: nothing left behind
+    h.tick()
+    // only the first visit, entered from a settled count, is judged
+    expect(h.state().textureReturn.history).toEqual([expect.objectContaining({ entry: 75, back: 75 })])
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+    // the pipelines leg still judges that return
+    expect(h.state().pipelines.history).toHaveLength(2)
+  })
+
+  it('takes no texture entry when a signature lever changed between the settle and the departure', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75
+    h.tick() // settled under the signature without panorama targets
+    panoramaAllocated = true // the capture takes its targets outside any store change
+    // read back unchanged at departure: only the signature guard can refuse it
+    h.go('place', 'b')
+    h.gl.info.memory.textures = 110
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75 + 9 // the capture's resident set, compared under its own signature
+    h.tick()
+    const s = h.state() as unknown as { textureReturn: { history: unknown[] }; history: Array<{ signature: string }> }
+    expect(s.history.at(-1)?.signature).toMatch(/^travel\|/)
+    expect(s.textureReturn.history).toEqual([expect.objectContaining({ entry: 75, back: 75 })])
     expect(h.asserts()).not.toContain('render-texture-return-leak')
   })
 
@@ -156,7 +284,7 @@ describe('render leak watch, live', () => {
     h.gl.info.memory.textures = 105 + 30
     h.tick()
     expect(h.state().textureReturn.history).toHaveLength(1)
-    expect(h.state().textureReturn.history[0].verdict).toBe('leak')
+    expect(h.state().textureReturn.history[0]).toMatchObject({ verdict: 'leak' })
     expect(h.asserts()).toContain('render-texture-return-leak')
   })
 
