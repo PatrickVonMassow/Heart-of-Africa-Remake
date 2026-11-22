@@ -12,6 +12,7 @@ import { groundSamples as readGroundSamples, bandRatio as readBandRatio } from '
 import { settledEdgeShot } from './edgeBandSettle.mjs'
 import sharp from 'sharp'
 import fs from 'node:fs'
+import { hopOwnerLines } from './hop-owners.mjs'
 import { section as sectionGate, check, checkTiming, unmeasured, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
 
 // Which section's place hops are which (point 1566): each running section
@@ -31,16 +32,24 @@ function section(name) {
   if (on) page.evaluate((n) => { window.__hopSection = n }, name).catch(() => {})
   return on
 }
-/** The place hops of one section (all with none), each with the section it started in. */
-const ownedHops = (only) => page.evaluate((only) => {
-  const hops = window.__renderLeak?.state().placeHop?.history ?? []
-  return hops
-    .map((h) => ({ ...h, owner: window.__hopSections?.get(h.visit) ?? '?' }))
-    .filter((h) => only === null || h.owner === only)
-}, only ?? null).catch(() => [])
-const hopLine = (h) => `hop ${/place hop (\d+)/.exec(h.detail ?? '')?.[1] ?? '?'} ${h.from} -> ${h.to}: textures ${h.delta?.textures ?? '?'}, pipelines ${h.delta?.pipelines ?? '?'}; grew: ${h.grew ?? '?'}`
+/** The report lines of one section's place hops (all with none). Waits, bounded,
+ *  for a running settle watch to finish first, so the last hop of a section is
+ *  judged before it is read; one still settling is reported as pending. */
+async function ownedHops(only) {
+  await page.waitForFunction(() => window.__renderLeak?.state().watching == null, null, { timeout: 30000 }).catch(() => {})
+  const read = await page.evaluate(() => {
+    const s = window.__renderLeak?.state()
+    const watching = s?.watching ?? null
+    return {
+      hops: s?.placeHop?.history ?? [],
+      sections: [...(window.__hopSections ?? new Map())],
+      pending: watching?.startsWith('place:') ? { visit: s.placeHop.visit, signature: watching } : null,
+    }
+  }).catch(() => ({ hops: [], sections: [], pending: null }))
+  return hopOwnerLines(read.hops, read.sections, read.pending, only ?? null)
+}
 async function printHopOwners() {
-  const lines = (await ownedHops()).map((h) => `[${h.owner}] ${hopLine(h)}`)
+  const lines = await ownedHops()
   // The run digest keeps only a failing suite's tail, so the whole list goes to disk.
   fs.mkdirSync('local', { recursive: true })
   fs.writeFileSync('local/place-hop-owners.txt', lines.join('\n') + '\n')
@@ -2634,7 +2643,7 @@ if (section('kraal-cattle')) {
   check('every beast stands inside its pen, clear of the fence (point 359)', kraals.every((r) => r.published && r.pen && inside(r)), JSON.stringify([zulu1890, maasai1890].map((r) => ({ hold: r.hold, at: r.cattle }))))
   // The place hops of this section with their grown census kinds (point 1566):
   // what a re-entry keeps resident beyond the previous village's reading.
-  for (const h of await ownedHops('kraal-cattle')) console.log(`  ${hopLine(h)}`)
+  for (const line of await ownedHops('kraal-cattle')) console.log(`  ${line}`)
 }
 
 await printHopOwners()
