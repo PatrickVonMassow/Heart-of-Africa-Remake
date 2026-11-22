@@ -227,6 +227,44 @@ describe('render leak watch, live', () => {
     expect(returns[1]).toMatchObject({ entry, back: entry + 5 })
   })
 
+  for (const webgpu of [true, false]) {
+    const backend = webgpu ? 'WebGPU' : 'WebGL 2'
+
+    it(`flags a texture-only hop once a busy shader compiler goes idle (${backend})`, async () => {
+      const h = await harness(webgpu)
+      let busy = false
+      ;(window as unknown as Record<string, unknown>).__shaderPipelines = () => ({ pending: busy ? 2 : 0, queued: busy ? 3 : 0 })
+      h.go('place', 'a')
+      h.gl.info.memory.textures = 100
+      h.tick()
+      h.go('place', 'b')
+      busy = true // the count stands still under the compile: not a settled reading
+      h.tick(60)
+      busy = false
+      h.gl.info.memory.textures = 130 // its uploads land once the pipelines are ready
+      h.tick()
+      const hops = h.state().placeHop.history as Array<{ verdict: string; counter?: string; delta: { textures: number | null; pipelines: number | null } }>
+      expect(hops).toHaveLength(1)
+      expect(hops[0]).toMatchObject({ verdict: 'leak', counter: 'textures', delta: { textures: 30, pipelines: 0 } })
+      expect(h.asserts()).toContain('render-place-hop-leak')
+    })
+
+    it(`flags a texture-only return (${backend})`, async () => {
+      const h = await harness(webgpu)
+      h.go('place', 'a')
+      h.gl.info.memory.textures = 120
+      h.tick()
+      h.go('travel')
+      h.gl.info.memory.textures = 75 + 12 // the visit left 12 textures behind, no pipelines
+      h.tick()
+      const returns = h.state().textureReturn.history as Array<{ verdict: string; delta: number }>
+      expect(returns).toEqual([expect.objectContaining({ verdict: 'leak', delta: 12 })])
+      expect(h.state().pipelines.history).toEqual([expect.objectContaining({ verdict: 'ok', delta: 0 })])
+      expect(h.asserts()).toContain('render-texture-return-leak')
+      expect(h.asserts()).not.toContain('render-pipeline-leak')
+    })
+  }
+
   it('judges a leave and re-entry of the same place in one tick as a hop', async () => {
     const h = await harness()
     h.go('place', 'a')
