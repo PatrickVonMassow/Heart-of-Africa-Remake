@@ -167,6 +167,17 @@ function releaseGeometry(g: THREE.BufferGeometry): void {
   }
   geometryUsers.delete(g)
   g.dispose()
+  // A disposed geometry is never drawn again (point 1566). three/webgpu shares
+  // the node-builder state of render objects with the same material and
+  // geometry, and that state holds the morph DataArrayTexture built on the
+  // first draw; the dispose above freed it and removed its dispose listener.
+  // A later figure taking this geometry from the cache — the next lineup row,
+  // a villager remounting in the same visit — re-uploaded that texture, which
+  // nothing would free again. Evicted, the next figure builds a fresh geometry
+  // with its own morph texture.
+  for (const m of [figureCache, gltfFigureCache]) {
+    for (const [k, v] of m) if (v === g) m.delete(k)
+  }
 }
 
 /** Forget every cached figure geometry and person (point 1447). The caches are

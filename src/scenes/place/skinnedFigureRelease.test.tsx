@@ -67,12 +67,20 @@ describe('shared figure geometry release', () => {
     await act(async () => root.render(<Stage n={0} />))
     expect(disposed).toBe(1) // place left: released
 
-    // re-entry draws the same cached geometry, released again on the next leave
+    // re-entry never draws the disposed geometry (point 1566): three's shared
+    // node state would re-upload its freed morph texture with no dispose
+    // listener left to free it again. A fresh geometry is built and shared,
+    // and released on the next leave.
     await act(async () => root.render(<Stage n={2} />))
-    const again = scene.getObjectByName('figure-body') as THREE.SkinnedMesh
-    expect(again.geometry).toBe(geo)
-    expect(disposed).toBe(1)
+    const again: THREE.SkinnedMesh[] = []
+    scene.traverse((o) => o.name === 'figure-body' && again.push(o as THREE.SkinnedMesh))
+    const fresh = again[0].geometry
+    expect(fresh).not.toBe(geo)
+    expect(again[1].geometry).toBe(fresh)
+    let freshDisposed = 0
+    fresh.addEventListener('dispose', () => freshDisposed++)
     await act(async () => root.unmount())
-    expect(disposed).toBe(2)
+    expect(freshDisposed).toBe(1)
+    expect(disposed).toBe(1)
   })
 })
