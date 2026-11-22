@@ -207,7 +207,7 @@ describe('render leak watch, live', () => {
     expect(ab).toMatchObject({ grew: 'no texture reading', delta: { textures: null } })
     // c's textures compare against a, the last texture-settled place, census included
     expect(bc.grew).toBe('Object 1x1 "n" +3')
-    expect(bc.delta.textures).not.toBeNull()
+    expect(bc.delta.textures).toBe(155 - 75) // c settles at b's last streaming count, against a's 75
   })
 
   it('takes no texture entry when streaming resumed after the bird\'s-eye view settled', async () => {
