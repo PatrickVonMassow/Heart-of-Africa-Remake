@@ -51,6 +51,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  delete (window as unknown as Record<string, unknown>).__shaderPipelines
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
@@ -85,6 +86,37 @@ describe('render leak watch, live', () => {
     expect(h.state().textureReturn.history).toHaveLength(1)
     expect(h.state().textureReturn.history[0].verdict).toBe('leak')
     expect(h.asserts()).toContain('render-texture-return-leak')
+  })
+
+  it('takes no texture entry while the bird\'s-eye textures still stream at departure', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75
+    h.tick(30, () => {
+      h.gl.info.memory.textures++ // uploads still landing when the player leaves
+    })
+    h.go('place', 'b')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 105 + 10 // the pending uploads landed; nothing left behind
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(0)
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
+  it('takes no texture entry while shaders compile at departure', async () => {
+    const h = await harness()
+    let busy = true
+    ;(window as unknown as Record<string, unknown>).__shaderPipelines = () => ({ pending: busy ? 1 : 0, queued: 0 })
+    h.go('place', 'a')
+    busy = false
+    h.gl.info.memory.textures = 75 + 12 // the compile's uploads land in the place
+    h.tick()
+    h.go('travel')
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(0)
   })
 
   it('compares a return only with an entry under the same bird\'s-eye signature', async () => {

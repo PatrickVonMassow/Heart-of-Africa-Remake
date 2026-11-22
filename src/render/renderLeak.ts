@@ -676,6 +676,8 @@ let lastCensus: ReadonlyMap<string, number> = new Map()
 /** The place and visit the running watch belongs to, captured at its start: a
  *  superseded watch is judged after the store has already moved on. */
 let watchPlace: { placeId: string | null; visit: number } = { placeId: null, visit: 0 }
+/** The signature whose texture count last settled; cleared by a new watch. */
+let texturesSettledFor: string | null = null
 
 /** `renderer._pipelines.caches.size` — three internals, so read defensively;
  *  null where the renderer or the field is missing (fail soft). */
@@ -839,6 +841,7 @@ function settleStep(): void {
     devAssert(evaluation.verdict !== 'leak', 'render-resource-leak', () => evaluation.detail)
   }
   if (step.texturesSettled) {
+    texturesSettledFor = w.signature
     judgePendingReturn(w.signature, step.texturesSettled.textures)
     judgeHop(w.signature, step.texturesSettled.textures)
   }
@@ -887,6 +890,7 @@ function startWatch(signature: string): void {
   const g = useGame.getState()
   watchPlace = { placeId: g.mode === 'place' ? g.placeId : null, visit: currentPlaceVisit() }
   watch = newWatch(signature)
+  texturesSettledFor = null
   schedule()
 }
 
@@ -909,10 +913,14 @@ function onStateChange(): void {
   const changed = sig !== currentSignature
   if (changed) judgeStreamingWatch()
   if (lastMode === 'travel' && mode === 'place' && pendingVisit === null) {
+    // The texture entry under the return's own gate: a bird's-eye count that
+    // has settled with no shader compile pending. Read mid-stream, uploads
+    // still due at departure would count as left behind on the settled return.
+    const settled = texturesSettledFor === currentSignature && !pipelinesCompiling()
     pendingVisit = {
       signature: currentRenderSignature('travel'),
       pipelines: readPipelines(),
-      textures: readCounts()?.textures ?? null,
+      textures: settled ? (readCounts()?.textures ?? null) : null,
     }
   }
   lastMode = mode
