@@ -10,7 +10,7 @@
 // verification reads — `figure-head`, `hand-left`, `hand-right` — sit on the
 // bones, so they report where the drawn body really is.
 
-import { Fragment, useEffect, useId, useMemo, useRef, type ReactNode, type RefObject } from 'react'
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { ScenePortal } from './scenePortal'
 import * as THREE from 'three/webgpu'
@@ -162,6 +162,17 @@ function holdGeometry(g: THREE.BufferGeometry): void {
   geometryUsers.set(g, (geometryUsers.get(g) ?? 0) + 1)
 }
 
+/** Free an unreachable geometry once the current commit is done: a figure of an
+ *  incoming settlement rendered in the same commit took it from the caches
+ *  before they were cleared and holds it in its layout effect, after this
+ *  commit's unmounts — then it stays orphaned and goes on that last release. */
+function disposeAfterCommit(g: THREE.BufferGeometry): void {
+  queueMicrotask(() => {
+    if (geometryUsers.has(g)) orphaned.add(g)
+    else g.dispose()
+  })
+}
+
 function releaseGeometry(g: THREE.BufferGeometry): void {
   const n = (geometryUsers.get(g) ?? 1) - 1
   if (n > 0) {
@@ -177,7 +188,7 @@ function releaseGeometry(g: THREE.BufferGeometry): void {
   // (placeRelease.ts) disposes every drawn geometry on leave instead; a
   // geometry no cache holds any more (the bird's-eye traveller, outside that
   // sweep) is unreachable for a redraw and is freed here.
-  if (orphaned.has(g)) g.dispose()
+  if (orphaned.has(g)) disposeAfterCommit(g)
 }
 
 /** Forget every cached figure geometry and person (point 1447). The caches are
@@ -196,7 +207,7 @@ export function releaseFigureCaches(): number {
       // Unused now and unreachable after the clear: free it; still drawn: free
       // it on its last release.
       if (geometryUsers.has(v)) orphaned.add(v)
-      else v.dispose()
+      else disposeAfterCommit(v)
     }
     m.clear()
   }
@@ -400,7 +411,9 @@ export function SkinnedFigure({
   const rig = useMemo(() => buildRig(id, look, cloth, skin, office, dress), [id, look, cloth, skin, office, dress])
   // The skeleton (and its bone texture) is this figure's own; the geometry is
   // shared through the caches, its GPU side held while any figure draws it.
-  useEffect(() => {
+  // A layout effect: the hold lands in the commit that mounts the figure, so a
+  // cache clear in that commit defers to it (disposeAfterCommit).
+  useLayoutEffect(() => {
     const geos = rig.meshes.map((m) => m.geometry)
     geos.forEach(holdGeometry)
     return () => {

@@ -6,7 +6,7 @@
 // unmounts — leaving a settlement — and never while one still draws it.
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { act } from 'react'
+import { act, useLayoutEffect } from 'react'
 import * as THREE from 'three/webgpu'
 import { createRoot, extend } from '@react-three/fiber'
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -74,6 +74,42 @@ describe('shared figure geometry release', () => {
     expect(disposed).toBe(0)
   })
 
+  it('never disposes a geometry a figure of the incoming place took in the same commit', async () => {
+    const look: FigureLook = {
+      peopleId: 'bambara',
+      drivers: { coldness: 0, harmattan: 0, karif: 0 },
+      year: 1890,
+      palette: PALETTE,
+      radial: 16,
+      villager: asset,
+    }
+    const scene = new THREE.Group()
+    // a settlement scene: its unmount clears the figure caches (PlaceScene.tsx)
+    const Place = () => {
+      useLayoutEffect(() => () => void releaseFigureCaches(), [])
+      return <SkinnedFigure look={look} cloth={PALETTE[2]} scale={1} sex="female" age="elder" identityKey="hop-probe" />
+    }
+    const Stage = ({ visit }: { visit: number }) => (
+      <primitive object={scene}>
+        <Place key={visit} />
+      </primitive>
+    )
+    const root = createRoot({} as HTMLCanvasElement)
+    const gl = { render() {}, setSize() {}, setPixelRatio() {}, domElement: {} }
+    await root.configure({ gl: gl as never, frameloop: 'never', size: { width: 1, height: 1, top: 0, left: 0 } })
+    await act(async () => root.render(<Stage visit={1} />))
+    const geo = (scene.getObjectByName('figure-body') as THREE.SkinnedMesh).geometry
+    let disposed = 0
+    geo.addEventListener('dispose', () => disposed++)
+    // leave and re-enter in one commit: the incoming figure takes the cached geometry while rendering
+    await act(async () => root.render(<Stage visit={2} />))
+    expect((scene.getObjectByName('figure-body') as THREE.SkinnedMesh).geometry).toBe(geo)
+    expect(disposed).toBe(0)
+    // dropped from the caches meanwhile: its last release frees it
+    await act(async () => root.unmount())
+    expect(disposed).toBe(1)
+  })
+
   it('frees a geometry the caches dropped once no figure draws it (the traveller outside the place sweep)', async () => {
     const look: FigureLook = {
       peopleId: 'bambara',
@@ -108,7 +144,8 @@ describe('shared figure geometry release', () => {
     await act(async () => root.render(<Stage n={0} />))
     let freshDisposed = 0
     fresh.addEventListener('dispose', () => freshDisposed++)
-    releaseFigureCaches() // unused at the clear: freed at once
+    releaseFigureCaches() // unused at the clear: freed once the commit is done
+    await Promise.resolve()
     expect(freshDisposed).toBe(1)
     await act(async () => root.unmount())
   })
