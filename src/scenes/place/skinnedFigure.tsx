@@ -11,7 +11,8 @@
 // bones, so they report where the drawn body really is.
 
 import { Fragment, useEffect, useId, useMemo, useRef, type ReactNode, type RefObject } from 'react'
-import { createPortal, useFrame } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
+import { ScenePortal } from './scenePortal'
 import * as THREE from 'three/webgpu'
 import { FIGURE_LIMBS } from '../../render/figures'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
@@ -166,6 +167,27 @@ function releaseGeometry(g: THREE.BufferGeometry): void {
   }
   geometryUsers.delete(g)
   g.dispose()
+}
+
+/** Forget every cached figure geometry and person (point 1447). The caches are
+ *  keyed per person, dress layer and village palette, so across a journey they
+ *  only grew (~120 MB of heap per village). Called when a settlement scene
+ *  unmounts: nothing is disposed here — mounted figures keep their own
+ *  references and GPU release stays with releaseGeometry / the place sweep —
+ *  the maps just stop pinning the CPU arrays. Returns the entries dropped. */
+export function releaseFigureCaches(): number {
+  const maps: Map<string, unknown>[] = [bodyCache, layerCache, figureCache, personCache, gltfFigureCache, gltfLayerCache]
+  let n = 0
+  for (const m of maps) {
+    n += m.size
+    m.clear()
+  }
+  return n
+}
+
+/** Entries held by the figure caches (verification and tests). */
+export function figureCacheSize(): number {
+  return bodyCache.size + layerCache.size + figureCache.size + personCache.size + gltfFigureCache.size + gltfLayerCache.size
 }
 
 /** The figure's whole scene graph, built once per identity and look. */
@@ -976,15 +998,17 @@ export function SkinnedFigure({
       </group>
       {/* Keyed by skeleton: a rebuilt rig remounts the props on its new bones. */}
       <Fragment key={rig.skeleton.uuid}>
-        {handProp && createPortal(<>{handProp}</>, rig.hands[0])}
-        {rig.gltf &&
-          createPortal(
+        {/* ScenePortal, not R3F's createPortal: 9.6.1 never drops a portal's
+            store subscription, which kept every figure ever drawn (scenePortal.tsx). */}
+        {handProp && <ScenePortal container={rig.hands[0]}>{handProp}</ScenePortal>}
+        {rig.gltf && (
+          <ScenePortal container={rig.bones['hand.R']}>
             <group ref={shovel} visible={false} name="digging-tool">
               <Shovel />
-            </group>,
-            rig.bones['hand.R'],
-          )}
-        {headProp && createPortal(<>{headProp}</>, rig.crown)}
+            </group>
+          </ScenePortal>
+        )}
+        {headProp && <ScenePortal container={rig.crown}>{headProp}</ScenePortal>}
       </Fragment>
     </group>
   )

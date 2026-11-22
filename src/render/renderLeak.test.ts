@@ -5,9 +5,17 @@
 import { describe, it, expect } from 'vitest'
 import {
   LEAK_BOUNDS,
+  PIPELINE_RETURN_BOUNDS,
+  PIPELINE_RETURN_START,
+  TEXTURE_RETURN_BOUNDS,
   SETTLE_POLICY,
   currentRenderSignature,
   evaluateReading,
+  judgePipelineReturn,
+  judgePlaceHop,
+  textureCensus,
+  PLACE_HOP_BOUNDS,
+  PLACE_HOP_START,
   newWatch,
   renderSignature,
   stepWatch,
@@ -229,12 +237,14 @@ describe('stepWatch', () => {
   /** Run the watch over a fixed reading sequence. */
   const run = (readings: Array<LeakCounts | null>) => {
     let w = newWatch('sig')
+    let settled: LeakCounts | undefined
     for (const r of readings) {
       const step = stepWatch(w, r, policy)
-      if (!step.watch) return step
+      settled ??= step.settled
+      if (!step.watch) return { ...step, settled }
       w = step.watch
     }
-    return { watch: w }
+    return { watch: w, settled }
   }
 
   it('waits the minimum frames even when the count never moves', () => {
@@ -260,6 +270,22 @@ describe('stepWatch', () => {
     let t = 300
     const readings = Array.from({ length: policy.minFrames + policy.stableFrames }, () => counts(44, (t += 7)))
     expect(run(readings).settled?.renderTargets).toBe(44)
+  })
+
+  it('reports the texture-settled reading only once the texture count repeats too', () => {
+    // The return and hop judgements compare textures across states, so they
+    // wait past the render-target settle while a place's textures still climb.
+    let t = 300
+    const climbing = Array.from({ length: policy.minFrames + 10 }, () => counts(44, (t += 1)))
+    const steady = Array.from({ length: policy.stableFrames + 1 }, () => counts(44, t))
+    const end = run([...climbing, ...steady])
+    expect(end.settled).toEqual(counts(44, 300 + policy.minFrames))
+    expect(end.texturesSettled).toEqual(counts(44, t))
+    expect(run(climbing).texturesSettled).toBeUndefined()
+    // steady from the start: both on the same frame
+    const both = run(Array.from({ length: policy.minFrames }, () => counts(44, 300)))
+    expect(both.settled).toEqual(counts(44, 300))
+    expect(both.texturesSettled).toEqual(counts(44, 300))
   })
 
   it('gives up without judging when the count never settles', () => {
@@ -290,5 +316,195 @@ describe('stepWatch', () => {
     const afterGap = [...blind, ...Array.from({ length: policy.stableFrames + 1 }, () => counts(44, 300))]
     expect(run(afterGap).settled).toEqual(counts(44, 300))
     expect(run(afterGap.slice(0, -1)).settled).toBeUndefined()
+  })
+})
+
+describe('pipeline return after a place visit', () => {
+  const bounds = { step: 10, total: 25 }
+
+  it('passes a visit that returns to the entry reading or near it', () => {
+    const r = judgePipelineReturn(PIPELINE_RETURN_START, 64, 66, bounds)
+    expect(r.evaluation.verdict).toBe('ok')
+    expect(r.evaluation.delta).toBe(2)
+    expect(r.state).toEqual({ visits: 1, growth: 2 })
+  })
+
+  it('flags one visit that leaves more than the step bound behind', () => {
+    const r = judgePipelineReturn(PIPELINE_RETURN_START, 64, 104, bounds)
+    expect(r.evaluation.verdict).toBe('leak')
+    expect(r.evaluation.detail).toMatch(/64 -> 104/)
+  })
+
+  it('flags a leak too small per visit once it grows with the villages visited', () => {
+    let state = PIPELINE_RETURN_START
+    let entry = 64
+    const verdicts: string[] = []
+    for (let i = 0; i < 5; i++) {
+      const r = judgePipelineReturn(state, entry, entry + 6, bounds)
+      state = r.state
+      entry += 6
+      verdicts.push(r.evaluation.verdict)
+    }
+    expect(verdicts).toEqual(['ok', 'ok', 'ok', 'ok', 'leak'])
+    expect(state.growth).toBe(30)
+  })
+
+  it('lets noise cancel and never carries a negative balance', () => {
+    let { state } = judgePipelineReturn(PIPELINE_RETURN_START, 70, 60, bounds)
+    expect(state.growth).toBe(0)
+    ;({ state } = judgePipelineReturn(state, 60, 68, bounds))
+    ;({ state } = judgePipelineReturn(state, 68, 61, bounds))
+    expect(state).toEqual({ visits: 3, growth: 1 })
+  })
+
+  it('reproduces the measured unreleased growth (~40 per village) as a leak under the default bounds', () => {
+    expect(judgePipelineReturn(PIPELINE_RETURN_START, 64, 104).evaluation.verdict).toBe('leak')
+    expect(PIPELINE_RETURN_BOUNDS.step).toBeLessThan(40)
+  })
+})
+
+describe('texture return after a place visit', () => {
+  it('reproduces the measured ~3-4 textures per village as a leak within a few villages', () => {
+    let state = PIPELINE_RETURN_START
+    let entry = 75
+    const verdicts: string[] = []
+    for (let i = 0; i < 8; i++) {
+      const r = judgePipelineReturn(state, entry, entry + 3.5, TEXTURE_RETURN_BOUNDS, 'textures')
+      state = r.state
+      entry += 3.5
+      verdicts.push(r.evaluation.verdict)
+      if (r.evaluation.verdict === 'leak') expect(r.evaluation.detail).toMatch(/^textures after place visit/)
+    }
+    expect(verdicts.slice(0, 6)).toEqual(Array(6).fill('ok'))
+    expect(verdicts[7]).toBe('leak')
+  })
+
+  it('passes a released place whose textures come back to the entry count', () => {
+    let state = PIPELINE_RETURN_START
+    for (const back of [76, 74, 75, 77, 75]) {
+      const r = judgePipelineReturn(state, 75, back, TEXTURE_RETURN_BOUNDS, 'textures')
+      state = r.state
+      expect(r.evaluation.verdict).toBe('ok')
+    }
+  })
+})
+
+describe('place-to-place hop', () => {
+  const at = (placeId: string, textures: number | null, pipelines: number | null = 100) => ({ placeId, textures, pipelines })
+
+  it('judges nothing on the first settlement of a chain or a re-settle of the same one', () => {
+    let r = judgePlaceHop(PLACE_HOP_START, at('a', 60))
+    expect(r.evaluation).toBeNull()
+    r = judgePlaceHop(r.state, at('a', 64))
+    expect(r.evaluation).toBeNull()
+    expect(r.state.last).toEqual(at('a', 64))
+  })
+
+  it('judges a re-entry of the same place as a hop when its visit differs', () => {
+    const r = judgePlaceHop(judgePlaceHop(PLACE_HOP_START, { ...at('a', 60), visit: 1 }).state, { ...at('a', 60, 200), visit: 2 })
+    expect(r.evaluation?.verdict).toBe('leak')
+    expect(r.evaluation?.counter).toBe('pipelines')
+  })
+
+  it('reports the measured ~7 textures per village hop without tripping: that leg belongs to point 1566', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, at('v0', 57)).state
+    for (let i = 1; i <= 8; i++) {
+      const r = judgePlaceHop(state, at(`v${i}`, 57 + 7 * i))
+      state = r.state
+      expect(r.evaluation!.verdict).toBe('ok')
+      expect(r.evaluation!.detail).toMatch(/textures \d+ -> \d+ \(\+7/)
+    }
+    expect(state.growth.textures).toBe(56)
+  })
+
+  it('reproduces the measured ~40 pipelines per village hop as a leak within a few villages', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, at('v0', 60, 64)).state
+    const verdicts: string[] = []
+    for (let i = 1; i <= 5; i++) {
+      const r = judgePlaceHop(state, at(`v${i}`, 60, 64 + 40 * i))
+      state = r.state
+      verdicts.push(r.evaluation!.verdict)
+      if (r.evaluation!.verdict === 'leak') {
+        expect(r.evaluation!.counter).toBe('pipelines')
+        expect(r.evaluation!.detail).toMatch(/grow with the villages visited/)
+      }
+    }
+    expect(verdicts.slice(0, 3)).toEqual(Array(3).fill('ok'))
+    expect(verdicts[3]).toBe('leak')
+  })
+
+  it('lets village differences cancel, flooring the net growth at zero', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, at('a', 60)).state
+    for (const [id, t] of [['b', 75], ['c', 52], ['d', 70], ['e', 58], ['f', 72], ['g', 61]] as const) {
+      const r = judgePlaceHop(state, at(id, t))
+      state = r.state
+      expect(r.evaluation!.verdict).toBe('ok')
+    }
+    expect(state.growth.textures).toBeLessThanOrEqual(PLACE_HOP_BOUNDS.textures.total)
+  })
+
+  it('flags one hop over the step bound, on pipelines too', () => {
+    const s = judgePlaceHop(PLACE_HOP_START, at('a', 60, 100)).state
+    const r = judgePlaceHop(s, at('b', 60, 100 + PLACE_HOP_BOUNDS.pipelines.step + 1))
+    expect(r.evaluation!.verdict).toBe('leak')
+    expect(r.evaluation!.counter).toBe('pipelines')
+    expect(r.evaluation!.detail).toMatch(/one hop left its pipelines behind/)
+  })
+
+  it('passes one hop exactly at the step bound', () => {
+    const s = judgePlaceHop(PLACE_HOP_START, at('a', 60, 100)).state
+    const r = judgePlaceHop(s, at('b', 60, 100 + PLACE_HOP_BOUNDS.pipelines.step))
+    expect(r.evaluation!.verdict).toBe('ok')
+    expect(r.evaluation!.delta.pipelines).toBe(PLACE_HOP_BOUNDS.pipelines.step)
+  })
+
+  it('passes the measured hop from a small port city into a full village', () => {
+    const s = judgePlaceHop(PLACE_HOP_START, at('giza', 60, 40)).state
+    const r = judgePlaceHop(s, at('bambara-village', 60, 103))
+    expect(r.evaluation!.verdict).toBe('ok')
+    expect(r.evaluation!.delta.pipelines).toBe(63)
+  })
+
+  it('reports the WebGL 2 pipeline drift without tripping when the pipelines leg is not judged', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, at('giza', 60, 63), PLACE_HOP_BOUNDS, false).state
+    for (let i = 1; i <= 30; i++) {
+      const r = judgePlaceHop(state, at(`v${i}`, 60, 190 + 2 * i), PLACE_HOP_BOUNDS, false)
+      state = r.state
+      expect(r.evaluation!.verdict).toBe('ok')
+      expect(r.evaluation!.detail).toMatch(/pipelines \d+ -> \d+/)
+    }
+    expect(state.growth.pipelines).toBeGreaterThan(PLACE_HOP_BOUNDS.pipelines.total)
+  })
+
+  it('fails soft on an unreadable counter', () => {
+    const s = judgePlaceHop(PLACE_HOP_START, at('a', null, null)).state
+    const r = judgePlaceHop(s, at('b', 500, 900))
+    expect(r.evaluation!.verdict).toBe('ok')
+    expect(r.evaluation!.delta).toEqual({ pipelines: null, textures: null })
+    expect(r.state.growth).toEqual({ pipelines: 0, textures: 0 })
+  })
+})
+
+describe('texture census', () => {
+  it('groups resident textures by kind, skips attributes and reports the change since the last census', async () => {
+    const THREE = await import('three/webgpu')
+    const morph = () => new THREE.DataArrayTexture(new Uint8Array(4 * 2 * 2 * 3), 2, 2, 3)
+    const rt = new THREE.RenderTarget(8, 8)
+    rt.texture.name = 'shadow'
+    const map = new Map<object, unknown>([
+      [morph(), 48],
+      [morph(), 48],
+      [rt.texture, 256],
+      [new THREE.BufferAttribute(new Float32Array(3), 3), { size: 12, type: 'attributes' }],
+    ])
+    const first = textureCensus(map)
+    expect(first.find((k) => k.kind === 'DataArrayTexture [array] 2x2x3')).toEqual({ kind: 'DataArrayTexture [array] 2x2x3', count: 2, bytes: 96, delta: 0 })
+    expect(first.find((k) => k.kind.includes('"shadow"'))?.kind).toMatch(/\[rt\] 8x8/)
+    expect(first.reduce((n, k) => n + k.count, 0)).toBe(3)
+    map.set(morph(), 48)
+    map.delete(rt.texture)
+    const next = textureCensus(map, new Map(first.map((k) => [k.kind, k.count])))
+    expect(next[0]).toMatchObject({ kind: 'DataArrayTexture [array] 2x2x3', count: 3, delta: 1 })
+    expect(next.find((k) => k.kind.includes('"shadow"'))).toMatchObject({ count: 0, delta: -1 })
   })
 })

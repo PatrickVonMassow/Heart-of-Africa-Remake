@@ -5270,6 +5270,12 @@ if (section('villager-dress')) {
     await goToPlace(villageOf(people))
     await awaitGltfBody(people)
     await gpuLoad(villageOf(people))
+    // Which texture kinds changed since the last village (point 1447): the
+    // counters say how many textures stay resident, this names them.
+    await page
+      .evaluate(() => window.__renderLeak?.textureKinds?.()?.filter((k) => k.delta !== 0).map((k) => `${k.delta > 0 ? '+' : ''}${k.delta} ${k.kind} =${k.count}`) ?? null)
+      .then((changed) => record('texture-census', { village: villageOf(people), changed }))
+      .catch((e) => record('texture-census', { village: villageOf(people), error: String(e?.message ?? e) }))
     if (!loadRecorded) {
       loadRecorded = true
       await nextFrames(10)
