@@ -218,13 +218,12 @@ export function judgePlaceHop(
   const hops = state.hops + 1
   let counter: 'pipelines' | 'textures' | undefined
   let why = ''
-  // Only the pipelines leg judges (point 1447). The textures leg is reported in
-  // the detail but does not trip: the figures' morph textures still grow in the
-  // villager-dress chain, which point 1566 owns; it re-arms this leg.
-  // `judgePipelines` false (WebGL 2) reports the pipelines leg too: its count
-  // still drifts ~2 per hop there (polish-settlement 21.11.2026, 238 -> 269
-  // over 23 hops), which point 1570 owns; WebGPU stays bounded and judged.
-  for (const c of judgePipelines ? (['pipelines'] as const) : []) {
+  // The textures leg judges on both backends (the figures' morph textures are
+  // released by the place sweep since point 1566). `judgePipelines` false
+  // (WebGL 2) only reports the pipelines leg: its count still drifts ~2 per hop
+  // there (polish-settlement 21.11.2026, 238 -> 269 over 23 hops), which point
+  // 1570 owns; WebGPU stays bounded and judged.
+  for (const c of judgePipelines ? (['textures', 'pipelines'] as const) : (['textures'] as const)) {
     const d = delta[c]
     if (d === null || counter) continue
     if (d > bounds[c].step) {
@@ -671,8 +670,7 @@ function judgePendingReturn(signature: string, texBack: number | null): void {
     textureState = t.state
     textureHistory.push(t.evaluation)
     if (textureHistory.length > HISTORY_CAP) textureHistory.splice(0, textureHistory.length - HISTORY_CAP)
-    // Reported, not asserted: the figures' morph textures still grow per visit,
-    // which point 1566 owns; it re-arms this assert (as the hop judge's leg).
+    devAssert(t.evaluation.verdict !== 'leak', 'render-texture-return-leak', () => t.evaluation.detail)
   }
   if (back === null || entry === null) return
   const { evaluation, state } = judgePipelineReturn(pipelineState, entry, back)

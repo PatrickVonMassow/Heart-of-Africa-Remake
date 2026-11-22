@@ -154,6 +154,9 @@ function cachedGltfFigure(asset: VillagerAsset, person: GltfPerson, layers: Dres
 // distinct figure ever drawn resident. A geometry drawn again re-uploads.
 
 const geometryUsers = new Map<THREE.BufferGeometry, number>()
+/** Geometries the caches dropped while a figure still drew them: no later
+ *  figure can reach them, so their last release may free the GPU side. */
+const orphaned = new WeakSet<THREE.BufferGeometry>()
 
 function holdGeometry(g: THREE.BufferGeometry): void {
   geometryUsers.set(g, (geometryUsers.get(g) ?? 0) + 1)
@@ -171,20 +174,30 @@ function releaseGeometry(g: THREE.BufferGeometry): void {
   // and geometry. A mid-visit dispose freed that texture and its dispose
   // listener; the next figure drawing the cached geometry re-uploaded a texture
   // nothing freed again (measured: +5..+13 per village). The place sweep
-  // (placeRelease.ts) disposes every drawn geometry on leave instead.
+  // (placeRelease.ts) disposes every drawn geometry on leave instead; a
+  // geometry no cache holds any more (the bird's-eye traveller, outside that
+  // sweep) is unreachable for a redraw and is freed here.
+  if (orphaned.has(g)) g.dispose()
 }
 
 /** Forget every cached figure geometry and person (point 1447). The caches are
  *  keyed per person, dress layer and village palette, so across a journey they
  *  only grew (~120 MB of heap per village). Called when a settlement scene
- *  unmounts: nothing is disposed here — mounted figures keep their own
- *  references and GPU release stays with releaseGeometry / the place sweep —
- *  the maps just stop pinning the CPU arrays. Returns the entries dropped. */
+ *  unmounts: a dropped geometry no figure draws is disposed (a second dispose
+ *  after the place sweep is a no-op); one still drawn is freed on its last
+ *  release. Returns the entries dropped. */
 export function releaseFigureCaches(): number {
   const maps: Map<string, unknown>[] = [bodyCache, layerCache, figureCache, personCache, gltfFigureCache, gltfLayerCache]
   let n = 0
   for (const m of maps) {
     n += m.size
+    for (const v of m.values()) {
+      if (!(v instanceof THREE.BufferGeometry)) continue
+      // Unused now and unreachable after the clear: free it; still drawn: free
+      // it on its last release.
+      if (geometryUsers.has(v)) orphaned.add(v)
+      else v.dispose()
+    }
     m.clear()
   }
   return n

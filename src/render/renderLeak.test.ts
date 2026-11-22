@@ -406,15 +406,31 @@ describe('place-to-place hop', () => {
     expect(r.evaluation?.counter).toBe('pipelines')
   })
 
-  it('reports the measured ~7 textures per village hop without tripping: that leg belongs to point 1566', () => {
-    let state = judgePlaceHop(PLACE_HOP_START, at('v0', 57)).state
-    for (let i = 1; i <= 8; i++) {
-      const r = judgePlaceHop(state, at(`v${i}`, 57 + 7 * i))
+  it('reproduces the measured ~7 textures per village hop as a leak within a few villages, on both backends', () => {
+    for (const judgePipelines of [true, false]) {
+      let state = judgePlaceHop(PLACE_HOP_START, at('v0', 57), PLACE_HOP_BOUNDS, judgePipelines).state
+      const verdicts: string[] = []
+      for (let i = 1; i <= 8; i++) {
+        const r = judgePlaceHop(state, at(`v${i}`, 57 + 7 * i), PLACE_HOP_BOUNDS, judgePipelines)
+        state = r.state
+        verdicts.push(r.evaluation!.verdict)
+        if (r.evaluation!.verdict === 'leak') {
+          expect(r.evaluation!.counter).toBe('textures')
+          expect(r.evaluation!.detail).toMatch(/textures grow with the villages visited/)
+        }
+      }
+      expect(verdicts.slice(0, 6)).toEqual(Array(6).fill('ok'))
+      expect(verdicts[6]).toBe('leak')
+    }
+  })
+
+  it('passes the bounded textures measured after the place sweep release (56-60 over 8 villages)', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, at('v0', 56)).state
+    for (const [i, t] of [57, 60, 58, 56, 59, 60, 57, 58].entries()) {
+      const r = judgePlaceHop(state, at(`v${i + 1}`, t))
       state = r.state
       expect(r.evaluation!.verdict).toBe('ok')
-      expect(r.evaluation!.detail).toMatch(/textures \d+ -> \d+ \(\+7/)
     }
-    expect(state.growth.textures).toBe(56)
   })
 
   it('reproduces the measured ~40 pipelines per village hop as a leak within a few villages', () => {
