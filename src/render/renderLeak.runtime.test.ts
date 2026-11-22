@@ -190,6 +190,26 @@ describe('render leak watch, live', () => {
     expect(last.grew).toBe('Object 1x1 "n" +2')
   })
 
+  it('names no texture growth on a pipelines-only hop and keeps the texture baseline across it', async () => {
+    const h = await harness()
+    const tex = (name: string) => ({ isTexture: true, name, image: { width: 1, height: 1 } })
+    const census = (...names: string[]) => (h.gl.info.memoryMap = new Map(names.map((n) => [tex(n), 4] as [object, unknown])))
+    census('m')
+    h.go('place', 'a')
+    h.tick() // texture-settled at a
+    census('m', 'n', 'n')
+    h.go('place', 'b')
+    h.tick(80, () => h.gl.info.memory.textures++) // textures keep streaming at b
+    census('m', 'n', 'n', 'n')
+    h.go('place', 'c') // leaving b mid-stream: a pipelines-only hop a -> b
+    h.tick()
+    const [ab, bc] = h.state().placeHop.history.slice(-2) as Array<{ placeId: string; grew: string; delta: { textures: number | null } }>
+    expect(ab).toMatchObject({ grew: 'no texture reading', delta: { textures: null } })
+    // c's textures compare against a, the last texture-settled place, census included
+    expect(bc.grew).toBe('Object 1x1 "n" +3')
+    expect(bc.delta.textures).not.toBeNull()
+  })
+
   it('takes no texture entry when streaming resumed after the bird\'s-eye view settled', async () => {
     const h = await harness()
     h.go('place', 'a')

@@ -801,7 +801,8 @@ function judgeHop(signature: string, textures: number | null): void {
   const before = hopCensus.get(setup) ?? null
   if (textures !== null) hopCensus.set(setup, kinds)
   if (!evaluation) return
-  evaluation.grew = grownKinds(before, kinds)
+  // A pipelines-only hop judged no texture delta, so it names no texture growth.
+  evaluation.grew = textures !== null ? grownKinds(before, kinds) : 'no texture reading'
   hopHistory.push(evaluation)
   if (hopHistory.length > HISTORY_CAP) hopHistory.splice(0, hopHistory.length - HISTORY_CAP)
   devAssert(evaluation.verdict !== 'leak', 'render-place-hop-leak', () => `${evaluation.detail}; grew: ${evaluation.grew}`)
