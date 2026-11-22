@@ -65,15 +65,6 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
-    point: 1566,
-    suite: 'polish-villagers',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    kind: 'console',
-    match: /render-texture-return-leak/i,
-    why: 'The settlement texture leak itself: texture return assert red in polish-villagers on WebGPU, 21-22.11.2026, while 1566 re-arms and bounds it. The charge dies with 1566.',
-  },
-  {
     point: 1572,
     suite: 'polish-villagers',
     backend: 'webgpu',
