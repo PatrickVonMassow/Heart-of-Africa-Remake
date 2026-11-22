@@ -91,7 +91,7 @@ describe('render leak watch, live', () => {
     h.gl.info.memory.textures = 75 + 30 // the visit left 30 textures behind
     h.tick()
     expect(h.state().textureReturn.history).toHaveLength(1)
-    expect(h.state().textureReturn.history[0].verdict).toBe('leak')
+    expect(h.state().textureReturn.history[0]).toMatchObject({ verdict: 'leak' })
     expect(h.asserts()).toContain('render-texture-return-leak')
   })
 
@@ -205,7 +205,7 @@ describe('render leak watch, live', () => {
     h.gl.info.memory.textures = 105 + 30
     h.tick()
     expect(h.state().textureReturn.history).toHaveLength(1)
-    expect(h.state().textureReturn.history[0].verdict).toBe('leak')
+    expect(h.state().textureReturn.history[0]).toMatchObject({ verdict: 'leak' })
     expect(h.asserts()).toContain('render-texture-return-leak')
   })
 
