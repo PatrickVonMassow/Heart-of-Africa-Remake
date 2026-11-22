@@ -12,7 +12,7 @@ import { groundSamples as readGroundSamples, bandRatio as readBandRatio } from '
 import { settledEdgeShot } from './edgeBandSettle.mjs'
 import sharp from 'sharp'
 import fs from 'node:fs'
-import { hopOwnerLines } from './hop-owners.mjs'
+import { checkedHopRead, hopOwnerLines } from './hop-owners.mjs'
 import { section as sectionGate, check, checkTiming, unmeasured, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
 
 // Which section's place hops are which (point 1566): each running section
@@ -34,18 +34,29 @@ function section(name) {
 }
 /** The report lines of one section's place hops (all with none). Waits, bounded,
  *  for a running settle watch to finish first, so the last hop of a section is
- *  judged before it is read; one still settling is reported as pending. */
+ *  judged before it is read; one still settling is reported as pending. A
+ *  missing watcher or a failed read fails a check instead of reporting no hops. */
 async function ownedHops(only) {
   await page.waitForFunction(() => window.__renderLeak?.state().watching == null, null, { timeout: 30000 }).catch(() => {})
-  const read = await page.evaluate(() => {
-    const s = window.__renderLeak?.state()
-    const watching = s?.watching ?? null
+  const raw = await page.evaluate(() => {
+    const leak = window.__renderLeak
+    if (!leak) return { armed: false }
+    const s = leak.state()
+    const watching = s.watching ?? null
     return {
-      hops: s?.placeHop?.history ?? [],
+      armed: true,
+      hops: s.placeHop?.history ?? null,
       sections: [...(window.__hopSections ?? new Map())],
-      pending: watching?.startsWith('place:') ? { visit: s.placeHop.visit, signature: watching } : null,
+      pending: watching?.startsWith('place:') ? { visit: s.placeHop?.visit, signature: watching } : null,
     }
-  }).catch(() => ({ hops: [], sections: [], pending: null }))
+  }).catch((e) => ({ error: String(e?.message ?? e) }))
+  let read
+  try {
+    read = checkedHopRead(raw)
+  } catch (e) {
+    check('the place-hop report read the armed render-leak watcher', false, e.message)
+    return [`hop report UNREADABLE: ${e.message}`]
+  }
   return hopOwnerLines(read.hops, read.sections, read.pending, only ?? null)
 }
 async function printHopOwners() {
