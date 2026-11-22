@@ -415,6 +415,18 @@ describe('place-to-place hop', () => {
     expect(r.state.last).toEqual(at('a', 64))
   })
 
+  it('starts a new chain instead of judging a hop across a render-setup change', () => {
+    // rain-depth's detail sweep, measured 22.11.2026: low read 57 textures, the
+    // re-entry at medium 87 (+30) with nothing left behind.
+    const low = judgePlaceHop(PLACE_HOP_START, { ...at('zulu', 57), visit: 1, setup: 'low|-' }).state
+    const r = judgePlaceHop(low, { ...at('zulu', 87, 155), visit: 2, setup: 'medium|-' })
+    expect(r.evaluation).toBeNull()
+    expect(r.state.growth).toEqual({ pipelines: 0, textures: 0 })
+    // the same jump under one setup is still a leak
+    const same = judgePlaceHop(judgePlaceHop(PLACE_HOP_START, { ...at('zulu', 57), visit: 1, setup: 'medium|-' }).state, { ...at('zulu', 87, 155), visit: 2, setup: 'medium|-' })
+    expect(same.evaluation?.verdict).toBe('leak')
+  })
+
   it('judges a re-entry of the same place as a hop when its visit differs', () => {
     const r = judgePlaceHop(judgePlaceHop(PLACE_HOP_START, { ...at('a', 60), visit: 1 }).state, { ...at('a', 60, 200), visit: 2 })
     expect(r.evaluation?.verdict).toBe('leak')

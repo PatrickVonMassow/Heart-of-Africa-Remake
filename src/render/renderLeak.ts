@@ -168,6 +168,9 @@ export interface PlaceHopReading {
   /** The entry count (state/placeVisit.ts): a leave and re-entry of the same
    *  place is a new visit and a hop; absent, a same-place reading re-settles. */
   visit?: number
+  /** The render setup the reading was taken under (the signature without its
+   *  place: detail level and post/shadow flags). Absent, setups are not compared. */
+  setup?: string
   pipelines: number | null
   textures: number | null
 }
@@ -209,6 +212,13 @@ export function judgePlaceHop(
 ): { evaluation: PlaceHopEvaluation | null; state: PlaceHopState } {
   const prev = state.last
   if (!prev || (prev.placeId === reading.placeId && prev.visit === reading.visit)) return { evaluation: null, state: { ...state, last: reading } }
+  // Like for like only: another detail level or post/shadow setup holds another
+  // resident set (a low-detail reading drew fewer figures at a smaller target),
+  // so a setup change starts a new chain instead of judging the difference
+  // (polish-settlement rain-depth's low/medium/high sweep, point 1566).
+  if (prev.setup !== undefined && reading.setup !== undefined && prev.setup !== reading.setup) {
+    return { evaluation: null, state: { ...PLACE_HOP_START, hops: state.hops, last: reading } }
+  }
   const delta = {
     pipelines: prev.pipelines !== null && reading.pipelines !== null ? reading.pipelines - prev.pipelines : null,
     textures: prev.textures !== null && reading.textures !== null ? reading.textures - prev.textures : null,
@@ -714,7 +724,7 @@ function judgeHop(signature: string, textures: number | null): void {
   if (!signature.startsWith('place:') || !placeId) return
   const { evaluation, state } = judgePlaceHop(
     hopState,
-    { placeId, visit, pipelines: readPipelines(), textures },
+    { placeId, visit, setup: signature.slice(signature.indexOf('|') + 1), pipelines: readPipelines(), textures },
     PLACE_HOP_BOUNDS,
     isWebGpuRenderer(),
   )
