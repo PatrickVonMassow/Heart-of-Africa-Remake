@@ -430,15 +430,22 @@ describe('place-to-place hop', () => {
   it('compares each reading with the previous reading of its own setup, so alternating setups cannot hide growth', () => {
     // low/medium on consecutive hops, every return to a setup +7 textures
     let state = PLACE_HOP_START
-    const verdicts: string[] = []
+    const per: Record<string, Array<{ verdict: string; delta: number | null; from: string }>> = { 'low|-': [], 'medium|-': [] }
     for (let i = 0; i < 18; i++) {
       const setup = i % 2 ? 'medium|-' : 'low|-'
       const base = i % 2 ? 87 : 57
       const r = judgePlaceHop(state, { ...at(`v${i}`, base + 7 * Math.floor(i / 2)), visit: i + 1, setup })
       state = r.state
-      if (r.evaluation) verdicts.push(r.evaluation.verdict)
+      if (r.evaluation) per[setup].push({ verdict: r.evaluation.verdict, delta: r.evaluation.delta.textures, from: r.evaluation.from })
     }
-    expect(verdicts).toContain('leak')
+    for (const [setup, evals] of Object.entries(per)) {
+      // every reading after a setup's first is judged against that setup's previous one
+      expect(evals, setup).toHaveLength(8)
+      expect(evals.map((e) => e.delta), setup).toEqual(Array(8).fill(7))
+      expect(evals[1].from, setup).toBe(setup === 'low|-' ? 'v2' : 'v3')
+      // and the steady growth trips each setup on its own at the 7th return (net 49 > 48)
+      expect(evals.map((e) => e.verdict), setup).toEqual([...Array(6).fill('ok'), 'leak', 'leak'])
+    }
   })
 
   it('never carries one setup\'s accumulated growth into another', () => {
