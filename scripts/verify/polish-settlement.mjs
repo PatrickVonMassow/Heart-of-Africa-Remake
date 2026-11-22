@@ -11,7 +11,50 @@ import { READ_GAP_FRAMES, READ_GAP_NET_MS, READ_GAP_MS } from './cropLuma.mjs'
 import { groundSamples as readGroundSamples, bandRatio as readBandRatio } from './edgeBandReading.mjs'
 import { settledEdgeShot } from './edgeBandSettle.mjs'
 import sharp from 'sharp'
-import { section, check, checkTiming, unmeasured, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
+import fs from 'node:fs'
+import { hopOwnerLines } from './hop-owners.mjs'
+import { section as sectionGate, check, checkTiming, unmeasured, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
+
+// Which section's place hops are which (point 1566): each running section
+// names itself in the page, and every place entry records the section it
+// started in under its visit number, so a hop still settling when the next
+// section begins stays with the section that made it.
+await page.evaluate(() => {
+  window.__hopSections = new Map()
+  window.__game.subscribe((s, prev) => {
+    if (s.mode !== 'place' || (prev.mode === 'place' && prev.placeId === s.placeId)) return
+    const visit = window.__renderLeak?.state().placeHop?.visit
+    if (visit !== undefined) window.__hopSections.set(visit, window.__hopSection ?? '?')
+  })
+})
+function section(name) {
+  const on = sectionGate(name)
+  if (on) page.evaluate((n) => { window.__hopSection = n }, name).catch(() => {})
+  return on
+}
+/** The report lines of one section's place hops (all with none). Waits, bounded,
+ *  for a running settle watch to finish first, so the last hop of a section is
+ *  judged before it is read; one still settling is reported as pending. */
+async function ownedHops(only) {
+  await page.waitForFunction(() => window.__renderLeak?.state().watching == null, null, { timeout: 30000 }).catch(() => {})
+  const read = await page.evaluate(() => {
+    const s = window.__renderLeak?.state()
+    const watching = s?.watching ?? null
+    return {
+      hops: s?.placeHop?.history ?? [],
+      sections: [...(window.__hopSections ?? new Map())],
+      pending: watching?.startsWith('place:') ? { visit: s.placeHop.visit, signature: watching } : null,
+    }
+  }).catch(() => ({ hops: [], sections: [], pending: null }))
+  return hopOwnerLines(read.hops, read.sections, read.pending, only ?? null)
+}
+async function printHopOwners() {
+  const lines = await ownedHops()
+  // The run digest keeps only a failing suite's tail, so the whole list goes to disk.
+  fs.mkdirSync('local', { recursive: true })
+  fs.writeFileSync('local/place-hop-owners.txt', lines.join('\n') + '\n')
+  console.log(`  place hops with their sections: local/place-hop-owners.txt (${lines.length})`)
+}
 
 // --- Settlement plan on the map (design.md §6.1, point 79) --------------------
 // Inside a place the map opens as a plan of the town: functional buildings
@@ -2598,6 +2641,10 @@ if (section('kraal-cattle')) {
   check('the Maasai kraal holds cattle in 1890 and visibly fewer in 1893 (point 359)', maasai1890.count > 0 && maasai1893.count < maasai1890.count, `${seen(maasai1890)} vs ${seen(maasai1893)}`)
   check('the Bemba village has no cattle in either year (point 359)', bemba1890.count === 0 && bemba1893.count === 0, `${seen(bemba1890)}, ${seen(bemba1893)}`)
   check('every beast stands inside its pen, clear of the fence (point 359)', kraals.every((r) => r.published && r.pen && inside(r)), JSON.stringify([zulu1890, maasai1890].map((r) => ({ hold: r.hold, at: r.cattle }))))
+  // The place hops of this section with their grown census kinds (point 1566):
+  // what a re-entry keeps resident beyond the previous village's reading.
+  for (const line of await ownedHops('kraal-cattle')) console.log(`  ${line}`)
 }
 
+await printHopOwners()
 await finishPolishSuite()

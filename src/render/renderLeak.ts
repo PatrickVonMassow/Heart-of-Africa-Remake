@@ -168,21 +168,37 @@ export interface PlaceHopReading {
   /** The entry count (state/placeVisit.ts): a leave and re-entry of the same
    *  place is a new visit and a hop; absent, a same-place reading re-settles. */
   visit?: number
+  /** The render setup the reading was taken under (the signature without its
+   *  place: detail level and post/shadow flags). Absent, setups are not compared. */
+  setup?: string
   pipelines: number | null
   textures: number | null
 }
 
-export interface PlaceHopState {
-  /** The last settled settlement reading of the current hop chain, or null
-   *  once the bird's-eye view has settled (a chain needs no travel between). */
-  last: PlaceHopReading | null
-  hops: number
-  /** Net growth summed over the judged hops of the current chain, floored at
-   *  zero; a settled bird's-eye reading resets it with the chain. */
+type HopCounter = 'pipelines' | 'textures'
+
+/** One render setup's hop chain: its last usable reading per counter and the
+ *  net growth summed over its judged hops, floored at zero. */
+export interface PlaceHopChain {
+  last: PlaceHopReading
   growth: { pipelines: number; textures: number }
+  /** Per counter, when `last` CARRIES an older usable value across hops whose
+   *  own reading was unreadable: the place it was read in and the hops it now
+   *  spans. Absent, the value is the reading of `last` itself. */
+  carried?: Partial<Record<HopCounter, { from: string; hops: number }>>
 }
 
-export const PLACE_HOP_START: PlaceHopState = { last: null, hops: 0, growth: { pipelines: 0, textures: 0 } }
+export interface PlaceHopState {
+  /** The hop chain of each render setup seen since the bird's-eye view last
+   *  settled (a chain needs no travel between; a settled bird's-eye reading
+   *  clears them all). A reading is compared only with the previous reading of
+   *  its own setup, so alternating setups cannot hide growth and growth never
+   *  carries from one setup into another. Readings without a setup share ''. */
+  chains: Record<string, PlaceHopChain>
+  hops: number
+}
+
+export const PLACE_HOP_START: PlaceHopState = { chains: {}, hops: 0 }
 
 export interface PlaceHopEvaluation {
   verdict: 'ok' | 'leak'
@@ -192,12 +208,25 @@ export interface PlaceHopEvaluation {
   delta: { pipelines: number | null; textures: number | null }
   counter?: 'pipelines' | 'textures'
   detail: string
+  /** The census kinds that grew across this hop (filled by the live watch). */
+  grew?: string
+  /** The visit (state/placeVisit.ts) of the reading judged, so a caller can
+   *  name the hop by when it started rather than when its verdict appeared. */
+  visit?: number
 }
 
 /**
- * Judge one settled settlement reading against the previous one, pure. A reading
- * of the SAME place (a settings toggle re-settling it) only replaces the chain's
- * last reading; the first reading of a chain judges nothing.
+ * Judge one settled settlement reading against the previous reading of the same
+ * render setup, pure. A reading of the SAME place and visit (a settings toggle
+ * re-settling it) only updates its setup's last reading; the first reading of a
+ * setup's chain judges nothing.
+ *
+ * An unreadable (null) counter never replaces the last usable reading: the
+ * older value is CARRIED under the new visit and marked as such. The next usable
+ * reading of that counter is judged against the carried value — a same-visit
+ * re-settle too, so a hop left while shaders compiled cannot hide its growth.
+ * A delta spanning n hops is bounded by n × step (n legitimate hops may each
+ * differ by up to a step); the total bound applies unchanged.
  */
 export function judgePlaceHop(
   state: PlaceHopState,
@@ -205,29 +234,57 @@ export function judgePlaceHop(
   bounds: PlaceHopBounds = PLACE_HOP_BOUNDS,
   judgePipelines = true,
 ): { evaluation: PlaceHopEvaluation | null; state: PlaceHopState } {
-  const prev = state.last
-  if (!prev || (prev.placeId === reading.placeId && prev.visit === reading.visit)) return { evaluation: null, state: { ...state, last: reading } }
-  const delta = {
-    pipelines: prev.pipelines !== null && reading.pipelines !== null ? reading.pipelines - prev.pipelines : null,
-    textures: prev.textures !== null && reading.textures !== null ? reading.textures - prev.textures : null,
+  // Like for like only: another detail level or post/shadow setup holds another
+  // resident set (a low-detail reading drew fewer figures at a smaller target;
+  // polish-settlement rain-depth's low/medium/high sweep, point 1566).
+  const key = reading.setup ?? ''
+  const chain = state.chains[key]
+  const prev = chain?.last
+  const growth0 = chain?.growth ?? { pipelines: 0, textures: 0 }
+  const sameVisit = !!prev && prev.placeId === reading.placeId && prev.visit === reading.visit
+  const counters = ['pipelines', 'textures'] as const
+  const last: PlaceHopReading = { ...reading }
+  const carried: NonNullable<PlaceHopChain['carried']> = {}
+  const delta: Record<HopCounter, number | null> = { pipelines: null, textures: null }
+  const spanned: Record<HopCounter, number> = { pipelines: 1, textures: 1 }
+  const from: Record<HopCounter, string> = { pipelines: prev?.placeId ?? '', textures: prev?.placeId ?? '' }
+  for (const c of counters) {
+    const was = prev?.[c] ?? null
+    const carry = chain?.carried?.[c]
+    if (reading[c] === null) {
+      last[c] = was
+      // a new hop widens the carry; a same-visit re-settle keeps it as it was
+      if (was !== null) carried[c] = carry ? { ...carry, hops: carry.hops + (sameVisit ? 0 : 1) } : sameVisit ? undefined : { from: prev!.placeId, hops: 1 }
+      if (!carried[c]) delete carried[c]
+      continue
+    }
+    if (was === null || (sameVisit && !carry)) continue
+    delta[c] = reading[c]! - was
+    spanned[c] = carry ? carry.hops + (sameVisit ? 0 : 1) : 1
+    from[c] = carry?.from ?? prev!.placeId
+  }
+  const judged = counters.some((c) => delta[c] !== null)
+  if (!prev || (sameVisit && !judged)) {
+    return { evaluation: null, state: { ...state, chains: { ...state.chains, [key]: { last, growth: growth0, carried } } } }
   }
   const growth = {
-    pipelines: delta.pipelines === null ? state.growth.pipelines : Math.max(0, state.growth.pipelines + delta.pipelines),
-    textures: delta.textures === null ? state.growth.textures : Math.max(0, state.growth.textures + delta.textures),
+    pipelines: delta.pipelines === null ? growth0.pipelines : Math.max(0, growth0.pipelines + delta.pipelines),
+    textures: delta.textures === null ? growth0.textures : Math.max(0, growth0.textures + delta.textures),
   }
-  const hops = state.hops + 1
-  let counter: 'pipelines' | 'textures' | undefined
+  // a deferred judgement of a same-visit re-settle belongs to the hop already counted
+  const hops = sameVisit ? state.hops : state.hops + 1
+  const step = (c: HopCounter) => bounds[c].step * spanned[c]
+  let counter: HopCounter | undefined
   let why = ''
-  // Only the pipelines leg judges (point 1447). The textures leg is reported in
-  // the detail but does not trip: the figures' morph textures still grow in the
-  // villager-dress chain, which point 1566 owns; it re-arms this leg.
-  // `judgePipelines` false (WebGL 2) reports the pipelines leg too: its count
-  // still drifts ~2 per hop there (polish-settlement 21.11.2026, 238 -> 269
-  // over 23 hops), which point 1570 owns; WebGPU stays bounded and judged.
-  for (const c of judgePipelines ? (['pipelines'] as const) : []) {
+  // The textures leg judges on both backends (the figures' morph textures are
+  // released by the place sweep since point 1566). `judgePipelines` false
+  // (WebGL 2) only reports the pipelines leg: its count still drifts ~2 per hop
+  // there (polish-settlement 21.11.2026, 238 -> 269 over 23 hops), which point
+  // 1570 owns; WebGPU stays bounded and judged.
+  for (const c of judgePipelines ? (['textures', 'pipelines'] as const) : (['textures'] as const)) {
     const d = delta[c]
     if (d === null || counter) continue
-    if (d > bounds[c].step) {
+    if (d > step(c)) {
       counter = c
       why = ` — one hop left its ${c} behind`
     } else if (growth[c] > bounds[c].total) {
@@ -235,15 +292,18 @@ export function judgePlaceHop(
       why = ` — ${c} grow with the villages visited`
     }
   }
-  const part = (c: 'pipelines' | 'textures') => {
+  const part = (c: HopCounter) => {
     const d = delta[c]
     if (d === null) return `${c} unreadable`
-    return `${c} ${prev[c]} -> ${reading[c]} (${d >= 0 ? '+' : ''}${d}, allowed +${bounds[c].step}; net ${growth[c]}, allowed ${bounds[c].total})`
+    const over = spanned[c] > 1 ? ` over ${spanned[c]} hops from ${from[c]}` : ''
+    return `${c} ${reading[c]! - d} -> ${reading[c]} (${d >= 0 ? '+' : ''}${d}, allowed +${step(c)}${over}; net ${growth[c]}, allowed ${bounds[c].total})`
   }
-  const detail = `place hop ${hops} ${prev.placeId} -> ${reading.placeId}: ${part('textures')}; ${part('pipelines')}${why}`
+  // the place the judged value was read in (a carried one names its own)
+  const origin = delta.textures !== null ? from.textures : delta.pipelines !== null ? from.pipelines : prev.placeId
+  const detail = `place hop ${hops} ${origin} -> ${reading.placeId}: ${part('textures')}; ${part('pipelines')}${why}`
   return {
-    evaluation: { verdict: counter ? 'leak' : 'ok', from: prev.placeId, to: reading.placeId, delta, counter, detail },
-    state: { last: reading, hops, growth },
+    evaluation: { verdict: counter ? 'leak' : 'ok', from: origin, to: reading.placeId, delta, counter, detail, visit: reading.visit },
+    state: { hops, chains: { ...state.chains, [key]: { last, growth, carried } } },
   }
 }
 
@@ -585,12 +645,19 @@ export interface StepResult {
 /**
  * One frame of the settle watch, pure. `counts` is the reading for this frame,
  * or null when no renderer is available (a torn-down canvas): a missing reading
- * ages the watch towards its give-up point but never settles it.
+ * ages the watch towards its give-up point but never settles it. `compiling`
+ * (shader pipelines still queued or pending) holds the TEXTURE reading back:
+ * three uploads a render object's textures — the figures' morph
+ * DataArrayTextures among them — at its first draw after its pipeline compiled,
+ * so a count read mid-compile stands still under load and misses a whole place's
+ * set (point 1566: polish-settlement's full run read zulu-village at 56
+ * textures / 146 pipelines and its re-entry at 85 / 195).
  */
 export function stepWatch(
   w: Watch,
   counts: LeakCounts | null,
   policy: SettlePolicy = SETTLE_POLICY,
+  compiling = false,
 ): StepResult {
   const frames = w.frames + 1
   let { stable, last, texStable, texLast } = w
@@ -600,7 +667,10 @@ export function stepWatch(
       stable = 0
       last = counts.renderTargets
     }
-    if (counts.textures === texLast) texStable++
+    if (compiling) {
+      texStable = 0
+      texLast = null
+    } else if (counts.textures === texLast) texStable++
     else {
       texStable = 0
       texLast = counts.textures
@@ -639,6 +709,10 @@ let lastCensus: ReadonlyMap<string, number> = new Map()
 /** The place and visit the running watch belongs to, captured at its start: a
  *  superseded watch is judged after the store has already moved on. */
 let watchPlace: { placeId: string | null; visit: number } = { placeId: null, visit: 0 }
+/** The signature whose texture count last settled, and that settled count;
+ *  cleared by a new watch. The return entry is this count, never a fresh
+ *  reading at departure (a transient dip would read as growth on return). */
+let texturesSettledFor: { signature: string; textures: number } | null = null
 
 /** `renderer._pipelines.caches.size` — three internals, so read defensively;
  *  null where the renderer or the field is missing (fail soft). */
@@ -650,6 +724,14 @@ function readPipelines(): number | null {
 
 /** True on the WebGPU backend; the hop judge's pipelines leg is calibrated
  *  there and only reported on WebGL 2 (see judgePlaceHop). */
+/** True while the async shader compile (render/asyncPipelines.ts, exposed by
+ *  App.tsx in dev) still has pipelines queued or pending; unreadable → false. */
+function pipelinesCompiling(): boolean {
+  const read = (window as unknown as { __shaderPipelines?: () => { pending: number; queued: number } | null }).__shaderPipelines
+  const s = typeof read === 'function' ? read() : null
+  return !!s && (s.pending > 0 || s.queued > 0)
+}
+
 function isWebGpuRenderer(): boolean {
   const gl = getRenderContext()?.gl as unknown as { backend?: { isWebGPUBackend?: boolean } } | undefined
   return gl?.backend?.isWebGPUBackend === true
@@ -671,8 +753,7 @@ function judgePendingReturn(signature: string, texBack: number | null): void {
     textureState = t.state
     textureHistory.push(t.evaluation)
     if (textureHistory.length > HISTORY_CAP) textureHistory.splice(0, textureHistory.length - HISTORY_CAP)
-    // Reported, not asserted: the figures' morph textures still grow per visit,
-    // which point 1566 owns; it re-arms this assert (as the hop judge's leg).
+    devAssert(t.evaluation.verdict !== 'leak', 'render-texture-return-leak', () => t.evaluation.detail)
   }
   if (back === null || entry === null) return
   const { evaluation, state } = judgePipelineReturn(pipelineState, entry, back)
@@ -689,21 +770,53 @@ function judgeHop(signature: string, textures: number | null): void {
     // A chain ends here, and its growth with it: the return judgement owns
     // what a visit leaves behind in the bird's-eye view.
     hopState = { ...PLACE_HOP_START, hops: hopState.hops }
+    hopCensus = null
     return
   }
   const { placeId, visit } = watchPlace
   if (!signature.startsWith('place:') || !placeId) return
   const { evaluation, state } = judgePlaceHop(
     hopState,
-    { placeId, visit, pipelines: readPipelines(), textures },
+    { placeId, visit, setup: signature.slice(signature.indexOf('|') + 1), pipelines: readPipelines(), textures },
     PLACE_HOP_BOUNDS,
     isWebGpuRenderer(),
   )
   hopState = state
+  // The census at this reading, so a leak names the texture kinds that grew
+  // since the previous place reading, not only their count.
+  const memoryMap = readMemoryMap()
+  const kinds = memoryMap ? new Map(textureCensus(memoryMap).map((k) => [k.kind, k.count])) : null
+  const before = hopCensus
+  hopCensus = kinds
   if (!evaluation) return
+  evaluation.grew = grownKinds(before, kinds)
   hopHistory.push(evaluation)
   if (hopHistory.length > HISTORY_CAP) hopHistory.splice(0, hopHistory.length - HISTORY_CAP)
-  devAssert(evaluation.verdict !== 'leak', 'render-place-hop-leak', () => evaluation.detail)
+  devAssert(evaluation.verdict !== 'leak', 'render-place-hop-leak', () => `${evaluation.detail}; grew: ${evaluation.grew}`)
+}
+
+let hopCensus: ReadonlyMap<string, number> | null = null
+
+function readMemoryMap(): Map<object, unknown> | null {
+  return (getRenderContext()?.gl?.info as { memoryMap?: Map<object, unknown> } | undefined)?.memoryMap ?? null
+}
+
+/** The kinds whose count rose from `before` to `after`, largest first, pure. */
+export function grownKinds(
+  before: ReadonlyMap<string, number> | null,
+  after: ReadonlyMap<string, number> | null,
+  limit = 6,
+): string {
+  if (!before || !after) return 'census unreadable'
+  const grown = [...after]
+    .map(([kind, n]) => [kind, n - (before.get(kind) ?? 0)] as const)
+    .filter(([, d]) => d > 0)
+    .sort((a, b) => b[1] - a[1])
+  if (!grown.length) return 'no kind'
+  return grown
+    .slice(0, limit)
+    .map(([kind, d]) => `${kind} +${d}`)
+    .join(', ')
 }
 
 function readCounts(): LeakCounts | null {
@@ -744,7 +857,7 @@ function settleStep(): void {
   const w = watch
   if (!w) return
   const counts = readCounts()
-  const step = stepWatch(w, counts)
+  const step = stepWatch(w, counts, SETTLE_POLICY, pipelinesCompiling())
   const frames = step.watch?.frames ?? w.frames + 1
   watch = step.watch
   if (step.settled) {
@@ -763,6 +876,7 @@ function settleStep(): void {
     devAssert(evaluation.verdict !== 'leak', 'render-resource-leak', () => evaluation.detail)
   }
   if (step.texturesSettled) {
+    texturesSettledFor = { signature: w.signature, textures: step.texturesSettled.textures }
     judgePendingReturn(w.signature, step.texturesSettled.textures)
     judgeHop(w.signature, step.texturesSettled.textures)
   }
@@ -811,6 +925,7 @@ function startWatch(signature: string): void {
   const g = useGame.getState()
   watchPlace = { placeId: g.mode === 'place' ? g.placeId : null, visit: currentPlaceVisit() }
   watch = newWatch(signature)
+  texturesSettledFor = null
   schedule()
 }
 
@@ -833,10 +948,14 @@ function onStateChange(): void {
   const changed = sig !== currentSignature
   if (changed) judgeStreamingWatch()
   if (lastMode === 'travel' && mode === 'place' && pendingVisit === null) {
+    // The texture entry under the return's own gate: a bird's-eye count that
+    // has settled with no shader compile pending. Read mid-stream, uploads
+    // still due at departure would count as left behind on the settled return.
+    const settled = texturesSettledFor?.signature === currentSignature && !pipelinesCompiling()
     pendingVisit = {
       signature: currentRenderSignature('travel'),
       pipelines: readPipelines(),
-      textures: readCounts()?.textures ?? null,
+      textures: settled ? texturesSettledFor!.textures : null,
     }
   }
   lastMode = mode
@@ -857,6 +976,7 @@ function reset(): void {
   textureState = PIPELINE_RETURN_START
   textureHistory = []
   hopState = PLACE_HOP_START
+  hopCensus = null
   hopHistory = []
   currentSignature = currentRenderSignature()
   startWatch(currentSignature)
@@ -936,6 +1056,7 @@ export function armRenderLeakWatch(): void {
         history: textureHistory,
       },
       placeHop: {
+        visit: currentPlaceVisit(),
         bounds: PLACE_HOP_BOUNDS,
         state: hopState,
         history: hopHistory,

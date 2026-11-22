@@ -4,6 +4,7 @@
 // does not — is the browser gate in scripts/verify/settings.mjs.
 import { describe, it, expect } from 'vitest'
 import {
+  grownKinds,
   LEAK_BOUNDS,
   PIPELINE_RETURN_BOUNDS,
   PIPELINE_RETURN_START,
@@ -234,12 +235,13 @@ describe('evaluateReading', () => {
 
 describe('stepWatch', () => {
   const policy = SETTLE_POLICY
-  /** Run the watch over a fixed reading sequence. */
-  const run = (readings: Array<LeakCounts | null>) => {
+  /** Run the watch over a fixed reading sequence; `compiling(i)` says whether
+   *  shader pipelines are still compiling at frame i. */
+  const run = (readings: Array<LeakCounts | null>, compiling: (i: number) => boolean = () => false) => {
     let w = newWatch('sig')
     let settled: LeakCounts | undefined
-    for (const r of readings) {
-      const step = stepWatch(w, r, policy)
+    for (const [i, r] of readings.entries()) {
+      const step = stepWatch(w, r, policy, compiling(i))
       settled ??= step.settled
       if (!step.watch) return { ...step, settled }
       w = step.watch
@@ -286,6 +288,19 @@ describe('stepWatch', () => {
     const both = run(Array.from({ length: policy.minFrames }, () => counts(44, 300)))
     expect(both.settled).toEqual(counts(44, 300))
     expect(both.texturesSettled).toEqual(counts(44, 300))
+  })
+
+  it('holds the texture reading while shader pipelines still compile (point 1566)', () => {
+    // Under load the texture count stands still mid-compile, then the compiled
+    // render objects upload their textures at their first draw.
+    const long = policy.minFrames + policy.stableFrames * 2
+    const stalled = Array.from({ length: long }, () => counts(44, 56))
+    const held = run(stalled, () => true)
+    expect(held.settled).toEqual(counts(44, 56))
+    expect(held.texturesSettled).toBeUndefined()
+    const after = Array.from({ length: policy.stableFrames + 1 }, () => counts(44, 85))
+    const end = run([...stalled, ...after], (i) => i < long)
+    expect(end.texturesSettled).toEqual(counts(44, 85))
   })
 
   it('gives up without judging when the count never settles', () => {
@@ -397,24 +412,114 @@ describe('place-to-place hop', () => {
     expect(r.evaluation).toBeNull()
     r = judgePlaceHop(r.state, at('a', 64))
     expect(r.evaluation).toBeNull()
-    expect(r.state.last).toEqual(at('a', 64))
+    expect(r.state.chains[''].last).toEqual(at('a', 64))
+  })
+
+  it('starts a new chain instead of judging a hop across a render-setup change', () => {
+    // rain-depth's detail sweep, measured 22.11.2026: low read 57 textures, the
+    // re-entry at medium 87 (+30) with nothing left behind.
+    const low = judgePlaceHop(PLACE_HOP_START, { ...at('zulu', 57), visit: 1, setup: 'low|-' }).state
+    const r = judgePlaceHop(low, { ...at('zulu', 87, 155), visit: 2, setup: 'medium|-' })
+    expect(r.evaluation).toBeNull()
+    expect(r.state.chains['medium|-'].growth).toEqual({ pipelines: 0, textures: 0 })
+    // the same jump under one setup is still a leak
+    const same = judgePlaceHop(judgePlaceHop(PLACE_HOP_START, { ...at('zulu', 57), visit: 1, setup: 'medium|-' }).state, { ...at('zulu', 87, 155), visit: 2, setup: 'medium|-' })
+    expect(same.evaluation?.verdict).toBe('leak')
+  })
+
+  it('compares each reading with the previous reading of its own setup, so alternating setups cannot hide growth', () => {
+    // low/medium on consecutive hops, every return to a setup +7 textures
+    let state = PLACE_HOP_START
+    const per: Record<string, Array<{ verdict: string; delta: number | null; from: string }>> = { 'low|-': [], 'medium|-': [] }
+    for (let i = 0; i < 18; i++) {
+      const setup = i % 2 ? 'medium|-' : 'low|-'
+      const base = i % 2 ? 87 : 57
+      const r = judgePlaceHop(state, { ...at(`v${i}`, base + 7 * Math.floor(i / 2)), visit: i + 1, setup })
+      state = r.state
+      if (r.evaluation) per[setup].push({ verdict: r.evaluation.verdict, delta: r.evaluation.delta.textures, from: r.evaluation.from })
+    }
+    for (const [setup, evals] of Object.entries(per)) {
+      // every reading after a setup's first is judged against that setup's previous one
+      expect(evals, setup).toHaveLength(8)
+      expect(evals.map((e) => e.delta), setup).toEqual(Array(8).fill(7))
+      expect(evals[1].from, setup).toBe(setup === 'low|-' ? 'v2' : 'v3')
+      // and the steady growth trips each setup on its own at the 7th return (net 49 > 48)
+      expect(evals.map((e) => e.verdict), setup).toEqual([...Array(6).fill('ok'), 'leak', 'leak'])
+    }
+  })
+
+  it('never carries one setup\'s accumulated growth into another', () => {
+    let state = PLACE_HOP_START
+    for (let i = 0; i <= 5; i++) state = judgePlaceHop(state, { ...at(`v${i}`, 57 + 8 * i), visit: i + 1, setup: 'low|-' }).state
+    // a settings change within the last visit re-settles it under medium
+    state = judgePlaceHop(state, { ...at('v5', 90), visit: 6, setup: 'medium|-' }).state
+    const r = judgePlaceHop(state, { ...at('w', 100), visit: 7, setup: 'medium|-' })
+    expect(r.evaluation).toMatchObject({ verdict: 'ok', delta: { textures: 10 } })
+  })
+
+  it('keeps the last usable reading of a counter across an unreadable one', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, { ...at('a', 60), visit: 1, setup: 's' }).state
+    state = judgePlaceHop(state, { ...at('b', null), visit: 2, setup: 's' }).state
+    const r = judgePlaceHop(state, { ...at('c', 74), visit: 3, setup: 's' })
+    expect(r.evaluation?.delta.textures).toBe(14)
+    expect(r.state.chains.s.growth.textures).toBe(14)
+  })
+
+  it('judges a hop whose count was unreadable once its visit re-settles readable', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, { ...at('a', 100), visit: 1, setup: 's' }).state
+    const blind = judgePlaceHop(state, { ...at('b', null), visit: 2, setup: 's' })
+    expect(blind.evaluation?.delta.textures).toBeNull()
+    state = blind.state
+    const r = judgePlaceHop(state, { ...at('b', 130), visit: 2, setup: 's' })
+    expect(r.evaluation).toMatchObject({ verdict: 'leak', counter: 'textures', from: 'a', to: 'b', delta: { textures: 30, pipelines: null } })
+    // judged once: a further re-settle of the same visit is a plain re-settle again
+    expect(judgePlaceHop(r.state, { ...at('b', 131), visit: 2, setup: 's' }).evaluation).toBeNull()
+  })
+
+  it('bounds a delta across an unreadable hop by the step per hop spanned', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, { ...at('a', 100), visit: 1, setup: 's' }).state
+    state = judgePlaceHop(state, { ...at('b', null), visit: 2, setup: 's' }).state
+    const r = judgePlaceHop(state, { ...at('c', 130), visit: 3, setup: 's' }) // two legitimate +15 hops
+    expect(r.evaluation).toMatchObject({ verdict: 'ok', from: 'a', delta: { textures: 30 } })
+    expect(r.evaluation?.detail).toMatch(/allowed \+48 over 2 hops/)
+    expect(r.state.chains.s.growth.textures).toBe(30)
+    // the total bound still applies across the span
+    const far = judgePlaceHop(state, { ...at('c', 100 + PLACE_HOP_BOUNDS.textures.total + 1), visit: 3, setup: 's' })
+    expect(far.evaluation).toMatchObject({ verdict: 'leak', counter: 'textures' })
   })
 
   it('judges a re-entry of the same place as a hop when its visit differs', () => {
     const r = judgePlaceHop(judgePlaceHop(PLACE_HOP_START, { ...at('a', 60), visit: 1 }).state, { ...at('a', 60, 200), visit: 2 })
     expect(r.evaluation?.verdict).toBe('leak')
     expect(r.evaluation?.counter).toBe('pipelines')
+    expect(r.evaluation?.visit).toBe(2) // the hop is named by the visit it started
   })
 
-  it('reports the measured ~7 textures per village hop without tripping: that leg belongs to point 1566', () => {
-    let state = judgePlaceHop(PLACE_HOP_START, at('v0', 57)).state
-    for (let i = 1; i <= 8; i++) {
-      const r = judgePlaceHop(state, at(`v${i}`, 57 + 7 * i))
+  it('reproduces the measured ~7 textures per village hop as a leak within a few villages, on both backends', () => {
+    for (const judgePipelines of [true, false]) {
+      let state = judgePlaceHop(PLACE_HOP_START, at('v0', 57), PLACE_HOP_BOUNDS, judgePipelines).state
+      const verdicts: string[] = []
+      for (let i = 1; i <= 8; i++) {
+        const r = judgePlaceHop(state, at(`v${i}`, 57 + 7 * i), PLACE_HOP_BOUNDS, judgePipelines)
+        state = r.state
+        verdicts.push(r.evaluation!.verdict)
+        if (r.evaluation!.verdict === 'leak') {
+          expect(r.evaluation!.counter).toBe('textures')
+          expect(r.evaluation!.detail).toMatch(/textures grow with the villages visited/)
+        }
+      }
+      expect(verdicts.slice(0, 6)).toEqual(Array(6).fill('ok'))
+      expect(verdicts[6]).toBe('leak')
+    }
+  })
+
+  it('passes the bounded textures measured after the place sweep release (56-60 over 8 villages)', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, at('v0', 56)).state
+    for (const [i, t] of [57, 60, 58, 56, 59, 60, 57, 58].entries()) {
+      const r = judgePlaceHop(state, at(`v${i + 1}`, t))
       state = r.state
       expect(r.evaluation!.verdict).toBe('ok')
-      expect(r.evaluation!.detail).toMatch(/textures \d+ -> \d+ \(\+7/)
     }
-    expect(state.growth.textures).toBe(56)
   })
 
   it('reproduces the measured ~40 pipelines per village hop as a leak within a few villages', () => {
@@ -440,7 +545,7 @@ describe('place-to-place hop', () => {
       state = r.state
       expect(r.evaluation!.verdict).toBe('ok')
     }
-    expect(state.growth.textures).toBeLessThanOrEqual(PLACE_HOP_BOUNDS.textures.total)
+    expect(state.chains[''].growth.textures).toBeLessThanOrEqual(PLACE_HOP_BOUNDS.textures.total)
   })
 
   it('flags one hop over the step bound, on pipelines too', () => {
@@ -473,7 +578,7 @@ describe('place-to-place hop', () => {
       expect(r.evaluation!.verdict).toBe('ok')
       expect(r.evaluation!.detail).toMatch(/pipelines \d+ -> \d+/)
     }
-    expect(state.growth.pipelines).toBeGreaterThan(PLACE_HOP_BOUNDS.pipelines.total)
+    expect(state.chains[''].growth.pipelines).toBeGreaterThan(PLACE_HOP_BOUNDS.pipelines.total)
   })
 
   it('fails soft on an unreadable counter', () => {
@@ -481,7 +586,7 @@ describe('place-to-place hop', () => {
     const r = judgePlaceHop(s, at('b', 500, 900))
     expect(r.evaluation!.verdict).toBe('ok')
     expect(r.evaluation!.delta).toEqual({ pipelines: null, textures: null })
-    expect(r.state.growth).toEqual({ pipelines: 0, textures: 0 })
+    expect(r.state.chains[''].growth).toEqual({ pipelines: 0, textures: 0 })
   })
 })
 
@@ -506,5 +611,25 @@ describe('texture census', () => {
     const next = textureCensus(map, new Map(first.map((k) => [k.kind, k.count])))
     expect(next[0]).toMatchObject({ kind: 'DataArrayTexture [array] 2x2x3', count: 3, delta: 1 })
     expect(next.find((k) => k.kind.includes('"shadow"'))).toMatchObject({ count: 0, delta: -1 })
+  })
+})
+
+describe('grownKinds', () => {
+  it('names the kinds that grew between two hop readings, largest first', () => {
+    const before = new Map([
+      ['DataArrayTexture [array] 4096x4x6', 10],
+      ['Texture 512x512', 4],
+    ])
+    const after = new Map([
+      ['DataArrayTexture [array] 4096x4x6', 22],
+      ['Texture 512x512', 4],
+      ['CanvasTexture 256x256', 3],
+    ])
+    expect(grownKinds(before, after)).toBe('DataArrayTexture [array] 4096x4x6 +12, CanvasTexture 256x256 +3')
+  })
+  it('says so when nothing grew or a census is missing', () => {
+    const m = new Map([['Texture 1x1', 1]])
+    expect(grownKinds(m, m)).toBe('no kind')
+    expect(grownKinds(null, m)).toBe('census unreadable')
   })
 })

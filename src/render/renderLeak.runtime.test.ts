@@ -51,6 +51,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  delete (window as unknown as Record<string, unknown>).__shaderPipelines
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
@@ -84,7 +85,56 @@ describe('render leak watch, live', () => {
     h.tick()
     expect(h.state().textureReturn.history).toHaveLength(1)
     expect(h.state().textureReturn.history[0].verdict).toBe('leak')
-    expect(h.asserts()).not.toContain('render-texture-return-leak') // reported only until point 1566
+    expect(h.asserts()).toContain('render-texture-return-leak')
+  })
+
+  it('takes no texture entry while the bird\'s-eye textures still stream at departure', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75
+    h.tick(30, () => {
+      h.gl.info.memory.textures++ // uploads still landing when the player leaves
+    })
+    h.go('place', 'b')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 105 + 10 // the pending uploads landed; nothing left behind
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(0)
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
+  it('takes the texture entry from the settled bird\'s-eye count, not a dip at departure', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 80
+    h.tick() // the bird's-eye view settles at 80
+    h.gl.info.memory.textures = 70 // a transient dip just before the player leaves
+    h.go('place', 'b')
+    h.gl.info.memory.textures = 110
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 80 // back where it settled: nothing left behind
+    h.tick()
+    expect(h.state().textureReturn.history.at(-1)).toMatchObject({ entry: 80, back: 80, verdict: 'ok' })
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
+  it('takes no texture entry while shaders compile at departure', async () => {
+    const h = await harness()
+    let busy = true
+    ;(window as unknown as Record<string, unknown>).__shaderPipelines = () => ({ pending: busy ? 1 : 0, queued: 0 })
+    h.go('place', 'a')
+    busy = false
+    h.gl.info.memory.textures = 75 + 12 // the compile's uploads land in the place
+    h.tick()
+    h.go('travel')
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(0)
   })
 
   it('compares a return only with an entry under the same bird\'s-eye signature', async () => {
@@ -107,7 +157,7 @@ describe('render leak watch, live', () => {
     h.tick()
     expect(h.state().textureReturn.history).toHaveLength(1)
     expect(h.state().textureReturn.history[0].verdict).toBe('leak')
-    expect(h.asserts()).not.toContain('render-texture-return-leak') // reported only until point 1566
+    expect(h.asserts()).toContain('render-texture-return-leak')
   })
 
   it('judges a hop on the texture count once it has settled, not while the place still builds', async () => {
@@ -194,6 +244,47 @@ describe('render leak watch, live', () => {
     expect(returns).toHaveLength(2)
     expect(returns[1]).toMatchObject({ entry, back: entry + 5 })
   })
+
+  for (const webgpu of [true, false]) {
+    const backend = webgpu ? 'WebGPU' : 'WebGL 2'
+
+    it(`flags a texture-only hop once a busy shader compiler goes idle (${backend})`, async () => {
+      const h = await harness(webgpu)
+      let busy = false
+      ;(window as unknown as Record<string, unknown>).__shaderPipelines = () => ({ pending: busy ? 2 : 0, queued: busy ? 3 : 0 })
+      h.go('place', 'a')
+      h.gl.info.memory.textures = 100
+      h.tick()
+      h.go('place', 'b')
+      busy = true // an over-bound count that stands still under the compile is not a settled reading
+      h.gl.info.memory.textures = 160
+      h.tick(60)
+      expect(h.state().placeHop.history).toHaveLength(0)
+      expect(h.asserts()).not.toContain('render-place-hop-leak')
+      busy = false
+      h.gl.info.memory.textures = 130 // its uploads land once the pipelines are ready
+      h.tick()
+      const hops = h.state().placeHop.history as Array<{ verdict: string; counter?: string; delta: { textures: number | null; pipelines: number | null } }>
+      expect(hops).toHaveLength(1)
+      expect(hops[0]).toMatchObject({ verdict: 'leak', counter: 'textures', delta: { textures: 30, pipelines: 0 } })
+      expect(h.asserts()).toContain('render-place-hop-leak')
+    })
+
+    it(`flags a texture-only return (${backend})`, async () => {
+      const h = await harness(webgpu)
+      h.go('place', 'a')
+      h.gl.info.memory.textures = 120
+      h.tick()
+      h.go('travel')
+      h.gl.info.memory.textures = 75 + 12 // the visit left 12 textures behind, no pipelines
+      h.tick()
+      const returns = h.state().textureReturn.history as Array<{ verdict: string; delta: number }>
+      expect(returns).toEqual([expect.objectContaining({ verdict: 'leak', delta: 12 })])
+      expect(h.state().pipelines.history).toEqual([expect.objectContaining({ verdict: 'ok', delta: 0 })])
+      expect(h.asserts()).toContain('render-texture-return-leak')
+      expect(h.asserts()).not.toContain('render-pipeline-leak')
+    })
+  }
 
   it('judges a leave and re-entry of the same place in one tick as a hop', async () => {
     const h = await harness()
