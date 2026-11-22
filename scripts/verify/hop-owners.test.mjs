@@ -31,17 +31,23 @@ describe('place-hop owner report', () => {
 
 describe('place-hop report read', () => {
   it('passes an armed read with a history, an empty one included', () => {
-    const read = { armed: true, hops: [], sections: [], pending: null }
-    expect(checkedHopRead(read)).toBe(read)
+    const read = { armed: true, page: 'p1', hops: [], sections: [], pending: null }
+    expect(checkedHopRead(read, 'p1')).toBe(read)
   })
 
   it('fails loud on a failed browser read instead of reporting no hops', () => {
-    expect(() => checkedHopRead({ error: 'Target page, context or browser has been closed' })).toThrow(/browser read failed \(Target page/)
-    expect(() => checkedHopRead(undefined)).toThrow(/browser read failed/)
+    expect(() => checkedHopRead({ error: 'Target page, context or browser has been closed' }, 'p1')).toThrow(/browser read failed \(Target page/)
+    expect(() => checkedHopRead(undefined, 'p1')).toThrow(/browser read failed/)
   })
 
   it('fails loud on a missing render watcher or a missing hop history', () => {
-    expect(() => checkedHopRead({ armed: false })).toThrow(/no render-leak watcher/)
-    expect(() => checkedHopRead({ armed: true, hops: null, sections: [], pending: null })).toThrow(/no place-hop history/)
+    expect(() => checkedHopRead({ armed: false, page: 'p1' }, 'p1')).toThrow(/no render-leak watcher/)
+    expect(() => checkedHopRead({ armed: true, page: 'p1', hops: null, sections: [], pending: null }, 'p1')).toThrow(/no place-hop history/)
+  })
+
+  it('fails loud on a reloaded page whose fresh watcher has an empty history', () => {
+    // the reload re-arms the watcher but not the report's token or ownership map
+    expect(() => checkedHopRead({ armed: true, page: null, hops: [], sections: [], pending: null }, 'p1')).toThrow(/page was replaced/)
+    expect(() => checkedHopRead({ armed: true, page: 'p2', hops: [], sections: [], pending: null }, 'p1')).toThrow(/page was replaced/)
   })
 })

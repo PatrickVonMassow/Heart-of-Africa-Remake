@@ -25,11 +25,14 @@ export function hopOwnerLines(hops, sections, pending, only = null) {
   return lines
 }
 
-/** Validate the page read behind the report: a failed browser read, a missing
+/** Validate the page read behind the report: a failed browser read, a page
+ *  other than the one the report armed in (`page`, its token — a reload brings
+ *  a fresh watcher with an empty history and no ownership map), a missing
  *  render watcher or a missing hop history throws, so the report can never
  *  print a normal zero-hop list for a watcher it did not read. */
-export function checkedHopRead(read) {
+export function checkedHopRead(read, page) {
   if (!read || read.error) throw new Error(`place-hop report: browser read failed (${read?.error ?? 'no result'})`)
+  if (read.page !== page) throw new Error(`place-hop report: the page was replaced since the report armed (token ${read.page ?? 'missing'}, armed ${page}) — its hop history is not the run's`)
   if (!read.armed) throw new Error('place-hop report: no render-leak watcher in the page (window.__renderLeak missing)')
   if (!Array.isArray(read.hops)) throw new Error('place-hop report: the render-leak watcher exposes no place-hop history')
   return read
