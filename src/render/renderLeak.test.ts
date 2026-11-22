@@ -4,6 +4,7 @@
 // does not — is the browser gate in scripts/verify/settings.mjs.
 import { describe, it, expect } from 'vitest'
 import {
+  grownKinds,
   LEAK_BOUNDS,
   PIPELINE_RETURN_BOUNDS,
   PIPELINE_RETURN_START,
@@ -536,5 +537,25 @@ describe('texture census', () => {
     const next = textureCensus(map, new Map(first.map((k) => [k.kind, k.count])))
     expect(next[0]).toMatchObject({ kind: 'DataArrayTexture [array] 2x2x3', count: 3, delta: 1 })
     expect(next.find((k) => k.kind.includes('"shadow"'))).toMatchObject({ count: 0, delta: -1 })
+  })
+})
+
+describe('grownKinds', () => {
+  it('names the kinds that grew between two hop readings, largest first', () => {
+    const before = new Map([
+      ['DataArrayTexture [array] 4096x4x6', 10],
+      ['Texture 512x512', 4],
+    ])
+    const after = new Map([
+      ['DataArrayTexture [array] 4096x4x6', 22],
+      ['Texture 512x512', 4],
+      ['CanvasTexture 256x256', 3],
+    ])
+    expect(grownKinds(before, after)).toBe('DataArrayTexture [array] 4096x4x6 +12, CanvasTexture 256x256 +3')
+  })
+  it('says so when nothing grew or a census is missing', () => {
+    const m = new Map([['Texture 1x1', 1]])
+    expect(grownKinds(m, m)).toBe('no kind')
+    expect(grownKinds(null, m)).toBe('census unreadable')
   })
 })

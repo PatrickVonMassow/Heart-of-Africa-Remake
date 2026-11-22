@@ -705,6 +705,7 @@ function judgeHop(signature: string, textures: number | null): void {
     // A chain ends here, and its growth with it: the return judgement owns
     // what a visit leaves behind in the bird's-eye view.
     hopState = { ...PLACE_HOP_START, hops: hopState.hops }
+    hopCensus = null
     return
   }
   const { placeId, visit } = watchPlace
@@ -716,10 +717,40 @@ function judgeHop(signature: string, textures: number | null): void {
     isWebGpuRenderer(),
   )
   hopState = state
+  // The census at this reading, so a leak names the texture kinds that grew
+  // since the previous place reading, not only their count.
+  const memoryMap = readMemoryMap()
+  const kinds = memoryMap ? new Map(textureCensus(memoryMap).map((k) => [k.kind, k.count])) : null
+  const before = hopCensus
+  hopCensus = kinds
   if (!evaluation) return
   hopHistory.push(evaluation)
   if (hopHistory.length > HISTORY_CAP) hopHistory.splice(0, hopHistory.length - HISTORY_CAP)
-  devAssert(evaluation.verdict !== 'leak', 'render-place-hop-leak', () => evaluation.detail)
+  devAssert(evaluation.verdict !== 'leak', 'render-place-hop-leak', () => `${evaluation.detail}; grew: ${grownKinds(before, kinds)}`)
+}
+
+let hopCensus: ReadonlyMap<string, number> | null = null
+
+function readMemoryMap(): Map<object, unknown> | null {
+  return (getRenderContext()?.gl?.info as { memoryMap?: Map<object, unknown> } | undefined)?.memoryMap ?? null
+}
+
+/** The kinds whose count rose from `before` to `after`, largest first, pure. */
+export function grownKinds(
+  before: ReadonlyMap<string, number> | null,
+  after: ReadonlyMap<string, number> | null,
+  limit = 6,
+): string {
+  if (!before || !after) return 'census unreadable'
+  const grown = [...after]
+    .map(([kind, n]) => [kind, n - (before.get(kind) ?? 0)] as const)
+    .filter(([, d]) => d > 0)
+    .sort((a, b) => b[1] - a[1])
+  if (!grown.length) return 'no kind'
+  return grown
+    .slice(0, limit)
+    .map(([kind, d]) => `${kind} +${d}`)
+    .join(', ')
 }
 
 function readCounts(): LeakCounts | null {
@@ -873,6 +904,7 @@ function reset(): void {
   textureState = PIPELINE_RETURN_START
   textureHistory = []
   hopState = PLACE_HOP_START
+  hopCensus = null
   hopHistory = []
   currentSignature = currentRenderSignature()
   startWatch(currentSignature)
