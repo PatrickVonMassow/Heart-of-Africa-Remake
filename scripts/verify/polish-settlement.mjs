@@ -11,7 +11,29 @@ import { READ_GAP_FRAMES, READ_GAP_NET_MS, READ_GAP_MS } from './cropLuma.mjs'
 import { groundSamples as readGroundSamples, bandRatio as readBandRatio } from './edgeBandReading.mjs'
 import { settledEdgeShot } from './edgeBandSettle.mjs'
 import sharp from 'sharp'
-import { section, check, checkTiming, unmeasured, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
+import { section as sectionGate, check, checkTiming, unmeasured, page, frame, nextFrames, goToPlace, finishPolishSuite } from './_polish.mjs'
+
+// Which section's place hops are which (point 1566): each running section marks
+// the hop count it starts at, and the suite end prints every hop with its owner.
+const hopMarks = []
+const lastHop = () => page.evaluate(() => {
+  const h = window.__renderLeak?.state().placeHop?.history ?? []
+  return Number(/place hop (\d+)/.exec(h.at(-1)?.detail ?? '')?.[1] ?? 0)
+}).catch(() => null)
+function section(name) {
+  const on = sectionGate(name)
+  if (on) hopMarks.push({ name, at: lastHop() })
+  return on
+}
+async function printHopOwners() {
+  const marks = await Promise.all(hopMarks.map(async (m) => ({ name: m.name, at: await m.at })))
+  const hops = await page.evaluate(() => window.__renderLeak?.state().placeHop?.history ?? []).catch(() => [])
+  for (const h of hops) {
+    const n = Number(/place hop (\d+)/.exec(h.detail ?? '')?.[1] ?? 0)
+    const owner = marks.filter((m) => m.at !== null && m.at < n).at(-1)?.name ?? '?'
+    console.log(`  [${owner}] hop ${n} ${h.from} -> ${h.to}: textures ${h.delta?.textures ?? '?'}, pipelines ${h.delta?.pipelines ?? '?'}; grew: ${h.grew ?? '?'}`)
+  }
+}
 
 // --- Settlement plan on the map (design.md §6.1, point 79) --------------------
 // Inside a place the map opens as a plan of the town: functional buildings
@@ -2604,4 +2626,5 @@ if (section('kraal-cattle')) {
   for (const h of hops) console.log(`  hop ${h.from} -> ${h.to}: textures ${h.delta?.textures ?? '?'}, pipelines ${h.delta?.pipelines ?? '?'}; grew: ${h.grew ?? '?'}`)
 }
 
+await printHopOwners()
 await finishPolishSuite()
