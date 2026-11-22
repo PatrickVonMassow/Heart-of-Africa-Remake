@@ -863,12 +863,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1573": {
-      "at": "2026-11-22T18:02:33.449Z",
-      "why": "split from 1566 (third review round of its leak detector)",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "1574": {
       "at": "2026-11-22T20:29:08.857Z",
       "why": "hits only landings of a charged point and has a known one-line hand repair; no charged point is in flight",
@@ -890,7 +884,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-22T22:38:54.555Z",
+    "at": "2026-11-22T23:35:31.026Z",
     "points": [
       184,
       200,
@@ -1083,7 +1077,6 @@
       1570,
       1571,
       1572,
-      1573,
       1574,
       1575
     ]
