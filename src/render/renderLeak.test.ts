@@ -11,6 +11,7 @@ import {
   TEXTURE_RETURN_BOUNDS,
   SETTLE_POLICY,
   currentRenderSignature,
+  departureTextureEntry,
   evaluateReading,
   judgePipelineReturn,
   judgePlaceHop,
@@ -488,6 +489,38 @@ describe('place-to-place hop', () => {
     expect(far.evaluation).toMatchObject({ verdict: 'leak', counter: 'textures' })
   })
 
+  it('bounds a carried delta by the step per hop on its own, under a total bound that cannot trip', () => {
+    // two hops spanned: n × step = 48 passes, one more fails, though the total
+    // is widened far past either so only the step bound can decide
+    const wide = { ...PLACE_HOP_BOUNDS, textures: { step: PLACE_HOP_BOUNDS.textures.step, total: 1000 } }
+    let state = judgePlaceHop(PLACE_HOP_START, { ...at('a', 100), visit: 1, setup: 's' }, wide).state
+    state = judgePlaceHop(state, { ...at('b', null), visit: 2, setup: 's' }, wide).state
+    const atBound = judgePlaceHop(state, { ...at('c', 148), visit: 3, setup: 's' }, wide)
+    expect(atBound.evaluation).toMatchObject({ verdict: 'ok', delta: { textures: 48 } })
+    expect(atBound.evaluation?.detail).toMatch(/allowed \+48 over 2 hops from a/)
+    const over = judgePlaceHop(state, { ...at('c', 149), visit: 3, setup: 's' }, wide)
+    expect(over.evaluation).toMatchObject({ verdict: 'leak', counter: 'textures', delta: { textures: 49 } })
+    expect(over.evaluation?.detail).toMatch(/one hop left its textures behind/)
+  })
+
+  it('numbers a deferred same-visit verdict by its own chain\'s hop, not by another setup\'s later one', () => {
+    let state = judgePlaceHop(PLACE_HOP_START, { ...at('a', 100), visit: 1, setup: 's' }).state
+    state = judgePlaceHop(state, { ...at('a', 90), visit: 1, setup: 't' }).state
+    // visit 2 under s reads blind: hop 1, judged on pipelines only
+    const blind = judgePlaceHop(state, { ...at('b', null), visit: 2, setup: 's' })
+    expect(blind.evaluation?.detail).toMatch(/^place hop 1 /)
+    // a settings toggle within visit 2: setup t judges its own hop 2
+    const other = judgePlaceHop(blind.state, { ...at('b', 95), visit: 2, setup: 't' })
+    expect(other.evaluation?.detail).toMatch(/^place hop 2 /)
+    // back to s, the visit re-settles readable: the deferred verdict is still hop 1
+    const deferred = judgePlaceHop(other.state, { ...at('b', 110), visit: 2, setup: 's' })
+    expect(deferred.evaluation).toMatchObject({ verdict: 'ok', visit: 2, setup: 's', delta: { textures: 10 } })
+    expect(deferred.evaluation?.detail).toMatch(/^place hop 1 a -> b/)
+    expect(deferred.state.hops).toBe(2)
+    // and the next real hop continues the global count
+    expect(judgePlaceHop(deferred.state, { ...at('c', 112), visit: 3, setup: 's' }).evaluation?.detail).toMatch(/^place hop 3 /)
+  })
+
   it('judges a re-entry of the same place as a hop when its visit differs', () => {
     const r = judgePlaceHop(judgePlaceHop(PLACE_HOP_START, { ...at('a', 60), visit: 1 }).state, { ...at('a', 60, 200), visit: 2 })
     expect(r.evaluation?.verdict).toBe('leak')
@@ -587,6 +620,27 @@ describe('place-to-place hop', () => {
     expect(r.evaluation!.verdict).toBe('ok')
     expect(r.evaluation!.delta).toEqual({ pipelines: null, textures: null })
     expect(r.state.chains[''].growth).toEqual({ pipelines: 0, textures: 0 })
+  })
+})
+
+describe('departure texture entry', () => {
+  const settled = { signature: 'travel|medium|pano0', textures: 80 }
+
+  it('takes the settled count under the exact signature, through a transient dip', () => {
+    expect(departureTextureEntry('travel|medium|pano0', settled, 80, false)).toBe(80)
+    expect(departureTextureEntry('travel|medium|pano0', settled, 70, false)).toBe(80)
+    expect(departureTextureEntry('travel|medium|pano0', settled, null, false)).toBe(80)
+  })
+
+  it('is unreadable when a signature lever changed since the settle', () => {
+    // the panorama capture's targets allocated after the settle: another resident set
+    expect(departureTextureEntry('travel|medium|pano1', settled, 80, false)).toBeNull()
+  })
+
+  it('is unreadable when streaming resumed after the settle, while shaders compile, or with no settle', () => {
+    expect(departureTextureEntry('travel|medium|pano0', settled, 81, false)).toBeNull()
+    expect(departureTextureEntry('travel|medium|pano0', settled, 80, true)).toBeNull()
+    expect(departureTextureEntry('travel|medium|pano0', null, 80, false)).toBeNull()
   })
 })
 

@@ -186,6 +186,9 @@ export interface PlaceHopChain {
    *  own reading was unreadable: the place it was read in and the hops it now
    *  spans. Absent, the value is the reading of `last` itself. */
   carried?: Partial<Record<HopCounter, { from: string; hops: number }>>
+  /** The hop number `last`'s visit was counted as in this chain, so a deferred
+   *  same-visit verdict keeps it while another setup's hops advance the count. */
+  hop?: number
 }
 
 export interface PlaceHopState {
@@ -213,6 +216,8 @@ export interface PlaceHopEvaluation {
   /** The visit (state/placeVisit.ts) of the reading judged, so a caller can
    *  name the hop by when it started rather than when its verdict appeared. */
   visit?: number
+  /** The render setup of the reading judged (PlaceHopReading.setup). */
+  setup?: string
 }
 
 /**
@@ -265,14 +270,17 @@ export function judgePlaceHop(
   }
   const judged = counters.some((c) => delta[c] !== null)
   if (!prev || (sameVisit && !judged)) {
-    return { evaluation: null, state: { ...state, chains: { ...state.chains, [key]: { last, growth: growth0, carried } } } }
+    const hop = sameVisit ? chain?.hop : undefined
+    return { evaluation: null, state: { ...state, chains: { ...state.chains, [key]: { last, growth: growth0, carried, ...(hop === undefined ? {} : { hop }) } } } }
   }
   const growth = {
     pipelines: delta.pipelines === null ? growth0.pipelines : Math.max(0, growth0.pipelines + delta.pipelines),
     textures: delta.textures === null ? growth0.textures : Math.max(0, growth0.textures + delta.textures),
   }
-  // a deferred judgement of a same-visit re-settle belongs to the hop already counted
-  const hops = sameVisit ? state.hops : state.hops + 1
+  // a deferred judgement of a same-visit re-settle belongs to the hop its own
+  // chain counted for that visit, not to whatever another setup counted since
+  const hop = sameVisit ? (chain?.hop ?? state.hops) : state.hops + 1
+  const hops = sameVisit ? state.hops : hop
   const step = (c: HopCounter) => bounds[c].step * spanned[c]
   let counter: HopCounter | undefined
   let why = ''
@@ -300,10 +308,10 @@ export function judgePlaceHop(
   }
   // the place the judged value was read in (a carried one names its own)
   const origin = delta.textures !== null ? from.textures : delta.pipelines !== null ? from.pipelines : prev.placeId
-  const detail = `place hop ${hops} ${origin} -> ${reading.placeId}: ${part('textures')}; ${part('pipelines')}${why}`
+  const detail = `place hop ${hop} ${origin} -> ${reading.placeId}: ${part('textures')}; ${part('pipelines')}${why}`
   return {
-    evaluation: { verdict: counter ? 'leak' : 'ok', from: origin, to: reading.placeId, delta, counter, detail, visit: reading.visit },
-    state: { hops, chains: { ...state.chains, [key]: { last, growth, carried } } },
+    evaluation: { verdict: counter ? 'leak' : 'ok', from: origin, to: reading.placeId, delta, counter, detail, visit: reading.visit, setup: reading.setup },
+    state: { hops, chains: { ...state.chains, [key]: { last, growth, carried, hop } } },
   }
 }
 
@@ -939,6 +947,26 @@ function judgeStreamingWatch(): void {
   judgeHop(watch.signature, null)
 }
 
+/**
+ * The texture entry of a place visit, pure: the count settled under EXACTLY the
+ * bird's-eye signature the return is compared under (a lever that changed since
+ * the settle, such as the panorama capture's targets, holds another resident
+ * set), with no shader compile pending, and not exceeded at departure. A count
+ * above the settled one means streaming resumed after the settle, so the
+ * settled count no longer is the entry; a count below it is a transient dip and
+ * keeps it. Otherwise unreadable (null): the texture return goes unjudged.
+ */
+export function departureTextureEntry(
+  signature: string,
+  settledFor: { signature: string; textures: number } | null,
+  current: number | null,
+  compiling: boolean,
+): number | null {
+  if (!settledFor || settledFor.signature !== signature || compiling) return null
+  if (current !== null && current > settledFor.textures) return null
+  return settledFor.textures
+}
+
 function onStateChange(): void {
   // Read at the store change itself, before React unmounts the bird's-eye view.
   const mode = useGame.getState().mode
@@ -951,11 +979,11 @@ function onStateChange(): void {
     // The texture entry under the return's own gate: a bird's-eye count that
     // has settled with no shader compile pending. Read mid-stream, uploads
     // still due at departure would count as left behind on the settled return.
-    const settled = texturesSettledFor?.signature === currentSignature && !pipelinesCompiling()
+    const signature = currentRenderSignature('travel')
     pendingVisit = {
-      signature: currentRenderSignature('travel'),
+      signature,
       pipelines: readPipelines(),
-      textures: settled ? texturesSettledFor!.textures : null,
+      textures: departureTextureEntry(signature, texturesSettledFor, readCounts()?.textures ?? null, pipelinesCompiling()),
     }
   }
   lastMode = mode
