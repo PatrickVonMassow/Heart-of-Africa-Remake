@@ -796,8 +796,10 @@ function judgeHop(signature: string, textures: number | null): void {
   // compares against), not only their count.
   const memoryMap = readMemoryMap()
   const kinds = memoryMap ? new Map(textureCensus(memoryMap).map((k) => [k.kind, k.count])) : null
+  // A pipelines-only reading carries the texture baseline (judgePlaceHop), so
+  // it keeps that baseline's census too.
   const before = hopCensus.get(setup) ?? null
-  hopCensus.set(setup, kinds)
+  if (textures !== null) hopCensus.set(setup, kinds)
   if (!evaluation) return
   evaluation.grew = grownKinds(before, kinds)
   hopHistory.push(evaluation)

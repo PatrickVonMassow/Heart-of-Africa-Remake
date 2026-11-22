@@ -150,6 +150,26 @@ describe('render leak watch, live', () => {
     expect(h.asserts()).not.toContain('render-texture-return-leak')
   })
 
+  it('takes no texture entry when the count is unreadable at departure', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 80
+    h.tick() // settles at 80
+    const memory = h.gl.info.memory
+    delete (h.gl.info as { memory?: unknown }).memory // the departure read fails
+    h.go('place', 'b')
+    h.gl.info.memory = { ...memory, textures: 110 }
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 100
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(1)
+    expect(h.state().textureReturn.history[0]).toMatchObject({ entry: 75 })
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
   it('names the texture kinds a hop grew against the same setup\'s earlier census', async () => {
     const h = await harness()
     const tex = (name: string) => ({ isTexture: true, name, image: { width: 1, height: 1 } })
@@ -199,7 +219,7 @@ describe('render leak watch, live', () => {
     h.gl.info.memory.textures = 75
     h.tick() // settled under the signature without panorama targets
     panoramaAllocated = true // the capture takes its targets outside any store change
-    h.gl.info.memory.textures = 70 // read at departure below the settle: no resumed stream to hide behind
+    // read back unchanged at departure: only the signature guard can refuse it
     h.go('place', 'b')
     h.gl.info.memory.textures = 110
     h.tick()
