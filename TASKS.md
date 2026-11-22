@@ -113,6 +113,20 @@ put it is the mistake this line exists to stop.
   Source: measurement of point 1446, 25.10.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 285 (accumulation and leak hunt).
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 1566. Settlement visits still leave morph textures and heap behind
+  Final state: after entering and leaving N different villages the renderer-tracked textures (`renderer.info.memory.textures`), the JS heap and Chrome's GPU-process memory return to a bounded level instead of growing with N (the cause named: what retains the figures' morph `DataArrayTexture`s and the heap); a dev invariant or browser check pins the bound; the villager-dress fresh-page staging of point 1446 (`DRESS_REBOOT_EVERY`) may then be lifted.
+  Observed problem: on feat/1447 (pipelines already bounded at ~70-90), `polish-villagers --section=villager-dress`, WebGPU, 21.11.2026 11:31-11:35 UTC, 9 villages after a fresh page (`gpu-load` and `texture-census` rows): renderer-tracked textures 55 -> 115, JS heap 374 -> 993 MB; the DEV texture census (`src/render/renderLeak.ts`) attributes the texture growth to morph `DataArrayTexture` 4096x4x6 and 4096x5x6 (three's `nodes/accessors/Morph.js`, freed only on its geometry's `dispose`), +5..+12 per village, never falling. Plain place hops without the dress checks did NOT grow (10 villages, worktree probe of 1447): suspect the dress section's per-village lineup (`__dressLineup`, `dressLineup.tsx`, `stageRow`) — geometry not released by `skinnedFigure.tsx` or not recorded by `PlaceReleaseTracker.attach`. Repro (~6 min): `DRESS_PEOPLES=zulu,pedi,san,wayeyi,bemba,lunda,bambundu,maasai DRESS_COST=zulu npm test -- polish-villagers --section=villager-dress`.
+  Source: split from point 1447, 21.11.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 1447, 285.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1568. Split rule: inherit the place of a parent standing before the release boundary
+  Final state: the append gate holds such a split exactly like a split of an `ahead` parent.
+  Observed problem: The split of 1447 into 1566 (21.11.2026, c52ddd397) passed the split rule and landed at position 188 of 188 while its parent stands at position 2 — a false approval by the rule meant to prevent exactly that. User asked why on 21.11.2026 13:05 and approved the fix in chat.
+  Spec: Close the gap in the split rule (point 1551): `splitPriorityOf` in scripts/queue-rank-core.mjs treats a split as priority only when its parent's rank entry is `ahead` or its block states high urgency. A parent that stands in front of the release boundary by position (its `last` entry predates its rise to the front) does not count, so its split is appended at the tail. Change: a split also inherits its parent's place when the parent currently stands in front of the release boundary in the shown work order (the same position read `releaseBoundaryState` uses). Correction of an existing rule, no new guard (CLAUDE.md §2 infrastructure freeze: possible false approval).
+  Test: Vitest case in scripts/queue-rank-core.test.mjs — parent with a `last` entry at position 2, its split appended last is held; a parent behind the boundary still lets its split append.
+  Source: user request of 21.11.2026 12:48 UTC via the findings carrier (session unknown); approved: "Ja, beide mit diesen Titeln freigegeben."
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 1144. Three of six probed village layouts leave no way out of the settlement,
   and the dev assertion that says so has been firing unread (measured 17.09.2026 while
   reviewing point 1045). `buildLayout` ends with
@@ -5292,8 +5306,16 @@ put it is the mistake this line exists to stop.
   Source: agent finding via the findings carrier, 21.11.2026 01:06 UTC.
   Bundle: Steuerung & Performance.
 
-- [ ] 1566. Settlement visits still leave morph textures and heap behind
-  Final state: after entering and leaving N different villages the renderer-tracked textures (`renderer.info.memory.textures`), the JS heap and Chrome's GPU-process memory return to a bounded level instead of growing with N (the cause named: what retains the figures' morph `DataArrayTexture`s and the heap); a dev invariant or browser check pins the bound; the villager-dress fresh-page staging of point 1446 (`DRESS_REBOOT_EVERY`) may then be lifted.
-  Observed problem: on feat/1447 (pipelines already bounded at ~70-90), `polish-villagers --section=villager-dress`, WebGPU, 21.11.2026 11:31-11:35 UTC, 9 villages after a fresh page (`gpu-load` and `texture-census` rows): renderer-tracked textures 55 -> 115, JS heap 374 -> 993 MB; the DEV texture census (`src/render/renderLeak.ts`) attributes the texture growth to morph `DataArrayTexture` 4096x4x6 and 4096x5x6 (three's `nodes/accessors/Morph.js`, freed only on its geometry's `dispose`), +5..+12 per village, never falling. Plain place hops without the dress checks did NOT grow (10 villages, worktree probe of 1447): suspect the dress section's per-village lineup (`__dressLineup`, `dressLineup.tsx`, `stageRow`) — geometry not released by `skinnedFigure.tsx` or not recorded by `PlaceReleaseTracker.attach`. Repro (~6 min): `DRESS_PEOPLES=zulu,pedi,san,wayeyi,bemba,lunda,bambundu,maasai DRESS_COST=zulu npm test -- polish-villagers --section=villager-dress`.
-  Source: split from point 1447, 21.11.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 1447, 285.
+- [ ] 1569. Board-claim guard and request-drain gate deadlock each other
+  Final state: with the idle card standing and pending user requests, the session can drain the requests (TASKS append, commit) without a hand edit of .batch-dashboard.html; either the board-claim guard lets the drain mutations through or `board.mjs now <N>` no longer requires the drain first.
+  Observed problem: 21.11.2026 13:52, session 6baf3b27: with the idle card standing and two pending user requests naming 1447, `board.mjs now <N>` refused (requests must be drained first) while the board-claim PreToolUse guard refused every Bash mutation needed to drain them (TASKS append). Escaped only by editing .batch-dashboard.html with the Edit tool.
+  Spec: Switch off whichever of the two refusals is redundant in that state (CLAUDE.md §2 infrastructure freeze: switch off an obstructing rule, do not rebuild it).
+  Test: Vitest case reproducing the state (idle card + pending request): the drain mutation is allowed.
+  Source: agent finding of 21.11.2026 13:16 UTC via the findings carrier (session unknown); real blockade (CLAUDE.md §2).
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1570. WebGL 2 pipeline count still drifts per settlement hop
+  Final state: on WebGL 2, consecutive settlement hops (`render-place-hop-leak` chain, `src/render/renderLeak.ts`) hold the renderer's cached pipeline count at a bounded level like WebGPU does (the cause named: which programs or render-object variants WebGL 2 keeps per visit); the hop judge's pipelines leg is then armed on WebGL 2 too (`judgePlaceHop(..., judgePipelines)`, today WebGPU only).
+  Observed problem: `polish-settlement`, WebGL 2, feat/1447 e79992b5f, 21.11.2026 22:14 UTC: places settle at 190-270 pipelines (WebGPU ~40-104), net growth over a 39-hop chain 129 -> 188 (bound 120 calibrated on WebGPU); same-place readings rise slowly (zulu-village 194 -> 257, bemba-village 192 -> 269 over ~30 hops, ~2 per hop). The WebGPU chain stays within the bound. Plain hops do NOT drift on WebGL 2 (probes 21.11.2026 23:20/23:28, worktree point-1447 `local/hop-probe-keys.mjs`, VERIFY_GL=webgl: zulu<->bemba 7 hops 65-87, cairo/tangier/bemba/maasai/zulu 12 hops 76-84); the growth comes from what polish-settlement does inside a visit (bisect its sections with the hop invariant on WebGL 2). Split 21.11.2026 from point 1447, whose pipelines bound is WebGPU-judged and WebGL-2-reported.
+  Source: split from point 1447 (point did not converge on both backends); reproducible player impact on the WebGL 2 fallback (CLAUDE.md §2 finding intake). Related: 1447, 1566, 285.
   Bundle: Session- & Repo-Hygiene.
