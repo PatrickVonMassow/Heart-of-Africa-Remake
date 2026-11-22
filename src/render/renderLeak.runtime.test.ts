@@ -256,8 +256,11 @@ describe('render leak watch, live', () => {
       h.gl.info.memory.textures = 100
       h.tick()
       h.go('place', 'b')
-      busy = true // the count stands still under the compile: not a settled reading
+      busy = true // an over-bound count that stands still under the compile is not a settled reading
+      h.gl.info.memory.textures = 160
       h.tick(60)
+      expect(h.state().placeHop.history).toHaveLength(0)
+      expect(h.asserts()).not.toContain('render-place-hop-leak')
       busy = false
       h.gl.info.memory.textures = 130 // its uploads land once the pipelines are ready
       h.tick()
