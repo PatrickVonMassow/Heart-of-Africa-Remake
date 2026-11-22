@@ -862,6 +862,12 @@
       "why": "a pre-existing suite red with no reported player sighting; it waits behind the user-reported points, its charge keeps the render gate honest meanwhile",
       "origin": "machine",
       "place": "last"
+    },
+    "1572": {
+      "at": "2026-11-22T08:08:45.337Z",
+      "why": "test-robustness fix of one check; it blocks no landing while charged, so it waits behind the player-facing points",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -872,7 +878,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-22T07:07:27.964Z",
+    "at": "2026-11-22T08:08:45.341Z",
     "points": [
       184,
       200,
@@ -1064,7 +1070,8 @@
       1568,
       1569,
       1570,
-      1571
+      1571,
+      1572
     ]
   }
 }

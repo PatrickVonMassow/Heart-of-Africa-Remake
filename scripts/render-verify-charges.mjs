@@ -65,6 +65,23 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1566,
+    suite: 'polish-villagers',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'console',
+    match: /render-texture-return-leak/i,
+    why: 'The settlement texture leak itself: texture return assert red in polish-villagers on WebGPU, 21-22.11.2026, while 1566 re-arms and bounds it. The charge dies with 1566.',
+  },
+  {
+    point: 1572,
+    suite: 'polish-villagers',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /low preset: (every kneeling primitive figure keeps a uniform scale|no kneeling primitive.s drawn hand sinks into the ground)/i,
+    why: 'Red on WebGPU, 21.11.2026 21:33 (feat/1447, e79992b5f): census kneeling 0 of 20 figures, a one-instant sample of free village life. The charge dies with 1572.',
+  },
+  {
     point: 1571,
     suite: 'polish-villagers',
     backend: 'webgpu',
