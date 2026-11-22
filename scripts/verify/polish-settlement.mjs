@@ -2598,6 +2598,10 @@ if (section('kraal-cattle')) {
   check('the Maasai kraal holds cattle in 1890 and visibly fewer in 1893 (point 359)', maasai1890.count > 0 && maasai1893.count < maasai1890.count, `${seen(maasai1890)} vs ${seen(maasai1893)}`)
   check('the Bemba village has no cattle in either year (point 359)', bemba1890.count === 0 && bemba1893.count === 0, `${seen(bemba1890)}, ${seen(bemba1893)}`)
   check('every beast stands inside its pen, clear of the fence (point 359)', kraals.every((r) => r.published && r.pen && inside(r)), JSON.stringify([zulu1890, maasai1890].map((r) => ({ hold: r.hold, at: r.cattle }))))
+  // The place hops of this section with their grown census kinds (point 1566):
+  // what a re-entry keeps resident beyond the previous village's reading.
+  const hops = await page.evaluate(() => window.__renderLeak?.state().placeHop?.history?.slice(-8) ?? [])
+  for (const h of hops) console.log(`  hop ${h.from} -> ${h.to}: textures ${h.delta?.textures ?? '?'}, pipelines ${h.delta?.pipelines ?? '?'}; grew: ${h.grew ?? '?'}`)
 }
 
 await finishPolishSuite()

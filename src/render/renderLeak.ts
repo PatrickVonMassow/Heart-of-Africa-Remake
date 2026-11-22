@@ -192,6 +192,8 @@ export interface PlaceHopEvaluation {
   delta: { pipelines: number | null; textures: number | null }
   counter?: 'pipelines' | 'textures'
   detail: string
+  /** The census kinds that grew across this hop (filled by the live watch). */
+  grew?: string
 }
 
 /**
@@ -724,9 +726,10 @@ function judgeHop(signature: string, textures: number | null): void {
   const before = hopCensus
   hopCensus = kinds
   if (!evaluation) return
+  evaluation.grew = grownKinds(before, kinds)
   hopHistory.push(evaluation)
   if (hopHistory.length > HISTORY_CAP) hopHistory.splice(0, hopHistory.length - HISTORY_CAP)
-  devAssert(evaluation.verdict !== 'leak', 'render-place-hop-leak', () => `${evaluation.detail}; grew: ${grownKinds(before, kinds)}`)
+  devAssert(evaluation.verdict !== 'leak', 'render-place-hop-leak', () => `${evaluation.detail}; grew: ${evaluation.grew}`)
 }
 
 let hopCensus: ReadonlyMap<string, number> | null = null
