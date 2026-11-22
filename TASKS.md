@@ -107,13 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1573. Place hop report and texture return assert misjudge edge cases across render setups
-  Final state: the DEV place-hop judge and the texture return assert in `src/render/renderLeak.ts` and the owner report (`scripts/verify/hop-owners.mjs`, `scripts/verify/polish-settlement.mjs`) give no false green and no misattribution in the six cases below, each pinned by a unit case.
-  Observed problem: third cross-vendor review round (GPT-6.2 Sol, passes 2/3 and 3/3) of point 1566 at 03511df6e, 22.11.2026: (1) `hop-owners.mjs:16` suppresses PENDING when the history holds the same visit under ANOTHER setup, hiding a still-pending settle watch; (2) a deferred same-visit verdict (`renderLeak.ts:275`) takes the global `state.hops` number of another setup's hop; (3) the return assert (`renderLeak.ts:954-958`) checks the cached settled count against `currentSignature` but stores it under a fresh `currentRenderSignature('travel')`, so a signature input changing in between (panorama-allocation flag) compares different resident sets; (4) `polish-settlement.mjs:39` treats a missing render watcher or a failed browser read as settled/empty and can print a normal zero-hop report; (5) `renderLeak.test.ts:479` does not test the carried-count step bound independently (+48 pass / +49 fail across two hops with a widened total bound); (6) `renderLeak.runtime.test.ts:109` lacks settle-then-resume-streaming before departure.
-  Source: split from point 1566, 22.11.2026 — the third review round of its detector answers found only further detector edge cases while the morph-texture fix itself stayed green; (1), (3), (4) are possible false approvals (CLAUDE.md §2 finding intake). Related: 1566, 1447.
-  Criticality: high — inherited from 1566; (1), (3) and (4) can let the leak detector approve a growing resident set.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1568. Split rule: inherit the place of a parent standing before the release boundary
   Final state: the append gate holds such a split exactly like a split of an `ahead` parent.
   Observed problem: The split of 1447 into 1566 (21.11.2026, c52ddd397) passed the split rule and landed at position 188 of 188 while its parent stands at position 2 — a false approval by the rule meant to prevent exactly that. User asked why on 21.11.2026 13:05 and approved the fix in chat.
