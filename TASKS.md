@@ -5324,3 +5324,10 @@ put it is the mistake this line exists to stop.
   Observed problem: on feat/1447-settlement-visit-release (e79992b5f, dirty), WebGPU, local/verify-logs/2026-11-21T21-33-28-761-polish-villagers.log, 'low preset: every kneeling primitive figure keeps a uniform scale' and 'low preset: no kneeling primitive's drawn hand sinks into the ground' FAIL with census `{"figures":20,"skinnedFigures":0,"kneeling":0,...}`; the census (`scripts/verify/polish-villagers.mjs` ~6310) samples one instant 8 frames after `setDetailLevel('low')` and requires `kneeling > 0`. Other village-walk runs of 21.11.2026 passed it.
   Source: render-verify-guard held the red unexplained, 22.11.2026 08:08 UTC (CLAUDE.md §2: a held red is a real blockade of the render gate). Related: 1301, 1447, 1566.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1574. Landing chain does not expire a landed point's render charge
+  Final state: `node scripts/land-point.mjs <N>` removes point N's entry from `scripts/render-verify-charges.mjs` in its tick commit (or the unit test 'charges only points the work order still holds OPEN' tolerates a charge of the point being ticked), so a landing of a point with a charge entry pushes green without a hand repair.
+  Observed problem: land-point 1566 (22.11.2026 20:58) failed at push: the pre-push unit gate's 'charges only points the work order still holds OPEN' test went red because `scripts/render-verify-charges.mjs` still held the 1566 entry; repaired by hand in 34b8d1f1f, board and cleanup then done by hand. Every landing of a charged point repeats this red push.
+  Test: Vitest case: ticking a charged point leaves no charge for it and the open-points test stays green.
+  Source: agent finding of 22.11.2026 20:21 UTC via the findings carrier; real blockade of the landing chain (CLAUDE.md §2 finding intake). Related: 1566.
+  Bundle: Session- & Repo-Hygiene.

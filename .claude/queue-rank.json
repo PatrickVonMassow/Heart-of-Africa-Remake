@@ -833,12 +833,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1566": {
-      "at": "2026-11-21T13:59:22.608Z",
-      "why": "split from 1447; continues the leak hunt right after 1447 lands",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1568": {
       "at": "2026-11-21T12:54:14.777Z",
       "why": "user-approved request 21.11.2026: closes the split-rule false approval that misplaced 1566",
@@ -874,6 +868,12 @@
       "why": "split from 1566 (third review round of its leak detector)",
       "origin": "machine",
       "place": "ahead"
+    },
+    "1574": {
+      "at": "2026-11-22T20:29:08.857Z",
+      "why": "hits only landings of a charged point and has a known one-line hand repair; no charged point is in flight",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -884,7 +884,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-22T18:02:33.453Z",
+    "at": "2026-11-22T20:29:08.860Z",
     "points": [
       184,
       200,
@@ -1072,13 +1072,13 @@
       1563,
       1564,
       1565,
-      1566,
       1568,
       1569,
       1570,
       1571,
       1572,
-      1573
+      1573,
+      1574
     ]
   }
 }
