@@ -5324,3 +5324,17 @@ put it is the mistake this line exists to stop.
   Observed problem: on feat/1447-settlement-visit-release (e79992b5f, dirty), WebGPU, local/verify-logs/2026-11-21T21-33-28-761-polish-villagers.log, 'low preset: every kneeling primitive figure keeps a uniform scale' and 'low preset: no kneeling primitive's drawn hand sinks into the ground' FAIL with census `{"figures":20,"skinnedFigures":0,"kneeling":0,...}`; the census (`scripts/verify/polish-villagers.mjs` ~6310) samples one instant 8 frames after `setDetailLevel('low')` and requires `kneeling > 0`. Other village-walk runs of 21.11.2026 passed it.
   Source: render-verify-guard held the red unexplained, 22.11.2026 08:08 UTC (CLAUDE.md §2: a held red is a real blockade of the render gate). Related: 1301, 1447, 1566.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1574. Landing chain does not expire a landed point's render charge
+  Final state: `node scripts/land-point.mjs <N>` removes point N's entry from `scripts/render-verify-charges.mjs` in its tick commit (or the unit test 'charges only points the work order still holds OPEN' tolerates a charge of the point being ticked), so a landing of a point with a charge entry pushes green without a hand repair.
+  Observed problem: land-point 1566 (22.11.2026 20:58) failed at push: the pre-push unit gate's 'charges only points the work order still holds OPEN' test went red because `scripts/render-verify-charges.mjs` still held the 1566 entry; repaired by hand in 34b8d1f1f, board and cleanup then done by hand. Every landing of a charged point repeats this red push.
+  Test: Vitest case: ticking a charged point leaves no charge for it and the open-points test stays green.
+  Source: agent finding of 22.11.2026 20:21 UTC via the findings carrier; real blockade of the landing chain (CLAUDE.md §2 finding intake). Related: 1566.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1575. Walker-dust visibility check reds in the full polish-settlement pass while its section run is green
+  Final state: `polish-settlement` judges walker-dust visibility against a still scene in the full pass as in its section run (the OFF-vs-OFF noise floor stays at the section level, or the comparison is made noise-robust), so the check reds only when the dust is actually invisible; the cause of the full-pass noise is named.
+  Observed problem: full WebGPU pass on feat/1573 86d1f7296 (local/verify-logs/2026-11-22T21-30-21-089-polish-settlement.log): 'the dust is visible' FAIL, ON-vs-OFF 10.12 against OFF-vs-OFF 8.79 mean |ΔRGB| — the OFF-vs-OFF floor shows the scene was not still. `--section=walker-dust` then passed on main 0d8638c33 (2026-11-22T22-31-56-885) and on the same branch head 86d1f7296 (2026-11-22T22-34-39-610); 1573 changes only the DEV leak judge and its report.
+  Test: the full-pass walker-dust block records its OFF-vs-OFF floor; a unit or section case pins the noise-robust comparison.
+  Source: agent finding of 22.11.2026 22:07 UTC via the findings carrier; a red that holds landings (CLAUDE.md §2 finding intake). Related: 358, 1573.
+  Bundle: Session- & Repo-Hygiene.
