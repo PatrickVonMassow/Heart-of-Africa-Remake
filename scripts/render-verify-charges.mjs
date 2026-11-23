@@ -1611,10 +1611,12 @@ export const RED_CHARGES = [
     // characters; a bambara (bank round) or cairo red, or a record written
     // before that change, stays UNACCOUNTED.
     // THE MARGIN IS FOUR CHARACTERS, not a wide one: at the measured field
-    // widths the signature ends (`traced.`) at character 196 of 200. A wider
-    // numeric field (a five-digit window count, a three-digit traced total)
-    // pushes it past the cut, the stored prefix no longer matches, and that
-    // red stays UNACCOUNTED — the fail-safe direction, deliberately not widened.
+    // widths the signature ends (`traced.`) at character 196 of 200, and the
+    // cut falls after the following ` In `. One wider field alone still fits
+    // (a five-digit window count moves the end to 197); only when the numeric
+    // fields together grow by MORE THAN FOUR characters does the signature pass
+    // the cut, the stored prefix no longer match, and that red stay
+    // UNACCOUNTED — the fail-safe direction, deliberately not widened.
     // The WebGPU compatibility sibling was REMOVED (cross-vendor review of
     // 1169, round 4): no compatibility red AT maasai-village is recorded, so a
     // WebGPU red of this check is a real red until one is measured.
@@ -1627,13 +1629,17 @@ export const RED_CHARGES = [
       + '0.00 % — a child that treads inside a second but never inside half of one. The retry passed '
       + 'with 207 checks, so the run was recorded SUSPECT and covered no backend, which is what left '
       + 'the WebGL 2 picture lane without a covering run. '
-      + 'IT DECLARES detailReadsPrefix, because this measurement is cut at the 200-character bound: '
-      + 'the record keeps everything up to the words "In 0.5s bursts: worst" and no further. WHAT '
+      + 'IT DECLARES detailReadsPrefix, because this measurement is cut at the 200-character bound. '
+      + 'The historical record, written without a place prefix, keeps everything up to the words '
+      + '"In 0.5s bursts: worst" and no further; with the `at maasai-village: ` prefix the same '
+      + 'numbers are cut 19 characters earlier, right after "traced. In ". WHAT '
       + 'THE BOUND REMOVES is the burst series and the constant threshold sentence the check always '
       + 'prints. The signature stops after the judgeability reading, clear of the bound by four '
       + 'characters only: since the `at maasai-village: ` prefix (23.11.2026) it ends at character 196 '
-      + 'of 200 at the measured field widths, so a wider numeric field pushes it past the cut and '
-      + 'leaves such a red UNACCOUNTED — the fail-safe direction; the matcher is not widened for it. It '
+      + 'of 200 at the measured field widths. One wider field alone still fits (a five-digit window '
+      + 'count ends it at 197); only numeric fields that grow by more than four characters in total '
+      + 'push it past the cut and leave such a red UNACCOUNTED — the fail-safe direction; the matcher '
+      + 'is not widened for it. It '
       + 'reads only numbers the record really holds: the one-second group share (under 0.2 % since '
       + 'the third measurement below), its window count, and the judgeability shares. A sustained '
       + 'tread — a larger group share — is a different composition and stays a real red. The '
