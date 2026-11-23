@@ -729,4 +729,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: a61210f9bfdbcd811e3fb9b0062dafe4d13d119e1be5cc3a4975a3ccfcc91e13 -->
+<!-- GUIDE-FINGERPRINT: f372c486ee2cac0e8c5c5f6830ab4f7adb3f660095d647e0ccd6b43a4ddd7866 -->
