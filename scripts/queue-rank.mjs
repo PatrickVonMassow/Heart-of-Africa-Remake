@@ -99,6 +99,7 @@ function writeRankRecord(record, open, tasksMd) {
     closed,
     blocked,
     bodies: openPointBodies(tasksMd),
+    releasePoint: RELEASE_TAG_POINT,
   })
   const next = settled.changed ? settled.record : pruneRankRecord(record, open)
   writeTextAtomic(RECORD, `${JSON.stringify(next, null, 2)}\n`)
@@ -282,7 +283,7 @@ if (isMainModule(import.meta.url) && wantsHelp(process.argv.slice(2))) {
       // right" is refused, with the remedy, before anything is written.
       if (!ahead) {
         const body = openPointBodies(tasksMd)[point]
-        const kind = splitPriorityOf(body, normaliseRankRecord(record).ranked, { open })
+        const kind = splitPriorityOf(body, normaliseRankRecord(record).ranked, { open, releasePoint: RELEASE_TAG_POINT })
         if (kind !== SPLIT_NONE) {
           throw new Error(splitPriorityMessage([{ point, kind, parent: splitParentOf(body) }]))
         }
@@ -302,7 +303,7 @@ if (isMainModule(import.meta.url) && wantsHelp(process.argv.slice(2))) {
       )
       // The record does not move the block: a split still standing outside the
       // leading run stays held, and the command says so (point 1551).
-      const held = appendGateState(open, next, { bodies: openPointBodies(tasksMd) }).splitHeld.filter(
+      const held = appendGateState(open, next, { bodies: openPointBodies(tasksMd), releasePoint: RELEASE_TAG_POINT }).splitHeld.filter(
         (h) => h.point === point,
       )
       if (held.length) {
@@ -402,7 +403,7 @@ if (isMainModule(import.meta.url) && wantsHelp(process.argv.slice(2))) {
         )
       }
     } else {
-      const state = appendGateState(open, record, { bodies: openPointBodies(tasksMd) })
+      const state = appendGateState(open, record, { bodies: openPointBodies(tasksMd), releasePoint: RELEASE_TAG_POINT })
       if (state.state === 'unarmed') {
         console.log(`queue-rank: no baseline recorded — nothing says which of the ${open.length} open point(s) are new.`)
         console.log(`  Arm it once, for the whole order at once: ${SEED_CMD}`)

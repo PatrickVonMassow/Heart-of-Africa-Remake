@@ -557,12 +557,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1447": {
-      "at": "2026-10-25T06:49:14.530Z",
-      "why": "1446's fresh-page staging unblocks the suite; the leak fix is real player impact but not blocking, so it waits behind the open front of the queue",
-      "origin": "machine",
-      "place": "last"
-    },
     "1449": {
       "at": "2026-10-26T04:13:03.990Z",
       "why": "a suite red with no reported player sighting; it waits behind the user-reported points, its charge keeps the guard honest meanwhile",
@@ -838,6 +832,48 @@
       "why": "re-measure first on a quiet machine; no player-blocking urgency ahead of the bundle front",
       "origin": "machine",
       "place": "last"
+    },
+    "1568": {
+      "at": "2026-11-21T12:54:14.777Z",
+      "why": "user-approved request 21.11.2026: closes the split-rule false approval that misplaced 1566",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "1569": {
+      "at": "2026-11-21T13:48:09.955Z",
+      "why": "guard deadlock with a known escape (hand edit of the board); tail of the hygiene bundle is right",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1570": {
+      "at": "2026-11-21T22:59:29.377Z",
+      "why": "WebGL-2-only residual of 1447; CLAUDE.md 7.2 lets WebGL-2-only defects wait, WebGPU meets the bound",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1571": {
+      "at": "2026-11-22T07:07:27.960Z",
+      "why": "a pre-existing suite red with no reported player sighting; it waits behind the user-reported points, its charge keeps the render gate honest meanwhile",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1572": {
+      "at": "2026-11-22T08:08:45.337Z",
+      "why": "test-robustness fix of one check; it blocks no landing while charged, so it waits behind the player-facing points",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1574": {
+      "at": "2026-11-22T20:29:08.857Z",
+      "why": "hits only landings of a charged point and has a known one-line hand repair; no charged point is in flight",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1575": {
+      "at": "2026-11-22T22:38:54.551Z",
+      "why": "a test-noise red already charged in the ledger; it holds no landing now, so it waits behind the open hygiene points",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -848,7 +884,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-21T03:20:45.069Z",
+    "at": "2026-11-22T23:35:31.026Z",
     "points": [
       184,
       200,
@@ -990,7 +1026,6 @@
       1428,
       1434,
       1435,
-      1447,
       1449,
       1453,
       1457,
@@ -1036,7 +1071,14 @@
       1553,
       1563,
       1564,
-      1565
+      1565,
+      1568,
+      1569,
+      1570,
+      1571,
+      1572,
+      1574,
+      1575
     ]
   }
 }

@@ -1,0 +1,428 @@
+// The live half of the point-1447 return/hop judgements, driven through the
+// armed watch itself: the store transitions, the rAF settle loop and the
+// renderer counters, with a fake renderer and a hand-cranked frame clock.
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+
+interface Fake {
+  info: { memory: { renderTargets: number; textures: number }; memoryMap?: Map<object, unknown> }
+  _pipelines: { caches: { size: number } } | undefined
+  backend: { isWebGPUBackend: boolean }
+}
+
+let frames: FrameRequestCallback[] = []
+/** The panorama capture's target allocation, a signature lever outside the stores. */
+let panoramaAllocated = false
+
+async function harness(webgpu = true) {
+  vi.resetModules()
+  vi.doMock('../scenes/travel/panoramaCapture', async (original) => ({
+    ...(await original<typeof import('../scenes/travel/panoramaCapture')>()),
+    panoramaCaptureTargetsAllocated: () => panoramaAllocated,
+  }))
+  delete (window as unknown as Record<string, unknown>).__renderLeakArmed
+  ;(window as unknown as { __assertLog?: unknown[] }).__assertLog = []
+  const { useGame } = await import('../state/store')
+  const { useUi } = await import('../state/ui')
+  const { setRenderContext } = await import('./renderContext')
+  const leak = await import('./renderLeak')
+  const gl: Fake = {
+    info: { memory: { renderTargets: 20, textures: 75 } },
+    _pipelines: { caches: { size: 60 } },
+    backend: { isWebGPUBackend: webgpu },
+  }
+  setRenderContext({ gl, scene: null, camera: null, clock: null } as never)
+  useGame.setState({ mode: 'travel', placeId: null })
+  leak.armRenderLeakWatch()
+  const tick = (n = 80, each?: () => void) => {
+    for (let i = 0; i < n; i++) {
+      each?.()
+      const due = frames
+      frames = []
+      for (const cb of due) cb(0)
+    }
+  }
+  const go = (mode: 'travel' | 'place', placeId: string | null = null) => useGame.setState({ mode, placeId })
+  const asserts = () =>
+    ((window as unknown as { __assertLog?: Array<{ code: string }> }).__assertLog ?? []).map((e) => e.code)
+  const state = () =>
+    (window as unknown as { __renderLeak: { state: () => Record<string, { history: unknown[] }> } }).__renderLeak.state()
+  tick()
+  return { gl, go, tick, asserts, state, useUi }
+}
+
+beforeEach(() => {
+  frames = []
+  panoramaAllocated = false
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => frames.push(cb))
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+})
+
+afterEach(() => {
+  delete (window as unknown as Record<string, unknown>).__shaderPipelines
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
+
+describe('render leak watch, live', () => {
+  it('ends a hop chain on the bird\'s-eye view: per-trip hop growth that every exit frees never adds up', async () => {
+    const h = await harness()
+    for (let trip = 0; trip < 4; trip++) {
+      h.go('place', 'a')
+      h.gl.info.memory.textures = 100
+      h.tick()
+      h.go('place', 'b') // a walk straight on: +15 legitimate textures
+      h.gl.info.memory.textures = 115
+      h.tick()
+      h.go('travel')
+      h.gl.info.memory.textures = 75 // the exit frees everything
+      h.tick()
+    }
+    expect(h.state().placeHop.history).toHaveLength(4)
+    expect(h.asserts()).not.toContain('render-place-hop-leak')
+  })
+
+  it('still judges the texture return when the pipeline counter is unreadable', async () => {
+    const h = await harness()
+    h.gl._pipelines = undefined
+    h.go('place', 'a')
+    h.gl.info.memory.textures = 120
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75 + 30 // the visit left 30 textures behind
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(1)
+    expect(h.state().textureReturn.history[0]).toMatchObject({ verdict: 'leak' })
+    expect(h.asserts()).toContain('render-texture-return-leak')
+  })
+
+  it('takes no texture entry while the bird\'s-eye textures still stream at departure', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75
+    h.tick(30, () => {
+      h.gl.info.memory.textures++ // uploads still landing when the player leaves
+    })
+    h.go('place', 'b')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 105 + 10 // the pending uploads landed; nothing left behind
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(0)
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
+  it('takes the texture entry from the settled bird\'s-eye count when it reads back unchanged at departure', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 80
+    h.tick() // the bird's-eye view settles at 80
+    h.go('place', 'b')
+    h.gl.info.memory.textures = 110
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 80 // back where it settled: nothing left behind
+    h.tick()
+    expect(h.state().textureReturn.history.at(-1)).toMatchObject({ entry: 80, back: 80, verdict: 'ok' })
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
+  it('takes no texture entry from a dip at departure that follows resumed streaming', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 80
+    h.tick() // settles at 80; streaming then resumes up to 100 with no watch running
+    h.gl.info.memory.textures = 79 // and dips just below the settle at departure
+    h.go('place', 'b')
+    h.gl.info.memory.textures = 110
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 100 // the resumed stream, not the visit
+    h.tick()
+    // only the first trip (entry 75) is judged; the second has no entry
+    expect(h.state().textureReturn.history).toHaveLength(1)
+    expect(h.state().textureReturn.history[0]).toMatchObject({ entry: 75 })
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
+  it('takes no texture entry when the count is unreadable at departure', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 80
+    h.tick() // settles at 80
+    const memory = h.gl.info.memory
+    delete (h.gl.info as { memory?: unknown }).memory // the departure read fails
+    h.go('place', 'b')
+    h.gl.info.memory = { ...memory, textures: 110 }
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 100
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(1)
+    expect(h.state().textureReturn.history[0]).toMatchObject({ entry: 75 })
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
+  it('names the texture kinds a hop grew against the same setup\'s earlier census', async () => {
+    const h = await harness()
+    const tex = (name: string) => ({ isTexture: true, name, image: { width: 1, height: 1 } })
+    const census = (...names: string[]) => (h.gl.info.memoryMap = new Map(names.map((n) => [tex(n), 4] as [object, unknown])))
+    census('m')
+    h.go('place', 'a')
+    h.tick() // medium chain starts at a
+    census('l', 'l', 'l')
+    h.useUi.setState({ detailLevel: 'low' })
+    h.tick() // low setup at a: another resident set
+    h.go('place', 'b')
+    h.tick() // low chain hop a -> b
+    census('m', 'n', 'n')
+    h.useUi.setState({ detailLevel: 'medium' })
+    h.tick() // medium chain hop a -> b, against medium at a
+    const last = h.state().placeHop.history.at(-1) as { setup: string; grew: string }
+    expect(last.setup).toMatch(/^medium/)
+    expect(last.grew).toBe('Object 1x1 "n" +2')
+  })
+
+  it('names no texture growth on a pipelines-only hop and keeps the texture baseline across it', async () => {
+    const h = await harness()
+    const tex = (name: string) => ({ isTexture: true, name, image: { width: 1, height: 1 } })
+    const census = (...names: string[]) => (h.gl.info.memoryMap = new Map(names.map((n) => [tex(n), 4] as [object, unknown])))
+    census('m')
+    h.go('place', 'a')
+    h.tick() // texture-settled at a
+    census('m', 'n', 'n')
+    h.go('place', 'b')
+    h.tick(80, () => h.gl.info.memory.textures++) // textures keep streaming at b
+    census('m', 'n', 'n', 'n')
+    h.go('place', 'c') // leaving b mid-stream: a pipelines-only hop a -> b
+    h.tick()
+    const [ab, bc] = h.state().placeHop.history.slice(-2) as Array<{ placeId: string; grew: string; delta: { textures: number | null } }>
+    expect(ab).toMatchObject({ grew: 'no texture reading', delta: { textures: null } })
+    // c's textures compare against a, the last texture-settled place, census included
+    expect(bc.grew).toBe('Object 1x1 "n" +3')
+    expect(bc.delta.textures).toBe(155 - 75) // c settles at b's last streaming count, against a's 75
+  })
+
+  it('takes no texture entry when streaming resumed after the bird\'s-eye view settled', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75
+    h.tick() // settled at 75, the watch ends
+    h.gl.info.memory.textures = 85 // uploads resume under the same signature: no new watch
+    h.go('place', 'b')
+    h.gl.info.memory.textures = 115
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 85 // back at the departure count: nothing left behind
+    h.tick()
+    // only the first visit, entered from a settled count, is judged
+    expect(h.state().textureReturn.history).toEqual([expect.objectContaining({ entry: 75, back: 75 })])
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+    // the pipelines leg still judges that return
+    expect(h.state().pipelines.history).toHaveLength(2)
+  })
+
+  it('takes no texture entry when a signature lever changed between the settle and the departure', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75
+    h.tick() // settled under the signature without panorama targets
+    panoramaAllocated = true // the capture takes its targets outside any store change
+    // read back unchanged at departure: only the signature guard can refuse it
+    h.go('place', 'b')
+    h.gl.info.memory.textures = 110
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75 + 9 // the capture's resident set, compared under its own signature
+    h.tick()
+    const s = h.state() as unknown as { textureReturn: { history: unknown[] }; history: Array<{ signature: string }> }
+    expect(s.history.at(-1)?.signature).toMatch(/^travel\|/)
+    expect(s.textureReturn.history).toEqual([expect.objectContaining({ entry: 75, back: 75 })])
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+  })
+
+  it('takes no texture entry while shaders compile at departure', async () => {
+    const h = await harness()
+    let busy = true
+    ;(window as unknown as Record<string, unknown>).__shaderPipelines = () => ({ pending: busy ? 1 : 0, queued: 0 })
+    h.go('place', 'a')
+    busy = false
+    h.gl.info.memory.textures = 75 + 12 // the compile's uploads land in the place
+    h.tick()
+    h.go('travel')
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(0)
+  })
+
+  it('compares a return only with an entry under the same bird\'s-eye signature', async () => {
+    const h = await harness()
+    const level = h.useUi.getState().detailLevel
+    h.go('place', 'a')
+    h.tick()
+    h.useUi.getState().setDetailLevel(level === 'high' ? 'low' : 'high') // a graphics change mid-visit
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 75 + 30 // a different resident set, legitimately
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(0)
+    expect(h.asserts()).not.toContain('render-texture-return-leak')
+    // the next visit under one signature is judged again
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl.info.memory.textures = 105 + 30
+    h.tick()
+    expect(h.state().textureReturn.history).toHaveLength(1)
+    expect(h.state().textureReturn.history[0]).toMatchObject({ verdict: 'leak' })
+    expect(h.asserts()).toContain('render-texture-return-leak')
+  })
+
+  it('judges a hop on the texture count once it has settled, not while the place still builds', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.gl.info.memory.textures = 60
+    // render targets stand still at once; the place's textures climb for 40 frames
+    h.tick(100, () => {
+      if (h.gl.info.memory.textures < 100) h.gl.info.memory.textures++
+    })
+    h.go('place', 'b')
+    h.gl.info.memory.textures = 110
+    h.tick()
+    const hops = h.state().placeHop.history as Array<{ delta: { textures: number } }>
+    expect(hops).toHaveLength(1)
+    expect(hops[0].delta.textures).toBe(10)
+    expect(h.asserts()).not.toContain('render-place-hop-leak')
+  })
+
+  it('still judges a hop on pipelines when the next place\'s textures never settle', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('place', 'b')
+    h.gl._pipelines!.caches.size += 90 // the hop left its pipelines behind
+    // render targets stand; the textures stream for the whole watch
+    h.tick(700, () => {
+      h.gl.info.memory.textures++
+    })
+    const hops = h.state().placeHop.history as Array<{ delta: { textures: number | null; pipelines: number | null } }>
+    expect(hops).toHaveLength(1)
+    expect(hops[0].delta).toEqual({ textures: null, pipelines: 90 })
+    expect(h.asserts()).toContain('render-place-hop-leak')
+  })
+
+  it('reports but does not assert a pipelines hop on WebGL 2 (point 1570 owns that drift)', async () => {
+    const h = await harness(false)
+    h.go('place', 'a')
+    h.tick()
+    h.go('place', 'b')
+    h.gl._pipelines!.caches.size += 90
+    h.tick()
+    const hops = h.state().placeHop.history as Array<{ verdict: string; delta: { pipelines: number | null } }>
+    expect(hops).toHaveLength(1)
+    expect(hops[0]).toMatchObject({ verdict: 'ok', delta: { pipelines: 90 } })
+    expect(h.asserts()).not.toContain('render-place-hop-leak')
+  })
+
+  it('judges a hop on pipelines when the player moves on while the place\'s textures still stream', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('place', 'b')
+    h.gl._pipelines!.caches.size += 90 // the hop left its pipelines behind
+    // render targets stand at once; textures stream until the player leaves at frame 80
+    h.tick(80, () => {
+      h.gl.info.memory.textures++
+    })
+    h.go('place', 'c')
+    h.tick()
+    const hops = h.state().placeHop.history as Array<{ from: string; to: string; delta: { textures: number | null; pipelines: number | null } }>
+    expect(hops[0]).toMatchObject({ from: 'a', to: 'b', delta: { textures: null, pipelines: 90 } })
+    expect(h.asserts()).toContain('render-place-hop-leak')
+  })
+
+  it('judges a return on pipelines when the player leaves the bird\'s-eye view while its textures still stream', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.gl._pipelines!.caches.size += 200 // the visit left its pipelines behind
+    h.tick(80, () => {
+      h.gl.info.memory.textures++
+    })
+    h.go('place', 'b') // the next visit's entry is recorded after the old return closed
+    h.tick()
+    expect(h.state().pipelines.history).toHaveLength(1)
+    expect(h.asserts()).toContain('render-pipeline-leak')
+    const entry = h.gl._pipelines!.caches.size
+    h.gl._pipelines!.caches.size += 5
+    h.go('travel')
+    h.tick()
+    const returns = h.state().pipelines.history as Array<{ entry: number; back: number }>
+    expect(returns).toHaveLength(2)
+    expect(returns[1]).toMatchObject({ entry, back: entry + 5 })
+  })
+
+  for (const webgpu of [true, false]) {
+    const backend = webgpu ? 'WebGPU' : 'WebGL 2'
+
+    it(`flags a texture-only hop once a busy shader compiler goes idle (${backend})`, async () => {
+      const h = await harness(webgpu)
+      let busy = false
+      ;(window as unknown as Record<string, unknown>).__shaderPipelines = () => ({ pending: busy ? 2 : 0, queued: busy ? 3 : 0 })
+      h.go('place', 'a')
+      h.gl.info.memory.textures = 100
+      h.tick()
+      h.go('place', 'b')
+      busy = true // an over-bound count that stands still under the compile is not a settled reading
+      h.gl.info.memory.textures = 160
+      h.tick(60)
+      expect(h.state().placeHop.history).toHaveLength(0)
+      expect(h.asserts()).not.toContain('render-place-hop-leak')
+      busy = false
+      h.gl.info.memory.textures = 130 // its uploads land once the pipelines are ready
+      h.tick()
+      const hops = h.state().placeHop.history as Array<{ verdict: string; counter?: string; delta: { textures: number | null; pipelines: number | null } }>
+      expect(hops).toHaveLength(1)
+      expect(hops[0]).toMatchObject({ verdict: 'leak', counter: 'textures', delta: { textures: 30, pipelines: 0 } })
+      expect(h.asserts()).toContain('render-place-hop-leak')
+    })
+
+    it(`flags a texture-only return (${backend})`, async () => {
+      const h = await harness(webgpu)
+      h.go('place', 'a')
+      h.gl.info.memory.textures = 120
+      h.tick()
+      h.go('travel')
+      h.gl.info.memory.textures = 75 + 12 // the visit left 12 textures behind, no pipelines
+      h.tick()
+      const returns = h.state().textureReturn.history as Array<{ verdict: string; delta: number }>
+      expect(returns).toEqual([expect.objectContaining({ verdict: 'leak', delta: 12 })])
+      expect(h.state().pipelines.history).toEqual([expect.objectContaining({ verdict: 'ok', delta: 0 })])
+      expect(h.asserts()).toContain('render-texture-return-leak')
+      expect(h.asserts()).not.toContain('render-pipeline-leak')
+    })
+  }
+
+  it('judges a leave and re-entry of the same place in one tick as a hop', async () => {
+    const h = await harness()
+    h.go('place', 'a')
+    h.tick()
+    h.go('travel')
+    h.go('place', 'a') // no frame in between: the bird's-eye view never settles
+    h.gl._pipelines!.caches.size += 90
+    h.tick()
+    expect(h.state().placeHop.history).toHaveLength(1)
+    expect(h.asserts()).toContain('render-place-hop-leak')
+  })
+})

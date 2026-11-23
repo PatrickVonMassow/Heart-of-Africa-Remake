@@ -1,12 +1,10 @@
 import { Suspense, useEffect, useState } from 'react'
 import { Canvas, extend, useThree, type ThreeToJSXElements } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { useGame } from './state/store'
 import { useUi, effectiveDprCap } from './state/ui'
 import { useLocale } from './i18n'
 import { speechAvailable, warmupSpeech } from './journal/speech'
-import { TravelScene } from './scenes/travel/TravelScene'
-import { PlaceScene } from './scenes/place/PlaceScene'
+import { SceneSwitch } from './scenes/SceneSwitch'
 import { Effects } from './render/Effects'
 import { setRenderContext } from './render/renderContext'
 import { describeBackend, startProbeName } from './render/backendInfo'
@@ -48,7 +46,6 @@ function RenderContextBridge() {
 }
 
 export default function App() {
-  const mode = useGame((s) => s.mode)
   // The touch layer (point 84) tightens the HUD and honours the safe-area insets.
   const touchActive = useUi((s) => s.touchActive)
   // Graphics level (design.md §21, F9 / point 276 part B): the low preset caps
@@ -148,7 +145,7 @@ export default function App() {
         >
           <RenderContextBridge />
           <Suspense fallback={null}>
-            {mode === 'travel' ? <TravelScene /> : <PlaceScene />}
+            <SceneSwitch />
             <Effects />
           </Suspense>
         </Canvas>

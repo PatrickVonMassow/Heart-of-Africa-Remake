@@ -6,13 +6,13 @@
 // unmounts — leaving a settlement — and never while one still draws it.
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { act } from 'react'
+import { act, useLayoutEffect } from 'react'
 import * as THREE from 'three/webgpu'
 import { createRoot, extend } from '@react-three/fiber'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { parseVillager, type VillagerAsset } from '../../render/villagerAsset'
 import type { FigureLook } from './placeFigureContext'
-import { SkinnedFigure } from './skinnedFigure'
+import { releaseFigureCaches, SkinnedFigure } from './skinnedFigure'
 
 extend(THREE as unknown as Parameters<typeof extend>[0])
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -65,14 +65,88 @@ describe('shared figure geometry release', () => {
     expect(disposed).toBe(0) // one figure still draws it
 
     await act(async () => root.render(<Stage n={0} />))
-    expect(disposed).toBe(1) // place left: released
+    expect(disposed).toBe(0) // the place sweep owns the GPU release (point 1566)
 
-    // re-entry draws the same cached geometry, released again on the next leave
     await act(async () => root.render(<Stage n={2} />))
     const again = scene.getObjectByName('figure-body') as THREE.SkinnedMesh
     expect(again.geometry).toBe(geo)
-    expect(disposed).toBe(1)
     await act(async () => root.unmount())
-    expect(disposed).toBe(2)
+    expect(disposed).toBe(0)
+  })
+
+  it('never disposes a geometry a figure of the incoming place took in the same commit', async () => {
+    const look: FigureLook = {
+      peopleId: 'bambara',
+      drivers: { coldness: 0, harmattan: 0, karif: 0 },
+      year: 1890,
+      palette: PALETTE,
+      radial: 16,
+      villager: asset,
+    }
+    const scene = new THREE.Group()
+    // a settlement scene: its unmount clears the figure caches (PlaceScene.tsx)
+    const Place = () => {
+      useLayoutEffect(() => () => void releaseFigureCaches(), [])
+      return <SkinnedFigure look={look} cloth={PALETTE[2]} scale={1} sex="female" age="elder" identityKey="hop-probe" />
+    }
+    const Stage = ({ visit }: { visit: number }) => (
+      <primitive object={scene}>
+        <Place key={visit} />
+      </primitive>
+    )
+    const root = createRoot({} as HTMLCanvasElement)
+    const gl = { render() {}, setSize() {}, setPixelRatio() {}, domElement: {} }
+    await root.configure({ gl: gl as never, frameloop: 'never', size: { width: 1, height: 1, top: 0, left: 0 } })
+    await act(async () => root.render(<Stage visit={1} />))
+    const geo = (scene.getObjectByName('figure-body') as THREE.SkinnedMesh).geometry
+    let disposed = 0
+    geo.addEventListener('dispose', () => disposed++)
+    // leave and re-enter in one commit: the incoming figure takes the cached geometry while rendering
+    await act(async () => root.render(<Stage visit={2} />))
+    expect((scene.getObjectByName('figure-body') as THREE.SkinnedMesh).geometry).toBe(geo)
+    expect(disposed).toBe(0)
+    // dropped from the caches meanwhile: its last release frees it
+    await act(async () => root.unmount())
+    expect(disposed).toBe(1)
+  })
+
+  it('frees a geometry the caches dropped once no figure draws it (the traveller outside the place sweep)', async () => {
+    const look: FigureLook = {
+      peopleId: 'bambara',
+      drivers: { coldness: 0, harmattan: 0, karif: 0 },
+      year: 1890,
+      palette: PALETTE,
+      radial: 16,
+      villager: asset,
+    }
+    const scene = new THREE.Group()
+    const Stage = ({ n }: { n: number }) => (
+      <primitive object={scene}>
+        {Array.from({ length: n }, (_, k) => (
+          <SkinnedFigure key={k} look={look} cloth={PALETTE[1]} scale={1} sex="male" age="adult" identityKey="orphan-probe" />
+        ))}
+      </primitive>
+    )
+    const root = createRoot({} as HTMLCanvasElement)
+    const gl = { render() {}, setSize() {}, setPixelRatio() {}, domElement: {} }
+    await root.configure({ gl: gl as never, frameloop: 'never', size: { width: 1, height: 1, top: 0, left: 0 } })
+    await act(async () => root.render(<Stage n={1} />))
+    const geo = (scene.getObjectByName('figure-body') as THREE.SkinnedMesh).geometry
+    let disposed = 0
+    geo.addEventListener('dispose', () => disposed++)
+    releaseFigureCaches() // a settlement unmounted while the traveller still stands
+    expect(disposed).toBe(0)
+    await act(async () => root.render(<Stage n={0} />))
+    expect(disposed).toBe(1) // its last release frees the orphan
+    await act(async () => root.render(<Stage n={1} />))
+    const fresh = (scene.getObjectByName('figure-body') as THREE.SkinnedMesh).geometry
+    expect(fresh).not.toBe(geo) // rebuilt from the emptied caches, never the disposed one
+    await act(async () => root.render(<Stage n={0} />))
+    let freshDisposed = 0
+    fresh.addEventListener('dispose', () => freshDisposed++)
+    releaseFigureCaches() // unused at the clear: freed once the commit is done
+    await Promise.resolve()
+    expect(freshDisposed).toBe(1)
+    await act(async () => root.unmount())
   })
 })
