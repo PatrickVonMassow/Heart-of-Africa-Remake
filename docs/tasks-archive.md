@@ -47740,3 +47740,15 @@ to land than a mechanism that needs a review.
   cornered runner beside the standing chaser, the ex-chaser's U-turn) — check first whether the
   red windows coincide with catches; then the catch steering, not the gate, is the repair.
   Bundle: Dorfleben.
+
+- [x] 1205. The lion does not move on once the elephant-trampling carcass is consumed.
+  PROBLEM, measured 24.09.2026 by the point-312 author: `npm test -- enrichments
+  --section=elephant-trampling` is 13 pass, 1 fail — "Lion moves on once the carcass is consumed"
+  — and the identical red reproduces with the section alone on main b3c0715bf, so it predates 312.
+  FINAL STATE: once the carcass is consumed the lion leaves the site as §19.8 requires (every
+  drama resolves), and the section is green on WebGPU; if the check rather than the lion is wrong,
+  the check is corrected with the measured reason.
+  Criticality: medium — a predator parked at a spent carcass is visible to the player.
+  Test: `npm test -- enrichments --section=elephant-trampling` green; a Vitest case if the leave
+  decision is a pure helper. Refs: src/scenes/travel/Wildlife.tsx, scripts/verify/enrichments.mjs.
+  Bundle: Tierverhalten.
