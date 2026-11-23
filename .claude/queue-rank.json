@@ -341,20 +341,8 @@
       "origin": "machine",
       "place": "last"
     },
-    "1227": {
-      "at": "2026-09-28T10:35:57.213Z",
-      "why": "visible-defect finding from the closing cleanup; its bundle runs after the closing, so last is right",
-      "origin": "machine",
-      "place": "last"
-    },
     "1228": {
       "at": "2026-09-28T10:35:57.317Z",
-      "why": "visible-defect finding from the closing cleanup; its bundle runs after the closing, so last is right",
-      "origin": "machine",
-      "place": "last"
-    },
-    "1229": {
-      "at": "2026-09-28T10:35:57.422Z",
       "why": "visible-defect finding from the closing cleanup; its bundle runs after the closing, so last is right",
       "origin": "machine",
       "place": "last"
@@ -872,7 +860,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-23T15:49:12.251Z",
+    "at": "2026-11-23T18:45:35.544Z",
     "points": [
       184,
       200,
@@ -978,9 +966,7 @@
       1223,
       1224,
       1225,
-      1227,
       1228,
-      1229,
       1236,
       1242,
       1243,
