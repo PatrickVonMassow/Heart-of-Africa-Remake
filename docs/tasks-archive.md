@@ -47763,3 +47763,14 @@ to land than a mechanism that needs a review.
   Test: unit assertion on the column bounds; picture of a rainy settlement on both backends.
   Refs: src/scenes/place/PlaceRain.tsx.
   Bundle: Dorfleben.
+
+- [x] 1229. A predator robbed of its chase victim walks off from where it stands.
+  PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c11.json U5474):
+  the crocodile-steal abort in `Wildlife.tsx` sets `s.lx/s.lz` to the kill-site flank although the
+  predator is still chasing elsewhere, so it visibly teleports.
+  FINAL STATE: the walk-off starts from the predator's current position, like the swim-escape
+  give-up.
+  Criticality: medium — a visible teleport in the panorama.
+  Test: unit case for the steal abort keeping the predator's position.
+  Refs: src/scenes/travel/Wildlife.tsx.
+  Bundle: Tierverhalten.

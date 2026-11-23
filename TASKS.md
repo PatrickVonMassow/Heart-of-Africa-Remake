@@ -107,17 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1229. A predator robbed of its chase victim walks off from where it stands.
-  PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c11.json U5474):
-  the crocodile-steal abort in `Wildlife.tsx` sets `s.lx/s.lz` to the kill-site flank although the
-  predator is still chasing elsewhere, so it visibly teleports.
-  FINAL STATE: the walk-off starts from the predator's current position, like the swim-escape
-  give-up.
-  Criticality: medium — a visible teleport in the panorama.
-  Test: unit case for the steal abort keeping the predator's position.
-  Refs: src/scenes/travel/Wildlife.tsx.
-  Bundle: Tierverhalten.
-
 - [ ] 1269. The tag beat's side-on standpoint search finds every stand occluded
   Source: first measured 02.10.2026 ~19:30 in the WebGL 2 covering run of point 1129 on 001ef76f1
   (`polish-children`, section `tag-catch`, log
