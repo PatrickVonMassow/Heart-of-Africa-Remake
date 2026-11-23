@@ -1578,8 +1578,10 @@ export const RED_CHARGES = [
     kind: 'check',
     match: /^no child walks without getting anywhere$/i,
     // DETAIL-SCOPED to WHAT THE RECORD ACTUALLY HOLDS. The run record cuts the
-    // detail at 200 characters (`detailCut: true`), and the cut falls inside the
-    // words "In 0.5s bursts: worst " — so the burst reading, which is the
+    // detail at 200 characters (`detailCut: true`). HISTORICAL (pre-prefix, before
+    // 23.11.2026): the cut fell inside the words "In 0.5s bursts: worst "; the
+    // current cut is stated in the SETTLEMENT-SCOPED note below. Either way the
+    // burst reading, which is the
     // sharpest discriminator (it stood at 0.00 % while the one-second reading
     // reddened), is NOT in the text a charge can read. The scope is therefore
     // everything the record does hold, spelled out rather than left to a
@@ -1587,8 +1589,9 @@ export const RED_CHARGES = [
     // the judgeability reading. A sustained tread — a group share of 0.2 % or more,
     // or a red without the judgeability line — is a different composition and
     // stays a real red.
-    // READS ONLY THE FRONT, and says so: the record cuts at 200 characters, which
-    // falls inside "In 0.5s bursts: worst ". How far the signature reaches: to
+    // READS ONLY THE FRONT, and says so: the record cuts at 200 characters (in
+    // the HISTORICAL pre-prefix record inside "In 0.5s bursts: worst "; for the
+    // current record see below). How far the signature reaches: to
     // the end of the judgeability reading, i.e. every number the record keeps.
     // Why the tail cannot matter: what follows the cut is the burst series and
     // the printed threshold sentence. The burst series can only make the red
@@ -1612,11 +1615,12 @@ export const RED_CHARGES = [
     // before that change, stays UNACCOUNTED.
     // THE MARGIN IS FOUR CHARACTERS, not a wide one: at the measured field
     // widths the signature ends (`traced.`) at character 196 of 200, and the
-    // cut falls after the following ` In `. One wider field alone still fits
-    // (a five-digit window count moves the end to 197); only when the numeric
-    // fields together grow by MORE THAN FOUR characters does the signature pass
-    // the cut, the stored prefix no longer match, and that red stay
-    // UNACCOUNTED — the fail-safe direction, deliberately not widened.
+    // cut falls after the following ` In `. The limit is FOUR ADDED CHARACTERS
+    // ACROSS ALL numeric fields COMBINED (e.g. a five-digit window count adds one
+    // and ends the signature at 197). Any growth of five or more characters in
+    // total, whether in one field alone or spread over several, pushes
+    // `traced.` past the cut; the stored prefix then no longer matches and that
+    // red stays UNACCOUNTED — the fail-safe direction, deliberately not widened.
     // The WebGPU compatibility sibling was REMOVED (cross-vendor review of
     // 1169, round 4): no compatibility red AT maasai-village is recorded, so a
     // WebGPU red of this check is a real red until one is measured.
@@ -1636,9 +1640,10 @@ export const RED_CHARGES = [
       + 'THE BOUND REMOVES is the burst series and the constant threshold sentence the check always '
       + 'prints. The signature stops after the judgeability reading, clear of the bound by four '
       + 'characters only: since the `at maasai-village: ` prefix (23.11.2026) it ends at character 196 '
-      + 'of 200 at the measured field widths. One wider field alone still fits (a five-digit window '
-      + 'count ends it at 197); only numeric fields that grow by more than four characters in total '
-      + 'push it past the cut and leave such a red UNACCOUNTED — the fail-safe direction; the matcher '
+      + 'of 200 at the measured field widths. The limit is four added characters across all numeric '
+      + 'fields combined (a five-digit window count adds one and ends it at 197); growth of five or '
+      + 'more characters in total, in a single field alone or spread over several, pushes `traced.` '
+      + 'past the cut and leaves such a red UNACCOUNTED — the fail-safe direction; the matcher '
       + 'is not widened for it. It '
       + 'reads only numbers the record really holds: the one-second group share (under 0.2 % since '
       + 'the third measurement below), its window count, and the judgeability shares. A sustained '
