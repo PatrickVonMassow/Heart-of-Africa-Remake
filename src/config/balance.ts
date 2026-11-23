@@ -2972,11 +2972,8 @@ export const balance: BalanceConfig = {
       wordWaitSeconds: 12,
       // Calibratable (work-order 1250): long enough that the boat is seen
       // under way before the word, short enough that a player walking in from
-      // the entrance hears the first DOWNSTREAM within a few seconds. Kept
-      // below the bank round's opening RIVER call (~3.3 s into the visit since
-      // the round speaks ungated): later, the children take the shared speech
-      // floor first and hold the boat's word until ~9.7 s.
-      firstCallSeconds: 2,
+      // the entrance hears the first DOWNSTREAM within a few seconds.
+      firstCallSeconds: 4,
       // A drift net of the middle Niger brings a handful of fish per drift,
       // Nile perch young and tilapia of a hand to a forearm (user 30.09.2026:
       // "recognisable, not stylised").
