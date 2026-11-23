@@ -47752,3 +47752,14 @@ to land than a mechanism that needs a review.
   Test: `npm test -- enrichments --section=elephant-trampling` green; a Vitest case if the leave
   decision is a pure helper. Refs: src/scenes/travel/Wildlife.tsx, scripts/verify/enrichments.mjs.
   Bundle: Tierverhalten.
+
+- [x] 1227. Settlement rain reaches the ground.
+  PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c09.json U4841):
+  `PlaceRain.tsx` places the rain column's base at eye height (1.5 m) with fall in
+  [0, RAIN_HEIGHT), so streaks run from eye height upward and never reach the ground.
+  FINAL STATE: the column is centred on the eye as the comments intend; streaks visibly reach the
+  ground in a settlement.
+  Criticality: medium — visible in every rainy settlement.
+  Test: unit assertion on the column bounds; picture of a rainy settlement on both backends.
+  Refs: src/scenes/place/PlaceRain.tsx.
+  Bundle: Dorfleben.

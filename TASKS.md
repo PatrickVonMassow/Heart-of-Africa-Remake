@@ -107,17 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1227. Settlement rain reaches the ground.
-  PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c09.json U4841):
-  `PlaceRain.tsx` places the rain column's base at eye height (1.5 m) with fall in
-  [0, RAIN_HEIGHT), so streaks run from eye height upward and never reach the ground.
-  FINAL STATE: the column is centred on the eye as the comments intend; streaks visibly reach the
-  ground in a settlement.
-  Criticality: medium — visible in every rainy settlement.
-  Test: unit assertion on the column bounds; picture of a rainy settlement on both backends.
-  Refs: src/scenes/place/PlaceRain.tsx.
-  Bundle: Dorfleben.
-
 - [ ] 1229. A predator robbed of its chase victim walks off from where it stands.
   PROBLEM, found by closing 633's blind cleanup (docs/blind-633/decisions/c11.json U5474):
   the crocodile-steal abort in `Wildlife.tsx` sets `s.lx/s.lz` to the kill-site flank although the
