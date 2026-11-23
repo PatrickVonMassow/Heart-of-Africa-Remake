@@ -5226,13 +5226,11 @@ if (section('villager-dress')) {
       // Diagnostics only: an unreadable load never stops the checks.
       .catch((e) => record('gpu-load', { where, unavailable: String(e?.message ?? e).slice(0, 200) }))
   await gpuLoad('section start')
-  // A FRESH PAGE, AND AGAIN EVERY FEW VILLAGES (point 1446). Every village
-  // visit leaves its pipelines and heap behind (measured: ~40 pipelines and
-  // ~0.6 GB of Chrome's GPU process per village), so after the sections before
-  // this one the full run lost the GPU process around the 16th village. A
-  // reload frees that load; every check below runs as before. Calibratable:
-  // DRESS_REBOOT_EVERY villages per page.
-  const REBOOT_EVERY = Number(process.env.DRESS_REBOOT_EVERY ?? 8)
+  // A FRESH PAGE at the section start (point 1446). The per-village reload that
+  // once freed the leaked pipelines, morph textures and heap is lifted: both are
+  // bounded since points 1447 and 1566, and the dev leak watch pins them.
+  // DRESS_REBOOT_EVERY=<n> restores a reload every n villages for diagnosis.
+  const REBOOT_EVERY = Number(process.env.DRESS_REBOOT_EVERY ?? 0)
   const freshPage = async () => {
     await page.goto(BASE)
     await page.evaluate(() => localStorage.clear())
@@ -5263,13 +5261,19 @@ if (section('villager-dress')) {
   await gpuLoad('fresh page')
   let loadRecorded = false
   for (const [n, people] of PEOPLES.entries()) {
-    if (n > 0 && n % REBOOT_EVERY === 0) {
+    if (REBOOT_EVERY > 0 && n > 0 && n % REBOOT_EVERY === 0) {
       await freshPage()
       await gpuLoad('fresh page')
     }
     await goToPlace(villageOf(people))
     await awaitGltfBody(people)
     await gpuLoad(villageOf(people))
+    // Which texture kinds changed since the last village (point 1447): the
+    // counters say how many textures stay resident, this names them.
+    await page
+      .evaluate(() => window.__renderLeak?.textureKinds?.()?.filter((k) => k.delta !== 0).map((k) => `${k.delta > 0 ? '+' : ''}${k.delta} ${k.kind} =${k.count}`) ?? null)
+      .then((changed) => record('texture-census', { village: villageOf(people), changed }))
+      .catch((e) => record('texture-census', { village: villageOf(people), error: String(e?.message ?? e) }))
     if (!loadRecorded) {
       loadRecorded = true
       await nextFrames(10)

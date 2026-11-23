@@ -760,6 +760,412 @@ describe('the children`s game at the bank (point 687)', () => {
     }
   })
 
+  it('does not carry a boulder trip`s walk home into the next roam', () => {
+    // The descent usually ends after the roam clock ran out, so the cycle opens
+    // before the climber took a step home; the flag must not outlive that roam,
+    // or the child walks a stale trip home in the next one (review, work-order 1169).
+    const cfg: BankConfig = { ...CFG, roamSeconds: 0.1, roamSpread: 0 }
+    const world = openWorld()
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const count = balance.villageLife.tag.childCount
+      const spots = Array.from({ length: count }, (_, i) => ({
+        x: STAGE.roam.x + Math.cos((i / count) * Math.PI * 2) * 2.4,
+        z: STAGE.roam.z + Math.sin((i / count) * Math.PI * 2) * 2.4,
+      }))
+      const s = createBankGame(spots, rand, cfg)
+      let c = s.children[0]
+      let homedAtCycle = false
+      let leftRoam = false
+      let reopened = false
+      for (let t = 0; t < 240 && !reopened; t += 1 / 60) {
+        stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+        if (!leftRoam && s.phase !== 'roam') {
+          leftRoam = true
+          c = s.children.find((k) => k.homing) ?? c
+          homedAtCycle = c.homing
+        } else if (leftRoam && s.phase === 'roam') {
+          reopened = true
+          expect(c.homing).toBe(false)
+        }
+      }
+      expect(homedAtCycle).toBe(true) // the case under test really arose
+      expect(reopened).toBe(true)
+    }
+  })
+
+  it('clears the walk home at the roam`s opening, not by the quarter`s radius', () => {
+    // ISOLATED from `stepRoam`'s radius check (cross-vendor review of 1169): on
+    // the step that reopens the roam, the child stands far OUTSIDE its quarter
+    // with the flag set, so only the reset in `openRoam` can clear it.
+    const cfg: BankConfig = { ...CFG, roamSeconds: 0.1, roamSpread: 0 }
+    const world = openWorld()
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const count = balance.villageLife.tag.childCount
+      const spots = Array.from({ length: count }, (_, i) => ({
+        x: STAGE.roam.x + Math.cos((i / count) * Math.PI * 2) * 2.4,
+        z: STAGE.roam.z + Math.sin((i / count) * Math.PI * 2) * 2.4,
+      }))
+      const s = createBankGame(spots, rand, cfg)
+      const c = s.children[0]
+      let leftRoam = false
+      let checked = false
+      for (let t = 0; t < 240 && !checked; t += 1 / 60) {
+        // The step that will reopen the roam (the same condition `advanceBankGame` tests).
+        const reopens =
+          leftRoam &&
+          s.phase === 'part' &&
+          s.seriesPlayed >= cfg.seriesCycles &&
+          s.endFor <= 0 &&
+          s.phaseFor - 1 / 60 <= 0 &&
+          !s.children.some((k) => k.arrival)
+        if (reopens) {
+          c.x = STAGE.roam.x - STAGE.roam.radius - 6
+          c.z = STAGE.roam.z
+          c.homing = true
+        }
+        stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+        if (s.phase !== 'roam') leftRoam = true
+        else if (reopens) {
+          expect(Math.hypot(c.x - STAGE.roam.x, c.z - STAGE.roam.z)).toBeGreaterThan(STAGE.roam.radius)
+          expect(c.homing).toBe(false)
+          checked = true
+        }
+      }
+      expect(checked).toBe(true) // the reopening step really was reached
+    }
+  })
+
+  it('walks a homing child from outside its quarter back into it', () => {
+    // OBSERVABLE RETURN, not the flag (cross-vendor review of 1169): a child the
+    // boulder took out of its quarter gains ground toward the quarter's centre
+    // at every half second until it stands inside.
+    const cfg: BankConfig = { ...CFG, roamSeconds: 600, roamSpread: 0 }
+    const world = openWorld()
+    const home = STAGE.roam
+    for (const seed of SEEDS) {
+      for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+        const rand = mulberry32(seed)
+        const s = createBankGame(
+          [
+            { x: home.x + Math.sin(angle) * (home.radius + 5), z: home.z + Math.cos(angle) * (home.radius + 5) },
+            { x: home.x + 1, z: home.z - 1 },
+          ],
+          rand,
+          cfg,
+        )
+        // The boulder is settled for this roam, so nobody is sent to it.
+        s.namedBoulder = true
+        const c = s.children[0]
+        c.homing = true
+        const toHome = () => Math.hypot(c.x - home.x, c.z - home.z)
+        let last = toHome()
+        let inside = false
+        // WALKED, NOT PLACED (cross-vendor review of 1169, round 4): no frame
+        // moves the child further than the walking pace carries it, with 5 %
+        // tolerance for the separation's sub-millimetre corrections.
+        const maxStep = cfg.walkPace * (1 / 60) * 1.05
+        // NO STOP ON THE WAY (cross-vendor review of 1169, round 5): once it
+        // has set off, every frame it starts outside its quarter moves it. Only
+        // the first turn on the spot toward home may stand it.
+        let setOff = false
+        // 0.5 s samples, at most 20 s of round clock for 5 m at walking pace.
+        for (let sample = 0; sample < 40 && !inside; sample++) {
+          for (let f = 0; f < 30; f++) {
+            const x0 = c.x
+            const z0 = c.z
+            const wasOutside = toHome() > home.radius
+            stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+            const moved = Math.hypot(c.x - x0, c.z - z0)
+            const at = `seed ${seed}, angle ${angle.toFixed(2)}, sample ${sample}, frame ${f}`
+            expect(moved, at).toBeLessThanOrEqual(maxStep)
+            if (setOff && wasOutside) expect(moved, `${at}: stood on the way home`).toBeGreaterThan(1e-6)
+            if (moved > 1e-6) setOff = true
+          }
+          const now = toHome()
+          expect(now, `seed ${seed}, angle ${angle.toFixed(2)}, sample ${sample}`).toBeLessThan(last)
+          last = now
+          inside = now <= home.radius
+        }
+        expect(inside, `seed ${seed}, angle ${angle.toFixed(2)}`).toBe(true)
+      }
+    }
+  })
+
+  it('turns a failed boulder candidate toward the stone while it walks home', () => {
+    // A ground-level playmate turns toward the naming while it walks (work-order
+    // 1082). A candidate that gave up on its route and is still walking home when
+    // its replacement reaches the top is one of them (cross-vendor review of 1169).
+    const cfg: BankConfig = { ...CFG, roamSeconds: 600, roamSpread: 0 }
+    const world = openWorld()
+    // The quarter lies well away from the stone, so the failed child's walk home
+    // is long enough to overlap the replacement's hold at the top.
+    const stage: BankStage = { ...STAGE, roam: { x: STAGE.boulder.x - 14, z: STAGE.boulder.z, radius: 3 } }
+    const b = stage.boulder
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const s = createBankGame(
+        [
+          { x: b.x + 3, z: b.z },
+          { x: b.x, z: b.z + 4 },
+        ],
+        rand,
+        cfg,
+      )
+      const failed = s.children[0]
+      stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+      expect(s.climber).toBe(0)
+      // FORCED FAILURE: no progress is possible against a best distance of zero,
+      // and the watch has run out.
+      failed.goalX = b.x
+      failed.goalZ = b.z
+      failed.goalFor = cfg.roamGoalSeconds + 1
+      stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+      expect(s.failedClimbers).toEqual([0])
+      expect(failed.homing).toBe(true)
+      const toHome = () => Math.hypot(failed.x - stage.roam.x, failed.z - stage.roam.z)
+      let watchedWalking = 0
+      // EVERY frame of the hold counts (cross-vendor review of 1169, round 4):
+      // a frame in which the child stands while still outside its quarter is a
+      // stop, and fails, instead of being skipped.
+      let stoppedInHold = 0
+      let holdStartHome = NaN
+      let holdEndHome = NaN
+      let holdSeconds = 0
+      let worstLook = 0
+      // WALKED, NOT PLACED (cross-vendor review of 1169, round 5): no frame
+      // carries it further than the walking pace, so a jump cannot stand in for
+      // the ground gained below.
+      const maxStep = cfg.walkPace * (1 / 60) * 1.05
+      for (let t = 0; t < 30 && failed.homing; t += 1 / 60) {
+        const x0 = failed.x
+        const z0 = failed.z
+        const outside = toHome() > stage.roam.radius
+        stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+        expect(Math.hypot(failed.x - x0, failed.z - z0), `seed ${seed}, t ${t.toFixed(2)}`)
+          .toBeLessThanOrEqual(maxStep)
+        const atTop = s.children[1].climb === 'top'
+        if (!(atTop && outside)) continue
+        if (Number.isNaN(holdStartHome)) holdStartHome = Math.hypot(x0 - stage.roam.x, z0 - stage.roam.z)
+        holdEndHome = toHome()
+        holdSeconds += 1 / 60
+        if (Math.hypot(failed.x - x0, failed.z - z0) < 1e-6) stoppedInHold++
+        else watchedWalking++
+        // After the first second (a half turn at `turnRate` takes 0.87 s),
+        // the facing holds on the stone.
+        if (watchedWalking > 60) {
+          const toStone = Math.atan2(b.x - failed.x, b.z - failed.z)
+          const off = Math.abs(Math.atan2(Math.sin(toStone - failed.facing), Math.cos(toStone - failed.facing)))
+          worstLook = Math.max(worstLook, off)
+        }
+      }
+      expect(watchedWalking, `seed ${seed}: the replacement stood on top while the failed child walked home`).toBeGreaterThan(90)
+      expect(stoppedInHold, `seed ${seed}: frames the homing child stood during the hold`).toBe(0)
+      // Real ground gained toward home over the overlap: at least half of what
+      // the walking pace covers in that time.
+      expect(holdStartHome - holdEndHome, `seed ${seed}`).toBeGreaterThan(0.5 * cfg.walkPace * holdSeconds)
+      expect(worstLook, `seed ${seed}`).toBeLessThan(0.2)
+    }
+  })
+
+  it('keeps a homing child walking through the end of a naming hold', () => {
+    // When the hold ends the child still faces the stone, which lies behind its
+    // walk; judged by that facing it would be told to stand and turn back — a
+    // visible stop (cross-vendor review of 1169, round 4). Every frame from the
+    // hold's end until it is inside its quarter must move it.
+    const cfg: BankConfig = { ...CFG, roamSeconds: 600, roamSpread: 0 }
+    const world = openWorld()
+    // Far enough that the walk home outlasts the hold by several seconds.
+    const stage: BankStage = { ...STAGE, roam: { x: STAGE.boulder.x - 22, z: STAGE.boulder.z, radius: 3 } }
+    const b = stage.boulder
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const s = createBankGame([{ x: b.x + 3, z: b.z }, { x: b.x, z: b.z + 4 }], rand, cfg)
+      const failed = s.children[0]
+      stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+      failed.goalX = b.x
+      failed.goalZ = b.z
+      failed.goalFor = cfg.roamGoalSeconds + 1
+      stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+      expect(failed.homing).toBe(true)
+      const outside = () => Math.hypot(failed.x - stage.roam.x, failed.z - stage.roam.z) > stage.roam.radius
+      let wasTop = false
+      let holdEnded = false
+      let afterHold = 0
+      let stopped = 0
+      // Every frame is bounded by the walking pace, and the walk ends INSIDE
+      // the quarter, not merely with `homing` cleared (cross-vendor review of
+      // 1169, round 5): a sideways walk or a jump cannot pass.
+      const maxStep = cfg.walkPace * (1 / 60) * 1.05
+      for (let t = 0; t < 30 && failed.homing; t += 1 / 60) {
+        const x0 = failed.x
+        const z0 = failed.z
+        const wasOutside = outside()
+        stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+        expect(Math.hypot(failed.x - x0, failed.z - z0), `seed ${seed}, t ${t.toFixed(2)}`)
+          .toBeLessThanOrEqual(maxStep)
+        const atTop = s.children[1].climb === 'top'
+        if (wasTop && !atTop) holdEnded = true
+        wasTop = atTop
+        if (!holdEnded || !wasOutside) continue
+        afterHold++
+        if (Math.hypot(failed.x - x0, failed.z - z0) < 1e-6) stopped++
+      }
+      expect(holdEnded, `seed ${seed}: the hold ended while the child was homing`).toBe(true)
+      expect(afterHold, `seed ${seed}: frames walked outside the quarter after the hold`).toBeGreaterThan(30)
+      expect(stopped, `seed ${seed}: zero-displacement frames after the hold`).toBe(0)
+      expect(outside(), `seed ${seed}: arrived inside its quarter`).toBe(false)
+    }
+  })
+
+  it('keeps a homing child walking when an obstacle deflects its walk past the set-off turn', () => {
+    // An obstacle turned a walking child's heading more than `setOffTurn` away
+    // from its way while its body still faced the way; reading the heading alone
+    // stood it for a frame (cross-vendor review of 1169, round 5). The state a
+    // real deflection leaves is imposed on a child walking home over open
+    // ground: once as a bare deflection, once with the edge commitment
+    // `moveChild` sets for it. Every frame until it stands inside its quarter
+    // must move it, never faster than its walking pace.
+    // A THIRD VARIANT turns the body off the way too (cross-vendor review of
+    // 1169, round 5): with heading AND facing past `setOffTurn`, facing no
+    // longer keeps it walking, so only the edge exemption (`edgeFor > 0`) does.
+    // It must move on the deflected frame and on every frame that starts with
+    // the commitment still running; once that has run out, turning on the spot
+    // is the allowed answer and only the pace bound and the arrival are held.
+    const cfg: BankConfig = { ...CFG, roamSeconds: 600, roamSpread: 0 }
+    const world = openWorld()
+    const home = STAGE.roam
+    const maxStep = cfg.walkPace * (1 / 60) * 1.05
+    for (const seed of SEEDS) {
+      for (const variant of ['bare', 'edge', 'edge-turned'] as const) {
+        const edge = variant !== 'bare'
+        const turned = variant === 'edge-turned'
+        for (const side of [1, -1]) {
+          const rand = mulberry32(seed)
+          const s = createBankGame(
+            [
+              { x: home.x - home.radius - 6, z: home.z },
+              { x: home.x + 1, z: home.z - 1 },
+            ],
+            rand,
+            cfg,
+          )
+          s.namedBoulder = true
+          const c = s.children[0]
+          c.homing = true
+          const label = `seed ${seed}, ${variant}, side ${side}`
+          let deflected = false
+          let inside = false
+          let frames = 0
+          let edgeFrames = 0
+          for (let f = 0; f < 60 * 30 && !inside; f++) {
+            // Once the child walks toward home with its body on the way,
+            // deflect its walk by 110°, past the 90° set-off turn.
+            const toHome = Math.atan2(home.x - c.x, home.z - c.z)
+            const bodyOff = Math.abs(Math.atan2(Math.sin(toHome - c.facing), Math.cos(toHome - c.facing)))
+            if (!deflected && f >= 30 && c.pace > 0 && bodyOff < 0.2) {
+              c.heading = toHome + side * ((110 * Math.PI) / 180)
+              if (turned) c.facing = c.heading
+              if (edge) {
+                c.edgeFor = cfg.edgeSeconds
+                c.edgeSide = side
+              }
+              deflected = true
+            }
+            const x0 = c.x
+            const z0 = c.z
+            const edgeBefore = c.edgeFor
+            if (turned && deflected && edgeBefore > 0) {
+              // The imposed state really is past the set-off turn both ways.
+              const wayNow = Math.atan2(home.x - x0, home.z - z0)
+              const offNow = (a: number) => Math.abs(Math.atan2(Math.sin(wayNow - a), Math.cos(wayNow - a)))
+              if (edgeFrames === 0) {
+                expect(offNow(c.heading), label).toBeGreaterThan(cfg.setOffTurn)
+                expect(offNow(c.facing), label).toBeGreaterThan(cfg.setOffTurn)
+              }
+            }
+            stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+            const moved = Math.hypot(c.x - x0, c.z - z0)
+            expect(moved, `${label}, frame ${f}: walked, not placed`).toBeLessThanOrEqual(maxStep)
+            inside = Math.hypot(c.x - home.x, c.z - home.z) <= home.radius
+            if (!deflected) continue
+            frames++
+            if (!turned || edgeBefore > 0) {
+              expect(moved, `${label}, frame ${f}: stood outside its quarter`).toBeGreaterThan(1e-6)
+            }
+            if (turned && edgeBefore > 0) edgeFrames++
+          }
+          expect(deflected, label).toBe(true)
+          expect(frames, label).toBeGreaterThan(30)
+          if (turned) expect(edgeFrames, `${label}: frames walked on the edge commitment`).toBeGreaterThan(0)
+          expect(inside, `${label}: arrived inside its quarter`).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('walks a homing child round a wall without stopping for its deflections', () => {
+    // The same defect against a REAL obstacle: a wall stands across the way
+    // home, the child slides along it and round its end, and every deflection
+    // past `setOffTurn` stood it for a frame — 70-200 stopped frames per walk
+    // before the fix (cross-vendor review of 1169, round 5). What remains
+    // allowed is ONE deliberate turn on the spot where, the wall passed, the way
+    // lies behind both its walk and its body, and never stop-walk-stop. Each
+    // stopped frame is judged by the state the step STARTED from: it is allowed
+    // only with no edge commitment running and with the heading AND the facing
+    // both past `setOffTurn` from the way (this world has no route planner, so
+    // the way is the quarter's centre).
+    const cfg: BankConfig = { ...CFG, roamSeconds: 600, roamSpread: 0 }
+    const home = STAGE.roam
+    const wx = home.x - home.radius - 2
+    // A wall across the way with short arms toward the child: deflections well
+    // past 90° (measured up to 3.0 rad) as it works round them.
+    const wall = (x: number, z: number) =>
+      (Math.abs(x - wx) < 0.3 && Math.abs(z - home.z) < 2.5) ||
+      (Math.abs(Math.abs(z - home.z) - 2.5) < 0.3 && x > wx - 0.8 && x < wx + 0.3)
+    const world: BankWorld = { ...openWorld(), blocked: wall }
+    const maxStep = cfg.walkPace * (1 / 60) * 1.05
+    for (const seed of SEEDS) {
+      for (const dz of [-1.2, -0.4, 0, 0.5, 1.1]) {
+        const rand = mulberry32(seed)
+        const s = createBankGame([{ x: wx - 2.5, z: home.z + dz }, { x: home.x + 1, z: home.z - 1 }], rand, cfg)
+        s.namedBoulder = true
+        const c = s.children[0]
+        c.homing = true
+        const label = `seed ${seed}, dz ${dz}`
+        let setOff = false
+        let stopRuns = 0
+        let wasStopped = false
+        let inside = false
+        for (let f = 0; f < 60 * 30 && !inside; f++) {
+          const x0 = c.x
+          const z0 = c.z
+          const toHome = Math.atan2(home.x - x0, home.z - z0)
+          const offBefore = (a: number) => Math.abs(Math.atan2(Math.sin(toHome - a), Math.cos(toHome - a)))
+          const headingOff = offBefore(c.heading)
+          const bodyOff = offBefore(c.facing)
+          const edgeBefore = c.edgeFor
+          stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+          const moved = Math.hypot(c.x - x0, c.z - z0)
+          expect(moved, `${label}, frame ${f}: walked, not placed`).toBeLessThanOrEqual(maxStep)
+          inside = Math.hypot(c.x - home.x, c.z - home.z) <= home.radius
+          const stopped = moved < 1e-6
+          if (setOff && stopped) {
+            expect(edgeBefore, `${label}, frame ${f}: stood while going round the wall`).toBeLessThanOrEqual(0)
+            expect(headingOff, `${label}, frame ${f}: stood while its walk led toward the way`).toBeGreaterThan(cfg.setOffTurn)
+            expect(bodyOff, `${label}, frame ${f}: stood while its body faced the way`).toBeGreaterThan(cfg.setOffTurn)
+            if (!wasStopped) stopRuns++
+          }
+          if (!stopped) setOff = true
+          wasStopped = stopped
+        }
+        expect(inside, `${label}: arrived inside its quarter`).toBe(true)
+        expect(stopRuns, `${label}: separate stops after setting off`).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+
   // THE CLIMB ITSELF (work-order 1080). What shipped before this point was a
   // flag: `climbing` went true for 0.35 s while the child stood 2.2 m from the
   // boulder's centre and the view lifted it 0.32 m where it stood. Every

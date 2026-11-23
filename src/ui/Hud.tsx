@@ -352,7 +352,9 @@ function RendererWarning() {
   const t = useStrings()
   const fallback = useUi((s) => s.webglFallback)
   const dismissed = useUi((s) => s.webglWarningDismissed)
-  if (!fallback || dismissed) return null
+  // A lost device supersedes the fallback notice (same anchor, same slot).
+  const lost = useUi((s) => s.deviceLost && !s.deviceLostDismissed)
+  if (!fallback || dismissed || lost) return null
   return (
     <div className="renderer-warning">
       <span>{t.hud.webglFallback}</span>
@@ -374,6 +376,24 @@ function RendererUnavailableNotice() {
     <div className="renderer-warning renderer-unavailable" role="alert">
       <span>{t.hud.rendererUnavailable}</span>
       <button onClick={() => useUi.getState().dismissRendererUnavailable()}>
+        {t.hud.webglFallbackDismiss}
+      </button>
+    </div>
+  )
+}
+
+/** Dismissible notice when the GPU device was lost mid-session
+ *  (src/render/gpuHealth.ts): the picture stopped — never a silent black
+ *  canvas behind a live HUD. */
+function DeviceLostNotice() {
+  const t = useStrings()
+  const lost = useUi((s) => s.deviceLost)
+  const dismissed = useUi((s) => s.deviceLostDismissed)
+  if (!lost || dismissed) return null
+  return (
+    <div className="renderer-warning renderer-device-lost" role="alert">
+      <span>{t.hud.deviceLost}</span>
+      <button onClick={() => useUi.getState().dismissDeviceLost()}>
         {t.hud.webglFallbackDismiss}
       </button>
     </div>
@@ -800,6 +820,7 @@ export function Hud() {
       <SunblindVeil />
       <RendererWarning />
       <RendererUnavailableNotice />
+      <DeviceLostNotice />
       <StartOverlay />
       <VictoryOverlay />
       <DefeatOverlay />

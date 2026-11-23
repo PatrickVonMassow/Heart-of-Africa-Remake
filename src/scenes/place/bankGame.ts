@@ -162,6 +162,8 @@ export interface BankChild extends TagChild {
    *  off-game ROCK utterance, and how long it has been in that stage. */
   climb: ClimbStage
   climbFor: number
+  /** Walking back to the group's quarter after the boulder took it outside. */
+  homing: boolean
   /** How high the child's feet stand above the settlement's ground, in metres.
    *  Zero for everybody who is not on a stone; the scene adds it to the gait's
    *  own body lift, so the game owns the height and the view only draws it. */
@@ -751,6 +753,7 @@ export function createBankGame(
       goalFor: 0,
       climb: 'none' as ClimbStage,
       climbFor: 0,
+      homing: false,
       lift: 0,
       footX: p.x,
       footZ: p.z,
@@ -1225,6 +1228,9 @@ function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
     c.slumped = false
     endClimb(c)
     c.settled = false
+    // A boulder trip's walk home belongs to the roam that sent it: a descent
+    // that ended as the roam timer ran out must not resume it next roam.
+    c.homing = false
   }
   // The approach is resolved against the live world on the first roaming step.
   s.climber = -1
@@ -1462,6 +1468,8 @@ function drive(
   cfg: BankConfig,
   world: BankWorld,
   stopAtGoal = false,
+  /** Walk round the playmates' bodies too, as round a hut (the roaming walk). */
+  roundMates = false,
 ): void {
   const c = s.children[i]
   ageEdge(c, dt)
@@ -1485,8 +1493,10 @@ function drive(
   const desired = headingToward(c.x, c.z, to.x, to.z, c.heading)
   const occupied = obstacles(i, cfg, world)
   const blockedByBody = (x: number, z: number) => !!occupied?.(x, z) ||
-    s.children.some((other, j) => j !== i && other.arrival?.holdFor != null &&
-      dist(other, { x, z }) < world.childRadius * 2)
+    s.children.some((other, j) => j !== i && (
+      (other.arrival?.holdFor != null && dist(other, { x, z }) < world.childRadius * 2) ||
+      // A playmate is a child's own size: its body, not an adult's berth.
+      (roundMates && !onStone(other) && dist(other, { x, z }) < world.childRadius)))
   // Contact has millimetres of tolerance. Walk the final partial step instead
   // of overshooting the solved stand and oscillating across it at low FPS.
   const step = stopAtGoal ? Math.min(c.pace * dt, dist(c, to)) : c.pace * dt
@@ -1556,7 +1566,10 @@ function stepRoam(
     // and when it steps off it takes a fresh heading like any other child that
     // has just finished something.
     if (onStone(c)) {
-      if (stepClimb(s, i, dt, cfg, stage, world)) roamGoal(c, rand)
+      if (stepClimb(s, i, dt, cfg, stage, world)) {
+        roamGoal(c, rand)
+        c.homing = true
+      }
       continue
     }
     const approaching = i === s.climber && !s.namedBoulder
@@ -1591,6 +1604,7 @@ function stepRoam(
         s.abandonedBoulder = s.failedClimbers.length === s.children.length
         clearPath(c)
         roamGoal(c, rand)
+        c.homing = true
       } else {
         // Steered straight at it, deliberately: the boulder is an ORDINARY
         // village stone a few paces off the group's own quarter, not a place the
@@ -1598,7 +1612,7 @@ function stepRoam(
         // gives up on it and the next child tries, which is what the guard's own
         // abandon is for — and the roam overtime bound in advanceBankGame keeps
         // that from holding a cycle.
-        drive(s, i, boulder, false, dt, cfg, world)
+        drive(s, i, boulder, false, dt, cfg, world, false, true)
         continue
       }
     }
@@ -1615,6 +1629,55 @@ function stepRoam(
     // The walk turns INTO either bend at the body's own `turnRate`: set in one
     // frame it flipped the travel up to 176° while the body eased after it, a
     // child walking backwards.
+    // OUTSIDE ITS QUARTER IT WALKS BACK TO THE GROUP, by the way round. Only
+    // the boulder takes a child out there, and it may step down into a sliver
+    // of ground between colliders: the reflection below then aimed it home
+    // straight into the wall, the deflection turned it round, and it paced on
+    // the spot (measured: bambara seed 59, 3.2 % of the climber's minute).
+    // It walks that way straight, steering round its playmates as round a hut —
+    // an eased turn left it probing the walls of the sliver — and where the way
+    // lies behind it, it first turns on the spot rather than walk backwards.
+    // ONLY THE CHILD THE BOULDER TOOK OUT. The separation also leaves ordinary
+    // roamers a hand's breadth past the rim, and sending them home round each
+    // other's bodies froze two of them there while a third walked into them
+    // (measured: bambara seed 35, 1.36 % of a roamer's minute); the reflection
+    // below brings those back on its own.
+    const out = Math.hypot(c.x - stage.roam.x, c.z - stage.roam.z)
+    if (out <= stage.roam.radius) c.homing = false
+    if (c.homing) {
+      const way = wayTo(c, stage.roam, dt, world)
+      const toWay = Math.atan2(way.x - c.x, way.z - c.z)
+      // A child STANDING turns on the spot until its body faces the way, then
+      // sets off. A child already WALKING stops to turn only when the way lies
+      // behind BOTH its walk and its body, and never while it is going round
+      // an obstacle. Either reading alone stopped it for a frame: the facing
+      // when a naming hold ended with its gaze still on the stone, the heading
+      // when an obstacle deflected its walk while its body still faced the way
+      // (cross-vendor review of 1169, rounds 4-5). An edge walk that bends past
+      // `setOffTurn` would otherwise stop, turn back into the obstacle, and be
+      // deflected again: a shuffle on the spot.
+      const off = (a: number) => Math.abs(Math.atan2(Math.sin(toWay - a), Math.cos(toWay - a)))
+      const turnFirst = c.pace > 0
+        ? c.edgeFor <= 0 && off(c.heading) > cfg.setOffTurn && off(c.facing) > cfg.setOffTurn
+        : off(c.facing) > cfg.setOffTurn
+      if (turnFirst) {
+        drive(s, i, null, false, dt, cfg, world)
+        c.facing = turnToward(c.facing, toWay, cfg.turnRate * dt)
+      } else {
+        const facingBefore = c.facing
+        drive(s, i, way, false, dt, cfg, world, false, true)
+        if (watched) {
+          c.facing = turnToward(
+            facingBefore,
+            Math.atan2(stage.boulder.x - c.x, stage.boulder.z - c.z),
+            cfg.turnRate * dt,
+          )
+        }
+      }
+      c.roamHeading = c.heading
+      continue
+    }
+    if (c.path) clearPath(c)
     c.roamHeading += (rand() * 2 - 1) * cfg.roamTurn * dt
     let aim = c.roamHeading
     const bend = (nx: number, nz: number) => {
@@ -1623,7 +1686,6 @@ function stepRoam(
       const toward = dx * nx + dz * nz
       if (toward > 0) aim = Math.atan2(dx - 2 * toward * nx, dz - 2 * toward * nz)
     }
-    const out = Math.hypot(c.x - stage.roam.x, c.z - stage.roam.z)
     if (out > stage.roam.radius * 0.8) bend((c.x - stage.roam.x) / out, (c.z - stage.roam.z) / out)
     // Only a playmate AHEAD of the walk counts: a nearer one behind would mask
     // one coming head-on, and `bend` ignores it anyway.
@@ -1873,7 +1935,11 @@ function stepStations(
       clearPath(c)
       drive(s, i, null, false, dt, cfg, world)
     } else {
-      drive(s, i, wayTo(c, to, dt, world), running, dt, cfg, world, tapping || c.role === 'catcher')
+      // A runner walks round its playmates' bodies on the shuffle between two
+      // runs too, not only on the run down: walking straight at a station past
+      // a settled playmate, it shoved that child backwards at walking pace
+      // (measured: bambara seed 2694999956, 0.56 m).
+      drive(s, i, wayTo(c, to, dt, world), running, dt, cfg, world, tapping || c.role === 'catcher', c.role !== 'catcher')
     }
   }
 }

@@ -35,6 +35,8 @@ import { repoPath } from './repo-paths.mjs'
 import { notify } from './notify.mjs'
 import {
   CONFIRMATION_ACTS,
+  USER_INPUT_ACT,
+  USER_INPUT_DETAIL_FORM,
   clearMarkers,
   gateReport,
   markAnswered,
@@ -52,6 +54,7 @@ const USAGE = [
   'usage:',
   `  node scripts/defer-for-user.mjs <point> --act <${Object.keys(CONFIRMATION_ACTS).join('|')}> --detail "<the concrete act>" --prepared "<the safe prepared state>"`,
   ...Object.entries(CONFIRMATION_ACTS).map(([key, what]) => `      --act ${key}  — ${what}`),
+  `      (--act ${USER_INPUT_ACT} takes --detail ${USER_INPUT_DETAIL_FORM})`,
   '  node scripts/defer-for-user.mjs --self-decide <point> --question "<question>" --decision "<decision>" --evidence "<evidence>" --consequence "<consequence>" --veto-action "<exact action>"',
   '  node scripts/defer-for-user.mjs --migrate',
   '  node scripts/defer-for-user.mjs --clear <point>',
@@ -275,7 +278,8 @@ if (a === '--clear') {
   write(r.text)
   console.log(
     r.wasGated
-      ? `point ${n}: the answer is recorded — it returns to the HEAD of the queue. Remove its "Von dir zu klären" card and rebuild the board: node scripts/board-queue.mjs`
+      ? `point ${n}: the answer is recorded — it returns to the HEAD of the queue. Rebuild the board; its derived "Von dir zu klären" card disappears: node scripts/board-queue.mjs` +
+        (r.wasUserInput ? ' (a user-input answer is a hand-in only — it approves no release, tag or board-contract act)' : '')
       : `point ${n} was not gated; it is marked answered anyway and now sorts to the head of the queue.`,
   )
   process.exit(0)
@@ -323,7 +327,7 @@ await notify(
 console.log(`point ${n} marked AWAITING-CONFIRMATION since ${today()}: ${reason}`)
 if (stranded) console.log('EVERY open point now awaits a true confirmation — there is no next point to move on to.')
 console.log(
-  'Now: add its "Von dir zu klären" card, rebuild the board (node scripts/board-queue.mjs)' +
+  'Now: rebuild the board — its "Von dir zu klären" card is derived from the gate (node scripts/board-queue.mjs)' +
     (stranded ? '.' : ' and continue elsewhere.'),
 )
 console.log('When the answer arrives: node scripts/defer-for-user.mjs --clear ' + n)

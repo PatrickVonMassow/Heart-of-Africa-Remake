@@ -1015,6 +1015,17 @@ interface BalanceConfig {
     /** Lens-flare ghost strength (three/addons LensflareNode over the bloom). */
     ghostIntensity: number
   }
+  /** Climate ground haze (point 1556): the baked noise tile replacing the
+   *  per-fragment 3D fractal noise. */
+  climateHaze: {
+    /** Texels per side of the baked R8 noise tile. */
+    noiseTextureSize: number
+    /** Base-octave noise cells across one tile (world tile = period / 0.13 units). */
+    noiseTilePeriod: number
+    /** Second (cross) sample's drift in noise cells per second, x and y. */
+    crossDriftX: number
+    crossDriftY: number
+  }
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
     weatherStrength: number
@@ -2383,6 +2394,12 @@ export const balance: BalanceConfig = {
     starIntensity: 0.7, // calibratable, debug-editable
     starLength: 0.1, // calibratable, debug-editable; 0.22 streaked the rays across the foreground
     ghostIntensity: 0.6, // calibratable, debug-editable
+  },
+  climateHaze: {
+    noiseTextureSize: 384, // ~40 ms one-time bake, 8 texels per finest-octave cycle; calibratable
+    noiseTilePeriod: 12, // ~92-unit world tile, about the 95-unit layer quad; calibratable
+    crossDriftX: -0.026, // calibratable: with the main sample's +0.03 this morphs about as
+    crossDriftY: 0.021, //   fast as the former z sweep (0.05 cells/s); calibratable
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable

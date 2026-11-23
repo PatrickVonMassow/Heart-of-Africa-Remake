@@ -151,6 +151,8 @@ export interface Strings {
     webglFallbackDismiss: string
     /** Shown when the device offers neither WebGPU nor WebGL 2. */
     rendererUnavailable: string
+    /** Shown when the GPU device was lost mid-session: the picture stopped. */
+    deviceLost: string
     /** Frame counter label, e.g. "62 FPS". */
     fps(fps: number): string
     /** Label/tooltip for the bottom-left health bar (design.md §17.1). */
@@ -321,11 +323,13 @@ export interface Strings {
     warmup: string
     /** Line naming the measured route section. */
     phase: (name: string) => string
-    /** The three route sections (CLAUDE.md §7.1 pt. 20). */
+    /** The route sections (CLAUDE.md §7.1 pt. 20): three travel scenes and
+     *  the settlement. */
     phases: {
       savannaStanding: string
       desertStanding: string
       savannaDriving: string
+      settlementStanding: string
     }
     /** Estimated time left, `m:ss`. */
     remaining: (time: string) => string
@@ -334,6 +338,9 @@ export interface Strings {
     doneTitle: string
     /** Shown instead of the result when the run was aborted. */
     abortedNote: string
+    /** The run was declared invalid (lost GPU device, frames that drew
+     *  nothing); `reason` is the report's English reason string. */
+    invalidNote(reason: string): string
     /** Which of the three measured series is the trustworthy result here. */
     headline: {
       /** Real GPU timestamps were measured — the headline number. */

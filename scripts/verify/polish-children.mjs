@@ -734,6 +734,12 @@ async function checkChildrenMotion(motionPlace) {
   // run record cuts the detail at 200 characters (point 690).
   const checkAt = (name, ok, detail) =>
     check(name, ok, detail === undefined ? `at ${motionPlace}` : `${detail} — at ${motionPlace}`)
+  // ONE EXCEPTION, the shuffle check: its ledger charge is scoped to ONE
+  // settlement (maasai-village, point 1576), and its detail runs past the
+  // 200-character cut, so a settlement at the END is never in the stored
+  // record and no charge could tell a bambara red from a maasai one
+  // (cross-vendor review of 1169). Its place goes first, as `at <place>: `.
+  const checkAtFront = (name, ok, detail) => check(name, ok, `at ${motionPlace}: ${detail}`)
   // EACH SETTLEMENT IS MEASURED FROM THE SAME PAGE, not on top of the two before
   // it. The loop's claim is that one gate reads three settlements, and that is
   // only true if the three start alike: chaining three 1200-frame traces into one
@@ -956,7 +962,7 @@ async function checkChildrenMotion(motionPlace) {
     // with the ground bar a ratio of the distance walked. Both verdicts are ONE
     // check, because they are one question asked at two scales.
     const burst = shuffleWindows(tracks, CHILD_MOTION.short)
-    checkAt(
+    checkAtFront(
       'no child walks without getting anywhere',
       // The bar is CHILD-SECONDS of game, not a count of frames: this trace is
       // 1200 rendered frames and buys anything from 20 s of game to a minute

@@ -126,6 +126,18 @@ undeclared 30 s (492), and `invariants` loses the device mid-run and still repor
 29 KB against 568 KB from a lane with the GPU, an all-but-empty picture the shutter still
 accepted (point 489). Never record acceptance screenshots from the software fallback lane.
 
+**The `invariants` device loss, decided 20.11.2026 (point 507).** The renderer now awaits
+`device.lost` and a suite fails at the loss, naming it. With that detector armed, one run of
+`VERIFY_GL=webgpu npm test -- invariants` on the compatibility lane completed `2 pass, 0 fail,
+0 console-errors` (`dcf3844e3`): the detector reported no loss on that attempt, which proves
+nothing beyond that attempt. A CDP `Browser.crashGpuProcess` on this host reproduces the exact
+05.08 message `A valid external Instance reference no longer exists`, so a lost GPU process is
+one way to produce that message; whether a page teardown produces it too is untested, and what
+caused it on 05.08 stays unconfirmed. The
+player's benchmark of 20.11.2026 (weak Intel Gen-8 notebook) shows drawCalls 0 in every row.
+That justifies the INVALID verdict, but it is not by itself proof of a device-loss event, nor
+of its timing; whether the in-game notice would have fired there needs separate loss evidence.
+
 Quiet, the hardware WebGL 2 lane kept (05.08.2026) five red checks under four named
 points (500–503), each red twice: the leave capture and the two band probes (500/501) in `polish`, the calf that
 does not drown and the High Atlas snow (502/503) in `enrichments`. The panorama reds appear

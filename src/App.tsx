@@ -1,16 +1,16 @@
 import { Suspense, useEffect, useState } from 'react'
 import { Canvas, extend, useThree, type ThreeToJSXElements } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { useGame } from './state/store'
 import { useUi, effectiveDprCap } from './state/ui'
 import { useLocale } from './i18n'
 import { speechAvailable, warmupSpeech } from './journal/speech'
-import { TravelScene } from './scenes/travel/TravelScene'
-import { PlaceScene } from './scenes/place/PlaceScene'
+import { SceneSwitch } from './scenes/SceneSwitch'
 import { Effects } from './render/Effects'
 import { setRenderContext } from './render/renderContext'
+import { describeBackend, startProbeName } from './render/backendInfo'
 import { enableAsyncPipelineCompile, type PipelineBackend } from './render/asyncPipelines'
 import { hasWebgpuAdapter, renderSupportNow } from './render/renderSupport'
+import { armGpuHealth } from './render/gpuHealth'
 import { Hud } from './ui/Hud'
 import { AmbienceController } from './ui/AmbienceController'
 
@@ -34,13 +34,18 @@ function RenderContextBridge() {
   const clock = useThree((s) => s.clock)
   useEffect(() => {
     setRenderContext({ gl: gl as unknown as THREE.WebGPURenderer, scene, camera, clock })
+    // First start on a weak GPU opens at LOW (point 1562); no-op after any choice.
+    const ui = useUi.getState()
+    if (ui.detailLevelSource === 'default') {
+      const info = describeBackend(gl)
+      ui.pickStartDetailLevel(info.adapter, window.devicePixelRatio || 1, startProbeName(info))
+    }
     return () => setRenderContext(null)
   }, [gl, scene, camera, clock])
   return null
 }
 
 export default function App() {
-  const mode = useGame((s) => s.mode)
   // The touch layer (point 84) tightens the HUD and honours the safe-area insets.
   const touchActive = useUi((s) => s.touchActive)
   // Graphics level (design.md §21, F9 / point 276 part B): the low preset caps
@@ -95,6 +100,10 @@ export default function App() {
               ...(props as ConstructorParameters<typeof THREE.WebGPURenderer>[0]),
               antialias: true,
             })
+            // A lost device asserts, raises the player notice and marks the
+            // benchmark and state dump (render/gpuHealth.ts) — before init, so
+            // a loss during startup is caught too.
+            armGpuHealth(renderer)
             await renderer.init()
             // Surface the automatic WebGL 2 fallback to the player (CLAUDE.md §3).
             const backend = (renderer as unknown as { backend?: { isWebGPUBackend?: boolean } }).backend
@@ -136,7 +145,7 @@ export default function App() {
         >
           <RenderContextBridge />
           <Suspense fallback={null}>
-            {mode === 'travel' ? <TravelScene /> : <PlaceScene />}
+            <SceneSwitch />
             <Effects />
           </Suspense>
         </Canvas>

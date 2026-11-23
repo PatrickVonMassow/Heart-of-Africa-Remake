@@ -16,7 +16,8 @@ import {
   fenceColliders,
   type PlaceLayout,
 } from './layout'
-import { PLAYER_RADIUS, type Collider } from './collision'
+import { PLAYER_RADIUS, standingClear, type Collider } from './collision'
+import { isOutsidePlace, placeBoundaryRadius } from './boundary'
 import { placeById } from '../../world/geo'
 import { REGION_PLACE_STYLES } from './regionStyles'
 
@@ -159,6 +160,45 @@ describe('every settlement keeps one way out free (work-order 688)', () => {
         crossingIsClear(layout, layout.wayOut as number),
         `${id} seed ${seed}: the way out at ${(layout.wayOut as number).toFixed(3)} rad is blocked`,
       ).toBeNull()
+    }
+  })
+
+  // THE RIVER VILLAGES' SEEDS FROM THE 17.09.2026 PROBE. Three of these six
+  // returned no bearing then (the assertion fired five times in an unread
+  // green run); re-measured 21.11.2026 on the current fabric, all six carry a
+  // way out, a sweep of every village over 40 seeds found no null, and a flood
+  // fill from the arrival point reached the boundary on ~200 bearings in every
+  // layout probed. The case keeps that state: a bearing, and the straight walk
+  // along it standable at the traveller's own width — the exact collider
+  // geometry, not the corridor estimate the picker reads.
+  const PROBED: Array<[string, number]> = [
+    ['bambara-village', 2861293141],
+    ['mandinka-village', 1716508768],
+    ['mandinka-village', 3170420543],
+    ['bambara-village', 2987912600],
+    ['bambara-village', 7],
+    ['bambara-village', 1337],
+  ]
+  it.each(PROBED)('%s seed %i: the way out exists and a walker fits through it', (id, seed) => {
+    const layout = sharedLayout(id, seed)
+    expect(layout.bank, `${id}: a river village`).not.toBeNull()
+    expect(layout.wayOut, `${id} seed ${seed}: no way out`).not.toBeNull()
+    const b = layout.wayOut as number
+    // Walked to the boundary that really ends the place at this bearing: the
+    // observed scene grounds push it 5-39 m past `radius + WAY_OUT_OUTER` in
+    // these layouts, beyond the corridor the picker measures.
+    const end = Math.max(layout.radius + WAY_OUT_OUTER, placeBoundaryRadius(layout, b) + 1)
+    expect(isOutsidePlace(layout, Math.cos(b) * end, Math.sin(b) * end)).toBe(true)
+    // Both endpoints sampled, and the clearance padded by half the spacing, so a
+    // collider grazing the line between two samples still counts (as clearCorridor).
+    const start = layout.radius - WAY_OUT_INNER
+    const steps = Math.ceil((end - start) / 0.25)
+    const pad = PLAYER_RADIUS + (end - start) / steps / 2
+    for (let k = 0; k <= steps; k++) {
+      const d = start + ((end - start) * k) / steps
+      const x = Math.cos(b) * d
+      const z = Math.sin(b) * d
+      expect(standingClear(layout.colliders, x, z, pad), `${id} seed ${seed}: blocked ${d.toFixed(2)} m out`).toBe(true)
     }
   })
 

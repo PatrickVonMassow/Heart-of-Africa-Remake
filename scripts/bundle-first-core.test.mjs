@@ -745,8 +745,9 @@ describe('the real docs/work-packages.md', () => {
     expect(open.size).toBeGreaterThan(100)
     const placedThen = measured.placed.filter((n) => open.has(n))
     // The old reader placed 609 numbers, most of which were never points; what
-    // matters is the OPEN ones, and there must still be a real set of them.
-    expect(placedThen.length).toBeGreaterThan(100)
+    // matters is the OPEN ones, and there must still be a real set of them
+    // (71 after the 1463-plan cleanup of 20.11.2026 moved 253 points out).
+    expect(placedThen.length).toBeGreaterThan(40)
 
     const bundles = parseBundles(md)
     const placedNow = new Set(parseUnbundled(md).points)

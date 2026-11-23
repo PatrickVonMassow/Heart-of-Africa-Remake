@@ -314,6 +314,7 @@ export function falseDoneClaims(cards, tasksOpenSet) {
 export function unrankedAppendProblem(tasksMd, rankRecordJson) {
   const state = appendGateState(openPointsOf(tasksMd), parseRankRecord(rankRecordJson), {
     bodies: openPointBodies(tasksMd),
+    releasePoint: RELEASE_TAG_POINT,
   })
   if (state.state === 'unarmed') {
     return (

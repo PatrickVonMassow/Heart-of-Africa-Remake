@@ -476,11 +476,19 @@ describe('a head piece faces outward', () => {
 })
 
 describe('the dressed figure', () => {
-  it('every people’s dress of every sex and age merges with the glTF body into one geometry', () => {
+  // One case per people: the full sweep in one case ran past the 20 s wall clock on CI.
+  const bodies = new Map<string, ReturnType<typeof gltfPerson>>()
+  const bodyFor = (sex: Parameters<typeof gltfPerson>[1], age: Parameters<typeof gltfPerson>[2]) => {
+    const key = `${sex}/${age}`
+    if (!bodies.has(key)) bodies.set(key, gltfPerson(asset, sex, age))
+    return bodies.get(key)!
+  }
+  it.each(Object.keys(DRESS_TABLES))('%s dress of every sex and age merges with the glTF body into one geometry', (id) => {
+    const table = DRESS_TABLES[id as keyof typeof DRESS_TABLES]
     for (const { sex, age } of people()) {
-      const person = gltfPerson(asset, sex, age)
+      const person = bodyFor(sex, age)
       const bodyCount = person.geometry.getAttribute('position').count
-      for (const [id, table] of Object.entries(DRESS_TABLES)) {
+      {
         // the table's 'cloth' colour is the figure's own cloth (appearanceFor resolves it)
         const cloth = <T extends string | null>(c: T): T | string => (c === 'cloth' ? '#b08850' : c)
         const layers = table[sex][age].map((l) => ({ ...l, colour: cloth(l.colour), colour2: cloth(l.colour2) }))

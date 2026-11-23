@@ -187,13 +187,12 @@ export function demElevation(
   return texture(getDemDataTexture(), demUvAt(lon, lat)).r as unknown as ReturnType<typeof float>
 }
 
-/** TSL node: inland-water coverage (rivers/lakes) in [0,1] at (lon, lat). */
-export function demInlandWater(
-  lon: THREE.Node<'float'>,
-  lat: THREE.Node<'float'>,
-): ReturnType<typeof float> {
-  return texture(getDemDataTexture(), demUvAt(lon, lat)).g as unknown as ReturnType<typeof float>
+/** TSL node: the raw DEM texel at (lon, lat) — R elevation (m), G inland
+ *  water — for shaders that need both from one fetch (point 1556). */
+export function demTexel(lon: THREE.Node<'float'>, lat: THREE.Node<'float'>) {
+  return texture(getDemDataTexture(), demUvAt(lon, lat))
 }
+
 
 
 // Point 314: the open-sea plane's land mask. The DEM's own land flag (B above)

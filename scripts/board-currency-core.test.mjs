@@ -564,6 +564,9 @@ describe('delta D — the stamp may not claim a board that is missing work', () 
   it('counts a now-card and a "Von dir zu klären" card as showing the point', () => {
     expect(boardMissingPoints(doc(card(1), titled(2), titled(3)), [1, 2, 3])).toEqual([])
   })
+  it('counts a four-digit point in a "Von dir zu klären" or now-card title, since the open set proves it', () => {
+    expect(boardMissingPoints(doc('', titled(1561), titled(1543)), [1543, 1561])).toEqual([])
+  })
   it('is empty for an empty open set, and never throws on junk', () => {
     expect(boardMissingPoints(doc(), [])).toEqual([])
     for (const bad of [null, undefined, 42, {}]) expect(() => boardMissingPoints(bad, [1])).not.toThrow()

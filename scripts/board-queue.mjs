@@ -40,7 +40,12 @@ import {
   QUEUE_DATA_PATH,
   SET_STDIN_FLAG,
   TITLE_CMD,
+  applyDerivedVdzk,
   buildQueueSection,
+  derivedUserWaitCards,
+  advisoryInFlight,
+  headSkipAdvisory,
+  normaliseQueueData,
   gatedEntryPoints,
   importQueueFromHtml,
   mergeQueueImport,
@@ -61,6 +66,8 @@ import { carrierPath } from './findings-paths.mjs'
 import { pendingRequests, requestRoute } from './findings-request-core.mjs'
 import { gateReport, gateSets } from './user-gate-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
+import { gatherActiveWorkSource } from './active-work-source.mjs'
+import { knownPoints as knownTaskPoints } from './dashboard-card-topic-guard-core.mjs'
 
 const state = readJson(STATE_PATH) ?? {}
 const boardFile = resolve(REPO_ROOT, state.dashboardPath ?? '.batch-dashboard.html')
@@ -109,7 +116,7 @@ function reportEntries(entries, tasksText = '') {
   const report = gateReport(tasksText)
   for (const line of report) console.log(`  ${line.trim()}`)
   if (gated.length) {
-    console.log('  give each one a "Von dir zu klären" card, and clear it with: node scripts/defer-for-user.mjs --clear <N>')
+    console.log('  each has its derived "Von dir zu klären" card; clear it with: node scripts/defer-for-user.mjs --clear <N>')
   }
   say(
     entries.filter((e) => e.stub).map((e) => e.point),
@@ -173,16 +180,46 @@ function calibration(tasksText) {
   }
 }
 
+/**
+ * The points a current-work card or the in-flight record holds (layer 3b reads
+ * them too). FAIL-SOFT: an unreadable source only silences the advisory.
+ */
+function activePoints(tasks, html) {
+  const now = [...parseNowCardPoints(html)]
+  try {
+    const source = gatherActiveWorkSource({ tasksText: tasks })
+    return { now, inFlight: advisoryInFlight(source) }
+  } catch {
+    return { now, inFlight: [] }
+  }
+}
+
 /** Board, work order and the exclusions the other sections already own. */
 function inputs() {
   if (!existsSync(boardFile)) throw new Error(`board not found: ${boardFile}`)
-  const html = readFileSync(boardFile, 'utf8')
+  const board = readFileSync(boardFile, 'utf8')
   const tasks = readFileSync(tasksFile, 'utf8')
+  const titles = parseTaskTitles(tasks)
+  const known = [...knownTaskPoints(tasks)]
+  const { now, inFlight } = activePoints(tasks, board)
+  // THE USER-WAIT CARDS ARE DERIVED FIRST (layer 2/3a): a gated point leaves
+  // the queue only once its card is assembled in "Von dir zu klären".
+  const stored = normaliseQueueData(readData()).points
+  const germanTitles = Object.fromEntries(
+    [...new Set([...Object.keys(stored), ...Object.keys(titles)])].map((n) => [n, stored[n]?.title || titles[n]]),
+  )
+  const userWait = derivedUserWaitCards(tasks, { titles: germanTitles, skip: now })
+  const derived = applyDerivedVdzk(board, userWait, { knownPoints: known, gated: gateSets(tasks).gated })
+  const html = derived.html
   return {
     html,
+    board,
+    userWait,
+    removedManual: derived.removed,
+    inFlight,
     tasks,
     open: openPointsOf(tasks),
-    titles: parseTaskTitles(tasks),
+    titles,
     calibration: calibration(tasks),
     // The user gate (point 450): which points wait on the user, which he has
     // answered, and since when.
@@ -191,7 +228,11 @@ function inputs() {
     // Erledigt is NOT excluded: a point there is closed, so it is not open, and
     // the open set already leaves it out. Excluding it too would hide a point
     // that is open AND wrongly archived — a real inconsistency the audit reports.
-    exclude: [...parseNowCardPoints(html), ...parseKlaerungPoints(html)],
+    exclude: [
+      ...now,
+      ...parseKlaerungPoints(html, { knownPoints: known }),
+      ...userWait.filter((c) => c.owns).map((c) => c.point),
+    ],
   }
 }
 
@@ -258,26 +299,37 @@ try {
         `${kept} already known (stored fields kept, empty ones filled from the board) → ${QUEUE_DATA_PATH}`,
     )
   } else if (cmd === '--check' || cmd === undefined) {
-    const { html, tasks, open, titles, exclude, requests, gates, calibration: measured } = inputs()
+    const { html, board, tasks, open, titles, exclude, requests, gates, calibration: measured, userWait, removedManual, inFlight } = inputs()
     const built = buildQueueSection(html, { open, data: readData(), exclude, titles, requests, gates, calibration: measured })
     const rendered = renderCardCriticalities(normaliseLineEndings(built.html), readTasksAll())
+    const reportUserWait = () => {
+      for (const kind of ['gate', 'malformed', 'maybe']) {
+        const points = userWait.filter((c) => c.kind === kind).map((c) => c.point)
+        if (points.length) console.log(`  derived "Von dir zu klären" card(s), ${kind}: ${points.join(', ')}`)
+      }
+      if (removedManual.length) console.log(`  manual card(s) for gated points replaced by derived ones: ${removedManual.join(' | ')}`)
+      const advisory = headSkipAdvisory({ open, gates, inFlight })
+      if (advisory) console.log(`  advisory: ${advisory}`)
+    }
     const saySoIfRequests = () => {
       if (requests.length) {
         console.log(`  ${requests.length} deposited request(s) named under the queue — node scripts/finding.mjs --requests`)
       }
     }
     if (cmd === '--check') {
-      console.log(`${built.entries.length} queue card(s) would be rendered${rendered === html ? ' (no change)' : ''}`)
+      console.log(`${built.entries.length} queue card(s) would be rendered${rendered === board ? ' (no change)' : ''}`)
       reportEntries(built.entries, tasks)
+      reportUserWait()
       saySoIfRequests()
-      process.exitCode = rendered === html ? 0 : 1
+      process.exitCode = rendered === board ? 0 : 1
     } else {
       // Atomic (point 443, four-eyes F3): a kill mid-write leaves torn bytes that
       // the doctor's board repair would push to the public page. LF-normalised
       // (point 439) so a hand edit's CRLF cannot outlive one rebuild.
-      if (rendered !== html) writeTextAtomic(boardFile, rendered)
-      console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${rendered === html ? ' (unchanged)' : ''}`)
+      if (rendered !== board) writeTextAtomic(boardFile, rendered)
+      console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${rendered === board ? ' (unchanged)' : ''}`)
       reportEntries(built.entries, tasks)
+      reportUserWait()
       saySoIfRequests()
       console.log(`Publish it: ${PUBLISH_CMD}`)
     }

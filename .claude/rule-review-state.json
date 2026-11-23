@@ -1,13 +1,8 @@
 {
-  "lastReviewedAt": 1794013904693,
+  "lastReviewedAt": 1795238269717,
   "reviewedCount": 158,
-  "evidence": "Read-only review of dashboard-reminder hook/core, batch-resume hook (body, queue selection, model header), user-gate-core, render-verify guard/core, point-brief VERIFICATION_LADDER, six Stop-guard block texts, MEMORY.md plus 17 memories, CLAUDE.md §2/4/6/7/9 against the code; 12 findings: 10 contradictions/unclear rules filed to docs/backlog.md as input for point 1463 (freeze: no new mechanism), umsteuerung memory marked superseded by 1463, effort slug and dashboard reminder kept",
+  "evidence": "Review of 21.11.2026 05:03 UTC by the preceding session (receipt lost to the doctor quarantine stash 05:04, re-recorded): per-prompt hook texts, SessionStart text, stop-guard messages against code, batch-in-flight evidence checks, author routing, fence constants, MEMORY.md and linked memories, CLAUDE.md §2/4/6/7/9. 22 findings: cloud-wait evidence gap (measured workaround: local push watcher) plus a text-vs-code drift list; both in docs/backlog.md, no edits (protected paths attended-only; infra freeze).",
   "history": [
-    {
-      "at": "2026-07-30T05:42:09.795Z",
-      "entryCount": 107,
-      "evidence": "Durchsicht der 107 Eintraege durch das ZWEITE Modell (Fable 5), gegen den Code aufgeloest, nicht gegen die Nachbarregel. 17 Befunde. SOFORT BEHOBEN: der Verweis im Resume-Hook auf ein seit 27.07. zurueckgezogenes Memory (schickte jeden frisch gespawnten Nachfolger dorthin); der falsche kanonische Board-Pfad in MEMORY.md und batch-dashboard-artifact.md (.claude/batch-dashboard.html existiert nicht, die reale Datei ist .batch-dashboard.html im Repo-Root); die Indexzeile, die den seit 21.07. gebauten prep-guard noch zu bauen befahl; und die Waechter-Aufzaehlung in CLAUDE.md §7.2, die vier verdrahtete Waechter hinter der settings.json herlief - sie nennt jetzt FAMILIEN und verweist auf die eine Quelle, die nicht driften kann (der Bestand SCHRUMPFT dadurch und bezahlt gleich den neuen CI-Vorbehalt). Ebenfalls behoben: die falsche Sicherheitszusage 'a red CI is noticed' traegt jetzt den own-HEAD-Vorbehalt und den Verweis auf Punkt 387. EINGEBUCHT als Punkte 435 und 436 (Buendel H): 43 Artefakt-Verweise in sieben Dateien, darunter die Remedy-Texte aller Board-Waechter und board.mjs bei JEDEM Edit, die die Sitzung auf den zurueckgezogenen Publikationsweg schicken; und der teuerste Text des Projekts, der bei jedem Prompt wiederholt, was board-structure-core und dashboard-guard-core schon erzwingen. NICHT behoben, bewusst: die Modell-Allowlist-Regex /(opus|fable)/i ist schwaecher als die Prosa (jede Opus-Version passiert) - das gehoert in den offenen Punkt 397, der die Trailer-Logik ohnehin anfasst; die Traeger-Leerung haengt am absichtlich schlafenden findings-guard (Verdrahtung attended). Ausdruecklich nicht geprueft laut Bericht: die Meldungstexte von timestamp-/retro-currency-/render-verify-/queue-order-Guard nur ueberflogen, CLAUDE.md §2/§4 nur auf Prozessaussagen."
-    },
     {
       "at": "2026-08-12T16:09:36.368Z",
       "entryCount": 117,
@@ -52,6 +47,11 @@
       "at": "2026-11-07T01:11:44.693Z",
       "entryCount": 158,
       "evidence": "Read-only review of dashboard-reminder hook/core, batch-resume hook (body, queue selection, model header), user-gate-core, render-verify guard/core, point-brief VERIFICATION_LADDER, six Stop-guard block texts, MEMORY.md plus 17 memories, CLAUDE.md §2/4/6/7/9 against the code; 12 findings: 10 contradictions/unclear rules filed to docs/backlog.md as input for point 1463 (freeze: no new mechanism), umsteuerung memory marked superseded by 1463, effort slug and dashboard reminder kept"
+    },
+    {
+      "at": "2026-11-21T05:17:49.717Z",
+      "entryCount": 158,
+      "evidence": "Review of 21.11.2026 05:03 UTC by the preceding session (receipt lost to the doctor quarantine stash 05:04, re-recorded): per-prompt hook texts, SessionStart text, stop-guard messages against code, batch-in-flight evidence checks, author routing, fence constants, MEMORY.md and linked memories, CLAUDE.md §2/4/6/7/9. 22 findings: cloud-wait evidence gap (measured workaround: local push watcher) plus a text-vs-code drift list; both in docs/backlog.md, no edits (protected paths attended-only; infra freeze)."
     }
   ]
 }

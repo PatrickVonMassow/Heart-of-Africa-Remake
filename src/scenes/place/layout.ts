@@ -208,8 +208,8 @@ export interface PlaceLayout {
    * person can walk out over the edge band without stepping around a bush or a
    * boulder. It is chosen from what the BUILT fabric already leaves open — the
    * huts, the compound fences and the lanes are never moved for it — and the
-   * scattered flora and rocks that fall in it are dropped. Null where no bearing
-   * is open.
+   * scattered flora and rocks that fall in it are dropped. Null where no sampled
+   * bearing passed the picker's coarse clearance estimate (see `pickWayOut`).
    */
   wayOut: number | null
   /** Livestock pen (kraal layouts, and the Tuareg camp's goat pen). */
@@ -646,7 +646,8 @@ function fabricOf(
  * keeps off it. Bearings pointing at the water are skipped, because a way out
  * over the bank is a way into the river.
  *
- * Returns the bearing, or null where the fabric itself leaves no crossing.
+ * Returns the bearing, or null where no sampled bearing passed this coarse
+ * clearance estimate — not proof that a walker is shut in.
  */
 export function pickWayOut(
   colliders: readonly Collider[],
@@ -2124,7 +2125,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   devAssert(
     wayOut !== null,
     'way-out-missing',
-    () => `${place.id}: the built fabric leaves no crossing of the boundary free`,
+    // Says only what the picker checked — a coarse estimate over sampled
+    // bearings — not whether a walker fits through some other gap.
+    () => `${place.id}@${seed}: no sampled bearing off the bank passed the picker's ${2 * WAY_OUT_HALF_WIDTH} m clearance estimate; other gaps are not measured here`,
   )
 
   const flora: PlaceLayout['flora'] = []

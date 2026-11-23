@@ -93,6 +93,7 @@ export const NON_RENDER_VERIFY = new Set([
   'baseline-classify-core.mjs',
   'baseline-classify.mjs',
   'carriedJar.mjs', // the carried-jar projection and pixel verdict; polish-villagers.mjs hands it its page
+  'device-loss-core.mjs', // the device-loss FAIL rule _browser.mjs arms on every suite page; drives no browser itself
   'childMotionMetric.mjs', // the children's shuffle/rescue verdict over a recorded trace; the polish-* suites and the replay test record it
   'colliderProbe.mjs', // the collider geometry the suites read with; collision.mjs and the polish-* suites hand it their page
   'communicationAudio.mjs', // PCM analysis and WAV encoding; no browser
@@ -109,6 +110,7 @@ export const NON_RENDER_VERIFY = new Set([
   'edgeBandSettle.mjs', // shot-window settle decisions with injected reads/gaps; the polish-* suites drives the browser
   'errandShutter.mjs', // the fill shot's line test over positions; polish-villagers.mjs reads them
   'garmentOverhead.mjs', // the overhead garment camera's geometry; polish-villagers.mjs places the camera
+  'hop-owners.mjs', // polish-settlement's place-hop report lines; the suite reads the page
   'standOrder.mjs', // the stand-order moment over errand state; polish-villagers.mjs drives the page
   'rimSeam.mjs', // the river-rim band lines on the camera's forward line; polish-villagers.mjs projects them
   'fixedWaits.mjs',
