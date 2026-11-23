@@ -60,6 +60,7 @@ import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon, type 
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { renderedSheetY, waterSurfaceY } from './waterSurface'
 import { drinkWalkDistance, crocodileNeedsReanchor } from './waterEdgeRules'
+import { abortChaseIntoLeave, leaveHeading } from './chaseAbort'
 import { climateZoneAt, CURRENT_WEATHER } from '../../systems/season'
 import { dramaCurrent, lakeDistance, riverDistance, riverIdAt } from '../../world/geoIndex'
 import { hashChunk, mulberry32 } from '../../world/noise'
@@ -1395,15 +1396,6 @@ function findWaterNear(x: number, z: number, seed: number): { x: number; z: numb
 function regionPreyAt(x: number, z: number): PreyKind[] {
   const ll = worldToLatLon(x, z)
   return REGION_PREY[regionAt(ll.lat, ll.lon)] ?? REGION_PREY.east
-}
-
-/** Walk-off direction after a kill: straight away from the traveller, so the
- *  leave never crosses the view; random when standing on the traveller. */
-function leaveHeading(x: number, z: number, px: number, pz: number): number {
-  const dx = x - px
-  const dz = z - pz
-  if (Math.hypot(dx, dz) < 1e-3) return Math.random() * Math.PI * 2
-  return Math.atan2(dx, dz)
 }
 
 /** A predator does not strip its kill bare (design.md §19): when it walks off,
@@ -7094,13 +7086,9 @@ function LionHunt() {
           if (v.caughtBy === 'crocodile') {
             // The crocodile stole the chase victim (point 194): §19.16 keeps the
             // two systems apart — the lion never feeds on a croc kill (it sinks).
-            // Abort into the ordinary walk-off, never feed on the sinking prey.
-            s.mode = 'leave'
-            s.heading = leaveHeading(s.px, s.pz, pos.x, pos.z)
-            s.leaveHeading = undefined
-            s.leaveT = 0
-            s.victim = null
-            s.victimHunt = false
+            // Abort into the ordinary walk-off from where the predator stands,
+            // never feed on the sinking prey.
+            abortChaseIntoLeave(s, pos.x, pos.z)
           } else {
             // Feed on the body the hunter actually reached (a shield take
             // switched the victim to the parent this frame): the prey point
@@ -7119,12 +7107,7 @@ function LionHunt() {
           // into the ordinary walk-off. The hunt resolves; nothing re-chases.
           v.chaseSwim = undefined
           lameAfterHunt(v) // the straggler (point 363): the chase broke off
-          s.mode = 'leave'
-          s.heading = leaveHeading(s.lx, s.lz, pos.x, pos.z)
-          s.leaveHeading = undefined
-          s.leaveT = 0
-          s.victim = null
-          s.victimHunt = false
+          abortChaseIntoLeave(s, pos.x, pos.z)
         } else {
           s.px = v.x
           s.pz = v.z
