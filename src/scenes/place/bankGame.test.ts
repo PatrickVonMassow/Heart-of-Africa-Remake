@@ -766,7 +766,6 @@ describe('the children`s game at the bank (point 687)', () => {
     // or the child walks a stale trip home in the next one (review, work-order 1169).
     const cfg: BankConfig = { ...CFG, roamSeconds: 0.1, roamSpread: 0 }
     const world = openWorld()
-    const b = STAGE.boulder
     for (const seed of SEEDS) {
       const rand = mulberry32(seed)
       const count = balance.villageLife.tag.childCount
