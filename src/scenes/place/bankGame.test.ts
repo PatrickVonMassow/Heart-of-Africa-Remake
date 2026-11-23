@@ -866,16 +866,22 @@ describe('the children`s game at the bank (point 687)', () => {
         // moves the child further than the walking pace carries it, with 5 %
         // tolerance for the separation's sub-millimetre corrections.
         const maxStep = cfg.walkPace * (1 / 60) * 1.05
+        // NO STOP ON THE WAY (cross-vendor review of 1169, round 5): once it
+        // has set off, every frame it starts outside its quarter moves it. Only
+        // the first turn on the spot toward home may stand it.
+        let setOff = false
         // 0.5 s samples, at most 20 s of round clock for 5 m at walking pace.
         for (let sample = 0; sample < 40 && !inside; sample++) {
           for (let f = 0; f < 30; f++) {
             const x0 = c.x
             const z0 = c.z
+            const wasOutside = toHome() > home.radius
             stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
-            expect(
-              Math.hypot(c.x - x0, c.z - z0),
-              `seed ${seed}, angle ${angle.toFixed(2)}, sample ${sample}, frame ${f}`,
-            ).toBeLessThanOrEqual(maxStep)
+            const moved = Math.hypot(c.x - x0, c.z - z0)
+            const at = `seed ${seed}, angle ${angle.toFixed(2)}, sample ${sample}, frame ${f}`
+            expect(moved, at).toBeLessThanOrEqual(maxStep)
+            if (setOff && wasOutside) expect(moved, `${at}: stood on the way home`).toBeGreaterThan(1e-6)
+            if (moved > 1e-6) setOff = true
           }
           const now = toHome()
           expect(now, `seed ${seed}, angle ${angle.toFixed(2)}, sample ${sample}`).toBeLessThan(last)
@@ -928,11 +934,17 @@ describe('the children`s game at the bank (point 687)', () => {
       let holdEndHome = NaN
       let holdSeconds = 0
       let worstLook = 0
+      // WALKED, NOT PLACED (cross-vendor review of 1169, round 5): no frame
+      // carries it further than the walking pace, so a jump cannot stand in for
+      // the ground gained below.
+      const maxStep = cfg.walkPace * (1 / 60) * 1.05
       for (let t = 0; t < 30 && failed.homing; t += 1 / 60) {
         const x0 = failed.x
         const z0 = failed.z
         const outside = toHome() > stage.roam.radius
         stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+        expect(Math.hypot(failed.x - x0, failed.z - z0), `seed ${seed}, t ${t.toFixed(2)}`)
+          .toBeLessThanOrEqual(maxStep)
         const atTop = s.children[1].climb === 'top'
         if (!(atTop && outside)) continue
         if (Number.isNaN(holdStartHome)) holdStartHome = Math.hypot(x0 - stage.roam.x, z0 - stage.roam.z)
@@ -982,11 +994,17 @@ describe('the children`s game at the bank (point 687)', () => {
       let holdEnded = false
       let afterHold = 0
       let stopped = 0
+      // Every frame is bounded by the walking pace, and the walk ends INSIDE
+      // the quarter, not merely with `homing` cleared (cross-vendor review of
+      // 1169, round 5): a sideways walk or a jump cannot pass.
+      const maxStep = cfg.walkPace * (1 / 60) * 1.05
       for (let t = 0; t < 30 && failed.homing; t += 1 / 60) {
         const x0 = failed.x
         const z0 = failed.z
         const wasOutside = outside()
         stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+        expect(Math.hypot(failed.x - x0, failed.z - z0), `seed ${seed}, t ${t.toFixed(2)}`)
+          .toBeLessThanOrEqual(maxStep)
         const atTop = s.children[1].climb === 'top'
         if (wasTop && !atTop) holdEnded = true
         wasTop = atTop
@@ -997,6 +1015,7 @@ describe('the children`s game at the bank (point 687)', () => {
       expect(holdEnded, `seed ${seed}: the hold ended while the child was homing`).toBe(true)
       expect(afterHold, `seed ${seed}: frames walked outside the quarter after the hold`).toBeGreaterThan(30)
       expect(stopped, `seed ${seed}: zero-displacement frames after the hold`).toBe(0)
+      expect(outside(), `seed ${seed}: arrived inside its quarter`).toBe(false)
     }
   })
 
