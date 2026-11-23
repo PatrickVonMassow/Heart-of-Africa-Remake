@@ -760,6 +760,41 @@ describe('the children`s game at the bank (point 687)', () => {
     }
   })
 
+  it('does not carry a boulder trip`s walk home into the next roam', () => {
+    // The descent usually ends after the roam clock ran out, so the cycle opens
+    // before the climber took a step home; the flag must not outlive that roam,
+    // or the child walks a stale trip home in the next one (review, work-order 1169).
+    const cfg: BankConfig = { ...CFG, roamSeconds: 0.1, roamSpread: 0 }
+    const world = openWorld()
+    const b = STAGE.boulder
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const count = balance.villageLife.tag.childCount
+      const spots = Array.from({ length: count }, (_, i) => ({
+        x: STAGE.roam.x + Math.cos((i / count) * Math.PI * 2) * 2.4,
+        z: STAGE.roam.z + Math.sin((i / count) * Math.PI * 2) * 2.4,
+      }))
+      const s = createBankGame(spots, rand, cfg)
+      let c = s.children[0]
+      let homedAtCycle = false
+      let leftRoam = false
+      let reopened = false
+      for (let t = 0; t < 240 && !reopened; t += 1 / 60) {
+        stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+        if (!leftRoam && s.phase !== 'roam') {
+          leftRoam = true
+          c = s.children.find((k) => k.homing) ?? c
+          homedAtCycle = c.homing
+        } else if (leftRoam && s.phase === 'roam') {
+          reopened = true
+          expect(c.homing).toBe(false)
+        }
+      }
+      expect(homedAtCycle).toBe(true) // the case under test really arose
+      expect(reopened).toBe(true)
+    }
+  })
+
   // THE CLIMB ITSELF (work-order 1080). What shipped before this point was a
   // flag: `climbing` went true for 0.35 s while the child stood 2.2 m from the
   // boulder's centre and the view lifted it 0.32 m where it stood. Every

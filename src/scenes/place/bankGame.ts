@@ -1228,6 +1228,9 @@ function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
     c.slumped = false
     endClimb(c)
     c.settled = false
+    // A boulder trip's walk home belongs to the roam that sent it: a descent
+    // that ended as the roam timer ran out must not resume it next roam.
+    c.homing = false
   }
   // The approach is resolved against the live world on the first roaming step.
   s.climber = -1
