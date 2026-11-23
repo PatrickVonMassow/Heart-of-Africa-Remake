@@ -600,7 +600,10 @@ if (section('tag-catch')) {
     // leaves clear to the subject — both sides tried at 3.2 m, then 4.2 m, then 2.6 m.
     // Each candidate is stood on, DRAWN, and only then ray-probed: the camera
     // follows the player pose in the next frame, not in the call that sets it.
+    // Each refused candidate is traced (back, side, why), so a red names what
+    // occluded every stand instead of only that all of them were.
     const standBeside = async (from, to, subject) => {
+      const tried = []
       for (const back of [3.2, 4.2, 2.6]) {
         for (const side of [1, -1]) {
           const placed = await page.evaluate(
@@ -626,7 +629,10 @@ if (section('tag-catch')) {
             },
             { from, to, back, side, subject },
           )
-          if (!placed) continue
+          if (!placed) {
+            tried.push(`${back}/${side}: outside the layout`)
+            continue
+          }
           await nextFrames(3)
           // Collision may have moved the drawn camera off the requested spot: re-aim
           // from where it really stands, pitch included, and refuse a spot so close
@@ -642,13 +648,19 @@ if (section('tag-catch')) {
             p.pitch = -Math.atan2(dy + 0.3 - 0.35, h)
             return true
           }, subject)
-          if (!aimed) continue
+          if (!aimed) {
+            tried.push(`${back}/${side}: no aim (collision pushed the camera within 2 m)`)
+            continue
+          }
           await nextFrames(3)
           const hit = await page.evaluate((q) => window.__placeRayHit?.(q.x, 0.3, q.z) ?? null, subject)
-          if (hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)) return { back }
+          if (hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)) return { back, tried }
+          tried.push(hit
+            ? `${back}/${side}: ${hit.hitName} at ${hit.hitDistance.toFixed(2)} of ${hit.targetDistance.toFixed(2)} m`
+            : `${back}/${side}: no ray probe`)
         }
       }
-      return null
+      return { back: null, tried }
     }
 
     // THE CATCH FRAME, held by the shutter the moment the hand lands.
@@ -669,8 +681,8 @@ if (section('tag-catch')) {
       )
       await nextFrames(2)
       const stood = await standBeside(shot.catcherAt, shot.caughtAt, shot.caughtAt)
-      check('a clear side-on standpoint on the catch', !!stood, stood ? `${stood.back} m` : 'every standpoint occluded')
-      if (stood) {
+      check('a clear side-on standpoint on the catch', stood.back != null, stood.back != null ? `${stood.back} m` : `every standpoint occluded — ${stood.tried.join('; ')}`)
+      if (stood.back != null) {
         await frame('1176-tag-catch', {
           local: { x: shot.caughtAt.x, y: 0.35, z: shot.caughtAt.z },
           label: "the catch frame: the catcher's reaching hand on the caught child, in the port at default zoom",
@@ -701,8 +713,8 @@ if (section('tag-catch')) {
       )
       await nextFrames(2)
       const stood = await standBeside(beat.caughtAt, beat.runnerAt ?? beat.caughtAt, beat.caughtAt)
-      check('a clear side-on standpoint on the beat', !!stood, stood ? `${stood.back} m` : 'every standpoint occluded')
-      if (stood) {
+      check('a clear side-on standpoint on the beat', stood.back != null, stood.back != null ? `${stood.back} m` : `every standpoint occluded — ${stood.tried.join('; ')}`)
+      if (stood.back != null) {
         await frame('1176-tag-beat', {
           local: { x: beat.caughtAt.x, y: 0.35, z: beat.caughtAt.z },
           label: 'the caught child standing out its beat, the catcher-that-was already running off',
