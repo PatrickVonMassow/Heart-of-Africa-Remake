@@ -900,6 +900,12 @@ if (section('mute-shore-scene')) {
       check('the stand lies within call reach of the dugout`s upstream end and of the near play rock',
         stand.toLane < stand.reach && stand.toRock < stand.reach, JSON.stringify(stand))
       const firstCall = await shore.evaluate(() => window.__balance.villageLife.canoe.firstCallSeconds)
+      // THE WINDOW'S PREMISE (work-order 1265): the bank round opens at visit
+      // start and, first come first spoken, keeps the shared floor through its
+      // cycle (measured: child 3.3 s, boat 9.7 s; before d2c3e690b ungated the
+      // round, boat 4.1 s). So the boat's first word is owed within its own
+      // hold limit — spoken, not given up unspoken — not within 3 s.
+      const wordWait = await shore.evaluate(() => window.__balance.villageLife.canoe.wordWaitSeconds)
       // The round's own clock is the visit's age; the readings are sampled on
       // every animation frame so a short one cannot fall between two polls.
       const heard = await shore
@@ -924,9 +930,9 @@ if (section('mute-shore-scene')) {
         const g = window.__game.getState()
         return Object.hasOwn(g.communication.heard, g.vocabulary.ROCK)
       })
-      check('a boatman`s reading appears within a few seconds of entry, without ROCK marked heard',
-        !!heard && heard.boat !== undefined && heard.boat <= firstCall + 3 && heard.rockAtBoat === false,
-        JSON.stringify({ heard, firstCall }))
+      check('a boatman`s first word is spoken, not given up, after the bank round`s opening, without ROCK marked heard',
+        !!heard && heard.boat !== undefined && heard.boat <= firstCall + wordWait && heard.rockAtBoat === false,
+        JSON.stringify({ heard, firstCall, wordWait }))
       check('a child`s reading appears within a few seconds of entry',
         !!heard && heard.child !== undefined && heard.child <= 15, JSON.stringify({ heard, rockHeard }))
       console.log(`# mute-shore-scene: first readings at round clock ${JSON.stringify(heard)} (ROCK heard by then: ${rockHeard})`)

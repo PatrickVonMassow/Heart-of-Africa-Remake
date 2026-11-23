@@ -1802,16 +1802,6 @@ export const RED_CHARGES = [
       + 'state-leak flake. Recurred unaccounted 19./20.11.2026 on webgpu. The charge dies with 200.',
   },
   {
-    point: 1265,
-    suite: 'polish-villagers',
-    kind: 'check',
-    match: /^a boatman`s reading appears within a few seconds of entry, without ROCK marked heard$/i,
-    why:
-      'FILED AS 1265 ON 02.10.2026: `--section=mute-shore-scene` reds identically on main fe28c8bde '
-      + '(unsplit polish, boat at 9.69 s against firstCall 4 + 3) and on feat/1129 14d11f2ca, so the '
-      + 'split did not cause it. Pure scene timing, so no backend is excluded. The charge dies with 1265.',
-  },
-  {
     point: 1266,
     suite: 'polish-villagers',
     kind: 'check',
