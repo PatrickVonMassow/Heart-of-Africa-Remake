@@ -5200,3 +5200,23 @@ put it is the mistake this line exists to stop.
   Test: Vitest case in `scripts/batch-autostart-core.test.mjs` for a spawn that died with an auth error line, plus the no-error-line case.
   Source: user request of 23.11.2026 13:18 UTC via the findings carrier, approved: "Ja, reih den Vorschlag mit der Pausenmeldung ein." Real blockade with operator impact (CLAUDE.md §2 finding intake).
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1578. The first place visit trips the WebGPU render-pipeline-leak assertion
+  Source: full WebGPU `enrichments` on main f284145f0, 23.11.2026 19:55-20:29 Berlin
+  (`local/verify-logs/2026-11-23T18-55-53-945-enrichments.log`), filed via the findings carrier.
+  THE RED. The dev assertion `[ASSERT] render-pipeline-leak` reads "pipelines after place visit 1:
+  12 -> 77 (+65, allowed +24); net growth over all visits 65 (allowed 72)", which fails
+  'no console errors' in the sections `solar-sun`, `horizon-maps` and `eye-adaptation-glare`.
+  Commits since da12426 touched only travel wildlife (points 1205, 1229), not the place scene, so
+  it is either an older regression or a first-visit warm-up the +24 budget does not cover.
+  Final state:
+  - Measured which pipelines the first place visit adds (`renderLeak.ts` instrumentation, WebGPU).
+  - Either the leak is fixed at its source, or the first-visit budget is re-derived from that
+    evidence (a warm-up named pipeline by pipeline), with no wider tolerance than measured.
+  - `enrichments` sections `solar-sun`, `horizon-maps`, `eye-adaptation-glare` green on WebGPU;
+    the red charged/closed in `render-verify-guard --status`.
+  Tests: the existing dev assertion and the `enrichments` sections; a Vitest case only if the
+  budget derivation moves into code.
+  Bundle: Testinfrastruktur.
+  Criticality: medium — a dev-assertion red that blocks render-verify-guard for 1205/1229; player
+  impact unmeasured (a real leak would grow GPU memory per place visit).
