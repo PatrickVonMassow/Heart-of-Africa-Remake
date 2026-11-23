@@ -383,12 +383,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1264": {
-      "at": "2026-10-02T08:26:41.464Z",
-      "why": "Low-criticality cosmetic pestle gap; behind the open village-life points, no user waits on it",
-      "origin": "machine",
-      "place": "last"
-    },
     "1265": {
       "at": "2026-10-02T12:02:39.074Z",
       "why": "pre-existing shore-timing red found on 1129's covering pass; no other point waits on it, so it queues behind the settled order",
@@ -973,7 +967,6 @@
       1244,
       1253,
       1263,
-      1264,
       1265,
       1266,
       1267,
