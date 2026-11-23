@@ -862,9 +862,21 @@ describe('the children`s game at the bank (point 687)', () => {
         const toHome = () => Math.hypot(c.x - home.x, c.z - home.z)
         let last = toHome()
         let inside = false
+        // WALKED, NOT PLACED (cross-vendor review of 1169, round 4): no frame
+        // moves the child further than the walking pace carries it, with 5 %
+        // tolerance for the separation's sub-millimetre corrections.
+        const maxStep = cfg.walkPace * (1 / 60) * 1.05
         // 0.5 s samples, at most 20 s of round clock for 5 m at walking pace.
         for (let sample = 0; sample < 40 && !inside; sample++) {
-          for (let f = 0; f < 30; f++) stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+          for (let f = 0; f < 30; f++) {
+            const x0 = c.x
+            const z0 = c.z
+            stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+            expect(
+              Math.hypot(c.x - x0, c.z - z0),
+              `seed ${seed}, angle ${angle.toFixed(2)}, sample ${sample}, frame ${f}`,
+            ).toBeLessThanOrEqual(maxStep)
+          }
           const now = toHome()
           expect(now, `seed ${seed}, angle ${angle.toFixed(2)}, sample ${sample}`).toBeLessThan(last)
           last = now
@@ -906,24 +918,85 @@ describe('the children`s game at the bank (point 687)', () => {
       stepBankGame(s, 1 / 60, cfg, stage, world, rand)
       expect(s.failedClimbers).toEqual([0])
       expect(failed.homing).toBe(true)
+      const toHome = () => Math.hypot(failed.x - stage.roam.x, failed.z - stage.roam.z)
       let watchedWalking = 0
+      // EVERY frame of the hold counts (cross-vendor review of 1169, round 4):
+      // a frame in which the child stands while still outside its quarter is a
+      // stop, and fails, instead of being skipped.
+      let stoppedInHold = 0
+      let holdStartHome = NaN
+      let holdEndHome = NaN
+      let holdSeconds = 0
       let worstLook = 0
       for (let t = 0; t < 30 && failed.homing; t += 1 / 60) {
+        const x0 = failed.x
+        const z0 = failed.z
+        const outside = toHome() > stage.roam.radius
         stepBankGame(s, 1 / 60, cfg, stage, world, rand)
         const atTop = s.children[1].climb === 'top'
-        if (atTop && failed.homing && failed.pace > 0) {
-          watchedWalking++
-          // After the first second (a half turn at `turnRate` takes 0.87 s),
-          // the facing holds on the stone.
-          if (watchedWalking > 60) {
-            const toStone = Math.atan2(b.x - failed.x, b.z - failed.z)
-            const off = Math.abs(Math.atan2(Math.sin(toStone - failed.facing), Math.cos(toStone - failed.facing)))
-            worstLook = Math.max(worstLook, off)
-          }
+        if (!(atTop && outside)) continue
+        if (Number.isNaN(holdStartHome)) holdStartHome = Math.hypot(x0 - stage.roam.x, z0 - stage.roam.z)
+        holdEndHome = toHome()
+        holdSeconds += 1 / 60
+        if (Math.hypot(failed.x - x0, failed.z - z0) < 1e-6) stoppedInHold++
+        else watchedWalking++
+        // After the first second (a half turn at `turnRate` takes 0.87 s),
+        // the facing holds on the stone.
+        if (watchedWalking > 60) {
+          const toStone = Math.atan2(b.x - failed.x, b.z - failed.z)
+          const off = Math.abs(Math.atan2(Math.sin(toStone - failed.facing), Math.cos(toStone - failed.facing)))
+          worstLook = Math.max(worstLook, off)
         }
       }
       expect(watchedWalking, `seed ${seed}: the replacement stood on top while the failed child walked home`).toBeGreaterThan(90)
+      expect(stoppedInHold, `seed ${seed}: frames the homing child stood during the hold`).toBe(0)
+      // Real ground gained toward home over the overlap: at least half of what
+      // the walking pace covers in that time.
+      expect(holdStartHome - holdEndHome, `seed ${seed}`).toBeGreaterThan(0.5 * cfg.walkPace * holdSeconds)
       expect(worstLook, `seed ${seed}`).toBeLessThan(0.2)
+    }
+  })
+
+  it('keeps a homing child walking through the end of a naming hold', () => {
+    // When the hold ends the child still faces the stone, which lies behind its
+    // walk; judged by that facing it would be told to stand and turn back — a
+    // visible stop (cross-vendor review of 1169, round 4). Every frame from the
+    // hold's end until it is inside its quarter must move it.
+    const cfg: BankConfig = { ...CFG, roamSeconds: 600, roamSpread: 0 }
+    const world = openWorld()
+    // Far enough that the walk home outlasts the hold by several seconds.
+    const stage: BankStage = { ...STAGE, roam: { x: STAGE.boulder.x - 22, z: STAGE.boulder.z, radius: 3 } }
+    const b = stage.boulder
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const s = createBankGame([{ x: b.x + 3, z: b.z }, { x: b.x, z: b.z + 4 }], rand, cfg)
+      const failed = s.children[0]
+      stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+      failed.goalX = b.x
+      failed.goalZ = b.z
+      failed.goalFor = cfg.roamGoalSeconds + 1
+      stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+      expect(failed.homing).toBe(true)
+      const outside = () => Math.hypot(failed.x - stage.roam.x, failed.z - stage.roam.z) > stage.roam.radius
+      let wasTop = false
+      let holdEnded = false
+      let afterHold = 0
+      let stopped = 0
+      for (let t = 0; t < 30 && failed.homing; t += 1 / 60) {
+        const x0 = failed.x
+        const z0 = failed.z
+        const wasOutside = outside()
+        stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+        const atTop = s.children[1].climb === 'top'
+        if (wasTop && !atTop) holdEnded = true
+        wasTop = atTop
+        if (!holdEnded || !wasOutside) continue
+        afterHold++
+        if (Math.hypot(failed.x - x0, failed.z - z0) < 1e-6) stopped++
+      }
+      expect(holdEnded, `seed ${seed}: the hold ended while the child was homing`).toBe(true)
+      expect(afterHold, `seed ${seed}: frames walked outside the quarter after the hold`).toBeGreaterThan(30)
+      expect(stopped, `seed ${seed}: zero-displacement frames after the hold`).toBe(0)
     }
   })
 

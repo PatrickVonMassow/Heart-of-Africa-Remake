@@ -1651,7 +1651,11 @@ function stepRoam(
       // at it like every other ground-level playmate (below). Its facing then
       // no longer says where its feet go, so the set-off test reads the walk
       // heading instead; a child turning on the spot still reads its facing.
-      const body = watched && c.pace > 0 ? c.heading : c.facing
+      // NOT ONLY DURING THE HOLD: when it ends the facing still points at the
+      // stone, and reading it then stopped a walking child to turn back
+      // (cross-vendor review of 1169, round 4). A child already walking keeps
+      // walking while its gaze eases forward.
+      const body = c.pace > 0 ? c.heading : c.facing
       if (Math.abs(Math.atan2(Math.sin(toWay - body), Math.cos(toWay - body))) > cfg.setOffTurn) {
         drive(s, i, null, false, dt, cfg, world)
         c.facing = turnToward(c.facing, toWay, cfg.turnRate * dt)
