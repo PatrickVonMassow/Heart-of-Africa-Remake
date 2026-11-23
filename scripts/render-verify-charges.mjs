@@ -1579,8 +1579,9 @@ export const RED_CHARGES = [
     match: /^no child walks without getting anywhere$/i,
     // DETAIL-SCOPED to WHAT THE RECORD ACTUALLY HOLDS. The run record cuts the
     // detail at 200 characters (`detailCut: true`). HISTORICAL (pre-prefix, before
-    // 23.11.2026): the cut fell inside the words "In 0.5s bursts: worst "; the
-    // current cut is stated in the SETTLEMENT-SCOPED note below. Either way the
+    // 23.11.2026): the cut fell right after "traced. In 0.5s bursts: worst ",
+    // trailing space included; the current cut is stated in the
+    // SETTLEMENT-SCOPED note below. Either way the
     // burst reading, which is the
     // sharpest discriminator (it stood at 0.00 % while the one-second reading
     // reddened), is NOT in the text a charge can read. The scope is therefore
@@ -1590,8 +1591,8 @@ export const RED_CHARGES = [
     // or a red without the judgeability line — is a different composition and
     // stays a real red.
     // READS ONLY THE FRONT, and says so: the record cuts at 200 characters (in
-    // the HISTORICAL pre-prefix record inside "In 0.5s bursts: worst "; for the
-    // current record see below). How far the signature reaches: to
+    // the HISTORICAL pre-prefix record right after "In 0.5s bursts: worst ",
+    // trailing space included; for the current record see below). How far the signature reaches: to
     // the end of the judgeability reading, i.e. every number the record keeps.
     // Why the tail cannot matter: what follows the cut is the burst series and
     // the printed threshold sentence. The burst series can only make the red
@@ -1635,7 +1636,7 @@ export const RED_CHARGES = [
       + 'the WebGL 2 picture lane without a covering run. '
       + 'IT DECLARES detailReadsPrefix, because this measurement is cut at the 200-character bound. '
       + 'The historical record, written without a place prefix, keeps everything up to the words '
-      + '"In 0.5s bursts: worst" and no further; with the `at maasai-village: ` prefix the same '
+      + '"In 0.5s bursts: worst " (trailing space included) and no further; with the `at maasai-village: ` prefix the same '
       + 'numbers are cut 19 characters earlier, right after "traced. In ". WHAT '
       + 'THE BOUND REMOVES is the burst series and the constant threshold sentence the check always '
       + 'prints. The signature stops after the judgeability reading, clear of the bound by four '
