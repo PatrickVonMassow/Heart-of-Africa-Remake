@@ -65,6 +65,30 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 1575,
+    suite: 'polish-settlement',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /the dust is visible: its crop differs from the same crop with the dust disabled/i,
+    why: 'Red in the full WebGPU pass on feat/1573 86d1f7296, 22.11.2026 21:30 (OFF-vs-OFF floor 8.79, scene not still); --section=walker-dust green on main 0d8638c33 and the same head. The charge dies with 1575.',
+  },
+  {
+    point: 1572,
+    suite: 'polish-villagers',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /low preset: (every kneeling primitive figure keeps a uniform scale|no kneeling primitive.s drawn hand sinks into the ground)/i,
+    why: 'Red on WebGPU, 21.11.2026 21:33 (feat/1447, e79992b5f): census kneeling 0 of 20 figures, a one-instant sample of free village life. The charge dies with 1572.',
+  },
+  {
+    point: 1571,
+    suite: 'polish-villagers',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    match: /the river is in the captured frame, read at the projected water points/i,
+    why: 'Red on WebGPU in three polish-villagers runs of 21.11.2026, the last on main baseline e45b6baa7 (pre-existing); all 9 water points inFrame. The charge dies with 1571.',
+  },
+  {
     point: 1533,
     suite: 'polish-settlement',
     backend: 'webgpu',

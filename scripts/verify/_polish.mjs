@@ -308,7 +308,9 @@ export async function finishPolishSuite() {
   for (const u of unmeasuredChecks) console.log(`UNMEASURED  ${u.name} — ${u.reason}`)
   if (unmeasuredChecks.length) console.log(`unmeasured checks: ${unmeasuredChecks.length} (they did not run; not both-backend coverage)`)
   console.log('console errors:', errors.length)
-  for (const e of errors) console.log('ERR:', e.slice(0, 300))
+  // A dev assert carries its diagnosis at the end (e.g. the census kinds that
+  // grew), so it is printed longer than an ordinary console error.
+  for (const e of errors) console.log('ERR:', e.slice(0, e.startsWith('[ASSERT]') ? 1500 : 300))
   // Said again where the verdict is read: a green one-section run is not a green
   // suite, and nothing downstream may quote it as one.
   if (sections.banner()) console.log(sections.banner())

@@ -107,45 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1447. Every settlement visit leaves its render pipelines and heap behind
-  Final state: leaving a place releases what it built: after entering and leaving N different villages the renderer's cached pipeline count (`renderer._pipelines.caches.size`), the JS heap and Chrome's GPU-process memory return to a bounded level instead of growing with N (the cause named: which materials/objects outlive their place); a dev invariant or browser check pins the bound; the villager-dress fresh-page staging of point 1446 (`DRESS_REBOOT_EVERY`) may then be lifted.
-  Observed problem: `polish-villagers --section=villager-dress` on feat/1446 6e1622764, 25.10.2026 05:51-05:58 UTC, 22 villages visited in turn (`gpu-load` rows in local/verify-measure/villager-dress.jsonl): pipelines 64 -> 993 (~40 per village, never falling), JS heap 286 -> 1709 MB, renderer-tracked textures 56 -> 156; Chrome's `--type=gpu-process` RSS 0.4 -> 9.7 GB at ~1.35 GB per minute (host has 15 GB). In the full suite the earlier sections add to it and the GPU process was lost around the 16th village (point 1446). A player who travels village to village grows the same load without bound.
-  Source: measurement of point 1446, 25.10.2026; reproducible player impact (CLAUDE.md §2 finding intake). Related: 285 (accumulation and leak hunt).
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 1144. Three of six probed village layouts leave no way out of the settlement,
-  and the dev assertion that says so has been firing unread (measured 17.09.2026 while
-  reviewing point 1045). `buildLayout` ends with
-  `const wayOut = pickWayOut(colliders, radius, bank)` and a `devAssert(wayOut !== null,
-  'way-out-missing', …)` at `layout.ts` ~1794. That assertion fires, and the same three
-  layouts fail IDENTICALLY on `main` and on `feat/1045-village-water-path`, so the gate
-  work is not the cause and the defect is older than it:
-  `bambara-village@2861293141`, `mandinka-village@1716508768` and
-  `mandinka-village@3170420543` all return `wayOut === null`, against three that return a
-  bearing (`bambara-village` at 2987912600, 7 and 1337). Point 1045 saw this ONCE over its
-  124-seed sweep and filed it verbatim as "recorded here, not diagnosed"; the six-pair
-  probe says the share is far larger than one in 124, and it is not confined to one people.
-  WHAT IS NOT YET KNOWN, and is the first half of this point: what the player actually
-  loses. `wayOut` is read twice further down — the flora and the loose rocks standing ON
-  the crossing are cleared with `onWayOut(...)` — so a null bearing may mean only that no
-  lane is swept clear, or it may mean the built fabric really does ring the place with no
-  gap a walker fits through. Measure that against the collider set at `WALKER_RADIUS`
-  before choosing a repair; the assertion's own text ("the built fabric leaves no crossing
-  of the boundary free") claims the second, and has never been checked.
-  Final state:
-  - Either every village layout carries a way out, or the cases that cannot are named with
-    a measured reason and the assertion stops claiming more than it knows.
-  - The dev assertion no longer fires in a green suite run: today `layout.test.ts` prints
-    it five times and passes anyway, which is exactly how it stayed unread.
-  Test: Vitest over the layout — sweep the river villages and assert `wayOut !== null`
-  (or the named, measured exception), plus a walker-radius check that the crossing the
-  bearing names is really free. No picture check unless the repair moves the fabric.
-  Criticality: medium until the player impact is measured; high if the second reading holds
-  and the player can be shut inside a settlement.
-  Refs: src/scenes/place/layout.ts (`pickWayOut`, the `way-out-missing` devAssert, `onWayOut`),
-  src/scenes/place/layout.test.ts
-  Bundle: Dorfleben
-
 - [ ] 1169. The children shuffle on the spot above the gate on roughly a tenth of the world
   seeds (measured 20.09.2026 while point 1094 moved the teaching checks onto the seed axis;
   reproducible, no browser needed).
@@ -5291,3 +5252,41 @@ put it is the mistake this line exists to stop.
   Test: Vitest for the restore-on-abort path; `benchmark` suite on both backends.
   Source: agent finding via the findings carrier, 21.11.2026 01:06 UTC.
   Bundle: Steuerung & Performance.
+
+- [ ] 1569. Board-claim guard and request-drain gate deadlock each other
+  Final state: with the idle card standing and pending user requests, the session can drain the requests (TASKS append, commit) without a hand edit of .batch-dashboard.html; either the board-claim guard lets the drain mutations through or `board.mjs now <N>` no longer requires the drain first.
+  Observed problem: 21.11.2026 13:52, session 6baf3b27: with the idle card standing and two pending user requests naming 1447, `board.mjs now <N>` refused (requests must be drained first) while the board-claim PreToolUse guard refused every Bash mutation needed to drain them (TASKS append). Escaped only by editing .batch-dashboard.html with the Edit tool.
+  Spec: Switch off whichever of the two refusals is redundant in that state (CLAUDE.md §2 infrastructure freeze: switch off an obstructing rule, do not rebuild it).
+  Test: Vitest case reproducing the state (idle card + pending request): the drain mutation is allowed.
+  Source: agent finding of 21.11.2026 13:16 UTC via the findings carrier (session unknown); real blockade (CLAUDE.md §2).
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1570. WebGL 2 pipeline count still drifts per settlement hop
+  Final state: on WebGL 2, consecutive settlement hops (`render-place-hop-leak` chain, `src/render/renderLeak.ts`) hold the renderer's cached pipeline count at a bounded level like WebGPU does (the cause named: which programs or render-object variants WebGL 2 keeps per visit); the hop judge's pipelines leg is then armed on WebGL 2 too (`judgePlaceHop(..., judgePipelines)`, today WebGPU only).
+  Observed problem: `polish-settlement`, WebGL 2, feat/1447 e79992b5f, 21.11.2026 22:14 UTC: places settle at 190-270 pipelines (WebGPU ~40-104), net growth over a 39-hop chain 129 -> 188 (bound 120 calibrated on WebGPU); same-place readings rise slowly (zulu-village 194 -> 257, bemba-village 192 -> 269 over ~30 hops, ~2 per hop). The WebGPU chain stays within the bound. Plain hops do NOT drift on WebGL 2 (probes 21.11.2026 23:20/23:28, worktree point-1447 `local/hop-probe-keys.mjs`, VERIFY_GL=webgl: zulu<->bemba 7 hops 65-87, cairo/tangier/bemba/maasai/zulu 12 hops 76-84); the growth comes from what polish-settlement does inside a visit (bisect its sections with the hop invariant on WebGL 2). Split 21.11.2026 from point 1447, whose pipelines bound is WebGPU-judged and WebGL-2-reported.
+  Source: split from point 1447 (point did not converge on both backends); reproducible player impact on the WebGL 2 fallback (CLAUDE.md §2 finding intake). Related: 1447, 1566, 285.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 1571. Village-loom river check reads no river although every water point is in frame
+  Final state: `polish-villagers --section=village-loom` on WebGPU either sees the river at its projected water points or the check is shown wrong and corrected; the cause is named (water not drawn at the loom shot, or a stale colour reading), and the four held reds are closed by that fix.
+  Observed problem: 'the river is in the captured frame, read at the projected water points' FAILS on WebGPU in polish-villagers runs of 21.11.2026 (logs local/verify-logs/2026-11-21T19-58-30-412, 21-09-30-877, 21-22-22-092), the last on the main verify baseline e45b6baa7, so pre-existing and not caused by 1447 or 1566; all 9 projected water points report inFrame=true.
+  Source: findings carrier 22.11.2026 06:26 UTC; render-verify-guard holds the reds unexplained and a charge needs an open point (CLAUDE.md §2: a held red is a real blockade of the render gate). Related: 1566, backlog entry 2026-11-21.
+  Bundle: Wetter & Wasser.
+- [ ] 1572. Low-preset kneel census reds when no villager happens to kneel at its instant
+  Final state: `polish-villagers --section=village-walk` judges the low-preset kneeling primitive only once a primitive figure is actually kneeling (bounded wait over frames, or a staged kneel), so `kneeling: 0` can no longer fail the uniform-scale and hand-sink checks; the cause is confirmed (one-instant sample of free village life) or the real defect named if no figure ever kneels on the low preset.
+  Observed problem: on feat/1447-settlement-visit-release (e79992b5f, dirty), WebGPU, local/verify-logs/2026-11-21T21-33-28-761-polish-villagers.log, 'low preset: every kneeling primitive figure keeps a uniform scale' and 'low preset: no kneeling primitive's drawn hand sinks into the ground' FAIL with census `{"figures":20,"skinnedFigures":0,"kneeling":0,...}`; the census (`scripts/verify/polish-villagers.mjs` ~6310) samples one instant 8 frames after `setDetailLevel('low')` and requires `kneeling > 0`. Other village-walk runs of 21.11.2026 passed it.
+  Source: render-verify-guard held the red unexplained, 22.11.2026 08:08 UTC (CLAUDE.md §2: a held red is a real blockade of the render gate). Related: 1301, 1447, 1566.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1574. Landing chain does not expire a landed point's render charge
+  Final state: `node scripts/land-point.mjs <N>` removes point N's entry from `scripts/render-verify-charges.mjs` in its tick commit (or the unit test 'charges only points the work order still holds OPEN' tolerates a charge of the point being ticked), so a landing of a point with a charge entry pushes green without a hand repair.
+  Observed problem: land-point 1566 (22.11.2026 20:58) failed at push: the pre-push unit gate's 'charges only points the work order still holds OPEN' test went red because `scripts/render-verify-charges.mjs` still held the 1566 entry; repaired by hand in 34b8d1f1f, board and cleanup then done by hand. Every landing of a charged point repeats this red push.
+  Test: Vitest case: ticking a charged point leaves no charge for it and the open-points test stays green.
+  Source: agent finding of 22.11.2026 20:21 UTC via the findings carrier; real blockade of the landing chain (CLAUDE.md §2 finding intake). Related: 1566.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1575. Walker-dust visibility check reds in the full polish-settlement pass while its section run is green
+  Final state: `polish-settlement` judges walker-dust visibility against a still scene in the full pass as in its section run (the OFF-vs-OFF noise floor stays at the section level, or the comparison is made noise-robust), so the check reds only when the dust is actually invisible; the cause of the full-pass noise is named.
+  Observed problem: full WebGPU pass on feat/1573 86d1f7296 (local/verify-logs/2026-11-22T21-30-21-089-polish-settlement.log): 'the dust is visible' FAIL, ON-vs-OFF 10.12 against OFF-vs-OFF 8.79 mean |ΔRGB| — the OFF-vs-OFF floor shows the scene was not still. `--section=walker-dust` then passed on main 0d8638c33 (2026-11-22T22-31-56-885) and on the same branch head 86d1f7296 (2026-11-22T22-34-39-610); 1573 changes only the DEV leak judge and its report.
+  Test: the full-pass walker-dust block records its OFF-vs-OFF floor; a unit or section case pins the noise-robust comparison.
+  Source: agent finding of 22.11.2026 22:07 UTC via the findings carrier; a red that holds landings (CLAUDE.md §2 finding intake). Related: 358, 1573.
+  Bundle: Session- & Repo-Hygiene.

@@ -10,8 +10,9 @@
 // verification reads — `figure-head`, `hand-left`, `hand-right` — sit on the
 // bones, so they report where the drawn body really is.
 
-import { Fragment, useEffect, useId, useMemo, useRef, type ReactNode, type RefObject } from 'react'
-import { createPortal, useFrame } from '@react-three/fiber'
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { ScenePortal } from './scenePortal'
 import * as THREE from 'three/webgpu'
 import { FIGURE_LIMBS } from '../../render/figures'
 import { applyFigurePose, restingArmRefs, type FigureLimbs } from '../../render/figurePose'
@@ -153,9 +154,23 @@ function cachedGltfFigure(asset: VillagerAsset, person: GltfPerson, layers: Dres
 // distinct figure ever drawn resident. A geometry drawn again re-uploads.
 
 const geometryUsers = new Map<THREE.BufferGeometry, number>()
+/** Geometries the caches dropped while a figure still drew them: no later
+ *  figure can reach them, so their last release may free the GPU side. */
+const orphaned = new WeakSet<THREE.BufferGeometry>()
 
 function holdGeometry(g: THREE.BufferGeometry): void {
   geometryUsers.set(g, (geometryUsers.get(g) ?? 0) + 1)
+}
+
+/** Free an unreachable geometry once the current commit is done: a figure of an
+ *  incoming settlement rendered in the same commit took it from the caches
+ *  before they were cleared and holds it in its layout effect, after this
+ *  commit's unmounts — then it stays orphaned and goes on that last release. */
+function disposeAfterCommit(g: THREE.BufferGeometry): void {
+  queueMicrotask(() => {
+    if (geometryUsers.has(g)) orphaned.add(g)
+    else g.dispose()
+  })
 }
 
 function releaseGeometry(g: THREE.BufferGeometry): void {
@@ -165,7 +180,43 @@ function releaseGeometry(g: THREE.BufferGeometry): void {
     return
   }
   geometryUsers.delete(g)
-  g.dispose()
+  // No dispose here (point 1566): three/webgpu shares node-builder state, and
+  // with it the morph DataArrayTexture, between render objects of one material
+  // and geometry. A mid-visit dispose freed that texture and its dispose
+  // listener; the next figure drawing the cached geometry re-uploaded a texture
+  // nothing freed again (measured: +5..+13 per village). The place sweep
+  // (placeRelease.ts) disposes every drawn geometry on leave instead; a
+  // geometry no cache holds any more (the bird's-eye traveller, outside that
+  // sweep) is unreachable for a redraw and is freed here.
+  if (orphaned.has(g)) disposeAfterCommit(g)
+}
+
+/** Forget every cached figure geometry and person (point 1447). The caches are
+ *  keyed per person, dress layer and village palette, so across a journey they
+ *  only grew (~120 MB of heap per village). Called when a settlement scene
+ *  unmounts: a dropped geometry no figure draws is disposed (a second dispose
+ *  after the place sweep is a no-op); one still drawn is freed on its last
+ *  release. Returns the entries dropped. */
+export function releaseFigureCaches(): number {
+  const maps: Map<string, unknown>[] = [bodyCache, layerCache, figureCache, personCache, gltfFigureCache, gltfLayerCache]
+  let n = 0
+  for (const m of maps) {
+    n += m.size
+    for (const v of m.values()) {
+      if (!(v instanceof THREE.BufferGeometry)) continue
+      // Unused now and unreachable after the clear: free it; still drawn: free
+      // it on its last release.
+      if (geometryUsers.has(v)) orphaned.add(v)
+      else disposeAfterCommit(v)
+    }
+    m.clear()
+  }
+  return n
+}
+
+/** Entries held by the figure caches (verification and tests). */
+export function figureCacheSize(): number {
+  return bodyCache.size + layerCache.size + figureCache.size + personCache.size + gltfFigureCache.size + gltfLayerCache.size
 }
 
 /** The figure's whole scene graph, built once per identity and look. */
@@ -360,7 +411,9 @@ export function SkinnedFigure({
   const rig = useMemo(() => buildRig(id, look, cloth, skin, office, dress), [id, look, cloth, skin, office, dress])
   // The skeleton (and its bone texture) is this figure's own; the geometry is
   // shared through the caches, its GPU side held while any figure draws it.
-  useEffect(() => {
+  // A layout effect: the hold lands in the commit that mounts the figure, so a
+  // cache clear in that commit defers to it (disposeAfterCommit).
+  useLayoutEffect(() => {
     const geos = rig.meshes.map((m) => m.geometry)
     geos.forEach(holdGeometry)
     return () => {
@@ -976,15 +1029,17 @@ export function SkinnedFigure({
       </group>
       {/* Keyed by skeleton: a rebuilt rig remounts the props on its new bones. */}
       <Fragment key={rig.skeleton.uuid}>
-        {handProp && createPortal(<>{handProp}</>, rig.hands[0])}
-        {rig.gltf &&
-          createPortal(
+        {/* ScenePortal, not R3F's createPortal: 9.6.1 never drops a portal's
+            store subscription, which kept every figure ever drawn (scenePortal.tsx). */}
+        {handProp && <ScenePortal container={rig.hands[0]}>{handProp}</ScenePortal>}
+        {rig.gltf && (
+          <ScenePortal container={rig.bones['hand.R']}>
             <group ref={shovel} visible={false} name="digging-tool">
               <Shovel />
-            </group>,
-            rig.bones['hand.R'],
-          )}
-        {headProp && createPortal(<>{headProp}</>, rig.crown)}
+            </group>
+          </ScenePortal>
+        )}
+        {headProp && <ScenePortal container={rig.crown}>{headProp}</ScenePortal>}
       </Fragment>
     </group>
   )
