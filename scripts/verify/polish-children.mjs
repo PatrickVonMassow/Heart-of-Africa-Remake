@@ -610,7 +610,7 @@ if (section('tag-catch')) {
             ({ from, to, back, side, subject }) => {
               const p = window.__placePlayer
               const L = window.__placeLayout
-              if (!p) return false
+              if (!p) return 'no player'
               const ux = to.x - from.x
               const uz = to.z - from.z
               const n = Math.hypot(ux, uz) || 1
@@ -618,19 +618,19 @@ if (section('tag-catch')) {
               const mz = (from.z + to.z) / 2
               const x = mx + ((side * uz) / n) * back
               const z = mz + ((-side * ux) / n) * back
-              if (Math.hypot(x, z) > (L ? L.radius : 28) - 1.5) return false
+              if (Math.hypot(x, z) > (L ? L.radius : 28) - 1.5) return 'off layout'
               p.x = x
               p.z = z
               // Aimed at the SUBJECT, not the pair's middle: the pair may have
               // run apart. Place-camera yaw 0 looks toward −Z, hence the +PI.
               p.yaw = Math.atan2(subject.x - x, subject.z - z) + Math.PI
               p.pitch = -0.28
-              return true
+              return 'ok'
             },
             { from, to, back, side, subject },
           )
-          if (!placed) {
-            tried.push(`${back}/${side}: outside the layout`)
+          if (placed !== 'ok') {
+            tried.push(`${back}${side > 0 ? '+' : '-'} ${placed}`)
             continue
           }
           await nextFrames(3)
@@ -640,26 +640,30 @@ if (section('tag-catch')) {
           const aimed = await page.evaluate((q) => {
             const p = window.__placePlayer
             const probe = window.__placeRayHit?.(q.x, 0.3, q.z)
-            if (!p || !probe) return false
+            if (!p) return 'no player'
+            if (!probe) return 'no probe'
             const h = Math.hypot(q.x - p.x, q.z - p.z)
-            if (h < 2) return false
+            if (h < 2) return `pushed to ${h.toFixed(1)} m`
             const dy = Math.sqrt(Math.max(0, probe.targetDistance ** 2 - h ** 2))
             p.yaw = Math.atan2(q.x - p.x, q.z - p.z) + Math.PI
             p.pitch = -Math.atan2(dy + 0.3 - 0.35, h)
-            return true
+            return 'ok'
           }, subject)
-          if (!aimed) {
-            tried.push(`${back}/${side}: no aim (collision pushed the camera within 2 m)`)
+          if (aimed !== 'ok') {
+            tried.push(`${back}${side > 0 ? '+' : '-'} ${aimed}`)
             continue
           }
           await nextFrames(3)
           const hit = await page.evaluate((q) => window.__placeRayHit?.(q.x, 0.3, q.z) ?? null, subject)
           if (hit && (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance * 0.9)) return { back, tried }
           tried.push(hit
-            ? `${back}/${side}: ${hit.hitName} at ${hit.hitDistance.toFixed(2)} of ${hit.targetDistance.toFixed(2)} m`
-            : `${back}/${side}: no ray probe`)
+            ? `${back}${side > 0 ? '+' : '-'} ${String(hit.hitName).slice(0, 12)}@${hit.hitDistance.toFixed(1)}/${hit.targetDistance.toFixed(1)}`
+            : `${back}${side > 0 ? '+' : '-'} no probe`)
         }
       }
+      // The stored run record cuts a check detail at 200 characters (point 690):
+      // the compact trace above fits there, and the log keeps it whole.
+      console.log(`  standpoint search refused every stand: ${tried.join('; ')}`)
       return { back: null, tried }
     }
 
@@ -681,7 +685,7 @@ if (section('tag-catch')) {
       )
       await nextFrames(2)
       const stood = await standBeside(shot.catcherAt, shot.caughtAt, shot.caughtAt)
-      check('a clear side-on standpoint on the catch', stood.back != null, stood.back != null ? `${stood.back} m` : `every standpoint occluded — ${stood.tried.join('; ')}`)
+      check('a clear side-on standpoint on the catch', stood.back != null, stood.back != null ? `${stood.back} m` : `no clear standpoint — ${stood.tried.join('; ')}`)
       if (stood.back != null) {
         await frame('1176-tag-catch', {
           local: { x: shot.caughtAt.x, y: 0.35, z: shot.caughtAt.z },
@@ -713,7 +717,7 @@ if (section('tag-catch')) {
       )
       await nextFrames(2)
       const stood = await standBeside(beat.caughtAt, beat.runnerAt ?? beat.caughtAt, beat.caughtAt)
-      check('a clear side-on standpoint on the beat', stood.back != null, stood.back != null ? `${stood.back} m` : `every standpoint occluded — ${stood.tried.join('; ')}`)
+      check('a clear side-on standpoint on the beat', stood.back != null, stood.back != null ? `${stood.back} m` : `no clear standpoint — ${stood.tried.join('; ')}`)
       if (stood.back != null) {
         await frame('1176-tag-beat', {
           local: { x: beat.caughtAt.x, y: 0.35, z: beat.caughtAt.z },
