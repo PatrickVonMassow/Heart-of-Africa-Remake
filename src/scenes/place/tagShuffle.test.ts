@@ -71,17 +71,25 @@ import { mulberry32 } from '../../world/noise'
 //  - and 46, which is NOT a comfortable third: swept over bambara seeds 1-60 it
 //    is the WORST layout still inside the gate (0.226 % against 0.25 %), so the
 //    sample's third case is the hardest clean one rather than a lucky one.
-// WHAT THE SWEEP ALSO FOUND, and what this file does NOT hide: six of those
-// sixty seeds read ABOVE the shipped gate — 27 (0.367 %), 30 (1.299 %), 33
-// (0.282 %), 35 (0.311 %), 40 (0.254 %) and 50 (0.254 %). That is the user's own
-// complaint, alive on roughly a tenth of the worlds he can be dealt, and it was
-// invisible for exactly as long as the sample varied the village instead of the
-// seed. It is filed as its own work-order point rather than folded in here: this
-// point deletes test breadth and builds nothing.
+// WHAT THE SWEEP ALSO FOUND: six of those sixty seeds read ABOVE the shipped
+// gate — 27 (0.367 %), 30 (1.299 %), 33 (0.282 %), 35 (0.311 %), 40 (0.254 %)
+// and 50 (0.254 %), the user's own complaint alive on roughly a tenth of the
+// worlds he can be dealt. All six are judged here since work-order 1169, so the
+// repair cannot be read off a lucky layout. Seed 35 is the one that stayed red
+// longest: on the bank round as it stood it read 0.452 %, and once the boulder
+// climber walked home round its playmates, 1.356 % — every roamer the
+// separation had left past the quarter's rim was sent home too, and two froze
+// there while a third walked into them. Only the boulder's child walks home now.
 const PLACES: Array<[string, number]> = [
   ['bambara-village', 2972259115],
   ['bambara-village', 42],
   ['bambara-village', 46],
+  ['bambara-village', 27],
+  ['bambara-village', 30],
+  ['bambara-village', 33],
+  ['bambara-village', 35],
+  ['bambara-village', 40],
+  ['bambara-village', 50],
   // AND THE TWO SETTLEMENTS THE SILENT GAME NOW RUNS IN (work-order 690). The
   // seed spread above stays what 1094 made it — one village, three seeds — and
   // these two add the axis that spread never had a reason to cover: the tag
@@ -372,7 +380,10 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // watches. Here every errand villager strolls INSIDE the ground: adult
     // bodies at full scale, crossing and standing among the children, which is
     // the crowding that made the multi-pass sweep necessary.
-    const v = village('bambara-village', 2972259115, undefined, { adultsAmongTheChildren: true })
+    // Seed 4, not the production report's seed (cross-vendor review of 1169):
+    // that one fell to 45 pair-frames of contact under 1169's walks, below the
+    // precondition below; seed 4 reads 258 with every other bar here clean.
+    const v = village('bambara-village', 4, undefined, { adultsAmongTheChildren: true })
     const paths: Track[][] = v.children.map(() => [])
     const sep = balance.villageLife.separation
     const adultPair = sep.bodyRadius * KID_SCALE + sep.bodyRadius - sep.slop
@@ -396,8 +407,13 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     }
     // They really did meet, and often. A PRECONDITION, not a quality bar: the
     // count is chaotic in any path change (point 1424 measured 15 seeds, 0-561
-    // pair-frames, this seed 168 before and 87 after an unrelated walk fix,
+    // pair-frames, seed 2972259115 168 before and 87 after an unrelated walk fix,
     // the sum unmoved), so the bar only asks for over 50 pair-frames of contact.
+    // Re-measured 23.11.2026 over bambara seeds 1-40 after work-order 1169's
+    // walks: 0-472 pair-frames, zero overlaps at every seed; 2972259115 reads
+    // 45, which is why this case now runs at seed 4 (258) instead of lowering
+    // the bar — the count says only whether the adults met the children, never
+    // how well they parted.
     expect(touching).toBeGreaterThan(50)
     // NOBODY IS EVER VISIBLY INSIDE ANYBODY. Measured over this minute: 6
     // pair-frames of contact at all, the deepest 0.9 cm of a 37 cm contact —
