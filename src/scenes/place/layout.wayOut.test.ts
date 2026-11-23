@@ -189,10 +189,16 @@ describe('every settlement keeps one way out free (work-order 688)', () => {
     // these layouts, beyond the corridor the picker measures.
     const end = Math.max(layout.radius + WAY_OUT_OUTER, placeBoundaryRadius(layout, b) + 1)
     expect(isOutsidePlace(layout, Math.cos(b) * end, Math.sin(b) * end)).toBe(true)
-    for (let d = layout.radius - WAY_OUT_INNER; d <= end; d += 0.25) {
+    // Both endpoints sampled, and the clearance padded by half the spacing, so a
+    // collider grazing the line between two samples still counts (as clearCorridor).
+    const start = layout.radius - WAY_OUT_INNER
+    const steps = Math.ceil((end - start) / 0.25)
+    const pad = PLAYER_RADIUS + (end - start) / steps / 2
+    for (let k = 0; k <= steps; k++) {
+      const d = start + ((end - start) * k) / steps
       const x = Math.cos(b) * d
       const z = Math.sin(b) * d
-      expect(standingClear(layout.colliders, x, z, PLAYER_RADIUS), `${id} seed ${seed}: blocked ${d.toFixed(2)} m out`).toBe(true)
+      expect(standingClear(layout.colliders, x, z, pad), `${id} seed ${seed}: blocked ${d.toFixed(2)} m out`).toBe(true)
     }
   })
 

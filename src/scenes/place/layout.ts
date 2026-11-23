@@ -646,7 +646,8 @@ function fabricOf(
  * keeps off it. Bearings pointing at the water are skipped, because a way out
  * over the bank is a way into the river.
  *
- * Returns the bearing, or null where the fabric itself leaves no crossing.
+ * Returns the bearing, or null where no sampled bearing passed the clearance
+ * check (bounding circles, 1.5 m steps) — not proof that a walker is shut in.
  */
 export function pickWayOut(
   colliders: readonly Collider[],
@@ -2124,10 +2125,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   devAssert(
     wayOut !== null,
     'way-out-missing',
-    // Says what the picker measured: a null means no corridor of the full way-out
-    // width off the bank, not that a walker cannot get out (work-order 1144 found
-    // narrower gaps walkable in every layout it flood-filled).
-    () => `${place.id}@${seed}: no bearing off the bank keeps a ${2 * WAY_OUT_HALF_WIDTH} m corridor through the boundary band; narrower gaps are not measured here`,
+    // Says only what the picker checked: its sampled bearings against bounding
+    // circles, not whether a walker fits through a narrower or unsampled gap.
+    () => `${place.id}@${seed}: none of the ${WAY_OUT_BEARINGS} sampled bearings off the bank passed the picker's ${2 * WAY_OUT_HALF_WIDTH} m clearance check; narrower or unsampled gaps are not measured here`,
   )
 
   const flora: PlaceLayout['flora'] = []
