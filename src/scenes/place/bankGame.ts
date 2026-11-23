@@ -1647,16 +1647,20 @@ function stepRoam(
     if (c.homing) {
       const way = wayTo(c, stage.roam, dt, world)
       const toWay = Math.atan2(way.x - c.x, way.z - c.z)
-      // While a playmate names the stone, a homing child that is WALKING looks
-      // at it like every other ground-level playmate (below). Its facing then
-      // no longer says where its feet go, so the set-off test reads the walk
-      // heading instead; a child turning on the spot still reads its facing.
-      // NOT ONLY DURING THE HOLD: when it ends the facing still points at the
-      // stone, and reading it then stopped a walking child to turn back
-      // (cross-vendor review of 1169, round 4). A child already walking keeps
-      // walking while its gaze eases forward.
-      const body = c.pace > 0 ? c.heading : c.facing
-      if (Math.abs(Math.atan2(Math.sin(toWay - body), Math.cos(toWay - body))) > cfg.setOffTurn) {
+      // A child STANDING turns on the spot until its body faces the way, then
+      // sets off. A child already WALKING stops to turn only when the way lies
+      // behind BOTH its walk and its body, and never while it is going round
+      // an obstacle. Either reading alone stopped it for a frame: the facing
+      // when a naming hold ended with its gaze still on the stone, the heading
+      // when an obstacle deflected its walk while its body still faced the way
+      // (cross-vendor review of 1169, rounds 4-5). An edge walk that bends past
+      // `setOffTurn` would otherwise stop, turn back into the obstacle, and be
+      // deflected again: a shuffle on the spot.
+      const off = (a: number) => Math.abs(Math.atan2(Math.sin(toWay - a), Math.cos(toWay - a)))
+      const turnFirst = c.pace > 0
+        ? c.edgeFor <= 0 && off(c.heading) > cfg.setOffTurn && off(c.facing) > cfg.setOffTurn
+        : off(c.facing) > cfg.setOffTurn
+      if (turnFirst) {
         drive(s, i, null, false, dt, cfg, world)
         c.facing = turnToward(c.facing, toWay, cfg.turnRate * dt)
       } else {

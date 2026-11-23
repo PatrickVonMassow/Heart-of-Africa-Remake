@@ -1000,6 +1000,122 @@ describe('the children`s game at the bank (point 687)', () => {
     }
   })
 
+  it('keeps a homing child walking when an obstacle deflects its walk past the set-off turn', () => {
+    // An obstacle turned a walking child's heading more than `setOffTurn` away
+    // from its way while its body still faced the way; reading the heading alone
+    // stood it for a frame (cross-vendor review of 1169, round 5). The state a
+    // real deflection leaves is imposed on a child walking home over open
+    // ground: once as a bare deflection, once with the edge commitment
+    // `moveChild` sets for it. Every frame until it stands inside its quarter
+    // must move it, never faster than its walking pace.
+    const cfg: BankConfig = { ...CFG, roamSeconds: 600, roamSpread: 0 }
+    const world = openWorld()
+    const home = STAGE.roam
+    const maxStep = cfg.walkPace * (1 / 60) * 1.05
+    for (const seed of SEEDS) {
+      for (const edge of [false, true]) {
+        for (const side of [1, -1]) {
+          const rand = mulberry32(seed)
+          const s = createBankGame(
+            [
+              { x: home.x - home.radius - 6, z: home.z },
+              { x: home.x + 1, z: home.z - 1 },
+            ],
+            rand,
+            cfg,
+          )
+          s.namedBoulder = true
+          const c = s.children[0]
+          c.homing = true
+          const label = `seed ${seed}, edge ${edge}, side ${side}`
+          let deflected = false
+          let inside = false
+          let frames = 0
+          for (let f = 0; f < 60 * 30 && !inside; f++) {
+            // Once the child walks toward home with its body on the way,
+            // deflect its walk by 110°, past the 90° set-off turn.
+            const toHome = Math.atan2(home.x - c.x, home.z - c.z)
+            const bodyOff = Math.abs(Math.atan2(Math.sin(toHome - c.facing), Math.cos(toHome - c.facing)))
+            if (!deflected && f >= 30 && c.pace > 0 && bodyOff < 0.2) {
+              c.heading = toHome + side * ((110 * Math.PI) / 180)
+              if (edge) {
+                c.edgeFor = cfg.edgeSeconds
+                c.edgeSide = side
+              }
+              deflected = true
+            }
+            const x0 = c.x
+            const z0 = c.z
+            stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+            const moved = Math.hypot(c.x - x0, c.z - z0)
+            expect(moved, `${label}, frame ${f}: walked, not placed`).toBeLessThanOrEqual(maxStep)
+            inside = Math.hypot(c.x - home.x, c.z - home.z) <= home.radius
+            if (deflected) {
+              frames++
+              expect(moved, `${label}, frame ${f}: stood outside its quarter`).toBeGreaterThan(1e-6)
+            }
+          }
+          expect(deflected, label).toBe(true)
+          expect(frames, label).toBeGreaterThan(30)
+          expect(inside, `${label}: arrived inside its quarter`).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('walks a homing child round a wall without stopping for its deflections', () => {
+    // The same defect against a REAL obstacle: a wall stands across the way
+    // home, the child slides along it and round its end, and every deflection
+    // past `setOffTurn` stood it for a frame — 70-200 stopped frames per walk
+    // before the fix (cross-vendor review of 1169, round 5). What remains
+    // allowed is ONE deliberate turn on the spot where, the wall passed, the way
+    // lies behind both its walk and its body: never a stop while the body still
+    // faces the way, and never stop-walk-stop.
+    const cfg: BankConfig = { ...CFG, roamSeconds: 600, roamSpread: 0 }
+    const home = STAGE.roam
+    const wx = home.x - home.radius - 2
+    // A wall across the way with short arms toward the child: deflections well
+    // past 90° (measured up to 3.0 rad) as it works round them.
+    const wall = (x: number, z: number) =>
+      (Math.abs(x - wx) < 0.3 && Math.abs(z - home.z) < 2.5) ||
+      (Math.abs(Math.abs(z - home.z) - 2.5) < 0.3 && x > wx - 0.8 && x < wx + 0.3)
+    const world: BankWorld = { ...openWorld(), blocked: wall }
+    const maxStep = cfg.walkPace * (1 / 60) * 1.05
+    for (const seed of SEEDS) {
+      for (const dz of [-1.2, -0.4, 0, 0.5, 1.1]) {
+        const rand = mulberry32(seed)
+        const s = createBankGame([{ x: wx - 2.5, z: home.z + dz }, { x: home.x + 1, z: home.z - 1 }], rand, cfg)
+        s.namedBoulder = true
+        const c = s.children[0]
+        c.homing = true
+        const label = `seed ${seed}, dz ${dz}`
+        let setOff = false
+        let stopRuns = 0
+        let wasStopped = false
+        let inside = false
+        for (let f = 0; f < 60 * 30 && !inside; f++) {
+          const x0 = c.x
+          const z0 = c.z
+          const toHome = Math.atan2(home.x - x0, home.z - z0)
+          const bodyOff = Math.abs(Math.atan2(Math.sin(toHome - c.facing), Math.cos(toHome - c.facing)))
+          stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+          const moved = Math.hypot(c.x - x0, c.z - z0)
+          expect(moved, `${label}, frame ${f}: walked, not placed`).toBeLessThanOrEqual(maxStep)
+          inside = Math.hypot(c.x - home.x, c.z - home.z) <= home.radius
+          const stopped = moved < 1e-6
+          if (setOff && stopped) {
+            expect(bodyOff, `${label}, frame ${f}: stood while its body faced the way`).toBeGreaterThan(cfg.setOffTurn)
+            if (!wasStopped) stopRuns++
+          }
+          if (!stopped) setOff = true
+          wasStopped = stopped
+        }
+        expect(inside, `${label}: arrived inside its quarter`).toBe(true)
+        expect(stopRuns, `${label}: separate stops after setting off`).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+
   // THE CLIMB ITSELF (work-order 1080). What shipped before this point was a
   // flag: `climbing` went true for 0.35 s while the child stood 2.2 m from the
   // boulder's centre and the view lifted it 0.32 m where it stood. Every
