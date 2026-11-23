@@ -794,6 +794,139 @@ describe('the children`s game at the bank (point 687)', () => {
     }
   })
 
+  it('clears the walk home at the roam`s opening, not by the quarter`s radius', () => {
+    // ISOLATED from `stepRoam`'s radius check (cross-vendor review of 1169): on
+    // the step that reopens the roam, the child stands far OUTSIDE its quarter
+    // with the flag set, so only the reset in `openRoam` can clear it.
+    const cfg: BankConfig = { ...CFG, roamSeconds: 0.1, roamSpread: 0 }
+    const world = openWorld()
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const count = balance.villageLife.tag.childCount
+      const spots = Array.from({ length: count }, (_, i) => ({
+        x: STAGE.roam.x + Math.cos((i / count) * Math.PI * 2) * 2.4,
+        z: STAGE.roam.z + Math.sin((i / count) * Math.PI * 2) * 2.4,
+      }))
+      const s = createBankGame(spots, rand, cfg)
+      const c = s.children[0]
+      let leftRoam = false
+      let checked = false
+      for (let t = 0; t < 240 && !checked; t += 1 / 60) {
+        // The step that will reopen the roam (the same condition `advanceBankGame` tests).
+        const reopens =
+          leftRoam &&
+          s.phase === 'part' &&
+          s.seriesPlayed >= cfg.seriesCycles &&
+          s.endFor <= 0 &&
+          s.phaseFor - 1 / 60 <= 0 &&
+          !s.children.some((k) => k.arrival)
+        if (reopens) {
+          c.x = STAGE.roam.x - STAGE.roam.radius - 6
+          c.z = STAGE.roam.z
+          c.homing = true
+        }
+        stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+        if (s.phase !== 'roam') leftRoam = true
+        else if (reopens) {
+          expect(Math.hypot(c.x - STAGE.roam.x, c.z - STAGE.roam.z)).toBeGreaterThan(STAGE.roam.radius)
+          expect(c.homing).toBe(false)
+          checked = true
+        }
+      }
+      expect(checked).toBe(true) // the reopening step really was reached
+    }
+  })
+
+  it('walks a homing child from outside its quarter back into it', () => {
+    // OBSERVABLE RETURN, not the flag (cross-vendor review of 1169): a child the
+    // boulder took out of its quarter gains ground toward the quarter's centre
+    // at every half second until it stands inside.
+    const cfg: BankConfig = { ...CFG, roamSeconds: 600, roamSpread: 0 }
+    const world = openWorld()
+    const home = STAGE.roam
+    for (const seed of SEEDS) {
+      for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+        const rand = mulberry32(seed)
+        const s = createBankGame(
+          [
+            { x: home.x + Math.sin(angle) * (home.radius + 5), z: home.z + Math.cos(angle) * (home.radius + 5) },
+            { x: home.x + 1, z: home.z - 1 },
+          ],
+          rand,
+          cfg,
+        )
+        // The boulder is settled for this roam, so nobody is sent to it.
+        s.namedBoulder = true
+        const c = s.children[0]
+        c.homing = true
+        const toHome = () => Math.hypot(c.x - home.x, c.z - home.z)
+        let last = toHome()
+        let inside = false
+        // 0.5 s samples, at most 20 s of round clock for 5 m at walking pace.
+        for (let sample = 0; sample < 40 && !inside; sample++) {
+          for (let f = 0; f < 30; f++) stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+          const now = toHome()
+          expect(now, `seed ${seed}, angle ${angle.toFixed(2)}, sample ${sample}`).toBeLessThan(last)
+          last = now
+          inside = now <= home.radius
+        }
+        expect(inside, `seed ${seed}, angle ${angle.toFixed(2)}`).toBe(true)
+      }
+    }
+  })
+
+  it('turns a failed boulder candidate toward the stone while it walks home', () => {
+    // A ground-level playmate turns toward the naming while it walks (work-order
+    // 1082). A candidate that gave up on its route and is still walking home when
+    // its replacement reaches the top is one of them (cross-vendor review of 1169).
+    const cfg: BankConfig = { ...CFG, roamSeconds: 600, roamSpread: 0 }
+    const world = openWorld()
+    // The quarter lies well away from the stone, so the failed child's walk home
+    // is long enough to overlap the replacement's hold at the top.
+    const stage: BankStage = { ...STAGE, roam: { x: STAGE.boulder.x - 14, z: STAGE.boulder.z, radius: 3 } }
+    const b = stage.boulder
+    for (const seed of SEEDS) {
+      const rand = mulberry32(seed)
+      const s = createBankGame(
+        [
+          { x: b.x + 3, z: b.z },
+          { x: b.x, z: b.z + 4 },
+        ],
+        rand,
+        cfg,
+      )
+      const failed = s.children[0]
+      stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+      expect(s.climber).toBe(0)
+      // FORCED FAILURE: no progress is possible against a best distance of zero,
+      // and the watch has run out.
+      failed.goalX = b.x
+      failed.goalZ = b.z
+      failed.goalFor = cfg.roamGoalSeconds + 1
+      stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+      expect(s.failedClimbers).toEqual([0])
+      expect(failed.homing).toBe(true)
+      let watchedWalking = 0
+      let worstLook = 0
+      for (let t = 0; t < 30 && failed.homing; t += 1 / 60) {
+        stepBankGame(s, 1 / 60, cfg, stage, world, rand)
+        const atTop = s.children[1].climb === 'top'
+        if (atTop && failed.homing && failed.pace > 0) {
+          watchedWalking++
+          // After the first second (a half turn at `turnRate` takes 0.87 s),
+          // the facing holds on the stone.
+          if (watchedWalking > 60) {
+            const toStone = Math.atan2(b.x - failed.x, b.z - failed.z)
+            const off = Math.abs(Math.atan2(Math.sin(toStone - failed.facing), Math.cos(toStone - failed.facing)))
+            worstLook = Math.max(worstLook, off)
+          }
+        }
+      }
+      expect(watchedWalking, `seed ${seed}: the replacement stood on top while the failed child walked home`).toBeGreaterThan(90)
+      expect(worstLook, `seed ${seed}`).toBeLessThan(0.2)
+    }
+  })
+
   // THE CLIMB ITSELF (work-order 1080). What shipped before this point was a
   // flag: `climbing` went true for 0.35 s while the child stood 2.2 m from the
   // boulder's centre and the view lifted it 0.32 m where it stood. Every
