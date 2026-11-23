@@ -47653,3 +47653,11 @@ to land than a mechanism that needs a review.
   Source: split from point 1566, 22.11.2026 — the third review round of its detector answers found only further detector edge cases while the morph-texture fix itself stayed green; (1), (3), (4) are possible false approvals (CLAUDE.md §2 finding intake). Related: 1566, 1447.
   Criticality: high — inherited from 1566; (1), (3) and (4) can let the leak detector approve a growing resident set.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 1568. Split rule: inherit the place of a parent standing before the release boundary
+  Final state: the append gate holds such a split exactly like a split of an `ahead` parent.
+  Observed problem: The split of 1447 into 1566 (21.11.2026, c52ddd397) passed the split rule and landed at position 188 of 188 while its parent stands at position 2 — a false approval by the rule meant to prevent exactly that. User asked why on 21.11.2026 13:05 and approved the fix in chat.
+  Spec: Close the gap in the split rule (point 1551): `splitPriorityOf` in scripts/queue-rank-core.mjs treats a split as priority only when its parent's rank entry is `ahead` or its block states high urgency. A parent that stands in front of the release boundary by position (its `last` entry predates its rise to the front) does not count, so its split is appended at the tail. Change: a split also inherits its parent's place when the parent currently stands in front of the release boundary in the shown work order (the same position read `releaseBoundaryState` uses). Correction of an existing rule, no new guard (CLAUDE.md §2 infrastructure freeze: possible false approval).
+  Test: Vitest case in scripts/queue-rank-core.test.mjs — parent with a `last` entry at position 2, its split appended last is held; a parent behind the boundary still lets its split append.
+  Source: user request of 21.11.2026 12:48 UTC via the findings carrier (session unknown); approved: "Ja, beide mit diesen Titeln freigegeben."
+  Bundle: Session- & Repo-Hygiene.

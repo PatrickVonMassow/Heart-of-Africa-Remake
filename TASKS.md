@@ -107,14 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1568. Split rule: inherit the place of a parent standing before the release boundary
-  Final state: the append gate holds such a split exactly like a split of an `ahead` parent.
-  Observed problem: The split of 1447 into 1566 (21.11.2026, c52ddd397) passed the split rule and landed at position 188 of 188 while its parent stands at position 2 — a false approval by the rule meant to prevent exactly that. User asked why on 21.11.2026 13:05 and approved the fix in chat.
-  Spec: Close the gap in the split rule (point 1551): `splitPriorityOf` in scripts/queue-rank-core.mjs treats a split as priority only when its parent's rank entry is `ahead` or its block states high urgency. A parent that stands in front of the release boundary by position (its `last` entry predates its rise to the front) does not count, so its split is appended at the tail. Change: a split also inherits its parent's place when the parent currently stands in front of the release boundary in the shown work order (the same position read `releaseBoundaryState` uses). Correction of an existing rule, no new guard (CLAUDE.md §2 infrastructure freeze: possible false approval).
-  Test: Vitest case in scripts/queue-rank-core.test.mjs — parent with a `last` entry at position 2, its split appended last is held; a parent behind the boundary still lets its split append.
-  Source: user request of 21.11.2026 12:48 UTC via the findings carrier (session unknown); approved: "Ja, beide mit diesen Titeln freigegeben."
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 1144. Three of six probed village layouts leave no way out of the settlement,
   and the dev assertion that says so has been firing unread (measured 17.09.2026 while
   reviewing point 1045). `buildLayout` ends with
