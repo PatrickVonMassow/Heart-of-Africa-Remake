@@ -1647,11 +1647,24 @@ function stepRoam(
     if (c.homing) {
       const way = wayTo(c, stage.roam, dt, world)
       const toWay = Math.atan2(way.x - c.x, way.z - c.z)
-      if (Math.abs(Math.atan2(Math.sin(toWay - c.facing), Math.cos(toWay - c.facing))) > cfg.setOffTurn) {
+      // While a playmate names the stone, a homing child that is WALKING looks
+      // at it like every other ground-level playmate (below). Its facing then
+      // no longer says where its feet go, so the set-off test reads the walk
+      // heading instead; a child turning on the spot still reads its facing.
+      const body = watched && c.pace > 0 ? c.heading : c.facing
+      if (Math.abs(Math.atan2(Math.sin(toWay - body), Math.cos(toWay - body))) > cfg.setOffTurn) {
         drive(s, i, null, false, dt, cfg, world)
         c.facing = turnToward(c.facing, toWay, cfg.turnRate * dt)
       } else {
+        const facingBefore = c.facing
         drive(s, i, way, false, dt, cfg, world, false, true)
+        if (watched) {
+          c.facing = turnToward(
+            facingBefore,
+            Math.atan2(stage.boulder.x - c.x, stage.boulder.z - c.z),
+            cfg.turnRate * dt,
+          )
+        }
       }
       c.roamHeading = c.heading
       continue
