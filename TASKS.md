@@ -5251,3 +5251,9 @@ put it is the mistake this line exists to stop.
   Test: Vitest case in `src/scenes/place/tagShuffle.test.ts` replaying maasai-village under a jittered cadence (one of the red jitter seeds), mutation-checked.
   Source: main-session diagnosis 23.11.2026 while landing 1169 (split: the 1169 fix is the bank round's seed axis; maasai plays the tag round). Reproducible player impact (CLAUDE.md §2 finding intake). Related: 1169, 1068, 690.
   Bundle: Dorfleben.
+- [ ] 1577. Pause reason names the spawned session's actual error
+  Final state: when the autostart watchdog pauses the batch after repeated spawns without progress (RUNAWAY, `RUNAWAY_FAIL_LIMIT` in `scripts/batch-autostart-core.mjs`), the pause reason written to `.claude/batch-paused` — and therefore the dashboard and the batch-resume notice — names the last error line the spawned `claude -p` session printed, read from `.claude/autostart-run.log` (e.g. "Failed to authenticate: this login reached its time limit … Run `claude auth login`"); if no such line exists, the reason says so. No new mechanism: only the existing pause-reason text is extended.
+  Observed problem: 23.11.2026 the batch stood still for about five hours (RUNAWAY pauses at 09:29, 11:15 and 13:31 Berlin) because the headless Claude login had expired; pause message and dashboard said only "spawn made no progress", the cause stood only deep in `.claude/autostart-run.log`.
+  Test: Vitest case in `scripts/batch-autostart-core.test.mjs` for a spawn that died with an auth error line, plus the no-error-line case.
+  Source: user request of 23.11.2026 13:18 UTC via the findings carrier, approved: "Ja, reih den Vorschlag mit der Pausenmeldung ein." Real blockade with operator impact (CLAUDE.md §2 finding intake).
+  Bundle: Session- & Repo-Hygiene.
