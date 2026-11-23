@@ -413,12 +413,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1269": {
-      "at": "2026-10-02T17:58:46.614Z",
-      "why": "low-criticality test-infra red, first occurrence on WebGL 2; behind the open Testinfrastruktur work, no player impact",
-      "origin": "machine",
-      "place": "last"
-    },
     "1270": {
       "at": "2026-10-02T19:14:30.224Z",
       "why": "low-criticality test-infra red, first occurrence on WebGL 2; behind the open Testinfrastruktur work, no player impact",
@@ -850,6 +844,12 @@
       "why": "operator-only hygiene fix with no player impact; behind the game front is right",
       "origin": "machine",
       "place": "last"
+    },
+    "1578": {
+      "at": "2026-11-23T21:25:45.654Z",
+      "why": "test-infrastructure red with no player impact measured; it follows 1447/1570, which share its files",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -860,7 +860,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-23T18:45:35.544Z",
+    "at": "2026-11-23T21:25:45.658Z",
     "points": [
       184,
       200,
@@ -978,7 +978,6 @@
       1266,
       1267,
       1268,
-      1269,
       1270,
       1292,
       1296,
@@ -1050,7 +1049,8 @@
       1574,
       1575,
       1576,
-      1577
+      1577,
+      1578
     ]
   }
 }
