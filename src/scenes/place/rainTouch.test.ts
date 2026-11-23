@@ -112,6 +112,22 @@ describe('impact: one shape, ring on water, puff on ground', () => {
       expect(f).toBeLessThan(RAIN_HEIGHT)
     }
   })
+
+  it('the column spans the ground under the drop up past the eye (work-order 1227)', () => {
+    // The lower tip sits at arrival + fall (rainMaterials.ts `base`); sweep one
+    // full period: it touches the ground and rises well above eye height.
+    const period = RAIN_HEIGHT / RAIN_FALL_SPEED
+    let lo = Infinity
+    let hi = -Infinity
+    for (let k = 0; k <= 2000; k++) {
+      const f = dropFall(0.37, (k / 2000) * period, RAIN_HEIGHT, RAIN_FALL_SPEED)
+      lo = Math.min(lo, f)
+      hi = Math.max(hi, f)
+    }
+    expect(lo).toBeLessThan(0.02) // reaches the ground, not the old 1.5 m eye-height floor
+    expect(hi).toBeGreaterThan(1.5 * 2) // the eye lies inside the column, not at its base
+    expect(hi).toBeLessThan(RAIN_HEIGHT)
+  })
 })
 
 describe('drops keep a fixed world x/z while the column follows the eye', () => {
