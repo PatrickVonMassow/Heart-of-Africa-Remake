@@ -208,8 +208,8 @@ export interface PlaceLayout {
    * person can walk out over the edge band without stepping around a bush or a
    * boulder. It is chosen from what the BUILT fabric already leaves open — the
    * huts, the compound fences and the lanes are never moved for it — and the
-   * scattered flora and rocks that fall in it are dropped. Null where no bearing
-   * is open.
+   * scattered flora and rocks that fall in it are dropped. Null where no sampled
+   * bearing passed the picker's coarse clearance estimate (see `pickWayOut`).
    */
   wayOut: number | null
   /** Livestock pen (kraal layouts, and the Tuareg camp's goat pen). */
