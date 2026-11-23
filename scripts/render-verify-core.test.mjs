@@ -2961,14 +2961,14 @@ describe('the shipped charge ledger', () => {
         '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
         '[run×16 part×72 roam×307] over 45s played, 3 tagged',
       '1576/polish-children/webgl':
-        'worst child 0 at 0.34 % of its own judged time; group 0.07 % (4 of 5805 1s windows, ' +
+        'at maasai-village: worst child 0 at 0.34 % of its own judged time; group 0.07 % (4 of 5805 1s windows, ' +
         '151.4 judged child-seconds). Least judgeable child 4 at 96.9 %, group 96.9 % of 156.3 ' +
         'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 153.8 judged ' +
         'child-seconds, least judgeable child 4 at 98.5 %. Bad = over 1 m walked inside 0.35 m',
       // The real WebGPU text, from the run that earned the entry
       // (local/verify-logs/2026-09-21T08-02-02-116-collision-polish-settings.log).
       '1576/polish-children/webgpu':
-        'worst child 0 at 0.34 % of its own judged time; group 0.07 % (4 of 5880 1s windows, ' +
+        'at maasai-village: worst child 0 at 0.34 % of its own judged time; group 0.07 % (4 of 5880 1s windows, ' +
         '263.5 judged child-seconds). Least judgeable child 4 at 98.1 %, group 98.1 % of 268.5 ' +
         'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 266.1 judged ' +
         'child-seconds, least judgeable child 4 at 99.1 %. Bad = over 1 m walked inside 0.35 m',
@@ -3018,6 +3018,40 @@ describe('the shipped charge ledger', () => {
       expect(why, id).toMatch(/what the bound removes|only the trailing epilogue removed/i)
       expect(why, id).toMatch(/clear of (?:that|it|the bound)/i)
     }
+  })
+
+  // SETTLEMENT-SCOPED 1576 CHARGES (cross-vendor review of 1169, 23.11.2026).
+  // 1576 owns the tag round's cadence-sensitive shuffle at maasai-village; a
+  // bambara (bank round) red with an otherwise identical measurement is what
+  // 1169 fixed and must stay a real red. Asked through the RECORD path, so the
+  // 200-character cut applies exactly as in a run.
+  it.each([
+    ['webgl', null],
+    ['webgpu', 'compatibility'],
+  ])('charges a %s children-motion red to 1576 only when it was measured at maasai-village', (backend, featureLevel) => {
+    const lane = { suite: 'polish-children', backend, featureLevel }
+    const body =
+      'worst child 0 at 0.42 % of its own judged time; group 0.08 % (5 of 5810 1s windows, ' +
+      '151.4 judged child-seconds). Least judgeable child 4 at 96.9 %, group 96.9 % of 156.3 ' +
+      'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 153.8 judged ' +
+      'child-seconds, least judgeable child 4 at 98.5 %. Bad = over 1 m walked inside 0.35 m'
+    const at = (place) => ({
+      name: 'no child walks without getting anywhere',
+      key: 'no child walks without getting anywhere',
+      kind: 'check',
+      detail: `at ${place}: ${body}`,
+    })
+    const [maasai, bambara, cairo] = chargeReds([at('maasai-village'), at('bambara-village'), at('cairo')], lane)
+    expect(maasai.detailCut).toBe(true)
+    expect(maasai.point).toBe(1576)
+    expect(bambara.detailCut).toBe(true)
+    expect(bambara.point).toBeNull()
+    expect(chargeFor(bambara, lane)).toBeNull()
+    expect(cairo.point).toBeNull()
+    // The pre-change shape (place at the END, past the cut) names no village
+    // in the record and therefore stays unaccounted as well.
+    const [legacy] = chargeReds([{ ...at('maasai-village'), detail: `${body} — at maasai-village` }], lane)
+    expect(legacy.point).toBeNull()
   })
 
   // The backstop for a ledger handed in by a caller rather than shipped here:

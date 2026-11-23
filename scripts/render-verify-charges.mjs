@@ -1604,8 +1604,14 @@ export const RED_CHARGES = [
     // 0.2 % still binds, so a sustained tread cannot slip through
     // on the widened index.
     detailReadsPrefix: true,
+    // SETTLEMENT-SCOPED (cross-vendor review of 1169, 23.11.2026): 1576 owns
+    // the tag round's cadence-sensitive shuffle at maasai-village only (cairo
+    // reads 0.00 % in its measurement). The check therefore prints its place
+    // FIRST (`at <place>: `, polish-children.mjs), inside the stored 200
+    // characters; a bambara (bank round) or cairo red, or a record written
+    // before that change, stays UNACCOUNTED.
     detailMatch:
-      /^worst child -?\d+ at \d+\.\d+ % of its own judged time; group 0\.[01]\d % \(\d+ of [1-9]\d* 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\./i,
+      /^at maasai-village: worst child -?\d+ at \d+\.\d+ % of its own judged time; group 0\.[01]\d % \(\d+ of [1-9]\d* 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\./i,
     why:
       'MEASURED 07.09.2026 on main at bd050ddf8, VERIFY_GL=webgl polish (log '
       + 'local/verify-logs/2026-09-07T05-44-35-994-polish.log): worst child 0 at 0.34 % of its own '
@@ -1657,7 +1663,10 @@ export const RED_CHARGES = [
       + ' RE-OWNED to 1576 on 23.11.2026: 1169 cleared the bambara seed axis, yet the WebGL 2 '
       + 'children-motion run on feat/1169 6aa8d136b reddened at maasai-village (worst child 0 at 0.42 %, '
       + 'group 0.08 %), and a browserless replay under a jittered cadence reads 0.39-0.59 % there in 3 '
-      + 'of 48 runs, identically on main: the tag round\'s cadence-sensitive shuffle, which 1576 owns.',
+      + 'of 48 runs, identically on main: the tag round\'s cadence-sensitive shuffle, which 1576 owns.'
+      + ' SCOPED TO MAASAI-VILLAGE on 23.11.2026 (cross-vendor review of 1169): the signature now '
+      + 'requires the detail to open with `at maasai-village: `, so a renewed bambara (bank round) or '
+      + 'cairo shuffle stays a real red instead of being recorded as accounted for under 1576.',
   },
   {
     point: 1576,
@@ -1683,8 +1692,14 @@ export const RED_CHARGES = [
     // reading. A sustained tread — a group share of 0.2 % and up, or a red
     // without the judgeability line — is a different composition and stays red.
     detailReadsPrefix: true,
+    // SETTLEMENT-SCOPED (cross-vendor review of 1169, 23.11.2026): 1576 owns
+    // the tag round's cadence-sensitive shuffle at maasai-village only (cairo
+    // reads 0.00 % in its measurement). The check therefore prints its place
+    // FIRST (`at <place>: `, polish-children.mjs), inside the stored 200
+    // characters; a bambara (bank round) or cairo red, or a record written
+    // before that change, stays UNACCOUNTED.
     detailMatch:
-      /^worst child -?\d+ at \d+\.\d+ % of its own judged time; group 0\.[01]\d % \(\d+ of [1-9]\d* 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\./i,
+      /^at maasai-village: worst child -?\d+ at \d+\.\d+ % of its own judged time; group 0\.[01]\d % \(\d+ of [1-9]\d* 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\./i,
     why:
       'FIRST WEBGPU SIGHTING OF THE COMPOSITION POINT 1068 ALREADY OWNS, measured 21.09.2026 on '
       + 'feat/1158-escape-cooldown-return at 6a34fffa2 (log '
@@ -1725,7 +1740,15 @@ export const RED_CHARGES = [
       + ' RE-OWNED to 1576 on 23.11.2026: 1169 cleared the bambara seed axis, yet the WebGL 2 '
       + 'children-motion run on feat/1169 6aa8d136b reddened at maasai-village (worst child 0 at 0.42 %, '
       + 'group 0.08 %), and a browserless replay under a jittered cadence reads 0.39-0.59 % there in 3 '
-      + 'of 48 runs, identically on main: the tag round\'s cadence-sensitive shuffle, which 1576 owns.',
+      + 'of 48 runs, identically on main: the tag round\'s cadence-sensitive shuffle, which 1576 owns.'
+      + ' SCOPED TO MAASAI-VILLAGE on 23.11.2026 (cross-vendor review of 1169): the signature now '
+      + 'requires the detail to open with `at maasai-village: `, so a renewed bambara (bank round) or '
+      + 'cairo shuffle stays a real red instead of being recorded as accounted for under 1576.'
+      + ' WEBGPU RESIDUAL MEASUREMENT, 23.11.2026 at fbc3ccf: `npm test -- polish-children '
+      + '--section=children-motion` ran GREEN on WebGPU (log local/verify-logs/'
+      + '2026-11-23T04-17-26-853-polish-children.log) and GREEN on WebGL 2 (local log stamped '
+      + '2026-11-23T04-24-19-971). The entry therefore stays a 1576 charge for '
+      + 'the cadence-sensitive maasai red ONLY, scoped as above, and dies with 1576.',
   },
   {
     point: 1050,
