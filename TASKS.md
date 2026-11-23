@@ -5290,3 +5290,10 @@ put it is the mistake this line exists to stop.
   Test: the full-pass walker-dust block records its OFF-vs-OFF floor; a unit or section case pins the noise-robust comparison.
   Source: agent finding of 22.11.2026 22:07 UTC via the findings carrier; a red that holds landings (CLAUDE.md §2 finding intake). Related: 358, 1573.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 1576. Maasai tag round shuffles a child under uneven frame cadence
+  Final state: the tag round in maasai-village keeps every child covering ground under an uneven frame cadence: a browserless replay at seed 2972259115 (and the six bambara-problem seeds' maasai layouts) over 60 s with dt jittered between 1/60 and 4/60 s reads the worst child below `CHILD_MOTION.shareGate` for every jitter seed swept; the cause in the catch steering (`src/scenes/place/tagGame.ts`) is named and repaired, not the gate; the `1576/polish-children` render charges are then struck.
+  Observed problem: 23.11.2026, replay of `maasai-village` seed 2972259115 for 60 s with dt=(lo + rand*span)/60, 12 jitter seeds per (lo,span) in {1,2}x{3,6}: worst child 0.42 %, 0.59 % and 0.39 % against the 0.25 % gate in 3 of 48 runs; identical numbers on main be47d1311 (pre-existing); fixed cadences 60/45/30/20 fps read 0.00 %; cairo reads 0.00 % throughout. It is the WebGL 2 `polish-children --section=children-motion` red on feat/1169 6aa8d136b (local/verify-logs/2026-11-23T02-39-57-646-polish-children.log: worst child 0 at 0.42 %, group 0.08 %), the transient earlier charged to 1068/1169.
+  Test: Vitest case in `src/scenes/place/tagShuffle.test.ts` replaying maasai-village under a jittered cadence (one of the red jitter seeds), mutation-checked.
+  Source: main-session diagnosis 23.11.2026 while landing 1169 (split: the 1169 fix is the bank round's seed axis; maasai plays the tag round). Reproducible player impact (CLAUDE.md §2 finding intake). Related: 1169, 1068, 690.
+  Bundle: Dorfleben.
