@@ -1610,6 +1610,14 @@ export const RED_CHARGES = [
     // FIRST (`at <place>: `, polish-children.mjs), inside the stored 200
     // characters; a bambara (bank round) or cairo red, or a record written
     // before that change, stays UNACCOUNTED.
+    // THE MARGIN IS FOUR CHARACTERS, not a wide one: at the measured field
+    // widths the signature ends (`traced.`) at character 196 of 200. A wider
+    // numeric field (a five-digit window count, a three-digit traced total)
+    // pushes it past the cut, the stored prefix no longer matches, and that
+    // red stays UNACCOUNTED — the fail-safe direction, deliberately not widened.
+    // The WebGPU compatibility sibling was REMOVED (cross-vendor review of
+    // 1169, round 4): no compatibility red AT maasai-village is recorded, so a
+    // WebGPU red of this check is a real red until one is measured.
     detailMatch:
       /^at maasai-village: worst child -?\d+ at \d+\.\d+ % of its own judged time; group 0\.[01]\d % \(\d+ of [1-9]\d* 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\./i,
     why:
@@ -1622,7 +1630,10 @@ export const RED_CHARGES = [
       + 'IT DECLARES detailReadsPrefix, because this measurement is cut at the 200-character bound: '
       + 'the record keeps everything up to the words "In 0.5s bursts: worst" and no further. WHAT '
       + 'THE BOUND REMOVES is the burst series and the constant threshold sentence the check always '
-      + 'prints. The signature stops after the judgeability reading, well clear of that bound, and '
+      + 'prints. The signature stops after the judgeability reading, clear of the bound by four '
+      + 'characters only: since the `at maasai-village: ` prefix (23.11.2026) it ends at character 196 '
+      + 'of 200 at the measured field widths, so a wider numeric field pushes it past the cut and '
+      + 'leaves such a red UNACCOUNTED — the fail-safe direction; the matcher is not widened for it. It '
       + 'reads only numbers the record really holds: the one-second group share (under 0.2 % since '
       + 'the third measurement below), its window count, and the judgeability shares. A sustained '
       + 'tread — a larger group share — is a different composition and stays a real red. The '
@@ -1657,8 +1668,8 @@ export const RED_CHARGES = [
       + 'local/verify-logs/2026-09-18T16-41-50-415-polish.log), was GREEN on this check and on '
       + 'the whole suite — so the composition is a transient even at the length of a full pass, '
       + 'and this charge is a record of a red that happened, not of one that reproduces. It now '
-      + 'has three shapes to explain. RE-OWNED to 1169 on 09.11.2026: the WebGPU probe in the sibling '
-      + 'entry put the same signature on a quiet unthrottled host, and the browserless replay reads it '
+      + 'has three shapes to explain. RE-OWNED to 1169 on 09.11.2026: the eight-run WebGPU probe of that '
+      + 'day (outside any charged compatibility scope, never charged) put the same signature on a quiet unthrottled host, and the browserless replay reads it '
       + 'on six of sixty seeds, so it is the shuffle 1169 fixes and dies with that fix.'
       + ' RE-OWNED to 1576 on 23.11.2026: 1169 cleared the bambara seed axis, yet the WebGL 2 '
       + 'children-motion run on feat/1169 6aa8d136b reddened at maasai-village (worst child 0 at 0.42 %, '
@@ -1667,88 +1678,6 @@ export const RED_CHARGES = [
       + ' SCOPED TO MAASAI-VILLAGE on 23.11.2026 (cross-vendor review of 1169): the signature now '
       + 'requires the detail to open with `at maasai-village: `, so a renewed bambara (bank round) or '
       + 'cairo shuffle stays a real red instead of being recorded as accounted for under 1576.',
-  },
-  {
-    point: 1576,
-    suite: 'polish-children',
-    backend: 'webgpu',
-    // LEVEL-SCOPED because the measurement was taken at that level and only
-    // there: .claude/render-verify-state.json records every WebGPU run at
-    // 6a34fffa2 as featureLevel=compatibility. Without the level this entry
-    // would excuse, on the CORE adapter the player runs, a red nobody has
-    // measured there.
-    featureLevel: 'compatibility',
-    kind: 'check',
-    match: /^no child walks without getting anywhere$/i,
-    // THE SECOND LANE, CHARGED SEPARATELY (21.09.2026). The sibling entry above
-    // owns the WebGL 2 sightings; this one owns the first WebGPU sighting, which
-    // is the comparison point 1068 lists in its own words as NOT measured. It is
-    // a separate entry rather than a dropped `backend` on the sibling for the
-    // reason stated at the top of this file — scope as narrowly as the evidence
-    // allows. An unscoped entry would also excuse a lane nobody has read, and it
-    // would put this lane's measurement under a `why` that never measured it.
-    // The composition, the cut and the cap are the sibling's, unchanged: the
-    // group share under 0.2 %, its window count, the judgeability
-    // reading. A sustained tread — a group share of 0.2 % and up, or a red
-    // without the judgeability line — is a different composition and stays red.
-    detailReadsPrefix: true,
-    // SETTLEMENT-SCOPED (cross-vendor review of 1169, 23.11.2026): 1576 owns
-    // the tag round's cadence-sensitive shuffle at maasai-village only (cairo
-    // reads 0.00 % in its measurement). The check therefore prints its place
-    // FIRST (`at <place>: `, polish-children.mjs), inside the stored 200
-    // characters; a bambara (bank round) or cairo red, or a record written
-    // before that change, stays UNACCOUNTED.
-    detailMatch:
-      /^at maasai-village: worst child -?\d+ at \d+\.\d+ % of its own judged time; group 0\.[01]\d % \(\d+ of [1-9]\d* 1s windows, [\d.]+ judged child-seconds\)\. Least judgeable child \d+ at [\d.]+ %, group [\d.]+ % of [\d.]+ traced\./i,
-    why:
-      'FIRST WEBGPU SIGHTING OF THE COMPOSITION POINT 1068 ALREADY OWNS, measured 21.09.2026 on '
-      + 'feat/1158-escape-cooldown-return at 6a34fffa2 (log '
-      + 'local/verify-logs/2026-09-21T08-02-02-116-collision-polish-settings.log, the three-suite '
-      + 'WebGPU pass a settlement pointer-lock change owes): worst child 0 at 0.34 % of its own '
-      + 'judged time, group 0.07 % (4 of 5880 one-second windows, 263.5 judged child-seconds), '
-      + 'burst series wholly clean at 0.00 % with no offending window at all, on a lane the run '
-      + 'record puts at featureLevel=compatibility. That is the sibling '
-      + 'entry\'s composition to the digit, on the lane 1068 had never had a reading printed for. '
-      + 'WHY IT IS CHARGED RATHER THAN LEFT OPEN, and what rules out the cheap explanations: the '
-      + 'children-motion block re-run ALONE on the SAME backend at the SAME HEAD was GREEN in '
-      + '2 m 00 s over 8 checks (log local/verify-logs/2026-09-21T08-40-03-361-polish.log), and the '
-      + 'change underneath it is confined to the settlement pointer-lock recovery — no walker, no '
-      + 'path, no motion code is touched by it, and the suite\'s own runner marked the red run NOT '
-      + 'AUTHORITATIVE because the host quiet could not be verified. So this is the transient the '
-      + 'sibling records, on a second lane, and NOT a WebGL 2 property as the scoping there implied. '
-      + 'What it does NOT do is name the cause: the eight-run WebGPU probe 1068 asks for is still '
-      + 'owed, and this charge dies with 1068. '
-      + 'IT DECLARES detailReadsPrefix, for the same reason the sibling does: this measurement is '
-      + 'cut at the 200-character bound, and the cut falls inside the words "In 0.5s bursts: worst ", '
-      + 'so the burst reading — the sharpest discriminator, standing at 0.00 % while the one-second '
-      + 'series reddened — is not in the text a charge can read. The signature stops after the '
-      + 'judgeability reading, well clear of that bound. What the bound removes is the burst series '
-      + 'and the printed threshold sentence: the threshold is a constant the check prints, and a '
-      + 'worse burst series would be a different composition than the one charged here — but it is '
-      + 'unreadable by construction, so this entry owns the whole of it exactly as the sibling does. '
-      + 'THE EIGHT-RUN WEBGPU PROBE, 09.11.2026 on feat/1068-children-motion-tread from main '
-      + 'cbfab3c17, quiet host, UNTHROTTLED (scripts/throttle-probe.mjs polish-children '
-      + '--section=children-motion --runs 8 --no-throttle --backend webgpu): this check red in 1 of '
-      + '8 (run 4: maasai-village worst child 0 at 0.25 %, group 0.05 %, 1.13 m inside 0.27 m; cairo '
-      + 'worst child 3 at 0.68 %, group 0.14 %, 1.00 m inside 0.33 m; burst series 0.00 % in both), '
-      + 'and that red was NOT charged: the run did not match this entry\'s compatibility scope, and the ledger requires every WebGPU entry to name one level. So the composition is '
-      + 'neither load nor a lane or level property: it is a rare standing trait of the play. NAMED, '
-      + 'and RE-OWNED to 1169 when 1068 closed on this measurement: the same signature (about a metre '
-      + 'walked inside a quarter of a metre, bursts clean) is what the browserless replay reads above '
-      + 'the gate on six of sixty bambara seeds, so it is the play shuffling, not the browser or the '
-      + 'host, and the charge now dies with the fix of that shuffle.'
-      + ' RE-OWNED to 1576 on 23.11.2026: 1169 cleared the bambara seed axis, yet the WebGL 2 '
-      + 'children-motion run on feat/1169 6aa8d136b reddened at maasai-village (worst child 0 at 0.42 %, '
-      + 'group 0.08 %), and a browserless replay under a jittered cadence reads 0.39-0.59 % there in 3 '
-      + 'of 48 runs, identically on main: the tag round\'s cadence-sensitive shuffle, which 1576 owns.'
-      + ' SCOPED TO MAASAI-VILLAGE on 23.11.2026 (cross-vendor review of 1169): the signature now '
-      + 'requires the detail to open with `at maasai-village: `, so a renewed bambara (bank round) or '
-      + 'cairo shuffle stays a real red instead of being recorded as accounted for under 1576.'
-      + ' WEBGPU RESIDUAL MEASUREMENT, 23.11.2026 at fbc3ccf: `npm test -- polish-children '
-      + '--section=children-motion` ran GREEN on WebGPU (log local/verify-logs/'
-      + '2026-11-23T04-17-26-853-polish-children.log) and GREEN on WebGL 2 (local log stamped '
-      + '2026-11-23T04-24-19-971). The entry therefore stays a 1576 charge for '
-      + 'the cadence-sensitive maasai red ONLY, scoped as above, and dies with 1576.',
   },
   {
     point: 1050,

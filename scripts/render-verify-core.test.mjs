@@ -2945,6 +2945,9 @@ describe('the shipped charge ledger', () => {
   // separate entry only because the two lanes' evidence is separate. Nothing
   // about what may be excused widens: what earned the new entry is a measurement
   // on a lane 1068 had never had a reading printed for, not a looser bound.
+  // REMOVED 23.11.2026 (review round 4 of 1169): that WebGPU reader, re-owned
+  // to 1576 and scoped to maasai-village, cited no compatibility red measured
+  // there, so it no longer holds the declaration.
   it('lets exactly the declared entries read a cut measurement, and makes each say why', () => {
     const MAX_STORED_DETAIL = 200
     const declaring = RED_CHARGES.filter((c) => c.detailReadsPrefix === true)
@@ -2960,18 +2963,16 @@ describe('the shipped charge ledger', () => {
         'from one side of him to the other — 0 of 4 crossed his line; along the lane (0 = his line) ' +
         '[-11..25@1, -10..22@1, -24..0@1, -11..14@1] m, walked [67, 67, 67, 68] m, phases ' +
         '[run×16 part×72 roam×307] over 45s played, 3 tagged',
+      // A CONSTRUCTED SAMPLE, not historical text: the numbers are the
+      // 07.09.2026 WebGL 2 measurement, the `at maasai-village: ` prefix is the
+      // shape the check prints since 23.11.2026, which no recorded red of this
+      // composition carries yet. At these field widths the signature ends at
+      // character 196 of 200.
       '1576/polish-children/webgl':
         'at maasai-village: worst child 0 at 0.34 % of its own judged time; group 0.07 % (4 of 5805 1s windows, ' +
         '151.4 judged child-seconds). Least judgeable child 4 at 96.9 %, group 96.9 % of 156.3 ' +
         'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 153.8 judged ' +
         'child-seconds, least judgeable child 4 at 98.5 %. Bad = over 1 m walked inside 0.35 m',
-      // The real WebGPU text, from the run that earned the entry
-      // (local/verify-logs/2026-09-21T08-02-02-116-collision-polish-settings.log).
-      '1576/polish-children/webgpu':
-        'at maasai-village: worst child 0 at 0.34 % of its own judged time; group 0.07 % (4 of 5880 1s windows, ' +
-        '263.5 judged child-seconds). Least judgeable child 4 at 98.1 %, group 98.1 % of 268.5 ' +
-        'traced. In 0.5s bursts: worst child -1 at 0.00 %, group 0.00 % of 266.1 judged ' +
-        'child-seconds, least judgeable child 4 at 99.1 %. Bad = over 1 m walked inside 0.35 m',
       // The real text, from local/verify-logs/2026-10-26T06-39-00-663-polish-villagers.log.
       '1435/polish-villagers/undefined':
         'order at frame 47, off the stand at 84, walking checked to 114; 27 take frames; jar lifted ' +
@@ -3025,11 +3026,11 @@ describe('the shipped charge ledger', () => {
   // bambara (bank round) red with an otherwise identical measurement is what
   // 1169 fixed and must stay a real red. Asked through the RECORD path, so the
   // 200-character cut applies exactly as in a run.
-  it.each([
-    ['webgl', null],
-    ['webgpu', 'compatibility'],
-  ])('charges a %s children-motion red to 1576 only when it was measured at maasai-village', (backend, featureLevel) => {
-    const lane = { suite: 'polish-children', backend, featureLevel }
+  // A CONSTRUCTED SAMPLE throughout (no recorded red carries the place prefix).
+  // The WebGPU compatibility charge was removed in review round 4 of 1169: no
+  // compatibility red AT maasai-village is recorded, so that lane stays red.
+  it('charges a webgl children-motion red to 1576 only when it was measured at maasai-village', () => {
+    const lane = { suite: 'polish-children', backend: 'webgl', featureLevel: null }
     const body =
       'worst child 0 at 0.42 % of its own judged time; group 0.08 % (5 of 5810 1s windows, ' +
       '151.4 judged child-seconds). Least judgeable child 4 at 96.9 %, group 96.9 % of 156.3 ' +
@@ -3052,6 +3053,10 @@ describe('the shipped charge ledger', () => {
     // in the record and therefore stays unaccounted as well.
     const [legacy] = chargeReds([{ ...at('maasai-village'), detail: `${body} — at maasai-village` }], lane)
     expect(legacy.point).toBeNull()
+    // The same maasai red on the WebGPU compatibility lane is charged to nobody.
+    const gpuLane = { suite: 'polish-children', backend: 'webgpu', featureLevel: 'compatibility' }
+    const [gpu] = chargeReds([at('maasai-village')], gpuLane)
+    expect(gpu.point).toBeNull()
   })
 
   // The backstop for a ledger handed in by a caller rather than shipped here:
