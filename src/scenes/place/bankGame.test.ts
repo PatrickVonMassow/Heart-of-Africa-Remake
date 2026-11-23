@@ -1027,12 +1027,20 @@ describe('the children`s game at the bank (point 687)', () => {
     // ground: once as a bare deflection, once with the edge commitment
     // `moveChild` sets for it. Every frame until it stands inside its quarter
     // must move it, never faster than its walking pace.
+    // A THIRD VARIANT turns the body off the way too (cross-vendor review of
+    // 1169, round 5): with heading AND facing past `setOffTurn`, facing no
+    // longer keeps it walking, so only the edge exemption (`edgeFor > 0`) does.
+    // It must move on the deflected frame and on every frame that starts with
+    // the commitment still running; once that has run out, turning on the spot
+    // is the allowed answer and only the pace bound and the arrival are held.
     const cfg: BankConfig = { ...CFG, roamSeconds: 600, roamSpread: 0 }
     const world = openWorld()
     const home = STAGE.roam
     const maxStep = cfg.walkPace * (1 / 60) * 1.05
     for (const seed of SEEDS) {
-      for (const edge of [false, true]) {
+      for (const variant of ['bare', 'edge', 'edge-turned'] as const) {
+        const edge = variant !== 'bare'
+        const turned = variant === 'edge-turned'
         for (const side of [1, -1]) {
           const rand = mulberry32(seed)
           const s = createBankGame(
@@ -1046,10 +1054,11 @@ describe('the children`s game at the bank (point 687)', () => {
           s.namedBoulder = true
           const c = s.children[0]
           c.homing = true
-          const label = `seed ${seed}, edge ${edge}, side ${side}`
+          const label = `seed ${seed}, ${variant}, side ${side}`
           let deflected = false
           let inside = false
           let frames = 0
+          let edgeFrames = 0
           for (let f = 0; f < 60 * 30 && !inside; f++) {
             // Once the child walks toward home with its body on the way,
             // deflect its walk by 110°, past the 90° set-off turn.
@@ -1057,6 +1066,7 @@ describe('the children`s game at the bank (point 687)', () => {
             const bodyOff = Math.abs(Math.atan2(Math.sin(toHome - c.facing), Math.cos(toHome - c.facing)))
             if (!deflected && f >= 30 && c.pace > 0 && bodyOff < 0.2) {
               c.heading = toHome + side * ((110 * Math.PI) / 180)
+              if (turned) c.facing = c.heading
               if (edge) {
                 c.edgeFor = cfg.edgeSeconds
                 c.edgeSide = side
@@ -1065,17 +1075,30 @@ describe('the children`s game at the bank (point 687)', () => {
             }
             const x0 = c.x
             const z0 = c.z
+            const edgeBefore = c.edgeFor
+            if (turned && deflected && edgeBefore > 0) {
+              // The imposed state really is past the set-off turn both ways.
+              const wayNow = Math.atan2(home.x - x0, home.z - z0)
+              const offNow = (a: number) => Math.abs(Math.atan2(Math.sin(wayNow - a), Math.cos(wayNow - a)))
+              if (edgeFrames === 0) {
+                expect(offNow(c.heading), label).toBeGreaterThan(cfg.setOffTurn)
+                expect(offNow(c.facing), label).toBeGreaterThan(cfg.setOffTurn)
+              }
+            }
             stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
             const moved = Math.hypot(c.x - x0, c.z - z0)
             expect(moved, `${label}, frame ${f}: walked, not placed`).toBeLessThanOrEqual(maxStep)
             inside = Math.hypot(c.x - home.x, c.z - home.z) <= home.radius
-            if (deflected) {
-              frames++
+            if (!deflected) continue
+            frames++
+            if (!turned || edgeBefore > 0) {
               expect(moved, `${label}, frame ${f}: stood outside its quarter`).toBeGreaterThan(1e-6)
             }
+            if (turned && edgeBefore > 0) edgeFrames++
           }
           expect(deflected, label).toBe(true)
           expect(frames, label).toBeGreaterThan(30)
+          if (turned) expect(edgeFrames, `${label}: frames walked on the edge commitment`).toBeGreaterThan(0)
           expect(inside, `${label}: arrived inside its quarter`).toBe(true)
         }
       }
@@ -1088,8 +1111,11 @@ describe('the children`s game at the bank (point 687)', () => {
     // past `setOffTurn` stood it for a frame — 70-200 stopped frames per walk
     // before the fix (cross-vendor review of 1169, round 5). What remains
     // allowed is ONE deliberate turn on the spot where, the wall passed, the way
-    // lies behind both its walk and its body: never a stop while the body still
-    // faces the way, and never stop-walk-stop.
+    // lies behind both its walk and its body, and never stop-walk-stop. Each
+    // stopped frame is judged by the state the step STARTED from: it is allowed
+    // only with no edge commitment running and with the heading AND the facing
+    // both past `setOffTurn` from the way (this world has no route planner, so
+    // the way is the quarter's centre).
     const cfg: BankConfig = { ...CFG, roamSeconds: 600, roamSpread: 0 }
     const home = STAGE.roam
     const wx = home.x - home.radius - 2
@@ -1116,13 +1142,18 @@ describe('the children`s game at the bank (point 687)', () => {
           const x0 = c.x
           const z0 = c.z
           const toHome = Math.atan2(home.x - x0, home.z - z0)
-          const bodyOff = Math.abs(Math.atan2(Math.sin(toHome - c.facing), Math.cos(toHome - c.facing)))
+          const offBefore = (a: number) => Math.abs(Math.atan2(Math.sin(toHome - a), Math.cos(toHome - a)))
+          const headingOff = offBefore(c.heading)
+          const bodyOff = offBefore(c.facing)
+          const edgeBefore = c.edgeFor
           stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
           const moved = Math.hypot(c.x - x0, c.z - z0)
           expect(moved, `${label}, frame ${f}: walked, not placed`).toBeLessThanOrEqual(maxStep)
           inside = Math.hypot(c.x - home.x, c.z - home.z) <= home.radius
           const stopped = moved < 1e-6
           if (setOff && stopped) {
+            expect(edgeBefore, `${label}, frame ${f}: stood while going round the wall`).toBeLessThanOrEqual(0)
+            expect(headingOff, `${label}, frame ${f}: stood while its walk led toward the way`).toBeGreaterThan(cfg.setOffTurn)
             expect(bodyOff, `${label}, frame ${f}: stood while its body faced the way`).toBeGreaterThan(cfg.setOffTurn)
             if (!wasStopped) stopRuns++
           }
