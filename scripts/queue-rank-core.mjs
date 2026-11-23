@@ -551,7 +551,7 @@ export function parseRankRecord(text) {
  * names the new points held as splits of a priority point; it is read only
  * where `bodies` (`{ <n>: '<block>' }`) is supplied.
  */
-export function appendGateState(open, record, { bodies } = {}) {
+export function appendGateState(open, record, { bodies, releasePoint } = {}) {
   const list = pointList(open)
   const { ranked, settled, torn } = normaliseRankRecord(record)
   const none = { pending: [], appended: [], inside: [], baseline: [], splitHeld: [] }
@@ -571,7 +571,7 @@ export function appendGateState(open, record, { bodies } = {}) {
   if (bodies && typeof bodies === 'object') {
     for (const [i, n] of list.entries()) {
       if (known.has(n)) continue
-      const kind = splitPriorityOf(bodies[n], ranked, { open: list })
+      const kind = splitPriorityOf(bodies[n], ranked, { open: list, releasePoint })
       if (kind === SPLIT_NONE) continue
       const leading = list.slice(0, i).every((p) => ranked[p]?.place === PLACE_AHEAD)
       if (kind === SPLIT_UNDECLARED || ranked[n]?.place !== PLACE_AHEAD || !leading) {
@@ -617,17 +617,30 @@ export function splitParentOf(body) {
  * block itself states high urgency (the carrier that survives the parent's
  * landing); `undeclared` where the parent has no entry and the block states no
  * `Criticality:` level; otherwise — and for a block without the citation — `none`.
- * With `open` given, a closed parent's entry is stale and does not count.
+ * With `open` given, a closed parent's entry is stale and does not count; with
+ * `releasePoint` given as well, a parent standing in front of that point in
+ * `open` (the position `releaseBoundaryState` reads) is a priority parent
+ * whatever its entry says (point 1568: a stale `last` entry no longer lets its
+ * split append at the tail).
  */
-export function splitPriorityOf(body, ranked = {}, { open } = {}) {
+export function splitPriorityOf(body, ranked = {}, { open, releasePoint } = {}) {
   const text = String(body ?? '')
   const parent = splitParentOf(text)
   if (parent === null) return SPLIT_NONE
   const live = !open || open.includes(parent)
   const entry = live && ranked && typeof ranked === 'object' ? ranked[parent] : undefined
   if ((entry && entry.place === PLACE_AHEAD) || statesHighUrgency(text)) return SPLIT_PRIORITY
+  if (live && open && standsBeforeRelease(open, parent, releasePoint)) return SPLIT_PRIORITY
   if (!entry && criticalityOf(text).level === null) return SPLIT_UNDECLARED
   return SPLIT_NONE
+}
+
+/** Does `point` stand in front of `releasePoint` in the order shown? */
+function standsBeforeRelease(open, point, releasePoint) {
+  const list = pointList(open)
+  const boundary = list.indexOf(Number(releasePoint))
+  const at = list.indexOf(point)
+  return boundary >= 0 && at >= 0 && at < boundary
 }
 
 /** The remedy for a held split, as one line per point — for the guard, the
@@ -858,7 +871,7 @@ export function releaseBoundaryMessage(breaches, releasePoint) {
  * always taken the read at face value — and a read of ZERO open points, where
  * absence would erase everything, shrinks on the TICK instead, see below.)
  */
-export function settleRecord(open, record, { at = '', closed = [], blocked = [], bodies } = {}) {
+export function settleRecord(open, record, { at = '', closed = [], blocked = [], bodies, releasePoint } = {}) {
   const list = pointList(open)
   const { ranked, settled, boundary, torn } = normaliseRankRecord(record)
   if (torn || !settled) return { changed: false, record: null }
@@ -911,7 +924,7 @@ export function settleRecord(open, record, { at = '', closed = [], blocked = [],
     for (const [key, value] of Object.entries(ranked)) if (!finished.has(Number(key))) live[key] = value
     return storedChange({ ranked: live, settled: { ...settled, points: kept }, boundary: front })
   }
-  const state = appendGateState(list, record, { bodies })
+  const state = appendGateState(list, record, { bodies, releasePoint })
   // A RELEASE-BOUNDARY BREACH FREEZES THE BASELINE EXACTLY AS AN UNRANKED APPEND
   // DOES (point 789). The boundary itself judges against the frozen front, not
   // the baseline; the freeze keeps the append question open beside it. The

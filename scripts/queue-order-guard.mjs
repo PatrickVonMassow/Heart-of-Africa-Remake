@@ -13,7 +13,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluate, openPointBodies, releaseBoundaryProblem } from './queue-order-guard-core.mjs'
-import { closedPointsOf, openPointsOf } from './board-queue-core.mjs'
+import { RELEASE_TAG_POINT, closedPointsOf, openPointsOf } from './board-queue-core.mjs'
 import { ARCHIVE_PATH } from './tasks-source.mjs'
 import { RANK_RECORD_PATH, parseRankRecord, settleRecord } from './queue-rank-core.mjs'
 import { ownsLock } from './batch-singleton.mjs'
@@ -110,6 +110,7 @@ function settleBaseline({ tasksMd, rankRecordJson }, path = RANKS) {
       closed,
       blocked,
       bodies: openPointBodies(tasksMd),
+      releasePoint: RELEASE_TAG_POINT,
     })
     if (settled.changed) writeTextAtomic(path, `${JSON.stringify(settled.record, null, 2)}\n`)
   } catch (e) {
