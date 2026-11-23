@@ -146,6 +146,14 @@ export function victimFeedEnds(
   return (v.dissolve ?? 0) <= dissolveSeconds * remnantFraction
 }
 
+/** Does the feed on a scripted (non-herd) carcass end this frame (point
+ *  1205)? It ends once its timer has run out, and a non-finite timer ends it
+ *  too: `timer <= 0` alone is false for NaN, which would park the predator at
+ *  a spent carcass for good — every drama resolves (design.md §19.8). */
+export function genericFeedEnds(timer: number): boolean {
+  return !(timer > 0)
+}
+
 /** May a remnant join a herd list of this length (point 453)? Only when the
  *  herd mesh will draw it: the draw clamps at `capacity`, and a scrap past it
  *  would hold the kill flock over nothing visible. */

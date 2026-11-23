@@ -277,6 +277,7 @@ import {
   handVigilToRemains,
   listIndexOf,
   remnantDrawable,
+  genericFeedEnds,
   victimFeedEnds,
   killFlockLands,
   killFlockRemnant,
@@ -7250,7 +7251,7 @@ function LionHunt() {
         }
       } else {
         s.timer -= dt
-        if (s.timer <= 0) {
+        if (genericFeedEnds(s.timer)) {
           // Carcass eaten down to the scrap: the lion moves on and the remnant
           // takes over in place, at the carcass's final size and yaw (§19).
           spawnRemnant(s.prey, { x: s.px, z: s.pz, rot: Math.atan2(s.px - s.lx, s.pz - s.lz) }, seed)
