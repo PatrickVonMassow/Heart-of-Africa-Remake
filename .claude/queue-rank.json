@@ -245,12 +245,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1144": {
-      "at": "2026-09-16T22:48:11.705Z",
-      "why": "Last is right: its first act is measuring what the player actually loses, and the whole layout path in front of it (1143, then 1045's neighbours) writes the same file.",
-      "origin": "machine",
-      "place": "last"
-    },
     "1169": {
       "at": "2026-09-20T03:58:25.002Z",
       "why": "Der Fund gehört hinter den laufenden Umbau der Lehrprüfungen: er wurde von dessen Stichprobe erst sichtbar gemacht, und die reparierten Saatzahlen gehören in genau die Tabelle, die 1094 gerade umstellt.",
@@ -833,12 +827,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1568": {
-      "at": "2026-11-21T12:54:14.777Z",
-      "why": "user-approved request 21.11.2026: closes the split-rule false approval that misplaced 1566",
-      "origin": "user",
-      "place": "ahead"
-    },
     "1569": {
       "at": "2026-11-21T13:48:09.955Z",
       "why": "guard deadlock with a known escape (hand edit of the board); tail of the hygiene bundle is right",
@@ -874,6 +862,12 @@
       "why": "a test-noise red already charged in the ledger; it holds no landing now, so it waits behind the open hygiene points",
       "origin": "machine",
       "place": "last"
+    },
+    "1576": {
+      "at": "2026-11-23T03:37:24.961Z",
+      "why": "pre-existing tag-round defect split from 1169; queued behind the village-life front, no release dependency",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -884,7 +878,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-22T23:35:31.026Z",
+    "at": "2026-11-23T03:37:24.965Z",
     "points": [
       184,
       200,
@@ -974,7 +968,6 @@
       1119,
       1120,
       1123,
-      1144,
       1169,
       1171,
       1172,
@@ -1072,13 +1065,13 @@
       1563,
       1564,
       1565,
-      1568,
       1569,
       1570,
       1571,
       1572,
       1574,
-      1575
+      1575,
+      1576
     ]
   }
 }
