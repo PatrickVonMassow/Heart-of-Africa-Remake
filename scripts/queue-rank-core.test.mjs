@@ -1010,4 +1010,30 @@ describe('a SPLIT of a priority point inherits its place (point 1551)', () => {
     const next = settleRecord([1549, 1560], settledAt([1542, 1543], ranked), { at, bodies: placed })
     expect(next.record.settled.points).toEqual([1549, 1560])
   })
+  describe('a parent standing in front of the release boundary (point 1568)', () => {
+    // 21.11.2026: 1447 stood at position 2 under a stale `last` entry, and its
+    // split 1566 was appended at 188 of 188 without being held.
+    const release = 1590
+    const parentLast = { 1542: { at, why: 'last is right', place: PLACE_LAST } }
+    const withRelease = (extra) => bodies({ 1590: '- [ ] 1590. Release.', ...extra })
+
+    it('holds the split appended last while its `last`-ranked parent stands at position 2', () => {
+      const open = [1543, 1542, 1590, 1544, 1549]
+      const record = settledAt([1543, 1542, 1590, 1544], parentLast)
+      expect(splitPriorityOf(child, parentLast, { open, releasePoint: release })).toBe(SPLIT_PRIORITY)
+      const state = appendGateState(open, record, { bodies: withRelease(), releasePoint: release })
+      expect(state.state).toBe('pending')
+      expect(state.splitHeld).toEqual([{ point: 1549, kind: SPLIT_PRIORITY, parent: 1542 }])
+    })
+
+    it('still lets the split of a parent behind the boundary append', () => {
+      const open = [1543, 1590, 1542, 1544, 1549]
+      const ranked = { ...parentLast, 1549: { at, why: 'last is right', place: PLACE_LAST } }
+      const record = settledAt([1543, 1590, 1542, 1544], ranked)
+      expect(splitPriorityOf(child, ranked, { open, releasePoint: release })).toBe(SPLIT_NONE)
+      const state = appendGateState(open, record, { bodies: withRelease(), releasePoint: release })
+      expect(state.state).toBe('settled')
+      expect(state.splitHeld).toEqual([])
+    })
+  })
 })
