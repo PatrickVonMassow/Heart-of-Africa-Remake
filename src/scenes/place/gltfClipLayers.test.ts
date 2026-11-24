@@ -604,18 +604,20 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         let worst = 0
         let worstFrame = 0
         // the handover's tail: the feet set down on the body's own stand and
-        // move with a drifting body from there, as the standing legs do after
+        // move with a drifting or turning body from there, as the standing legs
+        // do after, so the per-frame bound stops there; the per-stance bound
+        // runs on to the handoff (cross-vendor review 24.11.2026)
         const tail = VILLAGER_GLTF.settleRestep * VILLAGER_GLTF.settleStepSetDown
         for (let i = 0; i < 2; i++) {
           // per stance, each point's ground displacement from its touchdown
           let from: THREE.Vector3[] | null = null
-          for (let k = blend[0] - 1; k <= end && frames[k].w >= tail; k++) {
+          for (let k = blend[0] - 1; k <= end; k++) {
             const pts = frames[k].feet[i]
             if (Math.abs(pts[0].y - restY) > 0.003) from = null
             else if (!from) from = pts
             else {
               pts.forEach((p, j) => (worst = Math.max(worst, Math.hypot(p.x - from![j].x, p.z - from![j].z))))
-              worstFrame = Math.max(worstFrame, moved(frames, k)[i])
+              if (frames[k].w >= tail) worstFrame = Math.max(worstFrame, moved(frames, k)[i])
             }
           }
         }
@@ -655,7 +657,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     }
   })
 
-  it('a start cut short by a stop in a corner: from the stop on, the knee bends no faster than the walk clip bends it', () => {
+  it('a start cut short by a stop in a corner: past the reversal\'s step-share flip, the knee bends no faster than the walk clip bends it', () => {
     // a stop reversing a start still in its blend kept sampling the live gait
     // through the turn and snapped to the stand at its end (cross-vendor
     // review 24.11.2026)
