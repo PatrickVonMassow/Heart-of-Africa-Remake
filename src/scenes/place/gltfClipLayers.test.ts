@@ -430,7 +430,7 @@ describe('the posable clavicles (natural-villager-motion step 11)', () => {
 })
 
 describe('starting and stopping on the glTF figure (point 1330)', () => {
-  type Sole = { w: number; feet: THREE.Vector3[][] }
+  type Sole = { w: number; feet: THREE.Vector3[][]; knee: number[] }
   /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
   function soleOf(bones: Record<string, THREE.Bone>) {
     const f = person.frame
@@ -485,7 +485,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       stepClipLayers(asset, person, c, step, speed, { x, z, yaw, unit: 1 }, null, dt)
       applyClipLayers(asset, person, bones, c, { speed, weight: w, kneel }, [true, true])
       group.updateMatrixWorld(true)
-      frames.push({ w: w * (1 - kneel), feet: sole() })
+      frames.push({ w: w * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()) })
     }
     return frames
   }
@@ -614,6 +614,26 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         // what the stand's spot or turn still has to make up is stepped over, lifted
         expect(worstFrame, where).toBeLessThan(0.002)
         expect(worst, where).toBeLessThanOrEqual(0.04)
+      }
+    }
+  })
+
+  it('stopping in a corner: the knee bends no faster through the blend than the walk clip itself bends it', () => {
+    // a walker leaving the gait in a ~2.8 rad/s corner snapped its knee by
+    // 0.49-0.66 rad a frame into a deep bend (finding 22.10.2026, seed 42 walker 0)
+    const kneeStep = (frames: Sole[], k: number) => Math.max(...frames[k].knee.map((q, i) => q.angleTo(frames[k - 1].knee[i])))
+    // the clip's own range: the fastest a knee turns in a frame walking straight on
+    const walk = settle({ cut: 3 })
+    let clip = 0
+    for (let k = 30; k < 170; k++) clip = Math.max(clip, kneeStep(walk, k))
+    for (const turn of [2.8, -2.8, 1.5, -1.5]) {
+      for (let cut = 1; cut < 1.6; cut += 0.05) {
+        // turning into the corner from shortly before the stop, on through it
+        const frames = settle({ cut, yaw: (t) => Math.max(0, t - cut + 0.3) * turn })
+        const end = frames.findIndex((f, k) => k > 0 && f.w <= 0 && frames[k - 1].w > 0)
+        let worst = 0
+        for (let k = Math.max(1, blendFrames(frames)[0] - 5); k <= end + 5; k++) worst = Math.max(worst, kneeStep(frames, k))
+        expect(worst, `turning ${turn} rad/s, stop at ${cut.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip * 1.05)
       }
     }
   })
