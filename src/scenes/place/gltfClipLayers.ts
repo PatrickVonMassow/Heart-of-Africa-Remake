@@ -238,6 +238,9 @@ export function applyClipLayers(
     // stopping, the legs and hips stay as the gait last drew them walking
     if (settle > 0 && c.settleFirst < 0) c.stop = c.legs < before ? 1 : 0
     else if (c.stop > 0 && c.legs > before) c.stop *= before < 1 ? (1 - c.legs) / (1 - before) : 0
+    // a stop reversing a start mid-blend takes the hold in as the legs fall,
+    // full at the stand, from the gait as it was drawn the frame before
+    else if (c.stop < 1 && c.legs < before) c.stop = 1 - (1 - c.stop) * (before > 0 ? c.legs / before : 0)
     const hold = settle > 0 ? c.stop : 0
     LEGS.forEach((n, k) => {
       const q = c.local[asset.bones.indexOf(n)]
