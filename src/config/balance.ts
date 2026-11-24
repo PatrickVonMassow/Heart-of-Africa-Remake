@@ -4472,6 +4472,16 @@ export const VILLAGER_GLTF = {
    *  walk clip's roll off its heel once the legs are on the walk (held flat
    *  through the blend, it then left the stand by a jump). Calibratable. */
   startRollSeconds: 0.15,
+  /** Standing (the walk weight still 0) while the body moves, as in the
+   *  frames before a start's walk weight rises or under a jostle: the
+   *  stand's feet stay where they stood, out to this miss (figure units)
+   *  and this turn (rad) off the body's own stand, past which they are
+   *  carried along; once the body no longer moves they are drawn back onto
+   *  its stand at `standHoldSettle` (units/s; the turn in proportion), never
+   *  a step. Calibratable. */
+  standHoldReach: 0.05,
+  standHoldTurn: 0.35,
+  standHoldSettle: 0.15,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Where the hair is painted on the glTF head, as shares of chin → crown

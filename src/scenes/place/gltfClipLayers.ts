@@ -129,6 +129,13 @@ export interface ClipLayers {
   settleGaitY: [number, number]
   handY: [number, number]
   handW: number
+  /** The ground the body stepped this frame (`stepClipLayers`; 0 placed or still). */
+  walked: number
+  /** Standing while the body moves (the frames before a start's walk weight
+   *  rises, a jostle): the stand's feet are held where they stood
+   *  (`settleStand`, `settleTurn`) out to G.standHoldReach, and drawn back
+   *  onto the body's stand once it no longer moves. */
+  holding: boolean
 }
 
 export function clipLayers(asset: VillagerAsset): ClipLayers {
@@ -177,6 +184,8 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     settleGaitY: [0, 0],
     handY: [0, 0],
     handW: 0,
+    walked: 0,
+    holding: false,
   }
 }
 
@@ -198,6 +207,7 @@ export function stepClipLayers(
   dt: number,
 ): void {
   stepClipGait(c.gait, asset, person.frame, walked, speed)
+  c.walked = walked
   c.lastGround = c.ground
   c.ground = { ...ground }
   c.dig = ease(c.dig, work?.dig ? 1 : 0, dt)
@@ -303,6 +313,16 @@ export function applyClipLayers(
   }
   if (c.starting && c.startState[0] === 2 && c.startState[1] === 2) c.starting = false
   const legs = c.legs * (1 - m.kneel)
+  // standing while the body moves (point 1582): the stand's feet stay where
+  // they stood rather than slide with the body — the frames before a start's
+  // walk weight rises (it waits for the smoothed speed), or a jostle; a
+  // placement (no ground walked) lets go
+  const g0 = c.ground
+  const g1 = c.lastGround
+  const shifted = !!g0 && !!g1 && Math.hypot(g0.x - g1.x, g0.z - g1.z) > 1e-9
+  const travelled = shifted && c.walked !== 0
+  if (legs > 1e-3 || c.dig >= 1 || m.kneel > 0 || (shifted && !travelled)) c.holding = false
+  else if (travelled) c.holding = true
   // Each layer blends from what the one below left, so the dig eases in from
   // the carry (or the walk) and out to it again — never from the rest pose.
   const under = c.dig < 1
@@ -362,6 +382,19 @@ export function applyClipLayers(
     blendInto(asset, bones, ARM('L'), c.local, walking * c.arms[0])
     // under a carry too, so a carry partly overriding the arm stays continuous
     blendInto(asset, bones, ARM('R'), c.local, walking * c.arms[1])
+  } else if (c.holding) {
+    // the legs the code's stand, each foot solved onto where it is held
+    releaseClipGait(c.gait)
+    takeCodeLegs(bones)
+    c.stop = 0
+    c.anchor = 0
+    c.handoff = false
+    // held while the body moves; drawn back onto its stand once it stops
+    const miss = settleFeet(asset, bones, c, 0, 1, f.legScale, travelled ? 0 : G.standHoldSettle * dt)
+    if (!travelled && miss <= 1e-4) {
+      c.holding = false
+      c.settleFirst = -1
+    }
   } else {
     // standing: the feet are where they stand, nothing held for the next walk
     releaseClipGait(c.gait)
@@ -582,7 +615,7 @@ function startFeet(c: ClipLayers, body: GroundBody | null): void {
  * in the air as it goes, a landed one by a lifted re-step at the end. `share` (0 … 1): how much of this correction is drawn over the plain
  * bone blend (a kneel setting in takes it out).
  */
-function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: ClipLayers, w: number, share: number, legScale: number): void {
+function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: ClipLayers, w: number, share: number, legScale: number, ease = 0): number {
   const hips = bones.hips
   if (hips.parent) _base.copy(hips.parent.matrixWorld).invert()
   else _base.identity()
@@ -652,6 +685,29 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     const air = c.startState.indexOf(1)
     const off = air >= 0 ? air : c.startState[0] === 2 ? 0 : 1
     c.settleFirst = w > 0.5 ? off : 1 - off
+  }
+  // standing while the body moves: each foot held out to G.standHoldReach
+  // and G.standHoldTurn off the body's stand, eased back by `ease` (figure
+  // units; the turn in proportion); the miss left, as a share of those
+  let miss = 0
+  if (c.holding && body) {
+    const unit = body.unit || 1
+    const turnEase = (ease * G.standHoldTurn) / G.standHoldReach
+    LEG_SIDES.forEach((_, i) => {
+      bodyToWorld(body, _stand[i], _liveW)
+      const dx = c.settleStand[i].x - _liveW.x
+      const dz = c.settleStand[i].z - _liveW.z
+      const d = Math.hypot(dx, dz) / unit
+      const keepD = Math.min(G.standHoldReach, Math.max(0, d - ease))
+      const k = d > 1e-9 ? keepD / d : 0
+      c.settleStand[i].x = _liveW.x + dx * k
+      c.settleStand[i].z = _liveW.z + dz * k
+      _liveQ.copy(_standQ[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, body.yaw))
+      const a = c.settleTurn[i].angleTo(_liveQ)
+      const keepA = Math.min(G.standHoldTurn, Math.max(0, a - turnEase))
+      if (a > 1e-9) c.settleTurn[i].slerp(_liveQ, 1 - keepA / a)
+      miss = Math.max(miss, keepD / G.standHoldReach, keepA / G.standHoldTurn)
+    })
   }
   const shares = settleShares(w, c.settleFirst)
   const falling = w < c.settleW && c.settleW > 0
@@ -729,7 +785,7 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     if (!c.starting) drop = Math.max(drop, need)
     else if (i !== c.startFirst && c.startState[i] <= 1) drop = Math.max(drop, need * _startP[i])
   })
-  hips.position.y -= Math.min(drop, G.pelvisDropMax * legScale) * share * (c.starting ? 1 : c.stop)
+  hips.position.y -= Math.min(drop, G.pelvisDropMax * legScale) * share * (c.starting || c.holding ? 1 : c.stop)
   LEG_SIDES.forEach((s, i) => {
     const step = shares[i]
     const p = handPlace(c, i, stepPlace(step, c.stop))
@@ -784,6 +840,7 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     }
     c.lastMove[i].subVectors(at, c.lastMove[i])
   })
+  return miss
 }
 
 /** After a handoff, foot `i`'s step place `p` past where it was then
