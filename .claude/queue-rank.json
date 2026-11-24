@@ -443,12 +443,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1396": {
-      "at": "2026-10-20T12:18:29.622Z",
-      "why": "Dorfleben member behind 1395; walker separation follows the open rig and garment points",
-      "origin": "machine",
-      "place": "last"
-    },
     "1397": {
       "at": "2026-10-20T14:57:23.592Z",
       "why": "WebGL-2-only village-walk red; worked with 1396 on the same walk",
@@ -826,6 +820,18 @@
       "why": "test-infrastructure red with no player impact measured; it follows 1447/1570, which share its files",
       "origin": "machine",
       "place": "last"
+    },
+    "1580": {
+      "at": "2026-11-24T10:36:54.004Z",
+      "why": "low-criticality one-off red; no ordering pressure over the ranked Dorfleben points",
+      "origin": "machine",
+      "place": "last"
+    },
+    "1581": {
+      "at": "2026-11-24T10:36:54.150Z",
+      "why": "low-criticality review follow-up of landed 1396; follows the ranked walker points",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -836,7 +842,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-24T08:20:13.022Z",
+    "at": "2026-11-24T10:36:54.160Z",
     "points": [
       184,
       200,
@@ -959,7 +965,6 @@
       1381,
       1382,
       1383,
-      1396,
       1397,
       1422,
       1423,
@@ -1022,7 +1027,9 @@
       1575,
       1576,
       1577,
-      1578
+      1578,
+      1580,
+      1581
     ]
   }
 }
