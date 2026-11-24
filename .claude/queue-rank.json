@@ -383,12 +383,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "1265": {
-      "at": "2026-10-02T12:02:39.074Z",
-      "why": "pre-existing shore-timing red found on 1129's covering pass; no other point waits on it, so it queues behind the settled order",
-      "origin": "machine",
-      "place": "last"
-    },
     "1266": {
       "at": "2026-10-02T12:02:39.192Z",
       "why": "the loom is switched off for the player; reopened only to own its red, so last is right",
@@ -428,12 +422,6 @@
     "1300": {
       "at": "2026-10-05T11:24:02.990Z",
       "why": "unreproduced test reds that block no point; last is right until reproduced",
-      "origin": "machine",
-      "place": "last"
-    },
-    "1309": {
-      "at": "2026-10-05T17:32:23.639Z",
-      "why": "visual artefact present on main before 1287, no user urgency; queued behind the communication-first and user-ordered points",
       "origin": "machine",
       "place": "last"
     },
@@ -854,7 +842,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-23T21:25:45.658Z",
+    "at": "2026-11-24T01:25:53.458Z",
     "points": [
       184,
       200,
@@ -967,7 +955,6 @@
       1244,
       1253,
       1263,
-      1265,
       1266,
       1267,
       1268,
@@ -975,7 +962,6 @@
       1292,
       1296,
       1300,
-      1309,
       1381,
       1382,
       1383,
