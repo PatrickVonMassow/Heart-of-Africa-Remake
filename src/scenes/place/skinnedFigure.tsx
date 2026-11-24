@@ -613,10 +613,20 @@ export function SkinnedFigure({
       // not the drawn child's); past 1 it is the world point the pose names,
       // k of the primitive arm out from its shoulder (the quarry's surface),
       // blended over k 1 … 1.15 so the reach never jumps.
-      const handTarget = (s: 'L' | 'R', i: number, vh: THREE.Object3D, out: THREE.Vector3) => {
+      // A GESTURE arm without a pose reach (a point, an indication) is aimed:
+      // the drawn arm along the pose's direction at k = 1, faded in by the
+      // pointing weight — the virtual hand lies on the primitive's longer arm,
+      // out of the drawn reach, and its fallback aimed 43° low (point 1579).
+      const aimedWeight = (i: number) => (reachFor(i) === undefined ? ((i === 0 ? pointHand?.left : pointHand?.right) ?? 0) : 0)
+      const handTarget = (s: 'L' | 'R', i: number, vh: THREE.Object3D, out: THREE.Vector3): THREE.Vector3 => {
         const k = reachFor(i)
         const pivot = arms.current[i]
+        const aimed = aimedWeight(i)
+        if (aimed > 0 && pivot) return aimedTarget(s, pivot, vh, 1, out).lerp(loc(vh, _rf), 1 - Math.min(1, aimed))
         if (k === undefined || !pivot) return loc(vh, out)
+        return aimedTarget(s, pivot, vh, k, out)
+      }
+      const aimedTarget = (s: 'L' | 'R', pivot: THREE.Object3D, vh: THREE.Object3D, k: number, out: THREE.Vector3) => {
         loc(pivot, _rv)
         loc(vh, _rf)
         const far = _rf.clone().sub(_rv).multiplyScalar(k).add(_rv)
@@ -864,7 +874,7 @@ export function SkinnedFigure({
           // lunge) holds the arm straight toward it rather than dropping to the
           // unsolved fallback, so the hand runs on through k = 1 (the lean
           // search above still sees the full target)
-          if (reachFor(i) !== undefined) {
+          if (reachFor(i) !== undefined || aimedWeight(i) > 0) {
             loc(up, _s)
             if (_t.distanceTo(_s) > r) _t.sub(_s).setLength(r).add(_s)
           }
