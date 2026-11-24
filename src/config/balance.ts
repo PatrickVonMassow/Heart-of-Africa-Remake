@@ -4459,7 +4459,11 @@ export const VILLAGER_GLTF = {
   /** Starting from the stand, how far into its swing the foot that steps
    *  first is as the gait takes the legs (0 its lift-off … 1 its landing;
    *  the other foot then stands short of mid-stance under the body). Calibratable. */
-  startSwingShare: 0.5,
+  startSwingShare: 0.65,
+  /** Starting, a foot swinging off the stand is lifted by G.settleStepLift
+   *  of the stand's miss times the swing's sine to this power (1 lifted the
+   *  knee fastest at once, higher skimmed the ground). Calibratable. */
+  startLiftPower: 1.5,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Where the hair is painted on the glTF head, as shares of chin → crown

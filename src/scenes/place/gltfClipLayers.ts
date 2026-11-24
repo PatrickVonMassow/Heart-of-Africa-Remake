@@ -171,9 +171,6 @@ export function stepClipLayers(
   c.dt += dt
 }
 
-/** The legs' share held just short of the gait while a start's feet step. */
-const START_HOLD = 0.999
-
 /** The phase nearest `phase` at which one foot is G.startSwingShare into its swing. */
 function startPhase(asset: VillagerAsset, phase: number): number {
   let best = phase
@@ -245,16 +242,15 @@ export function applyClipLayers(
   const before = c.legs
   c.legs = Math.max(m.weight, c.legs - c.dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
   c.dt = 0
-  // A START FROM THE STAND: the gait set at the mid-swing of the foot that
-  // steps first (the other mid-stance, under the body as on the stand), the
-  // legs held in the blend until both feet have stepped onto the clip
+  // A START FROM THE STAND: the gait set G.startSwingShare into the swing
+  // of the foot that steps first (the other under the body as on the
+  // stand); the start's feet step on past the blend until both are on the clip
   if (!c.starting && before <= 0 && c.legs > 0 && c.legs < 1 && m.kneel <= 0 && c.dig < 1) {
     c.starting = true
     c.startState = [-1, -1]
     c.gait.phase = startPhase(asset, c.gait.phase)
   } else if (c.starting && (c.legs < before || m.kneel > 0)) c.starting = false
   if (c.starting && c.startState[0] === 2 && c.startState[1] === 2) c.starting = false
-  if (c.starting) c.legs = Math.min(c.legs, START_HOLD)
   const legs = c.legs * (1 - m.kneel)
   // Each layer blends from what the one below left, so the dig eases in from
   // the carry (or the walk) and out to it again — never from the rest pose.
@@ -279,7 +275,7 @@ export function applyClipLayers(
     // starting or stopping, the feet step between the stand and the gait
     // (a bone blend alone slid a foot on the ground from one to the other);
     // a kneel setting in takes the step's correction out as it folds the legs
-    const settle = w < 1 ? Math.max(0, 1 - m.kneel) : 0
+    const settle = w < 1 || c.starting ? Math.max(0, 1 - m.kneel) : 0
     if (settle > 0) takeCodeLegs(bones)
     else c.settleFirst = -1
     // stopping, the legs and hips stay as the gait last drew them walking
@@ -444,7 +440,7 @@ const _startQ = [new THREE.Quaternion(), new THREE.Quaternion()]
  * a straight leg in a tenth of a second and snapped the knee). The foot that
  * is mid-swing as the start sets the gait (`startPhase`) swings at once.
  */
-function startFeet(c: ClipLayers): void {
+function startFeet(c: ClipLayers, onWalk: boolean): void {
   const cyc = (x: number) => ((x % 1) + 1) % 1
   const phase = c.gait.phase
   LEG_SIDES.forEach((_, i) => {
@@ -454,20 +450,26 @@ function startFeet(c: ClipLayers): void {
     const swinging = span > 1e-6 && cyc(phase - land) >= span
     if (c.startState[i] === -1) c.startState[i] = 0
     // the foot on the stand leaves it as the clip lifts it, or (the clip
-    // rolling it off its heel already) as soon as the other has landed
-    if (c.startState[i] === 0 && (swinging || c.startState[1 - i] === 2)) {
+    // rolling it off its heel already) as soon as the other has landed —
+    // the second foot only once the legs are fully on the walk, so one foot
+    // stands through the whole blend
+    if (c.startState[i] === 0 && (swinging || c.startState[1 - i] === 2) && (onWalk || c.startState[1 - i] <= 0)) {
       c.startState[i] = 1
       c.startPhase[i] = phase
       c.startOff[i].copy(_stand[i]).sub(_gait[i])
       c.startTurn[i].copy(_gaitQ[i]).invert().multiply(_standQ[i])
     }
     let k = 0
+    let arc = 0
     if (c.startState[i] === 1) {
       const whole = cyc(land - c.startPhase[i])
       const u = whole > 1e-6 ? cyc(phase - c.startPhase[i]) / whole : 1
       // landed: the progress has run past the landing
       if (u >= 1 || (!swinging && cyc(phase - land) < 0.5 * span && u > 0.5)) c.startState[i] = 2
-      else k = 1 - u * u * (3 - 2 * u)
+      else {
+        k = 1 - u * u * (3 - 2 * u)
+        arc = Math.sin(Math.PI * u) ** G.startLiftPower
+      }
     }
     _startP[i] = c.startState[i] === 0 ? 1 : k
     if (c.startState[i] === 0) {
@@ -475,6 +477,8 @@ function startFeet(c: ClipLayers): void {
       _startQ[i].copy(_standQ[i])
     } else {
       _startT[i].copy(_gait[i]).addScaledVector(c.startOff[i], k)
+      // lifted over the stand's miss as a settling step is (it skimmed the ground)
+      _startT[i].y += G.settleStepLift * Math.hypot(c.startOff[i].x, c.startOff[i].z) * arc
       _startQ[i].copy(_gaitQ[i]).slerp(_liveQ.copy(_gaitQ[i]).multiply(c.startTurn[i]), k)
     }
   })
@@ -572,8 +576,10 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     if (body) worldToBody(body, c.settleStand[i], _stand[i])
     _standQ[i].copy(c.settleTurn[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, -yaw))
   })
+  // starting, the legs were fully on the walk the frame before
+  const onWalk = c.settleW >= 1
   c.settleW = w
-  if (c.starting) startFeet(c)
+  if (c.starting) startFeet(c, onWalk)
   // each leg's blended chain and its ankle's target
   let drop = 0
   hips.updateMatrixWorld(true)
