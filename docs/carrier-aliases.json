@@ -28,6 +28,10 @@
     "1549": {
       "status": "absorbed",
       "why": "Split in 5f13e6484: 1549 kept the per-pass GPU breakdown (landed a7d62076f) and its shadows-off cause fix moved to point 1552; the 19.11.2026 move-before-1543 order was carried out on 1549 and anchors its pre-split title."
+    },
+    "1582": {
+      "status": "absorbed",
+      "why": "Split in d4b986bc3 (owner decision under the standing split rule, 24.11.2026): 1582 retitled to the clip-timed start lift; its resume and reversal cases moved to points 1583 and 1584. The carrier tick anchors the pre-split title."
     }
   }
 }
