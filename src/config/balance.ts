@@ -1788,6 +1788,10 @@ interface BalanceConfig {
       /** Sweeps a group may take in one frame, so a CHAIN of three or more
        *  figures comes apart in the frame it formed. */
       passes: number
+      /** Extra body radius of a figure while it walks: the stride and the arm
+       *  swing reach past the torso disc, so two walkers at disc contact still
+       *  drew one inside the other. */
+      strideMargin: number
     }
   }
   /** Village speech and drums (design.md §13.4, docs/communication-poc-spec.md). */
@@ -3140,6 +3144,10 @@ export const balance: BalanceConfig = {
       maxSpeed: 8,
       wedgeSeconds: 1.5,
       passes: 4,
+      // Calibratable: two walkers then keep 0.72 m between centres — a stride
+      // reaches ~0.35 m fore and aft and the hands about as far to the side.
+      // Only the walking adults set it; the children's game is untouched.
+      strideMargin: 0.12,
     },
     // The glance at the traveller (design.md §19.10). Calibratable starting
     // values (educated guess, CLAUDE.md §2): the radius a little over a

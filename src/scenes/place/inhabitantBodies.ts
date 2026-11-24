@@ -58,6 +58,10 @@ export interface InhabitantBody {
    *  child is never given an adult's girth, and a debug edit of the radius takes
    *  effect on the very next frame without any owner writing it through. */
   scale: number
+  /** Whether the figure is walking right now: its radius then grows by the
+   *  calibratable `strideMargin`, so a stride never reaches into a neighbour.
+   *  The owner writes it each frame. */
+  striding: boolean
   /** Whether this body counts at all right now — a walker inside its hut is out
    *  of the picture and must not block the lane it is standing under. */
   active: boolean
@@ -121,6 +125,14 @@ export interface SeparationConfig {
    *  than leaving a residual overlap the player sees. Bounded, and the sweeping
    *  stops the moment one moves nobody — the ordinary frame pays for one. */
   passes: number
+  /** Extra radius of a striding body (see `InhabitantBody.striding`). */
+  strideMargin: number
+}
+
+/** A body's radius in the separation: its scaled torso, plus the stride
+ *  margin while it walks. */
+export function bodyRadiusOf(cfg: SeparationConfig, b: InhabitantBody): number {
+  return cfg.bodyRadius * b.scale + (b.striding ? cfg.strideMargin : 0)
 }
 
 /** What the settlement refuses, and where it sends a body that cannot get out.
@@ -149,6 +161,7 @@ export function createBodies(
     x: options.x ?? 0,
     z: options.z ?? 0,
     scale: options.scale ?? 1,
+    striding: false,
     active: true,
     fixed: options.fixed ?? false,
     wedged: 0,
@@ -219,7 +232,7 @@ export function groundOccupied(
 ): boolean {
   for (const b of set.bodies) {
     if (!b.active || exclude?.(b)) continue
-    const r = cfg.bodyRadius * b.scale + moverBodyRadius
+    const r = bodyRadiusOf(cfg, b) + moverBodyRadius
     const dx = x - b.x
     const dz = z - b.z
     if (dx * dx + dz * dz < r * r) return true
@@ -259,7 +272,7 @@ export function stepRoundBodies(
   cfg: SeparationConfig,
   blocked: (x: number, z: number) => boolean,
 ): { x: number; z: number } {
-  const selfRadius = cfg.bodyRadius * self.scale
+  const selfRadius = bodyRadiusOf(cfg, self)
   const notMe = (b: InhabitantBody) => b === self
   const occupiedAt = (x: number, z: number) => groundOccupied(set, x, z, cfg, selfRadius, notMe)
   // THE WHOLE SEGMENT IS TESTED, NOT THE ENDPOINT, AND CONTINUOUSLY, NOT BY
@@ -282,7 +295,7 @@ export function stepRoundBodies(
     const len2 = dxx * dxx + dzz * dzz
     for (const b of set.bodies) {
       if (!b.active || b === self) continue
-      const r = cfg.bodyRadius * b.scale + selfRadius
+      const r = bodyRadiusOf(cfg, b) + selfRadius
       const startD2 = (ax - b.x) * (ax - b.x) + (az - b.z) * (az - b.z)
       if (startD2 < r * r) {
         // Already in contact: only going deeper counts as a crossing.
@@ -362,7 +375,7 @@ function pushBody(
 ): number {
   if (!(dt > 0) || self.fixed || !self.active) return 0
   const selfIndex = set.bodies.indexOf(self)
-  const selfRadius = cfg.bodyRadius * self.scale
+  const selfRadius = bodyRadiusOf(cfg, self)
   let px = 0
   let pz = 0
   for (let i = 0; i < set.bodies.length; i++) {
@@ -371,7 +384,7 @@ function pushBody(
     const dx = self.x - other.x
     const dz = self.z - other.z
     const d = Math.hypot(dx, dz)
-    const min = selfRadius + cfg.bodyRadius * other.scale
+    const min = selfRadius + bodyRadiusOf(cfg, other)
     if (d >= min - cfg.slop) continue
     const overlap = min - cfg.slop - d
     let ux: number
