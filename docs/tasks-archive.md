@@ -47874,3 +47874,11 @@ to land than a mechanism that needs a review.
   Verifiable: a Vitest case on the villager movement layer asserts a minimum body distance between every pair of walking villagers over a simulated village walk; the 1295 walk frame shows no overlapping bodies on both backends.
   Criticality: medium - visible in the village walk frame.
   Bundle: Dorfleben.
+
+- [x] 1422. Villager knee snaps when a walker leaves the walk gait in a corner
+  Source: finding 22.10.2026 09:46 from the point-1402 moving capture (seed 42, walker 0, WebGPU 60 Hz fixed clock): while the walk share drops 1 -> 0 in a ~2.8 rad/s corner the knee jumps 0.49-0.66 rad per frame (shin.L 0.836 -> 1.499) into a deep-knee pose; present on main 9ecb039 before 1402, same on WebGL 2.
+  Final state: the knee angle changes smoothly through the walk-to-idle gait blend in a corner; no per-frame knee jump beyond the clip's own range.
+  Verifiable: a Vitest on the villager pose layer bounds the per-frame knee change across a gait blend in a turn; a moving capture shows no leg snap on both backends.
+  Criticality: medium - visible leg snap when villagers turn.
+  Review note (24.11.2026): the 1422 author narrowed the stance-slide test window ('no planted foot slides more than 4 cm in one stance') to exclude the final stop frames (weight < settleRestep x settleStepSetDown); the reviewer must judge it. Open after review a6a969c56: the reversal case in gltfClipLayers.test.ts is red at 0.075-0.10 s of walking (frame after the reversal, step-share flip) - fix here or narrow to 1582 with reason.
+  Bundle: Dorfleben.

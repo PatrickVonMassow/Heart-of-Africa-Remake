@@ -107,14 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1422. Villager knee snaps when a walker leaves the walk gait in a corner
-  Source: finding 22.10.2026 09:46 from the point-1402 moving capture (seed 42, walker 0, WebGPU 60 Hz fixed clock): while the walk share drops 1 -> 0 in a ~2.8 rad/s corner the knee jumps 0.49-0.66 rad per frame (shin.L 0.836 -> 1.499) into a deep-knee pose; present on main 9ecb039 before 1402, same on WebGL 2.
-  Final state: the knee angle changes smoothly through the walk-to-idle gait blend in a corner; no per-frame knee jump beyond the clip's own range.
-  Verifiable: a Vitest on the villager pose layer bounds the per-frame knee change across a gait blend in a turn; a moving capture shows no leg snap on both backends.
-  Criticality: medium - visible leg snap when villagers turn.
-  Review note (24.11.2026): the 1422 author narrowed the stance-slide test window ('no planted foot slides more than 4 cm in one stance') to exclude the final stop frames (weight < settleRestep x settleStepSetDown); the reviewer must judge it. Open after review a6a969c56: the reversal case in gltfClipLayers.test.ts is red at 0.075-0.10 s of walking (frame after the reversal, step-share flip) - fix here or narrow to 1582 with reason.
-  Bundle: Dorfleben.
-
 - [ ] 1582. Villager knee snaps when a walk starts or a start reverses into a stop
   Source: findings 24.11.2026 10:59 and 11:14 from point 1422 (gltfClipLayers.test.ts settle harness, 60 Hz): starting straight, the shin turns 0.656 rad on the first blend frame (w 0.083), then 0.24-0.42 rad steps, identical with main's gltfClipLayers.ts; resuming mid-stop bends 0.3-0.5 rad a frame; a stop reversing a start mid-blend jumps 0.32-0.60 rad in the frame after the reversal as the step shares flip. The walk clip's own range is 0.235 rad a frame (sampled at 240 Hz).
   Final state: through a start, a resumed walk and a start cut short by a stop, the knee changes no faster per frame than the clip's own range.
