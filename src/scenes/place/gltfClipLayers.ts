@@ -319,7 +319,8 @@ export function applyClipLayers(
   // placement (no ground walked) lets go
   const g0 = c.ground
   const g1 = c.lastGround
-  const shifted = !!g0 && !!g1 && Math.hypot(g0.x - g1.x, g0.z - g1.z) > 1e-9
+  // (a turn on the spot moves the stand's feet too: stepWalk counts it walked)
+  const shifted = !!g0 && !!g1 && (Math.hypot(g0.x - g1.x, g0.z - g1.z) > 1e-9 || Math.abs(Math.atan2(Math.sin(g0.yaw - g1.yaw), Math.cos(g0.yaw - g1.yaw))) > 1e-9)
   const travelled = shifted && c.walked !== 0
   if (legs > 1e-3 || c.dig >= 1 || m.kneel > 0 || (shifted && !travelled)) c.holding = false
   else if (travelled) c.holding = true

@@ -463,6 +463,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     kneel?: (t: number, w: number) => number
     /** Seconds the body is held where it stands (blocked) while it wants to walk. */
     held?: (t: number) => boolean
+    /** A turn on the spot (rad/s), given whatever the body's pace. */
+    spin?: (t: number) => number
   }
   /** Walk at `v`, stop (or start) with the walk weight easing as the code
    *  walk eases it, the skeleton in a figure group placed and turned as the
@@ -493,7 +495,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       // tighter than VILLAGER_MOTION.turnRadius, none standing
       const from = { x, z, yaw }
       const steer = steerHeading(yaw, yaw + (r.turn?.(t) ?? 0) * dt, pace, dt)
-      yaw = steer.yaw
+      yaw = steer.yaw + (r.spin?.(t) ?? 0) * dt
       // held, the body gets none of its step, and keeps no pace (as the game's walkers)
       const step = r.held?.(t) ? 0 : pace * steer.pace * dt
       pace = keptPace(pace, step, pace * dt)
@@ -659,12 +661,32 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       }
       // held while carried, eased back no faster than VILLAGER_GLTF.standHoldSettle
       expect(worst, `jostled ${drift} m/s`).toBeLessThanOrEqual(VILLAGER_GLTF.standHoldSettle * dt * 1.2)
+      // through the shove (within VILLAGER_GLTF.standHoldReach) each foot where it stood before it,
+      // not merely moving slowly with the body (cross-vendor review 24.11.2026)
+      const before = frames[28].feet
+      for (let k = 29; k < 59; k++)
+        frames[k].feet.forEach((pts, i) => pts.forEach((p, j) => expect(Math.hypot(p.x - before[i][j].x, p.z - before[i][j].z), `jostled ${drift} m/s, frame ${k}`).toBeLessThan(1e-4)))
       // and under the body again before it walks off
       const end = frames[140].feet
       const rest = frames[20].feet
       // (the body's 0.5 s carry, to within one frame of it)
       const body = Math.abs(drift) * 0.5
       end.forEach((pts, i) => pts.forEach((p, j) => expect(Math.abs(Math.hypot(p.x - rest[i][j].x, p.z - rest[i][j].z) - body), `jostled ${drift} m/s`).toBeLessThanOrEqual(Math.abs(drift) * dt + 1e-6)))
+    }
+  })
+
+  it('a standing body turned on the spot without walking: its feet stay where they stood', () => {
+    // the hold read only a move over the ground: a turn on the spot (which
+    // stepWalk counts as walked) swept the feet round with the body
+    // (cross-vendor review 24.11.2026); 0.15 rad/s for 0.5 s stays a stand
+    // and within VILLAGER_GLTF.standHoldTurn
+    for (const spin of [0.15, -0.15]) {
+      const frames = settle({ cut: 2.5, start: true, spin: (t) => (t > 0.5 && t < 1 ? spin : 0) })
+      const before = frames[28].feet
+      for (let k = 29; k < 59; k++) {
+        expect(frames[k].w, `spun ${spin} rad/s`).toBe(0)
+        frames[k].feet.forEach((pts, i) => pts.forEach((p, j) => expect(Math.hypot(p.x - before[i][j].x, p.z - before[i][j].z), `spun ${spin} rad/s, frame ${k}`).toBeLessThan(1e-4)))
+      }
     }
   })
 
@@ -805,19 +827,32 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     // setting off straight turned the shin 0.656 rad on the first blend frame,
     // then by 0.24-0.42 rad steps (finding 24.11.2026 from point 1422)
     for (const turn of [0, 2.8, -2.8, 1.5, -1.5]) {
-      let clip = clipKneeStep(turn)
+      const clip = clipKneeStep(turn)
       // OPEN: point 1423 (heel strike) owns the clip-range bound at +2.8 rad/s
-      // until then the start adds nothing over walking into that corner
-      // without one (the gait alone passes the clip's range there at landing)
+      // after the start: there the run past it adds nothing over walking into
+      // that corner without one (the gait alone passes the clip's range at landing)
+      let after = clip
       if (turn === 2.8) {
         for (let cut = 1; cut < 1.6; cut += 0.05) {
           const walk = settle({ cut: 3, turn: (t) => (t > cut ? turn : 0) })
-          for (let k = 1; k < 170; k++) clip = Math.max(clip, kneeStep(walk, k))
+          for (let k = 1; k < 170; k++) after = Math.max(after, kneeStep(walk, k))
         }
       }
       for (let cut = 1; cut < 1.6; cut += 0.05) {
-        const worst = worstKnee(settle({ cut, start: true, turn: (t) => (t > cut ? turn : 0) }))
-        expect(worst, `turning ${turn} rad/s, start at ${cut.toFixed(2)} s (bound ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
+        const frames = settle({ cut, start: true, turn: (t) => (t > cut ? turn : 0) })
+        // the start's blend itself (from the stand to full weight) within the
+        // clip's own range at every corner, the raised bound only past it, where
+        // the gait at full weight draws the knee (measured: +2.8 rad/s peaks at
+        // 0.249 at full weight on the second foot's clip swing, walking into the
+        // corner without a start at 0.271; cross-vendor review 24.11.2026)
+        const blend = frames.findIndex((f) => f.w > 0)
+        const full = frames.findIndex((f, k) => k > blend && f.w >= 1)
+        const where = `turning ${turn} rad/s, start at ${cut.toFixed(2)} s`
+        expect(blend > 0 && full > blend, where).toBe(true)
+        let start = 0
+        for (let k = 1; k <= full; k++) start = Math.max(start, kneeStep(frames, k))
+        expect(start, `${where} (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
+        expect(worstKnee(frames), `${where} (bound ${after.toFixed(3)})`).toBeLessThanOrEqual(after)
       }
     }
   })
