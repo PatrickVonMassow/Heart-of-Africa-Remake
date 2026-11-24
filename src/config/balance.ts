@@ -4435,10 +4435,22 @@ export const VILLAGER_GLTF = {
    *  (gltfClipLayers.ts `settleFeet`), lifted at mid-step by this share of
    *  the ground it covers. Calibratable. */
   settleStepLift: 0.35,
+  /** Stopping, the share of each step's start and end over which the foot
+   *  only rises and sets down, above its spots (below 0.5). Calibratable. */
+  settleStepSetDown: 0.15,
+  /** Stopping, the share of a leg's length short of its full reach from
+   *  which the settling leg's reach eases in (at most, mid-settle; none at
+   *  the gait or the stand). Calibratable. */
+  settleSoftReach: 0.06,
   /** Stopping, a foot landed on the stand holds its spot while the body
    *  drifts and steps the miss over (lifted as above) over this last share
-   *  of the walk weight. Calibratable. */
+   *  of the legs' share of the gait. Calibratable. */
   settleRestep: 0.45,
+  /** Stopping, the seconds each foot's settling step takes: the legs leave
+   *  the gait over two of them however fast the walk itself fades
+   *  (`walkFadeRate`), so a step swings about as fast as the walk clip's own
+   *  (at 0.1 s a step, the knee snapped). Calibratable. */
+  settleStepSeconds: 0.4,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Where the hair is painted on the glTF head, as shares of chin → crown
