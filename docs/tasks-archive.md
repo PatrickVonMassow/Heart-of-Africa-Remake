@@ -47850,3 +47850,19 @@ to land than a mechanism that needs a review.
   Further source: user bug report hoa-state-2026-10-21-3318564123 (2).zip (21:05:18Z), user words: "Warum bückt er sich, wenn er zum Häuptlingshütte zeit und warum zeigt seine Hand nicht geradeaus, sondern leicht nach unten." The man in dark blue points toward the chief's hut in a crouch with his arm slightly below horizontal - consistent with the measured release phase (arm pitch -1.71 to -1.50 while the crouch fires).
   Additional check: after the fix, the pointing hand aims level at the target while the gesture is held (not only at release); if it does not, split a separate point for the aim.
   Owned browser checks (charged by point 1465, 29.10.2026, bisected to the 1295 glTF merge 2eb4f1384; trace: hand 0.65 -> 0.82 -> 0.34 squat -> rest within a second): polish-speech --section=chief-to-drummer "the drummer's arm is raised in the pointing frame (point 1272)" and "the man and his word offer their keys at the same time (point 1139)" green on both backends; strike both charges in scripts/render-verify-charges.mjs.
+
+- [x] 1579. Held pointing arm aims about 43 degrees below its target on the glTF body
+  Source: split from point 1395 per its additional check (24.11.2026). Runtime-pose export
+  (src/render/villagerRuntimePose.test.tsx, subject `point`, adult, bearing 0.6, elevation 0.15):
+  while the gesture is held (t=0.58-1.92 s) the left upper arm and forearm both run at elevation
+  -0.75 rad (shoulder to hand, world Y up) instead of about +0.15; measured identically on main
+  8827b4ae5 and on feat/1395-point-gesture-squat, so it is independent of the squat fix. User bug
+  report hoa-state-2026-10-21-3318564123 (2).zip: "warum zeigt seine Hand nicht geradeaus, sondern
+  leicht nach unten."
+  Final state: the held pointing hand on the glTF body aims at the gesture's bearing and elevation
+  within a few degrees; release and squat behaviour of point 1395 unchanged.
+  Verifiable: Vitest assertion in villagerRuntimePose.test.tsx on the `point` subject's hold frames
+  (shoulder-to-hand elevation near the gesture's elevation); polish-villagers `villager-gestures`
+  pictures on both backends.
+  Bundle: Dorfleben.
+  Criticality: medium - every pointing villager on medium/high presets.

@@ -107,22 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1579. Held pointing arm aims about 43 degrees below its target on the glTF body
-  Source: split from point 1395 per its additional check (24.11.2026). Runtime-pose export
-  (src/render/villagerRuntimePose.test.tsx, subject `point`, adult, bearing 0.6, elevation 0.15):
-  while the gesture is held (t=0.58-1.92 s) the left upper arm and forearm both run at elevation
-  -0.75 rad (shoulder to hand, world Y up) instead of about +0.15; measured identically on main
-  8827b4ae5 and on feat/1395-point-gesture-squat, so it is independent of the squat fix. User bug
-  report hoa-state-2026-10-21-3318564123 (2).zip: "warum zeigt seine Hand nicht geradeaus, sondern
-  leicht nach unten."
-  Final state: the held pointing hand on the glTF body aims at the gesture's bearing and elevation
-  within a few degrees; release and squat behaviour of point 1395 unchanged.
-  Verifiable: Vitest assertion in villagerRuntimePose.test.tsx on the `point` subject's hold frames
-  (shoulder-to-hand elevation near the gesture's elevation); polish-villagers `villager-gestures`
-  pictures on both backends.
-  Bundle: Dorfleben.
-  Criticality: medium - every pointing villager on medium/high presets.
-
 - [ ] 1396. Two walking villagers stand inside each other at the village centre
   Queue position: with point 1383 (Dorfleben), after the planted-soles work of point 1330.
   Source: finding 20.10.2026 10:54 from the point-1330 picture check: verification/1295-village-walker-mid-stride-webgl2.png at f59ddaa0a shows a walking woman and a man behind her standing inside each other at the village centre (WebGL 2). Villager separation, not the planted-soles gait; WebGPU not yet judged for it.
