@@ -2043,6 +2043,8 @@ function Porters({
         free: (x, z) => escapeToFree(colliders, x, z, NPC_RADIUS, nav, [r.entrance.x, r.entrance.z]).pos,
       }, dt, walkRand)
       if (b) {
+        // Dwelling at either end, it stands; otherwise it walks.
+        b.striding = p.pause <= 0
         b.x = p.x
         b.z = p.z
         separateBody(bodySet, b, dt, balance.villageLife.separation, separationWorld)
@@ -2596,6 +2598,8 @@ function TaskWalker({
     if (!stand) return
     if (body) {
       body.active = s.mode !== 'inside'
+      // Walking out or back; it stops for the load handling.
+      body.striding = s.mode === 'go' || s.mode === 'back'
       body.x = s.x
       body.z = s.z
     }
@@ -2979,10 +2983,11 @@ function Walkers({
      *  where its own step left it. Skipped on the door segments, which pass
      *  through the walker's own hut — every direction is blocked in there, and a
      *  wedge escape would teleport it out of its own doorway. */
-    const settleBody = (i: number, s: WalkerState, separate: boolean) => {
+    const settleBody = (i: number, s: WalkerState, separate: boolean, striding = false) => {
       const b = bodies[i]
       if (!b) return
       b.active = s.mode !== 'inside'
+      b.striding = striding
       if (!b.active) return
       const sep = balance.villageLife.separation
       b.x = s.x
@@ -3152,7 +3157,7 @@ function Walkers({
       } else {
         s.pinned = 0
       }
-      settleBody(i, s, !throughDoor)
+      settleBody(i, s, !throughDoor, true)
       // On the ground: the body's own stride carries the rise and fall.
       g.position.set(s.x, groundHeight(s.x, s.z), s.z)
       g.rotation.y = s.yaw
@@ -3527,6 +3532,7 @@ function ErrandVillagers({
       const state = idle.current[i]
       // Where this villager is headed: what it was told, or its own stroll.
       let goal: ErrandPoint | null = null
+      let walking = false
       if (task) {
         // `goalOf`, not the task's own place: a water carrier is walked to the
         // head of the path first, where his word falls, and only then to the
@@ -3571,6 +3577,7 @@ function ErrandVillagers({
           state.routeTo = null
           state.stuck = 0
         } else {
+          walking = true
           // WHERE THE NEXT STEP GOES: at the goal while the line to it is open,
           // and otherwise at the next waypoint of a route round whatever stands
           // in between. Planning is asked for only when the straight line is
@@ -3664,6 +3671,7 @@ function ErrandVillagers({
       const body = bodies[i]
       if (body) {
         const sep = balance.villageLife.separation
+        body.striding = walking
         body.x = me.x
         body.z = me.z
         separateBody(bodySet, body, dt, sep, separationWorld)

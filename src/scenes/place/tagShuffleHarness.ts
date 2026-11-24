@@ -265,6 +265,7 @@ export function crowd(
           world.blocked,
         )
         const [x, z] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [b.x, b.z])
+        b.striding = true
         b.x = x
         b.z = z
         separateBody(set, b, dt, sep, world)
@@ -281,6 +282,8 @@ export function crowd(
       errands.forEach((e, i) => {
         const b = walkers[i]
         const task = taskOf(work, i)
+        // Striding only on the steps below that actually walk.
+        b.striding = false
         if (task && !task.arrived) {
           // A man on a task walks where the task sends him and nowhere else.
           const to = goalOf(task)
@@ -298,6 +301,7 @@ export function crowd(
               world.blocked,
             )
             const [x, z] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [b.x, b.z])
+            b.striding = true
             b.x = x
             b.z = z
           }
@@ -335,6 +339,7 @@ export function crowd(
           e.to = stroll()
           e.stuck = 0
         }
+        b.striding = true
         b.x = x
         b.z = z
       })

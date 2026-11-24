@@ -39,7 +39,7 @@ function escapeStep(actor: 'walker' | 'errand') {
     ? '      if (Math.hypot(s.x - oldX, s.z - oldZ) < step * 0.1) {'
     : '          if (moved < step * 0.25 && turn.pace >= 0.3) {'
   const after = actor === 'walker'
-    ? '\n      settleBody(i, s, !throughDoor)'
+    ? '\n      settleBody(i, s, !throughDoor, true)'
     : '\n        }\n      }\n\n      // THE BODY'
   const start = source.indexOf(begin)
   const end = source.indexOf(after, start)
