@@ -107,13 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1309. A hard-edged dark rectangle shows in the burning-grass travel frame
-  Source: findings carrier 05.10.2026 16:35, found on the picture check of point 1287.
-  verification/131-burning-grass.png shows a straight-edged dark rectangle (with horizontal bars) in the lower right of the bird's-eye view, on main (d8a093e50, WebGL 2) and on WebGPU and WebGL 2 at point 1287 alike; not caused by the camera shift. Looks like a shadow or overlay with a rectangular footprint.
-  Final state: the cause is measured in game (which mesh, overlay or shadow draws the rectangle) and removed; the burning-grass travel frame shows no straight-edged artefact on either backend.
-  Verifiable: the burning-grass frame on both backends, picture-checked per §7.2; a right-layer test for the corrected cause.
-  Bundle: Wetter & Wasser.
-
 - [ ] 1395. Point gesture release squats the glTF figure (virtual arm longer than the drawn reach)
   Queue position: with point 1383 (Dorfleben), whose point/reach step touches the same arm.
   Source: owner measurement 20.10.2026 on feat/1345-child-chaser-teleport (split from point 1345, whose spec named this squat as a related CROUCH_MAX case): in the runtime-pose export (src/render/villagerRuntimePose.test.tsx, subject `point`, adult, bearing 0.6) the hips sit at 0.51 of standing height at t=2.11 s. The cause is not the CROUCH_MAX fallback: while the arm lowers from the point (pitch -1.71 to -1.50) the arm off its rest pose counts as a contact arm (skinnedFigure.tsx `contactArm`, no `extras.reach`), its target is the virtual primitive hand (a straight arm longer than the glTF reach 0.47), the standing shortfall is 0.13-0.37, and the crouch really reaches it (-0.008 at 1.1), so `contactCrouch` picks 0.3 rising to 1.0 over about eight frames.
