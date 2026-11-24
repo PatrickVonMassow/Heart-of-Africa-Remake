@@ -707,9 +707,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         expect(frames[falls].w, 'the stop falls inside the start blend').toBeLessThan(1)
         let worst = 0
         // from the second frame after the reversal: the reversing frame and the
-        // one after it carry the step-share flip, and the start's own onset is
-        // not this case either; both belong to point 1582, whose start and
-        // reversal cases bound them (measured 24.11.2026: the only frame over
+        // one after it carry the step-share flip, which belongs to point 1584
+        // and its reversal case (the start's own onset to the start case)
+        // (measured 24.11.2026: the only frame over
         // the clip's range was the one after the reversal, 0.322 rad at 2.8 rad/s)
         for (let k = falls + 2; k < frames.length; k++) worst = Math.max(worst, kneeStep(frames, k))
         expect(worst, `turning ${turn} rad/s, walking ${run.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
