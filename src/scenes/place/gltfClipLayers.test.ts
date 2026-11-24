@@ -430,7 +430,7 @@ describe('the posable clavicles (natural-villager-motion step 11)', () => {
 })
 
 describe('starting and stopping on the glTF figure (point 1330)', () => {
-  type Sole = { w: number; feet: THREE.Vector3[][] }
+  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[] }
   /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
   function soleOf(bones: Record<string, THREE.Bone>) {
     const f = person.frame
@@ -445,6 +445,10 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     /** Seconds the walk stops (or, `start`, starts) at. */
     cut: number
     start?: boolean
+    /** Starting, the seconds the walk stops again at (a start cut short): the walk weight falls from there. */
+    stopAt?: number
+    /** Frames a second (60 by default). */
+    hz?: number
     /** Per frame: the body's heading, its sideways drift (m/s) and the kneel, by time and walk weight. */
     yaw?: (t: number) => number
     drift?: (t: number, w: number) => number
@@ -452,7 +456,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   }
   /** Walk at `v`, stop (or start) with the walk weight easing as the code
    *  walk eases it, the skeleton in a figure group placed and turned as the
-   *  body; per frame each foot's world points. */
+   *  body; per frame each foot's world points, the legs' share of the gait
+   *  (`w`, the clip layers' own: it falls slower than the walk weight) and
+   *  the shins' turns. */
   function settle(r: Run) {
     const { bones } = createGltfSkeleton(asset, person.rest)
     const group = new THREE.Group()
@@ -461,20 +467,20 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     const c = clipLayers(asset)
     const hipRest = bones.hips.position.clone()
     const sole = soleOf(bones)
-    const dt = 1 / 60
+    const dt = 1 / (r.hz ?? 60)
     const v = 1.48
     let x = 0
     let z = 0
     let w = r.start ? 0 : 1
     let speed = r.start ? 0 : v
     const frames: Sole[] = []
-    for (let t = 0; t < r.cut + 1; t += dt) {
+    for (let t = 0; t < Math.max(r.cut, r.stopAt ?? 0) + 1.5; t += dt) {
       const yaw = r.yaw?.(t) ?? 0
-      const step = (r.start ? t >= r.cut : t < r.cut) ? v * dt : 0
+      const step = (r.start ? t >= r.cut && t < (r.stopAt ?? Infinity) : t < r.cut) ? v * dt : 0
       x += Math.sin(yaw) * step + (r.drift?.(t, w) ?? 0) * dt
       z += Math.cos(yaw) * step
       speed += (step / dt - speed) * (1 - Math.exp(-dt / 0.12))
-      w = Math.abs(speed) > 0.08 ? Math.min(1, w + 5 * dt) : Math.max(0, w - 5 * dt)
+      w = Math.abs(speed) > 0.08 && !(r.stopAt !== undefined && t >= r.stopAt) ? Math.min(1, w + 5 * dt) : Math.max(0, w - 5 * dt)
       const kneel = r.kneel?.(t, w) ?? 0
       group.position.set(x, 0, z)
       group.rotation.y = yaw
@@ -485,7 +491,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       stepClipLayers(asset, person, c, step, speed, { x, z, yaw, unit: 1 }, null, dt)
       applyClipLayers(asset, person, bones, c, { speed, weight: w, kneel }, [true, true])
       group.updateMatrixWorld(true)
-      frames.push({ w: w * (1 - kneel), feet: sole() })
+      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()) })
     }
     return frames
   }
@@ -597,6 +603,11 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         expect(end).toBeGreaterThan(3)
         let worst = 0
         let worstFrame = 0
+        // the handover's tail: the feet set down on the body's own stand and
+        // move with a drifting or turning body from there, as the standing legs
+        // do after, so the per-frame bound stops there; the per-stance bound
+        // runs on to the handoff (cross-vendor review 24.11.2026)
+        const tail = VILLAGER_GLTF.settleRestep * VILLAGER_GLTF.settleStepSetDown
         for (let i = 0; i < 2; i++) {
           // per stance, each point's ground displacement from its touchdown
           let from: THREE.Vector3[] | null = null
@@ -606,7 +617,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
             else if (!from) from = pts
             else {
               pts.forEach((p, j) => (worst = Math.max(worst, Math.hypot(p.x - from![j].x, p.z - from![j].z))))
-              worstFrame = Math.max(worstFrame, moved(frames, k)[i])
+              if (frames[k].w >= tail) worstFrame = Math.max(worstFrame, moved(frames, k)[i])
             }
           }
         }
@@ -614,6 +625,58 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         // what the stand's spot or turn still has to make up is stepped over, lifted
         expect(worstFrame, where).toBeLessThan(0.002)
         expect(worst, where).toBeLessThanOrEqual(0.04)
+      }
+    }
+  })
+
+  const kneeStep = (frames: Sole[], k: number) => Math.max(...frames[k].knee.map((q, i) => q.angleTo(frames[k - 1].knee[i])))
+  /** The clip's own range: the fastest a knee turns in a frame walking on,
+   *  straight and through the same corner without stopping. */
+  const clipKneeStep = (turn: number) => {
+    // sampled at 240 Hz, so the clip's fastest phase is caught whatever phase a 60 Hz frame lands on
+    const hz = 240
+    let clip = 0
+    for (const walk of [settle({ cut: 3, hz }), settle({ cut: 3, hz, yaw: (t) => t * turn })])
+      for (let k = hz / 2; k < hz * 2.8; k++) clip = Math.max(clip, kneeStep(walk, k))
+    return (clip * hz) / 60
+  }
+
+  it('stopping in a corner: the knee bends no faster through the blend than the walk clip itself bends it', () => {
+    // a walker leaving the gait in a ~2.8 rad/s corner snapped its knee by
+    // 0.49-0.66 rad a frame into a deep bend (finding 22.10.2026, seed 42 walker 0)
+    for (const turn of [2.8, -2.8, 1.5, -1.5, 0]) {
+      const clip = clipKneeStep(turn)
+      for (let cut = 1; cut < 1.6; cut += 0.05) {
+        // turning into the corner from shortly before the stop, on through it
+        const frames = settle({ cut, yaw: (t) => Math.max(0, t - cut + 0.3) * turn })
+        let worst = 0
+        // from before the blend to the run's end: the legs settle on past the walk's fade
+        for (let k = Math.max(1, blendFrames(frames)[0] - 5); k < frames.length; k++) worst = Math.max(worst, kneeStep(frames, k))
+        expect(worst, `turning ${turn} rad/s, stop at ${cut.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
+      }
+    }
+  })
+
+  it('a start cut short by a stop in a corner: past the reversal\'s step-share flip, the knee bends no faster than the walk clip bends it', () => {
+    // a stop reversing a start still in its blend kept sampling the live gait
+    // through the turn and snapped to the stand at its end (cross-vendor
+    // review 24.11.2026)
+    for (const turn of [2.8, -2.8]) {
+      const clip = clipKneeStep(turn)
+      for (let run = 0.05; run < 0.2; run += 0.025) {
+        const cut = 0.5
+        const frames = settle({ cut, start: true, stopAt: cut + run, yaw: (t) => Math.max(0, t - cut) * turn })
+        const falls = Math.round((cut + run) * 60)
+        expect(frames[falls].w, 'the stop falls inside the start blend').toBeGreaterThan(0)
+        expect(frames[falls].w, 'the stop falls inside the start blend').toBeLessThan(1)
+        let worst = 0
+        // from the second frame after the reversal: the reversing frame and the
+        // one after it carry the step-share flip, and the start's own onset is
+        // not this case either; both belong to point 1582, whose start and
+        // reversal cases bound them (measured 24.11.2026: the only frame over
+        // the clip's range was the one after the reversal, 0.322 rad at 2.8 rad/s)
+        for (let k = falls + 2; k < frames.length; k++) worst = Math.max(worst, kneeStep(frames, k))
+        expect(worst, `turning ${turn} rad/s, walking ${run.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
       }
     }
   })
