@@ -91,6 +91,9 @@ interface Subject {
   /** Sheet cameras: 'side', 'front' or an azimuth in degrees. */
   views: Array<'side' | 'front' | number>
   elevation?: number
+  /** Hand the caller's gesture to the figure's own `gesture` prop (no pose):
+   *  the conversation pairs' path. Only for checks outside the export. */
+  selfGesture?: boolean
   drive: (c: Caller, dt: number) => void
 }
 
@@ -391,16 +394,25 @@ async function play(s: Subject) {
     const pose = useRef<FigurePose | null>({ ...REST_POSE })
     const limbs = useRef<FigureLimbs | null>(null)
     const work = useRef<FigureWork>(caller.work)
+    const gesture = useRef<GestureState>(restGesture())
     // the caller's frame runs after the figure's (a parent's useFrame subscribes
     // after its children's), as PlaceLife's does
     useFrame((_, dt) => {
       s.drive(caller, dt)
+      if (s.selfGesture) {
+        // the figure advances its own gesture: handed over once, as started
+        if (caller.mem.started && !caller.mem.handed) {
+          gesture.current = caller.gesture
+          caller.mem.handed = 1
+        }
+        return
+      }
       pose.current = { ...caller.pose }
       applyFigurePose(limbs.current, pose.current)
     })
     return (
       <primitive object={caller.root}>
-        <SkinnedFigure look={look} cloth={PALETTE[0]} scale={s.scale} sex={s.sex} age={s.age} identityKey={s.id} pose={pose} limbs={limbs} squat={caller.squat} work={work} />
+        <SkinnedFigure look={look} cloth={PALETTE[0]} scale={s.scale} sex={s.sex} age={s.age} identityKey={s.id} pose={s.selfGesture ? undefined : pose} limbs={s.selfGesture ? undefined : limbs} gesture={s.selfGesture ? gesture : undefined} squat={caller.squat} work={work} />
       </primitive>
     )
   }
@@ -467,6 +479,29 @@ const SHELL_OUTFITS: Array<{ sex: Sex; age: AgeGroup; worn: string[] }> = [
   { sex: 'male', age: 'adult', worn: ['g-trousersLong-waist', 'g-boots-feet'] },
 ]
 
+/** The held pointing arm aims at the gesture's bearing 0.6 and elevation 0.15
+ *  (it ran at -0.75 rad, 43 degrees low): upper arm and forearm alike, shoulder
+ *  to hand, in the figure's own frame (point 1579). */
+function expectHeldPointAim(rec: Awaited<ReturnType<typeof play>>) {
+  const bone = (n: string) => asset.bones.indexOf(n)
+  const at = (m: number[]) => new THREE.Vector3(m[12], m[13], m[14])
+  const held = rec.frames.filter((f) => f.t >= 0.6 && f.t <= 1.9)
+  expect(held.length).toBeGreaterThan(3)
+  const elevOf = (a: THREE.Vector3, b: THREE.Vector3) => Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z))
+  for (const f of held) {
+    const sh = at(f.world[bone('upperArm.L')])
+    const el = at(f.world[bone('forearm.L')])
+    const wr = at(f.world[bone('hand.L')])
+    const tag = `${rec.id} t=${f.t.toFixed(2)}`
+    for (const [a, b] of [[sh, el], [el, wr], [sh, wr]] as const) expect(Math.abs(elevOf(a, b) - 0.15), tag).toBeLessThan((5 * Math.PI) / 180)
+    expect(Math.abs(Math.atan2(wr.x - sh.x, wr.z - sh.z) - 0.6), tag).toBeLessThan((6 * Math.PI) / 180)
+    // an aimed arm is no contact the trunk leans toward: the spine stays near upright
+    const sp = at(f.world[bone('spine')])
+    const ch = at(f.world[bone('chest')])
+    expect(elevOf(sp, ch), tag).toBeGreaterThan(Math.PI / 2 - 0.2)
+  }
+}
+
 function shellRoundTrip() {
   if (!asset.shells) return []
   return SHELL_OUTFITS.map((o) => {
@@ -499,6 +534,10 @@ function columnRoundTrip() {
 }
 
 describe('the runtime-pose exporter', () => {
+  it('aims a self-driven point (the gesture prop alone) as the posed one', async () => {
+    const point = SUBJECTS.find((x) => x.id === 'point')!
+    expectHeldPointAim(await play({ ...point, id: 'point-self', selfGesture: true }))
+  }, 60_000)
   it('records all eleven subjects through the game\'s own figure, and the export is complete', async () => {
     const out: Awaited<ReturnType<typeof play>>[] = []
     for (const s of SUBJECTS) out.push(await play(s))
@@ -570,6 +609,10 @@ describe('the runtime-pose exporter', () => {
     // The reference is its own first frame, the gesture just begun.
     const pointHips = hipsOf('point')
     for (const [k, h] of pointHips.entries()) expect(h / pointHips[0], `point t=${by('point').frames[k].t.toFixed(2)}`).toBeGreaterThanOrEqual(0.85)
+    // the held pointing arm aims at the gesture's bearing and elevation (it ran
+    // at -0.75 rad, 43 degrees below the target): upper arm and forearm alike,
+    // shoulder to hand, in the figure's own frame (point 1579)
+    expectHeldPointAim(by('point'))
     // the chaser strides at its sprint (its legs froze above the old teleport speed)
     const feet = by('chaser').frames.map((fr) => at(fr.world[bone('foot.L')]).z - fr.root.p[2])
     expect(Math.max(...feet) - Math.min(...feet)).toBeGreaterThan(0.05)
