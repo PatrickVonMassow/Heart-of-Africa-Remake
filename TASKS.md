@@ -5164,3 +5164,10 @@ put it is the mistake this line exists to stop.
   Bundle: Testinfrastruktur.
   Criticality: medium — a dev-assertion red that blocks render-verify-guard for 1205/1229; player
   impact unmeasured (a real leak would grow GPU memory per place visit).
+
+- [ ] 1580. Head-carrier basket check went red once in a village walk
+  Source: finding 24.11.2026 09:06 UTC during point 1396 sampling (polish-villagers --section=village-walk, WebGPU, branch feat/1396-villager-separation): the check 'head carrier: each walker carries a basket exactly when it is flagged a carrier' went red once and stayed green in the next six runs. Cause not investigated; a retry covers nothing.
+  Final state: the cause is named — a real basket/flag mismatch at some frame (product defect, fixed) or a shutter-timing race in the check (check reads flag and mesh from one consistent frame).
+  Verifiable: a Vitest on the carrier flag/basket attach path (or the check's sampling) reproduces the mismatch window and stays green after the fix; the village-walk section green on WebGPU.
+  Criticality: low - one red in seven runs; player impact unmeasured (a carrier briefly without its basket).
+  Bundle: Dorfleben.
