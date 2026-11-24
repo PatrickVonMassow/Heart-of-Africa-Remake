@@ -5171,3 +5171,14 @@ put it is the mistake this line exists to stop.
   Verifiable: a Vitest on the carrier flag/basket attach path (or the check's sampling) reproduces the mismatch window and stays green after the fix; the village-walk section green on WebGPU.
   Criticality: low - one red in seven runs; player impact unmeasured (a carrier briefly without its basket).
   Bundle: Dorfleben.
+
+- [ ] 1581. Close the cross-vendor review objections on the villager stride gap
+  Source: cross-vendor review of landed point 1396 (GPT-6.2 Sol, 24.11.2026, merge-with-fixes, receipts 661cc5af0b457abb and 5456d0320f7dac51; range 414fc39..ff515de).
+  Final state:
+  - `striding` is published before steering (`PlaceLife.tsx` porter/errand steps and `tagShuffleHarness.ts` errand paths), so a stand-to-walk step near another body already steers with the stride radius.
+  - Mixed adult–child spacing is either intended and stated in `balance.ts` with a test, or the stride margin no longer reaches the children's game.
+  - `villagerSeparation.test.ts` covers walker–stationary and stationary–stationary pairs and asserts the encounters it names (walkers reach the crossing; a porter–errand pair meets).
+  - The polish-villagers stride-gap check refuses an empty scan and uses the pair's actual radii; the WebGL 2 kneel charge in `render-verify-charges.mjs` requires the zero-kneeler census it cites.
+  Verifiable: the extended Vitest cases red on the old code where they test behaviour; village-walk section green on both backends.
+  Criticality: low - review findings; the steering-order one is a small visible gap overlap on start-up.
+  Bundle: Dorfleben.
