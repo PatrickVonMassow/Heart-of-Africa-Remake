@@ -86,6 +86,10 @@ export interface ClipLayers {
   stop: number
   heldLegs: THREE.Quaternion[]
   heldHips: THREE.Vector3
+  /** The gait's phase the held legs and hips were drawn at: a walk taken up
+   *  again mid-stop sets the gait back there, so the live clip goes on from
+   *  the held pose rather than from where its phase moved on to. */
+  heldPhase: number
   settleGait: [{ x: number; z: number }, { x: number; z: number }]
   settleGaitTurn: [THREE.Quaternion, THREE.Quaternion]
   /** A start from the stand (`startFeet`): each foot stays on the stand
@@ -164,6 +168,7 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     stop: 0,
     heldLegs: LEGS.map(() => new THREE.Quaternion()),
     heldHips: new THREE.Vector3(),
+    heldPhase: 0,
     settleGait: [{ x: 0, z: 0 }, { x: 0, z: 0 }],
     settleGaitTurn: [new THREE.Quaternion(), new THREE.Quaternion()],
     starting: false,
@@ -294,6 +299,9 @@ export function applyClipLayers(
   const before = c.legs
   const dt = c.dt
   c.legs = Math.max(m.weight, c.legs - dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
+  // taken up again mid-stop, the legs rise back no faster than they fell (the
+  // walk's fade-in handed the held stop to the gait in five frames)
+  if (c.stop > 0 && c.legs > before) c.legs = Math.min(c.legs, before + dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
   c.dt = 0
   // A START FROM THE STAND: the gait set G.startSwingShare into the swing
   // of the foot that steps first (the other under the body as on the
@@ -340,6 +348,8 @@ export function applyClipLayers(
   }
   // THE GAIT
   if (legs > 1e-3 && under) {
+    // a walk taken up again mid-stop: the clip goes on from the held pose
+    if (c.stop >= 1 && c.legs > before && !c.starting) c.gait.phase = c.heldPhase
     clipGaitPose(c.gait, asset, f, m.speed, c.ground, c.pose)
     // the gait grounds its contacts at 0 (the rest A-pose's sole), not at the hung rest's
     toHung(asset, f, c.pose, c.local, c.hips, 0)
@@ -368,7 +378,10 @@ export function applyClipLayers(
       else c.heldLegs[k].copy(q)
     })
     if (hold > 0) c.hips.lerp(c.heldHips, hold)
-    else c.heldHips.copy(c.hips)
+    else {
+      c.heldHips.copy(c.hips)
+      c.heldPhase = c.gait.phase
+    }
     // stopping, the hips over the second step by the square of the weight: a leg near
     // straight on the stand bends by the root of the hips' drop, so a drop
     // linear in the weight still held a bent knee the frame before the
