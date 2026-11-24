@@ -5190,3 +5190,10 @@ put it is the mistake this line exists to stop.
   Verifiable: the extended Vitest cases red on the old code where they test behaviour; village-walk section green on both backends.
   Criticality: low - review findings; the steering-order one is a small visible gap overlap on start-up.
   Bundle: Dorfleben.
+
+- [ ] 1585. Errand set-off and walk-on captures miss their adult in the full villager pass
+  Source: finding 24.11.2026 22:59 from the full WebGPU polish-villagers run on main cbe76ad2a: 'an errand adult is caught about to set off from its stop, to film its start (point 1582)' and 'the filmed errand adult walks on between moving-capture frames 3 and 4 (point 1404)' are red with empty detail in the full run, green in --section=adult-errands on both backends at 5c0eb8aa3; the errand state after earlier sections likely differs. The full suite also outruns the default 45-min VERIFY_SUITE_TIMEOUT_MS.
+  Final state: both errand captures find and film their adult in the full polish-villagers run as in the section run, and a red names what it missed instead of an empty detail; the full pass finishes inside its suite timeout.
+  Verifiable: a full polish-villagers run on both backends with both captures green and non-empty detail on any red.
+  Criticality: medium - the render guard cannot close villager points while the full pass carries uncharged reds.
+  Bundle: Dorfleben.
