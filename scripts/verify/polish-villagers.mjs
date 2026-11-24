@@ -5875,6 +5875,26 @@ if (section('village-walk')) {
       try {
         const at = await sideOn(who, 3, -0.1)
         check('village walk: the camera found a free spot side-on to the walker', !!at, '')
+        // MEASURED, NOT JUDGED BY EYE: at the shutter no other drawn
+        // inhabitant stands inside the walker's striding body. Contact is a
+        // striding walker against a standing figure, less the slop.
+        const sepCfg = { r: 0.24, stride: 0.12, slop: 0.01 } // mirrors balance.villageLife.separation
+        const near = await page.evaluate((who) => {
+          const w = window.__placeWalkers
+          const me = w.states[who]
+          const self = w.group(who)
+          const out = []
+          window.__placeScene.traverse((o) => {
+            if (o.name !== 'inhabitant') return
+            for (let q = o; q; q = q.parent) if (!q.visible || q === self) return
+            const v = o.getWorldPosition(new o.position.constructor())
+            out.push(+Math.hypot(v.x - me.x, v.z - me.z).toFixed(3))
+          })
+          return out.sort((p, q) => p - q).slice(0, 3)
+        }, who)
+        const contact = sepCfg.r * 2 + sepCfg.stride - sepCfg.slop
+        report(`  village-walk shutter nearest inhabitants ${JSON.stringify(near)} (contact ${contact.toFixed(2)} m)`)
+        check(`village walk: no other inhabitant stands inside the photographed walker at the shutter (≥ ${contact.toFixed(2)} m)`, near.every((d) => d >= contact), JSON.stringify(near))
         if (at) await frame(shot('1295-village-walker-mid-stride'), {
           local: { x: at.x, y: 0.6, z: at.z },
           label: 'a Zulu villager walking, caught mid-stride side-on three metres off: one foot planted on the ground, the other swinging, arms countering the legs',
