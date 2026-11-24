@@ -530,6 +530,13 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   const JOSTLE = 0.9 * VILLAGER_MOTION.moveSpeed
   const blendFrames = (frames: Sole[]) => frames.map((b, k) => (k > 0 && ((b.w > 0 && b.w < 1) || (frames[k - 1].w > 0 && frames[k - 1].w < 1)) ? k : -1)).filter((k) => k > 0)
   /** Per foot, the most any of its points moved over the ground from frame k − 1 to k. */
+  /** The frames a run's motion over (from, to) seconds acts on, stepped as settle steps its clock. */
+  const activeFrames = (frames: Sole[], from: number, to: number, dt = 1 / 60) => {
+    const out: number[] = []
+    let k = 0
+    for (let t = 0; k < frames.length; t += dt, k++) if (t > from && t < to) out.push(k)
+    return out
+  }
   const moved = (frames: Sole[], k: number) => frames[k].feet.map((pts, i) => Math.max(...pts.map((p, j) => Math.hypot(p.x - frames[k - 1].feet[i][j].x, p.z - frames[k - 1].feet[i][j].z))))
 
   it('each foot steps between the gait and the stand in turn, the other standing: never a foot slid along the ground', () => {
@@ -663,8 +670,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       expect(worst, `jostled ${drift} m/s`).toBeLessThanOrEqual(VILLAGER_GLTF.standHoldSettle * dt * 1.2)
       // through the shove (within VILLAGER_GLTF.standHoldReach) each foot where it stood before it,
       // not merely moving slowly with the body (cross-vendor review 24.11.2026)
-      const before = frames[28].feet
-      for (let k = 29; k < 59; k++)
+      const shove = activeFrames(frames, 0.5, 1)
+      const before = frames[shove[0] - 1].feet
+      for (const k of shove)
         frames[k].feet.forEach((pts, i) => pts.forEach((p, j) => expect(Math.hypot(p.x - before[i][j].x, p.z - before[i][j].z), `jostled ${drift} m/s, frame ${k}`).toBeLessThan(1e-4)))
       // and under the body again before it walks off
       const end = frames[140].feet
@@ -682,8 +690,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     // and within VILLAGER_GLTF.standHoldTurn
     for (const spin of [0.15, -0.15]) {
       const frames = settle({ cut: 2.5, start: true, spin: (t) => (t > 0.5 && t < 1 ? spin : 0) })
-      const before = frames[28].feet
-      for (let k = 29; k < 59; k++) {
+      const turning = activeFrames(frames, 0.5, 1)
+      const before = frames[turning[0] - 1].feet
+      for (const k of turning) {
         expect(frames[k].w, `spun ${spin} rad/s`).toBe(0)
         frames[k].feet.forEach((pts, i) => pts.forEach((p, j) => expect(Math.hypot(p.x - before[i][j].x, p.z - before[i][j].z), `spun ${spin} rad/s, frame ${k}`).toBeLessThan(1e-4)))
       }
