@@ -895,6 +895,18 @@ export const RED_CHARGES = [
     backend: 'webgpu',
     featureLevel: 'compatibility',
     kind: 'check',
+    match: /jar.s mouth is tipped under the water surface/i,
+    why:
+      'Charged to 1476 in the work order on 31.10.2026 (mouth 0.097 m over a -0.25 m surface at ' +
+      '5f6679479) but never entered here; re-measured 24.11.2026 at f7084f857 on the 1582 branch, ' +
+      'mouth 0.098 m, so the same red and not that branch\'s.',
+  },
+  {
+    point: 1476,
+    suite: 'polish-villagers',
+    backend: 'webgpu',
+    featureLevel: 'compatibility',
+    kind: 'check',
     match: /handover zone itself carries neither band.s edge/i,
     why:
       'The SECOND half of the same rim measurement: it reads red beside the "SAME water" check ' +
