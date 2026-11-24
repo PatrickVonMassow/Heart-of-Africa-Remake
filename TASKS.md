@@ -109,8 +109,9 @@ put it is the mistake this line exists to stop.
 
 - [ ] 1583. Villager knee jumps when a stopping walk resumes
   Source: split from point 1582 on 24.11.2026: a resumed walk hands the held stop pose back to the live walk clip whose phase moved on, so the knee jumps 0.715 rad a frame (pauses 0.05-0.75 s, harness on feat/1582-knee-start-snap 33ce8dfe1).
-  Final state: a resumed walk lines the walk clip's phase up with the held pose (on the start mechanism of 1582), so the knee changes no faster per frame than the clip's own range.
-  Verifiable: the resume case of gltfClipLayers.test.ts bounded by the clip's 240 Hz range; a moving capture on both backends.
+  Scope (decided 25.11.2026 after the author's measurement): only resumes where the stop has begun, i.e. the legs' walk weight has left 1 (pauses ~0.35-0.75 s); there the legs rise at the walk fade rate (0.58 to 1 in five frames, knee up to 0.62 rad) and a plain phase rewind does not help. Shorter pauses never leave the gait; their 0.24-0.27 rad excess is the landing of the gait alone and belongs to 1423.
+  Final state: a resume from a begun stop hands the legs back to the walk clip on the start mechanism of 1582 (each foot swung onto the clip from where the settle left it, the legs' rise no faster than their fall), so the knee changes no faster per frame than the clip's own range.
+  Verifiable: the resume case of gltfClipLayers.test.ts over pauses where the legs' weight left 1, bounded by the clip's 240 Hz range; a moving capture on both backends.
   Criticality: medium - visible leg snap when a villager hesitates and walks on.
   Bundle: Dorfleben.
 
@@ -125,7 +126,7 @@ put it is the mistake this line exists to stop.
   Also: a flat foot drops its kept heading in sharp curves.
   Source: finding 22.10.2026 09:46 from the point-1402 joint-speed sweep: the heel is caught while the clip still swings it forward ~2 m/s (foot up to 2.8x clip max speed, shin ~4 rad/s reversal at 144 Hz); at 3.5 rad/s yaw the flat foot gives up its kept heading at the end of flat stance (foot reversal 4.1-4.6 rad/s). Pre-existing; the 3x margin in villagerClipPose.test.ts exists because of the heel strike.
   Final state: heel strike decelerates the foot without a dead stop, and a flat foot keeps its heading through sharp curves; the 3x margin in villagerClipPose.test.ts can drop.
-  Verifiable: villagerClipPose.test.ts with a tightened foot-speed margin and a sharp-curve heading case; a moving capture on both backends.
+  Verifiable: villagerClipPose.test.ts with a tightened foot-speed margin and a sharp-curve heading case; the short-pause resumes of gltfClipLayers.test.ts (0.05-0.30 s, gait never left) within the clip's 240 Hz knee range; a moving capture on both backends.
   Criticality: medium - visible foot jerk in village walks.
   Bundle: Dorfleben.
 
