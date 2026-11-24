@@ -81,6 +81,13 @@ export const RED_CHARGES = [
     why: 'Red on WebGPU, 21.11.2026 21:33 (feat/1447, e79992b5f): census kneeling 0 of 20 figures, a one-instant sample of free village life. The charge dies with 1572.',
   },
   {
+    point: 1572,
+    suite: 'polish-villagers',
+    backend: 'webgl',
+    match: /low preset: (every kneeling primitive figure keeps a uniform scale|no kneeling primitive.s drawn hand sinks into the ground)/i,
+    why: 'Red on WebGL 2, 24.11.2026 (feat/1396, 16ad520ad, log 2026-11-24T09-06-40-717): the same census signature, kneeling 0 of 20 figures. The charge dies with 1572.',
+  },
+  {
     point: 1571,
     suite: 'polish-villagers',
     backend: 'webgpu',
