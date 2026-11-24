@@ -3996,7 +3996,6 @@ function ErrandVillagers({
   // The adults for the bug report's `placeLife` section, in every build: each
   // villager's errand and the scheduler `__placeErrands` reports.
   usePlaceLifeSource('errands', () => {
-    const cfg = balance.villageLife.adultErrands
     const inhabitants: PlaceLifeInhabitant[] = people.map((p, i) => {
       const task = taskOf(work, i)
       const yaw = yaws.current[i] ?? 0
@@ -4005,12 +4004,7 @@ function ErrandVillagers({
       refs.current[i]?.traverse((o) => {
         if (speed === null && o.userData.walk) speed = (o.userData.walk as { speed: number }).speed
       })
-      const dwell = !task || !task.arrived
-        ? null
-        : task.phase === 'dig' ? cfg.digSeconds - task.dug
-          : task.phase === 'fill' ? balance.bankFillSeconds - task.dug
-            : task.phase === 'take' ? balance.waterJarTakeSeconds - task.dug
-              : null
+      const dwell = dwellOf(task)
       return {
         id: `errands/${i}`,
         kind: 'adult',
@@ -4024,7 +4018,7 @@ function ErrandVillagers({
           phase: task ? task.phase : null,
           target: task ? { x: task.x, z: task.z } : null,
           arrived: task ? task.arrived : false,
-          dwellRemaining: dwell === null ? null : Math.max(0, dwell),
+          dwellRemaining: dwell,
         },
       }
     })
@@ -4136,7 +4130,7 @@ function ErrandVillagers({
                 pending: task.pendingWord?.concept ?? null, childrenHear: view.childrenHear(p.x, p.z),
                 // The take at the stand and where he stands for it (work-order 1405).
                 taking: task.arrived && task.phase === 'take' ? Math.min(1, task.dug / balance.waterJarTakeSeconds) : null,
-                tableSpot: task.tableSpot ?? null }
+                tableSpot: task.tableSpot ?? null, dwellRemaining: dwellOf(task) }
             : null,
           gesture: gestures.current[i] ? { ...gestures.current[i].current } : null,
         }
@@ -5065,4 +5059,14 @@ export function PlaceLife({
       </LimbDetailContext.Provider>
     </ColdCloaksContext.Provider>
   )
+}
+
+/** Seconds an arrived errand still stays at its stop; null while walking or for a phase without a timed stay. */
+function dwellOf(task: ReturnType<typeof taskOf>): number | null {
+  if (!task || !task.arrived) return null
+  const left = task.phase === 'dig' ? balance.villageLife.adultErrands.digSeconds - task.dug
+    : task.phase === 'fill' ? balance.bankFillSeconds - task.dug
+      : task.phase === 'take' ? balance.waterJarTakeSeconds - task.dug
+        : null
+  return left === null ? null : Math.max(0, left)
 }
