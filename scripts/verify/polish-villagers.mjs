@@ -2323,6 +2323,55 @@ if (section('adult-errands')) {
         if (!walked) break
       }
     }
+    // THE SET-OFF CAPTURE (point 1582): an errand adult dwelling at its stop,
+    // filmed as it sets off — four frames about 0.12 s apart through the
+    // ~0.5 s start, the camera 4 m off its flank at the stop. The feet must
+    // stay on the stand until the walk clip lifts them, no leg snapped straight.
+    const starter = await page
+      .waitForFunction(() => {
+        const vs = window.__placeErrands().villagers
+        const i = vs.findIndex((v) => v.work && v.work.arrived && !v.digging && v.drawn.speed !== null && v.drawn.speed < 0.05 && (v.work.dwellRemaining ?? 9) < 0.4)
+        return i >= 0 ? { i } : false
+      }, null, { timeout: 60000, polling: 'raf' })
+      .then((h) => h.jsonValue())
+      .then((r) => r.i)
+      .catch(() => null)
+    check('an errand adult is caught about to set off from its stop, to film its start (point 1582)', starter !== null)
+    if (starter !== null) {
+      const side = await page.evaluate((i) => window.__placeErrands().villagers[i].yaw + Math.PI / 2, starter)
+      const anchor = await page.evaluate((i) => { const v = window.__placeErrands().villagers[i]; return { x: v.x, z: v.z } }, starter)
+      // the camera stays put at the stop: the start walks out of its centre
+      const place = ({ a, s }) => {
+        const p = window.__placePlayer
+        p.x = a.x + Math.sin(s) * 4
+        p.z = a.z + Math.cos(s) * 4
+        p.yaw = s
+        p.pitch = -0.15
+      }
+      await page.evaluate(place, { a: anchor, s: side })
+      const setOff = await page
+        .waitForFunction((i) => (window.__placeErrands().villagers[i].drawn.speed ?? 0) > 0.03, starter, { timeout: 5000, polling: 'raf' })
+        .then(() => true)
+        .catch(() => false)
+      check('the filmed errand adult sets off from its stop (point 1582)', setOff)
+      for (const k of setOff ? [1, 2, 3, 4] : []) {
+        await freezeLife(true)
+        await page.evaluate(place, { a: anchor, s: side })
+        const at = await page.evaluate((i) => {
+          const v = window.__placeErrands().villagers[i]
+          return { x: v.x, z: v.z, gait: v.drawn.gait, speed: v.drawn.speed }
+        }, starter)
+        const g = at.gait ? `walk ${at.gait.walk.toFixed(2)}` : 'no gait'
+        const label = `set-off capture ${k}/4: errand adult #${starter} (frame centre, camera 4 m off its flank at its stop) setting off — speed ${(at.speed ?? 0).toFixed(2)} m/s, ${g}, ${Math.hypot(at.x - anchor.x, at.z - anchor.z).toFixed(2)} m from the stop`
+        console.log(label)
+        try {
+          await frame(`1582-set-off-${k}${VERIFY_GL === 'webgl' ? '-webgl2' : ''}`, { local: { x: at.x, y: 0.9, z: at.z }, label })
+        } finally {
+          await freezeLife(false)
+        }
+        if (k < 4) await nextFrames(7)
+      }
+    }
     // NO VILLAGE ADULT FLIES (point 1404 oddity, frame 1 of 23.10.2026: a woman
     // drawn near horizontal in mid-air, legs splayed). The drawn gait of every
     // errand adult over ~10 s: an errand walks; a sprint share means the body's
