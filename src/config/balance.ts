@@ -4451,6 +4451,10 @@ export const VILLAGER_GLTF = {
    *  (`walkFadeRate`), so a step swings about as fast as the walk clip's own
    *  (at 0.1 s a step, the knee snapped). Calibratable. */
   settleStepSeconds: 0.4,
+  /** Starting from the stand, how far into its swing the foot that steps
+   *  first is as the gait takes the legs (0 its lift-off … 1 its landing;
+   *  the other foot then stands short of mid-stance under the body). Calibratable. */
+  startSwingShare: 0.5,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Where the hair is painted on the glTF head, as shares of chin → crown

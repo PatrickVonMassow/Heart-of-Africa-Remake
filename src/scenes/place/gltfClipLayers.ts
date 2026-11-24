@@ -21,7 +21,7 @@ import * as THREE from 'three/webgpu'
 import { VILLAGER_GLTF as G, VILLAGER_POSE } from '../../config/balance'
 import { clipBones, type VillagerAsset } from '../../render/villagerAsset'
 import { LIVE_MORPHS, type LiveMorph } from '../../render/villagerBody'
-import { clipGaitPose, clipPoseAt, newClipGait, releaseClipGait, samplePhase, shovelOnHungHand, stepClipGait, toHung, type ClipGait, type GroundBody } from '../../render/villagerClipPose'
+import { clipGaitPose, clipPoseAt, gaitStance, newClipGait, releaseClipGait, samplePhase, shovelOnHungHand, stanceOf, stepClipGait, toHung, type ClipGait, type GroundBody } from '../../render/villagerClipPose'
 import type { GltfPerson } from '../../render/villagerFigureBody'
 import { aimHead, distributeLean, gazeDirection, LEAN_BONES, solveTwoBone, type LeanBone } from '../../render/figureRig'
 import { blendPoses, newPose, type VillagerPose } from '../../render/villagerRig'
@@ -88,6 +88,18 @@ export interface ClipLayers {
   heldHips: THREE.Vector3
   settleGait: [{ x: number; z: number }, { x: number; z: number }]
   settleGaitTurn: [THREE.Quaternion, THREE.Quaternion]
+  /** A start from the stand (`startFeet`): each foot stays on the stand
+   *  until the walk clip lifts it, then swings onto the clip's landing over
+   *  the clip's own swing. Per foot -1 not yet taken, 0 on the stand,
+   *  1 swinging, 2 landed. */
+  starting: boolean
+  startState: [number, number]
+  /** Per foot, the phase its swing began at, the stand's miss of the
+   *  gait's ankle then (body frame, faded out over the swing) and the
+   *  stand's turn onto the gait's foot. */
+  startPhase: [number, number]
+  startOff: [THREE.Vector3, THREE.Vector3]
+  startTurn: [THREE.Quaternion, THREE.Quaternion]
 }
 
 export function clipLayers(asset: VillagerAsset): ClipLayers {
@@ -118,6 +130,11 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     heldHips: new THREE.Vector3(),
     settleGait: [{ x: 0, z: 0 }, { x: 0, z: 0 }],
     settleGaitTurn: [new THREE.Quaternion(), new THREE.Quaternion()],
+    starting: false,
+    startState: [-1, -1],
+    startPhase: [0, 0],
+    startOff: [new THREE.Vector3(), new THREE.Vector3()],
+    startTurn: [new THREE.Quaternion(), new THREE.Quaternion()],
   }
 }
 
@@ -152,6 +169,26 @@ export function stepClipLayers(
   c.arms = [ease(c.arms[0], c.free[0] ? 1 : 0, dt), ease(c.arms[1], c.free[1] ? 1 : 0, dt)]
   c.idleT += dt
   c.dt += dt
+}
+
+/** The legs' share held just short of the gait while a start's feet step. */
+const START_HOLD = 0.999
+
+/** The phase nearest `phase` at which one foot is G.startSwingShare into its swing. */
+function startPhase(asset: VillagerAsset, phase: number): number {
+  let best = phase
+  let miss = Infinity
+  for (const s of LEG_SIDES) {
+    const [land, lift] = stanceOf(asset.clips.walk, s)
+    if (lift - land < 1e-6) continue
+    const mid = (((lift + (land + 1 - lift) * G.startSwingShare) % 1) + 1) % 1
+    const d = Math.abs(((mid - phase + 1.5) % 1) - 0.5)
+    if (d < miss) {
+      miss = d
+      best = mid
+    }
+  }
+  return best
 }
 
 const LEGS = ['hips', 'thigh.L', 'shin.L', 'foot.L', 'toe.L', 'thigh.R', 'shin.R', 'foot.R', 'toe.R']
@@ -208,6 +245,16 @@ export function applyClipLayers(
   const before = c.legs
   c.legs = Math.max(m.weight, c.legs - c.dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
   c.dt = 0
+  // A START FROM THE STAND: the gait set at the mid-swing of the foot that
+  // steps first (the other mid-stance, under the body as on the stand), the
+  // legs held in the blend until both feet have stepped onto the clip
+  if (!c.starting && before <= 0 && c.legs > 0 && c.legs < 1 && m.kneel <= 0 && c.dig < 1) {
+    c.starting = true
+    c.startState = [-1, -1]
+    c.gait.phase = startPhase(asset, c.gait.phase)
+  } else if (c.starting && (c.legs < before || m.kneel > 0)) c.starting = false
+  if (c.starting && c.startState[0] === 2 && c.startState[1] === 2) c.starting = false
+  if (c.starting) c.legs = Math.min(c.legs, START_HOLD)
   const legs = c.legs * (1 - m.kneel)
   // Each layer blends from what the one below left, so the dig eases in from
   // the carry (or the walk) and out to it again — never from the rest pose.
@@ -383,6 +430,56 @@ function ankleAt(bones: Record<string, THREE.Bone>, s: 'L' | 'R', out: THREE.Vec
   return out
 }
 
+/** A start's per foot share of the stand (1 on it … 0 on the gait) and ankle target (body frame). */
+const _startP = [0, 0]
+const _startT = [new THREE.Vector3(), new THREE.Vector3()]
+const _startQ = [new THREE.Quaternion(), new THREE.Quaternion()]
+
+/**
+ * THE START FROM THE STAND (point 1582): each foot stays on the stand's spot
+ * (`_stand`, held in the world) until the walk clip lifts it; from there it
+ * swings onto the clip's own landing over the clip's swing, the stand's miss
+ * of the gait's ankle as the swing began faded out by its progress, so the
+ * knee follows the clip's own bend (a step timed by the walk weight lifted
+ * a straight leg in a tenth of a second and snapped the knee). The foot that
+ * is mid-swing as the start sets the gait (`startPhase`) swings at once.
+ */
+function startFeet(c: ClipLayers): void {
+  const cyc = (x: number) => ((x % 1) + 1) % 1
+  const phase = c.gait.phase
+  LEG_SIDES.forEach((_, i) => {
+    const [land, lift] = gaitStance(i)
+    const span = lift - land
+    // in the clip's swing: past its lift, before its next landing
+    const swinging = span > 1e-6 && cyc(phase - land) >= span
+    if (c.startState[i] === -1) c.startState[i] = 0
+    // the foot on the stand leaves it as the clip lifts it, or (the clip
+    // rolling it off its heel already) as soon as the other has landed
+    if (c.startState[i] === 0 && (swinging || c.startState[1 - i] === 2)) {
+      c.startState[i] = 1
+      c.startPhase[i] = phase
+      c.startOff[i].copy(_stand[i]).sub(_gait[i])
+      c.startTurn[i].copy(_gaitQ[i]).invert().multiply(_standQ[i])
+    }
+    let k = 0
+    if (c.startState[i] === 1) {
+      const whole = cyc(land - c.startPhase[i])
+      const u = whole > 1e-6 ? cyc(phase - c.startPhase[i]) / whole : 1
+      // landed: the progress has run past the landing
+      if (u >= 1 || (!swinging && cyc(phase - land) < 0.5 * span && u > 0.5)) c.startState[i] = 2
+      else k = 1 - u * u * (3 - 2 * u)
+    }
+    _startP[i] = c.startState[i] === 0 ? 1 : k
+    if (c.startState[i] === 0) {
+      _startT[i].copy(_stand[i])
+      _startQ[i].copy(_standQ[i])
+    } else {
+      _startT[i].copy(_gait[i]).addScaledVector(c.startOff[i], k)
+      _startQ[i].copy(_gaitQ[i]).slerp(_liveQ.copy(_gaitQ[i]).multiply(c.startTurn[i]), k)
+    }
+  })
+}
+
 /**
  * THE SETTLING STEP (point 1330): while the walk weight blends the legs
  * between the code's stand and the gait, each foot steps from the gait's
@@ -476,15 +573,18 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     _standQ[i].copy(c.settleTurn[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, -yaw))
   })
   c.settleW = w
+  if (c.starting) startFeet(c)
   // each leg's blended chain and its ankle's target
   let drop = 0
   hips.updateMatrixWorld(true)
   LEG_SIDES.forEach((s, i) => {
-    const step = shares[i]
-    const p = stepPlace(step, c.stop)
+    const step = c.starting ? 0 : shares[i]
+    // starting, the leg drawn as the clip draws it (its knee bent where the clip bends it)
+    const p = c.starting ? 0 : stepPlace(step, c.stop)
     legChain(bones, s).forEach((b, k) => b.quaternion.copy(_codeLeg[i][k]).slerp(gaitLocal(asset, c, s, k), 1 - p))
     const T = _target[i]
-    T.copy(_gait[i]).lerp(_stand[i], p)
+    if (c.starting) T.copy(_startT[i])
+    else T.copy(_gait[i]).lerp(_stand[i], p)
     // lifted at mid-step by a share of the ground it covers (and a landed
     // foot's re-step). Stopping, by the square of the arc's sine: a knee near
     // straight bends by the root of the lift, so a lift rising with the
@@ -516,7 +616,8 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     const [H, K, A, , pole] = _ik
     const T = _target[i]
     // the foot turned from the gait's turn to the stand's with its step
-    _footQ.copy(_gaitQ[i]).slerp(_standQ[i], p)
+    if (c.starting) _footQ.copy(_startQ[i])
+    else _footQ.copy(_gaitQ[i]).slerp(_standQ[i], p)
     hips.updateMatrixWorld(true)
     inBody(chain[0], H, _q)
     inBody(chain[1], K, _q)
