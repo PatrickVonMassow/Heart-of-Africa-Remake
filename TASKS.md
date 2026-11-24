@@ -107,11 +107,26 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1582. Villager knee snaps when a walk starts or a start reverses into a stop
-  Source: findings 24.11.2026 10:59 and 11:14 from point 1422 (gltfClipLayers.test.ts settle harness, 60 Hz): starting straight, the shin turns 0.656 rad on the first blend frame (w 0.083), then 0.24-0.42 rad steps, identical with main's gltfClipLayers.ts; resuming mid-stop bends 0.3-0.5 rad a frame; a stop reversing a start mid-blend jumps 0.32-0.60 rad in the frame after the reversal as the step shares flip. The walk clip's own range is 0.235 rad a frame (sampled at 240 Hz).
-  Final state: through a start, a resumed walk and a start cut short by a stop, the knee changes no faster per frame than the clip's own range.
-  Verifiable: gltfClipLayers.test.ts start and reversal cases bounded by the clip's 240 Hz range; a moving capture on both backends.
+- [ ] 1582. Villager foot lifts on the walk clip's own step when a walk starts
+  Source: findings 24.11.2026 10:59 and 11:14 from point 1422 (gltfClipLayers.test.ts settle harness, 60 Hz): starting straight, the shin turns 0.656 rad on the first blend frame (w 0.083), then 0.24-0.42 rad steps. Split on 24.11.2026 (owner decision under the standing split rule) after the author's attempt on feat/1582-knee-start-snap 33ce8dfe1 did not converge: with steps timed by the walk weight each foot's step takes ~0.1 s, so the first lift snaps 0.66 rad; slower weight blends overstretch the trailing leg (0.46-0.56) and break the feet-never-slide tests; reusing the stop shaping reached 0.47-0.62; a knee speed cap only moves the snap (0.57) and breaks planted feet. Branch 33ce8dfe1 carries the bounding Vitest cases (start, resume, reversal) and the resume harness.
+  Final state: on a start each foot stays planted on the stand until the walk clip itself lifts that foot; its swing then runs from the stand spot to the clip's landing spot over the clip's own swing time, so the knee follows the clip's bend. Feet still never slide.
+  Verifiable: the start case of gltfClipLayers.test.ts (straight and ±1.5 / ±2.8 rad/s corners) bounded by the clip's 240 Hz range (0.197 straight / 0.235 at 2.8 rad/s); the existing planted-foot tests green; a moving capture on both backends.
+  Review state 24.11.2026: cross-review of b2d3a9c held the merge; the author fixed findings 1-4 on be2ca59f2 (second foot leaves only on clip swing, pelvis lowers for an out-of-reach standing foot, stop mid-start continues from the last drawn feet, kept pace resets when the body did not move; start knee within the clip range at all five corners). Open: (5) from the last stationary frame the standing feet slide 5 frames before the blend (11.5 mm straight, 25 mm at ±1.5 rad/s) because the walk weight waits for smoothed speed > 0.08 after the pace ramp; raw-speed trigger broke four start cases, so decide when the walk weight rises without jostled villagers stepping. (6) feeding the corner fixture production travel (groundStepped) breaks five cases (2.8 start 0.360; corner stops never finish); proposed: steerHeading-limited turn rate in the fixtures. Discard the uncommitted finding-6 attempt in the worktree; full gates not yet run; the set-off capture (polish-villagers adult-errands) has never run.
   Criticality: medium - visible leg snap whenever a villager sets off.
+  Bundle: Dorfleben.
+
+- [ ] 1583. Villager knee jumps when a stopping walk resumes
+  Source: split from point 1582 on 24.11.2026: a resumed walk hands the held stop pose back to the live walk clip whose phase moved on, so the knee jumps 0.715 rad a frame (pauses 0.05-0.75 s, harness on feat/1582-knee-start-snap 33ce8dfe1).
+  Final state: a resumed walk lines the walk clip's phase up with the held pose (on the start mechanism of 1582), so the knee changes no faster per frame than the clip's own range.
+  Verifiable: the resume case of gltfClipLayers.test.ts bounded by the clip's 240 Hz range; a moving capture on both backends.
+  Criticality: medium - visible leg snap when a villager hesitates and walks on.
+  Bundle: Dorfleben.
+
+- [ ] 1584. Villager knee jumps when a stop cuts a start short
+  Source: split from point 1582 on 24.11.2026: a stop reversing a start mid-blend jumps 0.32-0.60 rad in the frame after the reversal as the step shares flip.
+  Final state: a start cut short by a stop (on the start mechanism of 1582) keeps the knee within the clip's own per-frame range, reversal frames included.
+  Verifiable: the reversal case of gltfClipLayers.test.ts (straight and ±2.8 rad/s) bounded by the clip's 240 Hz range; a moving capture on both backends.
+  Criticality: low - only when a villager stops within a fraction of a second of setting off.
   Bundle: Dorfleben.
 
 - [ ] 1423. Villager heel strike stops the swinging foot dead
