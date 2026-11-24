@@ -782,6 +782,36 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     }
   })
 
+  it('a start cut short by a stop hands each foot on from where it was drawn: none jumps at the handoff', () => {
+    // the first falling frame dropped the start's feet for the stop's step
+    // targets, anchored where the gait stood as the start began: the foot on
+    // the stand jumped 6-14 cm and the swinging one 4-11 cm in that frame
+    // (cross-vendor review 24.11.2026)
+    // the walk clip's own fastest foot, walking on (60 Hz)
+    const walk = settle({ cut: 3 })
+    let clip = 0
+    for (let k = 30; k < 168; k++) clip = Math.max(clip, ...moved(walk, k))
+    for (const turn of [0, 1.5, -1.5, 2.8, -2.8]) {
+      for (let run = 0.125; run < 0.3; run += 0.025) {
+        const cut = 0.5
+        const frames = settle({ cut, start: true, stopAt: cut + run, yaw: (t) => Math.max(0, t - cut) * turn })
+        const at = frames.findIndex((f, k) => k > 0 && f.w < frames[k - 1].w)
+        const where = `turning ${turn} rad/s, walking ${run.toFixed(3)} s`
+        expect(frames[at - 1].w, where).toBeGreaterThan(0)
+        expect(frames[at - 1].w, where).toBeLessThan(1)
+        // at the handoff and the frame after, each foot goes on at the pace it
+        // had (one standing stays where it stands) …
+        for (let k = at; k <= at + 1; k++) {
+          const now = moved(frames, k)
+          const was = moved(frames, k - 1)
+          for (let i = 0; i < 2; i++) expect(now[i], `${where}, foot ${i} ${k - at} frames after the handoff`).toBeLessThan(was[i] + 0.005)
+        }
+        // … and from there to the stand none moves faster than the walk clip moves a foot
+        for (let k = at; k < frames.length; k++) expect(Math.max(...moved(frames, k)), `${where}, ${k - at} frames after the handoff (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
+      }
+    }
+  })
+
   // OPEN: point 1584 — the reversal flips the step shares by a jump
   it.skip('a start cut short by a stop, straight or in a corner: the knee bends no faster than the walk clip bends it, the reversal included', () => {
     // a stop reversing a start still in its blend jumped 0.32-0.60 rad in the
