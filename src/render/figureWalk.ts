@@ -488,13 +488,16 @@ export function hipJointAt(j: HipJoint, yaw: number): FootOffset {
  * The ground a figure's feet step for one frame's move (figure units): the
  * step along the facing is the stride; a sideways shove and a turn are stepped
  * too (the held foot cannot follow them far), in the sense the body moves
- * along its facing. Its rate is the speed the gait is chosen from.
+ * along its facing. A turn adds only what the step along the facing does not
+ * already cover (a corner wider than M.turnStep is walked, not stepped round
+ * again: counted twice, a walker in a corner read a jog's pace and its knee
+ * snapped into the jog). Its rate is the speed the gait is chosen from.
  */
 export function groundStepped(dx: number, dz: number, fromYaw: number, yaw: number, unit = 1): number {
   const ahead = (dx * Math.sin(yaw) + dz * Math.cos(yaw)) / unit
   const aside = Math.abs(dx * Math.cos(yaw) - dz * Math.sin(yaw)) / unit
   const turned = Math.abs(Math.atan2(Math.sin(yaw - fromYaw), Math.cos(yaw - fromYaw)))
-  return ahead + Math.sign(ahead || 1) * (aside + turned * M.turnStep)
+  return ahead + Math.sign(ahead || 1) * (aside + Math.max(0, turned * M.turnStep - Math.abs(ahead)))
 }
 
 /**

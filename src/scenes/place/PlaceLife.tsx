@@ -2680,7 +2680,8 @@ function TaskWalker({
       s.seg++
     } else if (throughDoor) {
       // Turned toward the way, never snapped (a planted foot rides a snap).
-      const turn = steerHeading(s.yaw, Math.atan2(dx, dz), speed, dt)
+      // at the pace its body has: setting off, no tighter than VILLAGER_MOTION.turnRadius
+      const turn = steerHeading(s.yaw, Math.atan2(dx, dz), s.pace, dt)
       s.yaw = turn.yaw
       s.x += Math.sin(s.yaw) * step * turn.pace
       s.z += Math.cos(s.yaw) * step * turn.pace
@@ -2694,7 +2695,8 @@ function TaskWalker({
       const [tx, tz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
       if (Math.hypot(tx - s.x, tz - s.z) < step * 0.25) s.seg++ // blocked: skip ahead
       const way = wayHeading(s.x, s.z, tx, tz, dx, dz, step)
-      const turn = steerHeading(s.yaw, way, speed, dt)
+      // at the pace its body has: setting off, no tighter than VILLAGER_MOTION.turnRadius
+      const turn = steerHeading(s.yaw, way, s.pace, dt)
       s.yaw = turn.yaw
       const [fromX, fromZ] = [s.x, s.z]
       ;[s.x, s.z] = resolveMove(colliders, s.x + Math.sin(s.yaw) * step * turn.pace, s.z + Math.cos(s.yaw) * step * turn.pace, NPC_RADIUS, [s.x, s.z])
@@ -3124,7 +3126,8 @@ function Walkers({
         }
       } else if (throughDoor) {
         // Turned toward the way, never snapped (a planted foot rides a snap).
-        const turn = steerHeading(s.yaw, Math.atan2(dx, dz), def.speed, dt)
+        // at the pace its body has: setting off, no tighter than VILLAGER_MOTION.turnRadius
+        const turn = steerHeading(s.yaw, Math.atan2(dx, dz), s.pace, dt)
         s.yaw = turn.yaw
         s.x += Math.sin(s.yaw) * step * turn.pace
         s.z += Math.cos(s.yaw) * step * turn.pace
@@ -3142,7 +3145,8 @@ function Walkers({
         const moved = Math.hypot(tx - s.x, tz - s.z)
         // The body turns toward where it can really go and steps along its
         // heading: a snapped turn swings a planted foot across the ground.
-        const turn = steerHeading(s.yaw, wayHeading(s.x, s.z, tx, tz, dx, dz, step), def.speed, dt)
+        // at the pace its body has: setting off, no tighter than VILLAGER_MOTION.turnRadius
+        const turn = steerHeading(s.yaw, wayHeading(s.x, s.z, tx, tz, dx, dz, step), s.pace, dt)
         s.yaw = turn.yaw
         ;[s.x, s.z] = resolveMove(colliders, s.x + Math.sin(s.yaw) * step * turn.pace, s.z + Math.cos(s.yaw) * step * turn.pace, NPC_RADIUS, [s.x, s.z])
         // held by its turn or blocked, it sets off on the ramp again
@@ -3661,7 +3665,8 @@ function ErrandVillagers({
           // way far off its heading slows it nearly to a stand while it turns.
           // The step stays the way round bodies and walls, only shortened by
           // that pace, so the turn never walks it into a body it routes round.
-          const turn = steerHeading(yaws.current[i], wayHeading(me.x, me.z, tx, tz, ax, az, step), cfg.pace, dt)
+          // at the pace its body has: setting off, no tighter than VILLAGER_MOTION.turnRadius
+          const turn = steerHeading(yaws.current[i], wayHeading(me.x, me.z, tx, tz, ax, az, step), state.pace, dt)
           yaws.current[i] = turn.yaw
           faceTo.current[i] = null
           const sx = me.x + (tx - me.x) * turn.pace
