@@ -22,6 +22,7 @@ import {
   loadRadiusAt,
   phasePerDistance,
   leanedHipY,
+  groundStepped,
   primitiveHandTarget,
   primitiveLayout,
   primitivePoseRig,
@@ -675,5 +676,23 @@ describe('kneeling folds the body, it never squashes it', () => {
         expect(a.hand.distanceTo(a.pivot.position)).toBeLessThanOrEqual(L.armLength + 1e-9)
       }
     })
+  })
+})
+
+describe('groundStepped', () => {
+  it('counts a corner\'s turn only where the step along and across the facing does not cover it', () => {
+    // an oblique errand step (moved along the collision-resolved vector while
+    // the yaw catches up) counted its sideways share in full and the turn on
+    // top (cross-vendor review 24.11.2026)
+    const yaw = 0.3
+    for (const [ahead, aside] of [[0.001, 0.02], [0.02, 0.001], [0.0, 0.03], [-0.01, 0.01]]) {
+      const dx = ahead * Math.sin(yaw) + aside * Math.cos(yaw)
+      const dz = ahead * Math.cos(yaw) - aside * Math.sin(yaw)
+      for (const turned of [0, 0.01, 0.2]) {
+        const g = groundStepped(dx, dz, yaw - turned, yaw)
+        expect(Math.abs(g)).toBeCloseTo(Math.max(Math.abs(ahead) + Math.abs(aside), turned * M.turnStep), 9)
+        expect(Math.sign(g)).toBe(Math.sign(ahead || 1))
+      }
+    }
   })
 })
