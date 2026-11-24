@@ -107,17 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1395. Point gesture release squats the glTF figure (virtual arm longer than the drawn reach)
-  Queue position: with point 1383 (Dorfleben), whose point/reach step touches the same arm.
-  Source: owner measurement 20.10.2026 on feat/1345-child-chaser-teleport (split from point 1345, whose spec named this squat as a related CROUCH_MAX case): in the runtime-pose export (src/render/villagerRuntimePose.test.tsx, subject `point`, adult, bearing 0.6) the hips sit at 0.51 of standing height at t=2.11 s. The cause is not the CROUCH_MAX fallback: while the arm lowers from the point (pitch -1.71 to -1.50) the arm off its rest pose counts as a contact arm (skinnedFigure.tsx `contactArm`, no `extras.reach`), its target is the virtual primitive hand (a straight arm longer than the glTF reach 0.47), the standing shortfall is 0.13-0.37, and the crouch really reaches it (-0.008 at 1.1), so `contactCrouch` picks 0.3 rising to 1.0 over about eight frames.
-  Final state: a gesture arm is no contact for the crouch: a pointing villager on the glTF body never squats at the end of the gesture; low work contacts (the jar fill, the dig) keep their crouch.
-  Verifiable: the export's `point` subject keeps its hips at 0.85 or more of standing height in every frame (Vitest in src/render/villagerRuntimePose.test.tsx); skinnedFigureCrouch.test.tsx stays green.
-  Criticality: medium - every pointing villager on medium/high presets.
-  Bundle: Dorfleben.
-  Further source: user bug report hoa-state-2026-10-21-3318564123 (2).zip (21:05:18Z), user words: "Warum bückt er sich, wenn er zum Häuptlingshütte zeit und warum zeigt seine Hand nicht geradeaus, sondern leicht nach unten." The man in dark blue points toward the chief's hut in a crouch with his arm slightly below horizontal - consistent with the measured release phase (arm pitch -1.71 to -1.50 while the crouch fires).
-  Additional check: after the fix, the pointing hand aims level at the target while the gesture is held (not only at release); if it does not, split a separate point for the aim.
-  Owned browser checks (charged by point 1465, 29.10.2026, bisected to the 1295 glTF merge 2eb4f1384; trace: hand 0.65 -> 0.82 -> 0.34 squat -> rest within a second): polish-speech --section=chief-to-drummer "the drummer's arm is raised in the pointing frame (point 1272)" and "the man and his word offer their keys at the same time (point 1139)" green on both backends; strike both charges in scripts/render-verify-charges.mjs.
-
 - [ ] 1579. Held pointing arm aims about 43 degrees below its target on the glTF body
   Source: split from point 1395 per its additional check (24.11.2026). Runtime-pose export
   (src/render/villagerRuntimePose.test.tsx, subject `point`, adult, bearing 0.6, elevation 0.15):
