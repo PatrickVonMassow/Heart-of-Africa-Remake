@@ -590,6 +590,27 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     }
   })
 
+  it('starting in a corner and shoved sideways: the foot on the stand stays within the leg\'s reach, its ball where it stands', () => {
+    // the pelvis came down for a foot out of reach only stopping: a body
+    // turning and carried sideways as it set off dragged the standing foot
+    // by up to 3.5 mm a frame (cross-vendor review 24.11.2026)
+    for (const turn of [1.5, -1.5, 2.8, -2.8]) {
+      for (const drift of [1, -1]) {
+        for (let cut = 1; cut < 1.6; cut += 0.05) {
+          const frames = settle({ cut, start: true, drift: (t) => (t > cut ? drift : 0), yaw: (t) => Math.max(0, t - cut) * turn })
+          let worst = 0
+          for (let k = 1; k < frames.length; k++)
+            for (let i = 0; i < 2; i++)
+              if (frames[k].start[i] === 0 && frames[k - 1].start[i] === 0) {
+                const [b, a] = [frames[k].feet[i][2], frames[k - 1].feet[i][2]]
+                worst = Math.max(worst, Math.hypot(b.x - a.x, b.z - a.z))
+              }
+          expect(worst, `turning ${turn} rad/s, shoved ${drift} m/s, start at ${cut.toFixed(2)} s`).toBeLessThan(0.002)
+        }
+      }
+    }
+  })
+
   it('a kneel setting in mid-blend takes the step out continuously: no foot jumps at its onset', () => {
     // any kneel above 0 switched the step off for the plain bone blend
     for (let cut = 1; cut < 1.4; cut += 0.1) {

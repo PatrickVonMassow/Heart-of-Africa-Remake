@@ -105,6 +105,8 @@ export interface ClipLayers {
   startFlat: [THREE.Quaternion, THREE.Quaternion]
   /** Per foot, the height of the gait's ball (toe joint, body frame) as the start took it up. */
   startBall: [number, number]
+  /** The foot that swung off the stand as the start set the gait (-1 none yet). */
+  startFirst: number
   /** How far a foot on the stand takes up the clip's roll off its heel (0 … 1):
    *  none while the walk weight blends the legs, then over G.startRollSeconds. */
   startRoll: number
@@ -145,6 +147,7 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     startTurn: [new THREE.Quaternion(), new THREE.Quaternion()],
     startFlat: [new THREE.Quaternion(), new THREE.Quaternion()],
     startBall: [0, 0],
+    startFirst: -1,
     startRoll: 0,
   }
 }
@@ -260,6 +263,7 @@ export function applyClipLayers(
   if (!c.starting && before <= 0 && c.legs > 0 && c.legs < 1 && m.kneel <= 0 && c.dig < 1) {
     c.starting = true
     c.startState = [-1, -1]
+    c.startFirst = -1
     c.startRoll = 0
     c.gait.phase = startPhase(asset, c.gait.phase)
   } else if (c.starting && (c.legs < before || m.kneel > 0)) c.starting = false
@@ -493,6 +497,7 @@ function startFeet(c: ClipLayers, body: GroundBody | null): void {
     // never while the other is in the air, so one foot always stands
     if (c.startState[i] === 0 && swinging && c.startState[1 - i] !== 1) {
       c.startState[i] = 1
+      if (c.startFirst < 0) c.startFirst = i
       c.startPhase[i] = phase
       c.startOff[i].copy(_stand[i]).sub(_gait[i])
       c.startTurn[i].copy(_gaitQ[i]).invert().multiply(_standQ[i])
@@ -650,15 +655,24 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     // by a jump (a leg's bend goes with the root of its shortening there)
     const chain = legChain(bones, s)
     chain[0].updateMatrixWorld(true)
-    const [H, , A] = _ik
+    const [H, K, A] = _ik
     inBody(chain[0], H, _q)
+    inBody(chain[1], K, _q)
     inBody(chain[2], A, _q)
-    const reach = H.distanceTo(A)
+    // starting, the legs are the clip's own: a foot on the stand needs the
+    // hips lowered only past the leg's full reach
+    const reach = c.starting ? H.distanceTo(K) + K.distanceTo(A) : H.distanceTo(A)
     const flat = (T.x - H.x) ** 2 + (T.z - H.z) ** 2
     const dy = H.y - T.y
-    drop = Math.max(drop, flat < reach * reach ? dy - Math.sqrt(reach * reach - flat) : dy)
+    const need = flat < reach * reach ? dy - Math.sqrt(reach * reach - flat) : dy
+    // starting, by the foot standing on (or stepping off) the stand (point
+    // 1582 review): a body turning or shoved sideways as it sets off carried
+    // the hips past that leg's reach and dragged the planted foot; its need
+    // fades with its step's share of the stand
+    if (!c.starting) drop = Math.max(drop, need)
+    else if (i !== c.startFirst && c.startState[i] <= 1) drop = Math.max(drop, need * _startP[i])
   })
-  hips.position.y -= Math.min(drop, G.pelvisDropMax * legScale) * share * c.stop
+  hips.position.y -= Math.min(drop, G.pelvisDropMax * legScale) * share * (c.starting ? 1 : c.stop)
   LEG_SIDES.forEach((s, i) => {
     const step = shares[i]
     const p = stepPlace(step, c.stop)
