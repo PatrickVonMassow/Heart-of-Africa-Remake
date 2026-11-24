@@ -565,6 +565,11 @@ describe('the runtime-pose exporter', () => {
     const childStanding = (id: string) => ((at(caughtStanding.world[bone('hips')]).y - caughtStanding.root.p[1]) * by(id).person.scale) / by('caught').person.scale
     expect(Math.min(...hipsOf('chaser')) / childStanding('chaser')).toBeGreaterThan(0.75)
     expect(Math.min(...hipsOf('caught')) / childStanding('caught')).toBeGreaterThan(0.95)
+    // a pointing adult never squats as the gesture arm lowers (its hips sat at
+    // 0.51 of standing height at t=2.11 s): a gesture arm is no crouch contact.
+    // The reference is its own first frame, the gesture just begun.
+    const pointHips = hipsOf('point')
+    for (const [k, h] of pointHips.entries()) expect(h / pointHips[0], `point t=${by('point').frames[k].t.toFixed(2)}`).toBeGreaterThanOrEqual(0.85)
     // the chaser strides at its sprint (its legs froze above the old teleport speed)
     const feet = by('chaser').frames.map((fr) => at(fr.world[bone('foot.L')]).z - fr.root.p[2])
     expect(Math.max(...feet) - Math.min(...feet)).toBeGreaterThan(0.05)
