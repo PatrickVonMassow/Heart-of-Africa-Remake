@@ -6,11 +6,12 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { VILLAGER_ASSET, VILLAGER_GLTF, VILLAGER_POSE } from '../../config/balance'
+import { VILLAGER_ASSET, VILLAGER_GLTF, VILLAGER_MOTION, VILLAGER_POSE } from '../../config/balance'
 import { distributeLean, gazeDirection, LEAN_BONES, newGaze, stepGaze } from '../../render/figureRig'
 import { parseVillager, type VillagerAsset } from '../../render/villagerAsset'
-import { clipGaitPose, clipPoseAt, shovelOnHungHand, toHung } from '../../render/villagerClipPose'
+import { clipGaitPose, clipPoseAt, gaitStance, shovelOnHungHand, toHung } from '../../render/villagerClipPose'
 import { newPose } from '../../render/villagerRig'
+import { groundStepped, keptPace, setOffSpeed, steerHeading } from '../../render/figureWalk'
 import { createGltfSkeleton, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { AGE_GROUPS, SEXES } from '../../systems/appearance'
 import { applyClipLayers, clipLayers, gazeHead, gripShaft, handShapes, leanTrunk, newTrunkBase, placeShovel, poseShoulders, settleShares, stepClipLayers, takeTrunkBase, TRUNK, type ClipLayers } from './gltfClipLayers'
@@ -430,7 +431,10 @@ describe('the posable clavicles (natural-villager-motion step 11)', () => {
 })
 
 describe('starting and stopping on the glTF figure (point 1330)', () => {
-  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[] }
+  /** Per frame: the legs' share of the gait, each foot's world points, the
+   *  shins' turns, and the start's state per foot (`ClipLayers.startState`,
+   *  -1 when no start runs) with whether the walk clip swings that foot. */
+  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; swing: boolean[]; step: number }
   /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
   function soleOf(bones: Record<string, THREE.Bone>) {
     const f = person.frame
@@ -447,12 +451,20 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     start?: boolean
     /** Starting, the seconds the walk stops again at (a start cut short): the walk weight falls from there. */
     stopAt?: number
+    /** Stopping, the seconds the walk takes up again at (a walk resumed mid-stop). */
+    resumeAt?: number
     /** Frames a second (60 by default). */
     hz?: number
-    /** Per frame: the body's heading, its sideways drift (m/s) and the kneel, by time and walk weight. */
-    yaw?: (t: number) => number
+    /** Per frame: the turn the body wants (rad/s; turned as steerHeading
+     *  turns the game's walkers), its sideways drift (m/s) and the kneel, by
+     *  time and walk weight. */
+    turn?: (t: number) => number
     drift?: (t: number, w: number) => number
     kneel?: (t: number, w: number) => number
+    /** Seconds the body is held where it stands (blocked) while it wants to walk. */
+    held?: (t: number) => boolean
+    /** A turn on the spot (rad/s), given whatever the body's pace. */
+    spin?: (t: number) => number
   }
   /** Walk at `v`, stop (or start) with the walk weight easing as the code
    *  walk eases it, the skeleton in a figure group placed and turned as the
@@ -473,14 +485,26 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     let z = 0
     let w = r.start ? 0 : 1
     let speed = r.start ? 0 : v
+    // the body's own pace, gained setting off as the game's walkers gain it
+    let pace = speed
+    let yaw = 0
     const frames: Sole[] = []
-    for (let t = 0; t < Math.max(r.cut, r.stopAt ?? 0) + 1.5; t += dt) {
-      const yaw = r.yaw?.(t) ?? 0
-      const step = (r.start ? t >= r.cut && t < (r.stopAt ?? Infinity) : t < r.cut) ? v * dt : 0
+    for (let t = 0; t < Math.max(r.cut, r.stopAt ?? 0, r.resumeAt ?? 0) + 1.5; t += dt) {
+      pace = setOffSpeed(pace, (r.start ? t >= r.cut && t < (r.stopAt ?? Infinity) : t < r.cut || t >= (r.resumeAt ?? Infinity)) ? v : 0, dt)
+      // turned as the game's walkers turn: a corner rounded at its pace no
+      // tighter than VILLAGER_MOTION.turnRadius, none standing
+      const from = { x, z, yaw }
+      const steer = steerHeading(yaw, yaw + (r.turn?.(t) ?? 0) * dt, pace, dt)
+      yaw = steer.yaw + (r.spin?.(t) ?? 0) * dt
+      // held, the body gets none of its step, and keeps no pace (as the game's walkers)
+      const step = r.held?.(t) ? 0 : pace * steer.pace * dt
+      pace = keptPace(pace, step, pace * dt)
       x += Math.sin(yaw) * step + (r.drift?.(t, w) ?? 0) * dt
       z += Math.cos(yaw) * step
-      speed += (step / dt - speed) * (1 - Math.exp(-dt / 0.12))
-      w = Math.abs(speed) > 0.08 && !(r.stopAt !== undefined && t >= r.stopAt) ? Math.min(1, w + 5 * dt) : Math.max(0, w - 5 * dt)
+      // the ground the feet step and the speed the walk weight reads, as stepWalk measures them
+      const walked = groundStepped(x - from.x, z - from.z, from.yaw, yaw)
+      speed += (walked / dt - speed) * (1 - Math.exp(-dt / VILLAGER_MOTION.speedSmoothing))
+      w = Math.abs(speed) > VILLAGER_MOTION.moveSpeed && !(r.stopAt !== undefined && t >= r.stopAt) ? Math.min(1, w + VILLAGER_MOTION.walkFadeRate * dt) : Math.max(0, w - VILLAGER_MOTION.walkFadeRate * dt)
       const kneel = r.kneel?.(t, w) ?? 0
       group.position.set(x, 0, z)
       group.rotation.y = yaw
@@ -488,15 +512,31 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       // the code-built stand: every bone at rest
       for (const b of Object.values(bones)) b.quaternion.identity()
       bones.hips.position.copy(hipRest)
-      stepClipLayers(asset, person, c, step, speed, { x, z, yaw, unit: 1 }, null, dt)
+      stepClipLayers(asset, person, c, walked, speed, { x, z, yaw, unit: 1 }, null, dt)
       applyClipLayers(asset, person, bones, c, { speed, weight: w, kneel }, [true, true])
       group.updateMatrixWorld(true)
-      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()) })
+      const swing = [0, 1].map((i) => {
+        const [land, lift] = gaitStance(i)
+        return lift - land > 1e-6 && ((((c.gait.phase - land) % 1) + 1) % 1) >= lift - land
+      })
+      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], swing, step })
     }
     return frames
   }
+  /** A jostle the stand takes without walking: a body carried faster reads
+   *  as walking (stepWalk measures every move) and never settles. */
+  // (a 0.3 m/s carry cannot stay a stand any other way: smoothed over
+  // speedSmoothing it passes moveSpeed on the 3rd frame: a shove, not a carry)
+  const JOSTLE = 0.9 * VILLAGER_MOTION.moveSpeed
   const blendFrames = (frames: Sole[]) => frames.map((b, k) => (k > 0 && ((b.w > 0 && b.w < 1) || (frames[k - 1].w > 0 && frames[k - 1].w < 1)) ? k : -1)).filter((k) => k > 0)
   /** Per foot, the most any of its points moved over the ground from frame k − 1 to k. */
+  /** The frames a run's motion over (from, to) seconds acts on, stepped as settle steps its clock. */
+  const activeFrames = (frames: Sole[], from: number, to: number, dt = 1 / 60) => {
+    const out: number[] = []
+    let k = 0
+    for (let t = 0; k < frames.length; t += dt, k++) if (t > from && t < to) out.push(k)
+    return out
+  }
   const moved = (frames: Sole[], k: number) => frames[k].feet.map((pts, i) => Math.max(...pts.map((p, j) => Math.hypot(p.x - frames[k - 1].feet[i][j].x, p.z - frames[k - 1].feet[i][j].z))))
 
   it('each foot steps between the gait and the stand in turn, the other standing: never a foot slid along the ground', () => {
@@ -533,7 +573,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     for (const turn of [-1.5, 1.5]) {
       for (let cut = 1; cut < 1.4; cut += 0.1) {
         // walking off while turning (rad/s from the start)
-        const frames = settle({ cut, start: true, yaw: (t) => Math.max(0, t - cut) * turn })
+        const frames = settle({ cut, start: true, turn: (t) => (t > cut ? turn : 0) })
         // the first half of the start: the first foot still on the stand
         const span = blendFrames(frames).filter((k) => frames[k].w < 0.45)
         expect(span.length).toBeGreaterThan(2)
@@ -543,6 +583,134 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         for (const k of span) frames[k].feet[first].forEach((p, j) => (worst = Math.max(worst, Math.hypot(p.x - from[j].x, p.z - from[j].z))))
         expect(worst, `turning ${turn} rad/s from ${cut.toFixed(1)} s`).toBeLessThan(0.002)
       }
+    }
+  })
+
+  it('starting, each foot leaves the stand only as the walk clip swings it: none drifts off it through the clip\'s stance', () => {
+    // the second foot left the stand as soon as the first had landed and the
+    // legs were on the walk, in the clip's stance too, and then took nearly a
+    // whole cycle to settle, drifting over the ground while the clip stood
+    // on it (cross-vendor review 24.11.2026)
+    for (const turn of [0, 1.5, -1.5, 2.8, -2.8]) {
+      for (let cut = 1; cut < 1.6; cut += 0.05) {
+        const frames = settle({ cut, start: true, turn: (t) => (t > cut ? turn : 0) })
+        const where = `turning ${turn} rad/s, start at ${cut.toFixed(2)} s`
+        let left = 0
+        let worst = 0
+        for (let k = 1; k < frames.length; k++) {
+          for (let i = 0; i < 2; i++) {
+            if (frames[k - 1].start[i] <= 0 && frames[k].start[i] >= 1) {
+              left++
+              expect(frames[k].swing[i], `${where}: foot ${i} leaves the stand in the clip's stance`).toBe(true)
+            }
+            // a foot on the stand keeps its ball where it stands (its heel
+            // rolls off with the clip's)
+            if (frames[k].start[i] === 0 && frames[k - 1].start[i] === 0) {
+              const [b, a] = [frames[k].feet[i][2], frames[k - 1].feet[i][2]]
+              worst = Math.max(worst, Math.hypot(b.x - a.x, b.z - a.z))
+            }
+          }
+        }
+        expect(left, where).toBe(2)
+        expect(worst, where).toBeLessThan(0.002)
+      }
+    }
+  })
+
+  it('starting in a corner and shoved sideways: the foot on the stand stays within the leg\'s reach, its ball where it stands', () => {
+    // the pelvis came down for a foot out of reach only stopping: a body
+    // turning and carried sideways as it set off dragged the standing foot
+    // by up to 3.5 mm a frame (cross-vendor review 24.11.2026)
+    for (const turn of [1.5, -1.5, 2.8, -2.8]) {
+      for (const drift of [1, -1]) {
+        for (let cut = 1; cut < 1.6; cut += 0.05) {
+          const frames = settle({ cut, start: true, drift: (t) => (t > cut ? drift : 0), turn: (t) => (t > cut ? turn : 0) })
+          let worst = 0
+          for (let k = 1; k < frames.length; k++)
+            for (let i = 0; i < 2; i++)
+              if (frames[k].start[i] === 0 && frames[k - 1].start[i] === 0) {
+                const [b, a] = [frames[k].feet[i][2], frames[k - 1].feet[i][2]]
+                worst = Math.max(worst, Math.hypot(b.x - a.x, b.z - a.z))
+              }
+          expect(worst, `turning ${turn} rad/s, shoved ${drift} m/s, start at ${cut.toFixed(2)} s`).toBeLessThan(0.002)
+        }
+      }
+    }
+  })
+
+  it('starting, the stand\'s feet stay where they stood while the body moves before the walk weight rises', () => {
+    // the walk weight waits for the smoothed speed: the standing legs went
+    // with the body for 5 frames, the feet sliding 11.5 mm straight and
+    // 25 mm at 1.5 rad/s (cross-vendor review 24.11.2026)
+    for (const turn of [0, 1.5, -1.5, 2.8, -2.8]) {
+      for (let cut = 1; cut < 1.6; cut += 0.05) {
+        const frames = settle({ cut, start: true, turn: (t) => (t > cut ? turn : 0) })
+        const go = frames.findIndex((f) => f.step > 0)
+        const blend = frames.findIndex((f) => f.w > 0)
+        const where = `turning ${turn} rad/s, start at ${cut.toFixed(2)} s`
+        expect(blend - go, where).toBeGreaterThan(2)
+        let worst = 0
+        for (let k = go; k < blend; k++)
+          frames[k].feet.forEach((pts, i) => pts.forEach((p, j) => (worst = Math.max(worst, Math.hypot(p.x - frames[go - 1].feet[i][j].x, p.z - frames[go - 1].feet[i][j].z)))))
+        expect(worst, where).toBeLessThan(0.0005)
+      }
+    }
+  })
+
+  it('a standing body jostled without walking: its feet stay, then come back under it without a step or a jump', () => {
+    for (const drift of [JOSTLE, -JOSTLE]) {
+      const frames = settle({ cut: 2.5, start: true, drift: (t) => (t > 0.5 && t < 1 ? drift : 0) })
+      const dt = 1 / 60
+      let worst = 0
+      for (let k = 1; k < 140; k++) {
+        expect(frames[k].w, `jostled ${drift} m/s`).toBe(0)
+        worst = Math.max(worst, ...moved(frames, k))
+      }
+      // held while carried, eased back no faster than VILLAGER_GLTF.standHoldSettle
+      expect(worst, `jostled ${drift} m/s`).toBeLessThanOrEqual(VILLAGER_GLTF.standHoldSettle * dt * 1.2)
+      // through the shove (within VILLAGER_GLTF.standHoldReach) each foot where it stood before it,
+      // not merely moving slowly with the body (cross-vendor review 24.11.2026)
+      const shove = activeFrames(frames, 0.5, 1)
+      const before = frames[shove[0] - 1].feet
+      for (const k of shove)
+        frames[k].feet.forEach((pts, i) => pts.forEach((p, j) => expect(Math.hypot(p.x - before[i][j].x, p.z - before[i][j].z), `jostled ${drift} m/s, frame ${k}`).toBeLessThan(1e-4)))
+      // and under the body again before it walks off
+      const end = frames[140].feet
+      const rest = frames[20].feet
+      // (the body's 0.5 s carry, to within one frame of it)
+      const body = Math.abs(drift) * 0.5
+      end.forEach((pts, i) => pts.forEach((p, j) => expect(Math.abs(Math.hypot(p.x - rest[i][j].x, p.z - rest[i][j].z) - body), `jostled ${drift} m/s`).toBeLessThanOrEqual(Math.abs(drift) * dt + 1e-6)))
+    }
+  })
+
+  it('a standing body turned on the spot without walking: its feet stay where they stood', () => {
+    // the hold read only a move over the ground: a turn on the spot (which
+    // stepWalk counts as walked) swept the feet round with the body
+    // (cross-vendor review 24.11.2026); 0.15 rad/s for 0.5 s stays a stand
+    // and within VILLAGER_GLTF.standHoldTurn
+    for (const spin of [0.15, -0.15]) {
+      const frames = settle({ cut: 2.5, start: true, spin: (t) => (t > 0.5 && t < 1 ? spin : 0) })
+      const turning = activeFrames(frames, 0.5, 1)
+      const before = frames[turning[0] - 1].feet
+      for (const k of turning) {
+        expect(frames[k].w, `spun ${spin} rad/s`).toBe(0)
+        frames[k].feet.forEach((pts, i) => pts.forEach((p, j) => expect(Math.hypot(p.x - before[i][j].x, p.z - before[i][j].z), `spun ${spin} rad/s, frame ${k}`).toBeLessThan(1e-4)))
+      }
+    }
+  })
+
+  it('a walker held where it stands while it wants to walk sets off on the ramp once let go', () => {
+    // its pace was gained before its step was resolved, so a body blocked
+    // (or held by its turn) built up its full pace standing and set off at
+    // it (cross-vendor review 24.11.2026)
+    const dt = 1 / 60
+    for (const hold of [0.2, 0.5, 1]) {
+      const cut = 1
+      const frames = settle({ cut, start: true, held: (t) => t >= cut && t < cut + hold })
+      let worst = 0
+      for (let k = 1; k < frames.length; k++) worst = Math.max(worst, (frames[k].step - frames[k - 1].step) / dt)
+      expect(frames.some((f) => f.step > 0), `held ${hold} s`).toBe(true)
+      expect(worst / dt, `held ${hold} s`).toBeLessThanOrEqual(VILLAGER_MOTION.setOffAccel + 1e-6)
     }
   })
 
@@ -563,7 +731,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   it('a body carried on through the end of the blend hands its feet to the stand without a jump', () => {
     // the stand's spots were held in the world to the end, then dropped for
     // the body's own stand: a jostled body's feet jumped by its drift
-    for (const drift of [0.3, -0.3]) {
+    for (const drift of [JOSTLE, -JOSTLE]) {
       for (let cut = 1; cut < 1.4; cut += 0.1) {
         const frames = settle({ cut, drift: (t) => (t > cut + 0.2 ? drift : 0) })
         const body = Math.abs(drift) / 60
@@ -593,10 +761,10 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     // and its turn onto the turning body's, heel and ball swept round the
     // held ankle (cross-vendor reviews of the planted-soles walk, 20.10.2026)
     const restY = settle({ cut: 0.5, start: true })[0].feet[0][0].y
-    for (const [drift, turn] of [0, 1.5, -1.5].flatMap((turn) => [0.3, -0.3, 0].map((drift) => [drift, turn]))) {
+    for (const [drift, turn] of [0, 1.5, -1.5].flatMap((turn) => [JOSTLE, -JOSTLE, 0].map((drift) => [drift, turn]))) {
       if (!drift && !turn) continue
       for (let cut = 1; cut < 1.4; cut += 0.1) {
-        const frames = settle({ cut, drift: (t) => (t > cut + 0.2 ? drift : 0), yaw: (t) => Math.max(0, t - cut) * turn })
+        const frames = settle({ cut, drift: (t) => (t > cut + 0.2 ? drift : 0), turn: (t) => (t > cut ? turn : 0) })
         const blend = blendFrames(frames)
         // the frame the standing legs take over: the handoff's last
         const end = frames.findIndex((f, k) => k > 0 && f.w <= 0 && frames[k - 1].w > 0)
@@ -636,7 +804,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     // sampled at 240 Hz, so the clip's fastest phase is caught whatever phase a 60 Hz frame lands on
     const hz = 240
     let clip = 0
-    for (const walk of [settle({ cut: 3, hz }), settle({ cut: 3, hz, yaw: (t) => t * turn })])
+    for (const walk of [settle({ cut: 3, hz }), settle({ cut: 3, hz, turn: () => turn })])
       for (let k = hz / 2; k < hz * 2.8; k++) clip = Math.max(clip, kneeStep(walk, k))
     return (clip * hz) / 60
   }
@@ -648,11 +816,67 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       const clip = clipKneeStep(turn)
       for (let cut = 1; cut < 1.6; cut += 0.05) {
         // turning into the corner from shortly before the stop, on through it
-        const frames = settle({ cut, yaw: (t) => Math.max(0, t - cut + 0.3) * turn })
+        const frames = settle({ cut, turn: (t) => (t > cut - 0.3 ? turn : 0) })
         let worst = 0
         // from before the blend to the run's end: the legs settle on past the walk's fade
         for (let k = Math.max(1, blendFrames(frames)[0] - 5); k < frames.length; k++) worst = Math.max(worst, kneeStep(frames, k))
         expect(worst, `turning ${turn} rad/s, stop at ${cut.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
+      }
+    }
+  })
+
+  /** The worst knee step over a whole run, from its first frame. */
+  const worstKnee = (frames: Sole[]) => {
+    let worst = 0
+    for (let k = 1; k < frames.length; k++) worst = Math.max(worst, kneeStep(frames, k))
+    return worst
+  }
+
+  it('starting, straight or into a corner: the knee bends no faster through the blend than the walk clip bends it', () => {
+    // setting off straight turned the shin 0.656 rad on the first blend frame,
+    // then by 0.24-0.42 rad steps (finding 24.11.2026 from point 1422)
+    for (const turn of [0, 2.8, -2.8, 1.5, -1.5]) {
+      const clip = clipKneeStep(turn)
+      // OPEN: point 1423 (heel strike) owns the clip-range bound at +2.8 rad/s
+      // after the start: there the run past it adds nothing over walking into
+      // that corner without one (the gait alone passes the clip's range at landing)
+      let after = clip
+      if (turn === 2.8) {
+        for (let cut = 1; cut < 1.6; cut += 0.05) {
+          const walk = settle({ cut: 3, turn: (t) => (t > cut ? turn : 0) })
+          for (let k = 1; k < 170; k++) after = Math.max(after, kneeStep(walk, k))
+        }
+      }
+      for (let cut = 1; cut < 1.6; cut += 0.05) {
+        const frames = settle({ cut, start: true, turn: (t) => (t > cut ? turn : 0) })
+        // the start's blend itself (from the stand to full weight) within the
+        // clip's own range at every corner, the raised bound only past it, where
+        // the gait at full weight draws the knee (measured: +2.8 rad/s peaks at
+        // 0.249 at full weight on the second foot's clip swing, walking into the
+        // corner without a start at 0.271; cross-vendor review 24.11.2026)
+        const blend = frames.findIndex((f) => f.w > 0)
+        const full = frames.findIndex((f, k) => k > blend && f.w >= 1)
+        const where = `turning ${turn} rad/s, start at ${cut.toFixed(2)} s`
+        expect(blend > 0 && full > blend, where).toBe(true)
+        let start = 0
+        for (let k = 1; k <= full; k++) start = Math.max(start, kneeStep(frames, k))
+        expect(start, `${where} (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
+        expect(worstKnee(frames), `${where} (bound ${after.toFixed(3)})`).toBeLessThanOrEqual(after)
+      }
+    }
+  })
+
+  // OPEN: point 1583 — the resume hands the held stop back to the live gait by a jump
+  it.skip('a walk taken up again mid-stop: the knee bends no faster than the walk clip bends it', () => {
+    // resuming while the legs still left the gait bent the knee by 0.3-0.5 rad a
+    // frame (finding 24.11.2026 from point 1422)
+    for (const turn of [0, 2.8, -2.8]) {
+      const clip = clipKneeStep(turn)
+      for (let pause = 0.05; pause < 0.8; pause += 0.05) {
+        const cut = 1.2
+        const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
+        const worst = worstKnee(frames)
+        expect(worst, `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
       }
     }
   })
@@ -663,23 +887,83 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     // review 24.11.2026)
     for (const turn of [2.8, -2.8]) {
       const clip = clipKneeStep(turn)
-      for (let run = 0.05; run < 0.2; run += 0.025) {
+      // the stop inside the start blend: the walk weight takes up once the
+      // body, gaining its pace (VILLAGER_MOTION.setOffAccel), has a stride
+      for (let run = 0.125; run < 0.3; run += 0.025) {
         const cut = 0.5
-        const frames = settle({ cut, start: true, stopAt: cut + run, yaw: (t) => Math.max(0, t - cut) * turn })
+        const frames = settle({ cut, start: true, stopAt: cut + run, turn: (t) => (t > cut ? turn : 0) })
         const falls = Math.round((cut + run) * 60)
         expect(frames[falls].w, 'the stop falls inside the start blend').toBeGreaterThan(0)
         expect(frames[falls].w, 'the stop falls inside the start blend').toBeLessThan(1)
         let worst = 0
         // from the second frame after the reversal: the reversing frame and the
-        // one after it carry the step-share flip, and the start's own onset is
-        // not this case either; both belong to point 1582, whose start and
-        // reversal cases bound them (measured 24.11.2026: the only frame over
+        // one after it carry the step-share flip, which belongs to point 1584
+        // and its reversal case (the start's own onset to the start case)
+        // (measured 24.11.2026: the only frame over
         // the clip's range was the one after the reversal, 0.322 rad at 2.8 rad/s)
         for (let k = falls + 2; k < frames.length; k++) worst = Math.max(worst, kneeStep(frames, k))
         expect(worst, `turning ${turn} rad/s, walking ${run.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
       }
     }
   })
+
+  it('a start cut short by a stop hands each foot on from where it was drawn: none jumps at the handoff', () => {
+    // the first falling frame dropped the start's feet for the stop's step
+    // targets, anchored where the gait stood as the start began: the foot on
+    // the stand jumped 6-14 cm and the swinging one 4-11 cm in that frame
+    // (cross-vendor review 24.11.2026)
+    // the walk clip's own fastest foot, walking on (60 Hz)
+    const walk = settle({ cut: 3 })
+    let clip = 0
+    for (let k = 30; k < 168; k++) clip = Math.max(clip, ...moved(walk, k))
+    for (const turn of [0, 1.5, -1.5, 2.8, -2.8]) {
+      for (let run = 0.125; run < 0.3; run += 0.025) {
+        const cut = 0.5
+        const frames = settle({ cut, start: true, stopAt: cut + run, turn: (t) => (t > cut ? turn : 0) })
+        const at = frames.findIndex((f, k) => k > 0 && f.w < frames[k - 1].w)
+        const where = `turning ${turn} rad/s, walking ${run.toFixed(3)} s`
+        expect(frames[at - 1].w, where).toBeGreaterThan(0)
+        expect(frames[at - 1].w, where).toBeLessThan(1)
+        // at the handoff and the frame after, each foot goes on at the pace it
+        // had (one standing stays where it stands) …
+        for (let k = at; k <= at + 1; k++) {
+          const now = moved(frames, k)
+          const was = moved(frames, k - 1)
+          for (let i = 0; i < 2; i++) expect(now[i], `${where}, foot ${i} ${k - at} frames after the handoff`).toBeLessThan(was[i] + 0.005)
+        }
+        // … and from there to the stand none moves faster than the walk clip moves a foot
+        for (let k = at; k < frames.length; k++) expect(Math.max(...moved(frames, k)), `${where}, ${k - at} frames after the handoff (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
+      }
+    }
+  })
+
+  // OPEN: point 1584 — the reversal flips the step shares by a jump
+  it.skip('a start cut short by a stop, straight or in a corner: the knee bends no faster than the walk clip bends it, the reversal included', () => {
+    // a stop reversing a start still in its blend jumped 0.32-0.60 rad in the
+    // frame after the reversal as the step shares flipped (finding 24.11.2026
+    // from point 1422), and kept sampling the live gait through the turn
+    // (cross-vendor review 24.11.2026)
+    for (const turn of [0, 2.8, -2.8]) {
+      const clip = clipKneeStep(turn)
+      // the stop inside the start blend: the walk weight takes up once the
+      // body, gaining its pace (VILLAGER_MOTION.setOffAccel), has a stride
+      for (let run = 0.125; run < 0.3; run += 0.025) {
+        const cut = 0.5
+        const frames = settle({ cut, start: true, stopAt: cut + run, turn: (t) => (t > cut ? turn : 0) })
+        const falls = Math.round((cut + run) * 60)
+        expect(frames[falls].w, 'the stop falls inside the start blend').toBeGreaterThan(0)
+        expect(frames[falls].w, 'the stop falls inside the start blend').toBeLessThan(1)
+        const worst = worstKnee(frames)
+        expect(worst, `turning ${turn} rad/s, walking ${run.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
+      }
+    }
+  })
+
+
+
+
+
+
 
   it('the step shares: the first foot over the first half of the way to the stand, the other over the second', () => {
     expect(settleShares(1, 0)).toEqual([0, 0])

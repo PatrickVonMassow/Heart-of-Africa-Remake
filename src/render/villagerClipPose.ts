@@ -372,6 +372,9 @@ type GaitWeights = { walk: number; jog: number; sprint: number }
  *  under 1/5); blended at one phase a foot would be half planted, half
  *  swinging and drag its hold. So each leg plays every clip at a phase warped
  *  to the blended stance (`stanceSync`), left in `_blendStance`. */
+/** Foot `i`'s blended stance (land, lift; the lift may lie past 1) as the last `clipGaitPose` drew it. */
+export const gaitStance = (i: number): readonly [number, number] => _blendStance[i]
+
 function blendGait(asset: VillagerAsset, frame: PersonFrame, phase: number, w: GaitWeights, walkClip: VillagerClip, out: VillagerPose): VillagerPose {
   const n = asset.bones.length
   const parts = [

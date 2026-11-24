@@ -237,6 +237,21 @@ export function steerHeading(yaw: number, desired: number, speed: number, dt: nu
   return { yaw: yaw + turn, pace }
 }
 
+/** A walker's body speed this frame, from last frame's `v` toward its pace
+ *  `target`: gained at VILLAGER_MOTION.setOffAccel setting off, dropped at
+ *  once (a stop or a slower pace). */
+export function setOffSpeed(v: number, target: number, dt: number): number {
+  return target > v ? Math.min(target, v + M.setOffAccel * dt) : target
+}
+
+/** The pace a walker keeps once its step is resolved: none when its body
+ *  `moved` less than VILLAGER_MOTION.setOffHeldShare of the `step` it took
+ *  (held by its turn or blocked), so a body let go sets off on the ramp
+ *  again rather than at the pace it built up standing. */
+export function keptPace(pace: number, moved: number, step: number): number {
+  return moved < step * M.setOffHeldShare ? 0 : pace
+}
+
 /** The heading a walker turns toward: where a full step toward its waypoint
  *  really goes (slid along a wall, round another body) — unless that is
  *  hardly a step, or a shove back, which never turns it about. */
@@ -473,13 +488,16 @@ export function hipJointAt(j: HipJoint, yaw: number): FootOffset {
  * The ground a figure's feet step for one frame's move (figure units): the
  * step along the facing is the stride; a sideways shove and a turn are stepped
  * too (the held foot cannot follow them far), in the sense the body moves
- * along its facing. Its rate is the speed the gait is chosen from.
+ * along its facing. A turn adds only what the step along and across the facing
+ * does not already cover (a corner wider than M.turnStep is walked, not stepped round
+ * again: counted twice, a walker in a corner read a jog's pace and its knee
+ * snapped into the jog). Its rate is the speed the gait is chosen from.
  */
 export function groundStepped(dx: number, dz: number, fromYaw: number, yaw: number, unit = 1): number {
   const ahead = (dx * Math.sin(yaw) + dz * Math.cos(yaw)) / unit
   const aside = Math.abs(dx * Math.cos(yaw) - dz * Math.sin(yaw)) / unit
   const turned = Math.abs(Math.atan2(Math.sin(yaw - fromYaw), Math.cos(yaw - fromYaw)))
-  return ahead + Math.sign(ahead || 1) * (aside + turned * M.turnStep)
+  return Math.sign(ahead || 1) * Math.max(Math.abs(ahead) + aside, turned * M.turnStep)
 }
 
 /**

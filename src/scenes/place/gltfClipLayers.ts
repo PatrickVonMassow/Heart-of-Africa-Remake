@@ -21,7 +21,7 @@ import * as THREE from 'three/webgpu'
 import { VILLAGER_GLTF as G, VILLAGER_POSE } from '../../config/balance'
 import { clipBones, type VillagerAsset } from '../../render/villagerAsset'
 import { LIVE_MORPHS, type LiveMorph } from '../../render/villagerBody'
-import { clipGaitPose, clipPoseAt, newClipGait, releaseClipGait, samplePhase, shovelOnHungHand, stepClipGait, toHung, type ClipGait, type GroundBody } from '../../render/villagerClipPose'
+import { clipGaitPose, clipPoseAt, gaitStance, newClipGait, releaseClipGait, samplePhase, shovelOnHungHand, stanceOf, stepClipGait, toHung, type ClipGait, type GroundBody } from '../../render/villagerClipPose'
 import type { GltfPerson } from '../../render/villagerFigureBody'
 import { aimHead, distributeLean, gazeDirection, LEAN_BONES, solveTwoBone, type LeanBone } from '../../render/figureRig'
 import { blendPoses, newPose, type VillagerPose } from '../../render/villagerRig'
@@ -88,6 +88,54 @@ export interface ClipLayers {
   heldHips: THREE.Vector3
   settleGait: [{ x: number; z: number }, { x: number; z: number }]
   settleGaitTurn: [THREE.Quaternion, THREE.Quaternion]
+  /** A start from the stand (`startFeet`): each foot stays on the stand
+   *  until the walk clip lifts it, then swings onto the clip's landing over
+   *  the clip's own swing. Per foot -1 not yet taken, 0 on the stand,
+   *  1 swinging, 2 landed. */
+  starting: boolean
+  startState: [number, number]
+  /** Per foot, the phase its swing began at, the stand's miss of the
+   *  gait's ankle then (body frame, faded out over the swing) and the
+   *  stand's turn onto the gait's foot. */
+  startPhase: [number, number]
+  startOff: [THREE.Vector3, THREE.Vector3]
+  startTurn: [THREE.Quaternion, THREE.Quaternion]
+  /** Per foot, the gait's foot turn (world) as the start took it up: a foot
+   *  on the stand rolls about its ball as the clip's foot rolls off this. */
+  startFlat: [THREE.Quaternion, THREE.Quaternion]
+  /** Per foot, the height of the gait's ball (toe joint, body frame) as the start took it up. */
+  startBall: [number, number]
+  /** The foot that swung off the stand as the start set the gait (-1 none yet). */
+  startFirst: number
+  /** How far a foot on the stand takes up the clip's roll off its heel (0 … 1):
+   *  none while the walk weight blends the legs, then over G.startRollSeconds. */
+  startRoll: number
+  /** Per foot, where and as the last settle drew it (ankle: world x, z and
+   *  body y; turn: world), so a start cut short hands its feet on from there. */
+  lastAt: [THREE.Vector3, THREE.Vector3]
+  lastTurn: [THREE.Quaternion, THREE.Quaternion]
+  /** Per foot, how far the ankle moved in that last frame (as `lastAt`). */
+  lastMove: [THREE.Vector3, THREE.Vector3]
+  /** A start cut short by a stop, its feet still to be handed on (`handFeet`). */
+  handoff: boolean
+  /** After that handoff, how far the stop's gait spots stay where the start
+   *  left the feet (1; eased off like `stop` as a walk is taken up again),
+   *  their heights (`settleGaitY`, body), and per foot the height a foot
+   *  set straight on the stand still has to come down (`handY`, met at the
+   *  stand by the weight's share of `handW`, the weight at the handoff). */
+  anchor: number
+  /** Per foot, its step's place at the handoff (the lift covers what is left). */
+  handP: [number, number]
+  settleGaitY: [number, number]
+  handY: [number, number]
+  handW: number
+  /** The ground the body stepped this frame (`stepClipLayers`; 0 placed or still). */
+  walked: number
+  /** Standing while the body moves (the frames before a start's walk weight
+   *  rises, a jostle): the stand's feet are held where they stood
+   *  (`settleStand`, `settleTurn`) out to G.standHoldReach, and drawn back
+   *  onto the body's stand once it no longer moves. */
+  holding: boolean
 }
 
 export function clipLayers(asset: VillagerAsset): ClipLayers {
@@ -118,6 +166,26 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     heldHips: new THREE.Vector3(),
     settleGait: [{ x: 0, z: 0 }, { x: 0, z: 0 }],
     settleGaitTurn: [new THREE.Quaternion(), new THREE.Quaternion()],
+    starting: false,
+    startState: [-1, -1],
+    startPhase: [0, 0],
+    startOff: [new THREE.Vector3(), new THREE.Vector3()],
+    startTurn: [new THREE.Quaternion(), new THREE.Quaternion()],
+    startFlat: [new THREE.Quaternion(), new THREE.Quaternion()],
+    startBall: [0, 0],
+    startFirst: -1,
+    startRoll: 0,
+    lastAt: [new THREE.Vector3(), new THREE.Vector3()],
+    lastTurn: [new THREE.Quaternion(), new THREE.Quaternion()],
+    lastMove: [new THREE.Vector3(), new THREE.Vector3()],
+    handoff: false,
+    anchor: 0,
+    handP: [0, 0],
+    settleGaitY: [0, 0],
+    handY: [0, 0],
+    handW: 0,
+    walked: 0,
+    holding: false,
   }
 }
 
@@ -139,6 +207,7 @@ export function stepClipLayers(
   dt: number,
 ): void {
   stepClipGait(c.gait, asset, person.frame, walked, speed)
+  c.walked = walked
   c.lastGround = c.ground
   c.ground = { ...ground }
   c.dig = ease(c.dig, work?.dig ? 1 : 0, dt)
@@ -152,6 +221,23 @@ export function stepClipLayers(
   c.arms = [ease(c.arms[0], c.free[0] ? 1 : 0, dt), ease(c.arms[1], c.free[1] ? 1 : 0, dt)]
   c.idleT += dt
   c.dt += dt
+}
+
+/** The phase nearest `phase` at which one foot is G.startSwingShare into its swing. */
+function startPhase(asset: VillagerAsset, phase: number): number {
+  let best = phase
+  let miss = Infinity
+  for (const s of LEG_SIDES) {
+    const [land, lift] = stanceOf(asset.clips.walk, s)
+    if (lift - land < 1e-6) continue
+    const mid = (((lift + (land + 1 - lift) * G.startSwingShare) % 1) + 1) % 1
+    const d = Math.abs(((mid - phase + 1.5) % 1) - 0.5)
+    if (d < miss) {
+      miss = d
+      best = mid
+    }
+  }
+  return best
 }
 
 const LEGS = ['hips', 'thigh.L', 'shin.L', 'foot.L', 'toe.L', 'thigh.R', 'shin.R', 'foot.R', 'toe.R']
@@ -206,9 +292,38 @@ export function applyClipLayers(
   // the legs leave the gait at the settling steps' own pace (each foot's
   // step a swing's time, not a share of the walk's fade)
   const before = c.legs
-  c.legs = Math.max(m.weight, c.legs - c.dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
+  const dt = c.dt
+  c.legs = Math.max(m.weight, c.legs - dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
   c.dt = 0
+  // A START FROM THE STAND: the gait set G.startSwingShare into the swing
+  // of the foot that steps first (the other under the body as on the
+  // stand); the start's feet step on past the blend until both are on the clip
+  if (!c.starting && before <= 0 && c.legs > 0 && c.legs < 1 && m.kneel <= 0 && c.dig < 1) {
+    c.starting = true
+    c.startState = [-1, -1]
+    c.startFirst = -1
+    c.startRoll = 0
+    c.handoff = false
+    c.anchor = 0
+    c.gait.phase = startPhase(asset, c.gait.phase)
+  } else if (c.starting && (c.legs < before || m.kneel > 0)) {
+    // cut short: the stop takes the feet on from where the start drew them
+    c.starting = false
+    c.handoff = true
+  }
+  if (c.starting && c.startState[0] === 2 && c.startState[1] === 2) c.starting = false
   const legs = c.legs * (1 - m.kneel)
+  // standing while the body moves (point 1582): the stand's feet stay where
+  // they stood rather than slide with the body — the frames before a start's
+  // walk weight rises (it waits for the smoothed speed), or a jostle; a
+  // placement (no ground walked) lets go
+  const g0 = c.ground
+  const g1 = c.lastGround
+  // (a turn on the spot moves the stand's feet too: stepWalk counts it walked)
+  const shifted = !!g0 && !!g1 && (Math.hypot(g0.x - g1.x, g0.z - g1.z) > 1e-9 || Math.abs(Math.atan2(Math.sin(g0.yaw - g1.yaw), Math.cos(g0.yaw - g1.yaw))) > 1e-9)
+  const travelled = shifted && c.walked !== 0
+  if (legs > 1e-3 || c.dig >= 1 || m.kneel > 0 || (shifted && !travelled)) c.holding = false
+  else if (travelled) c.holding = true
   // Each layer blends from what the one below left, so the dig eases in from
   // the carry (or the walk) and out to it again — never from the rest pose.
   const under = c.dig < 1
@@ -232,12 +347,17 @@ export function applyClipLayers(
     // starting or stopping, the feet step between the stand and the gait
     // (a bone blend alone slid a foot on the ground from one to the other);
     // a kneel setting in takes the step's correction out as it folds the legs
-    const settle = w < 1 ? Math.max(0, 1 - m.kneel) : 0
+    const settle = w < 1 || c.starting ? Math.max(0, 1 - m.kneel) : 0
     if (settle > 0) takeCodeLegs(bones)
-    else c.settleFirst = -1
+    else {
+      c.settleFirst = -1
+      c.anchor = 0
+      c.handoff = false
+    }
     // stopping, the legs and hips stay as the gait last drew them walking
     if (settle > 0 && c.settleFirst < 0) c.stop = c.legs < before ? 1 : 0
     else if (c.stop > 0 && c.legs > before) c.stop *= before < 1 ? (1 - c.legs) / (1 - before) : 0
+    if (c.anchor > 0 && c.legs > before) c.anchor *= before < 1 ? (1 - c.legs) / (1 - before) : 0
     // a stop reversing a start mid-blend takes the hold in as the legs fall,
     // full at the stand, from the gait as it was drawn the frame before
     else if (c.stop < 1 && c.legs < before) c.stop = 1 - (1 - c.stop) * (before > 0 ? c.legs / before : 0)
@@ -257,15 +377,31 @@ export function applyClipLayers(
     blendInto(asset, bones, LEGS.slice(1), c.local, w)
     blendInto(asset, bones, ['hips'], c.local, hw)
     blendHips(bones, c.hips, hw)
+    if (c.starting && c.legs >= 1) c.startRoll = Math.min(1, c.startRoll + dt / Math.max(1e-6, G.startRollSeconds))
     if (settle > 0) settleFeet(asset, bones, c, w, settle, f.legScale)
     blendInto(asset, bones, TRUNK, c.local, walking)
     blendInto(asset, bones, ARM('L'), c.local, walking * c.arms[0])
     // under a carry too, so a carry partly overriding the arm stays continuous
     blendInto(asset, bones, ARM('R'), c.local, walking * c.arms[1])
+  } else if (c.holding) {
+    // the legs the code's stand, each foot solved onto where it is held
+    releaseClipGait(c.gait)
+    takeCodeLegs(bones)
+    c.stop = 0
+    c.anchor = 0
+    c.handoff = false
+    // held while the body moves; drawn back onto its stand once it stops
+    const miss = settleFeet(asset, bones, c, 0, 1, f.legScale, travelled ? 0 : G.standHoldSettle * dt)
+    if (!travelled && miss <= 1e-4) {
+      c.holding = false
+      c.settleFirst = -1
+    }
   } else {
     // standing: the feet are where they stand, nothing held for the next walk
     releaseClipGait(c.gait)
     c.settleFirst = -1
+    c.anchor = 0
+    c.handoff = false
   }
   // THE SHOVEL CARRIED: the right arm from the carry, in step with the gait
   if (c.carry > 0 && under && c.arms[1] > 0) {
@@ -307,6 +443,7 @@ const _standQ = [new THREE.Quaternion(), new THREE.Quaternion()]
 const _gaitQ = [new THREE.Quaternion(), new THREE.Quaternion()]
 const _footQ = new THREE.Quaternion()
 const _yawQ = new THREE.Quaternion()
+const _yawQ2 = new THREE.Quaternion()
 const _liveW = { x: 0, z: 0 }
 const _liveQ = new THREE.Quaternion()
 /** Per foot, a landed foot's lift (world) as it steps the stand's miss (place and turn) over. */
@@ -315,6 +452,10 @@ const _plain = LEG_SIDES.map(() => [0, 1, 2, 3].map(() => new THREE.Quaternion()
 const _yAxis = new THREE.Vector3(0, 1, 0)
 const _ik = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
 const _target = [new THREE.Vector3(), new THREE.Vector3()]
+/** Per foot, the ball (the toe's joint) off the ankle in the stand's foot frame. */
+const _ball = [new THREE.Vector3(), new THREE.Vector3()]
+/** Per foot, the gait's ball (body frame). */
+const _gaitBall = [new THREE.Vector3(), new THREE.Vector3()]
 
 /** The code-built legs and hips, before the gait blends over them. */
 function takeCodeLegs(bones: Record<string, THREE.Bone>): void {
@@ -383,6 +524,85 @@ function ankleAt(bones: Record<string, THREE.Bone>, s: 'L' | 'R', out: THREE.Vec
   return out
 }
 
+/** A start's per foot share of the stand (1 on it … 0 on the gait) and ankle target (body frame). */
+const _startP = [0, 0]
+const _startT = [new THREE.Vector3(), new THREE.Vector3()]
+const _startQ = [new THREE.Quaternion(), new THREE.Quaternion()]
+
+/**
+ * THE START FROM THE STAND (point 1582): each foot stays on the stand's spot
+ * (`_stand`, held in the world) until the walk clip lifts it; from there it
+ * swings onto the clip's own landing over the clip's swing, the stand's miss
+ * of the gait's ankle as the swing began faded out by its progress, so the
+ * knee follows the clip's own bend (a step timed by the walk weight lifted
+ * a straight leg in a tenth of a second and snapped the knee). The foot that
+ * is mid-swing as the start sets the gait (`startPhase`) swings at once.
+ */
+function startFeet(c: ClipLayers, body: GroundBody | null): void {
+  const yaw = body?.yaw ?? 0
+  const cyc = (x: number) => ((x % 1) + 1) % 1
+  const phase = c.gait.phase
+  LEG_SIDES.forEach((_, i) => {
+    const [land, lift] = gaitStance(i)
+    const span = lift - land
+    // in the clip's swing: past its lift, before its next landing
+    const swinging = span > 1e-6 && cyc(phase - land) >= span
+    if (c.startState[i] === -1) {
+      c.startState[i] = 0
+      c.startFlat[i].copy(_gaitQ[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, yaw))
+      c.startBall[i] = _gaitBall[i].y
+    }
+    // a foot on the stand rolls off its heel about its ball as the clip's
+    // foot rolls off the turn it had as the start began, and rises off its
+    // toes as the clip's ball does (held flat, the hips walking on stretched
+    // the leg to the clip's lift, and the foot left the stand by a jump onto
+    // the clip's rolled foot); flat while the walk weight blends the legs,
+    // taken up over G.startRollSeconds once they are on the walk
+    if (c.startState[i] === 0 && c.startRoll > 0) {
+      const r = c.startRoll * c.startRoll * (3 - 2 * c.startRoll)
+      _yawQ.setFromAxisAngle(_yAxis, -yaw)
+      const roll = _liveQ.copy(_yawQ).multiply(c.startFlat[i]).invert().premultiply(_gaitQ[i])
+      roll.slerp(_q.identity(), 1 - r)
+      const toBall = _ik[4].copy(_ball[i]).applyQuaternion(_standQ[i])
+      _stand[i].add(toBall).sub(toBall.applyQuaternion(roll))
+      _standQ[i].premultiply(roll)
+      _stand[i].y += Math.max(0, _gaitBall[i].y - c.startBall[i]) * r
+    }
+    // the foot on the stand leaves it only while the clip swings it (left in
+    // the clip's stance, it drifted off the stand for nearly a cycle), and
+    // never while the other is in the air, so one foot always stands
+    if (c.startState[i] === 0 && swinging && c.startState[1 - i] !== 1) {
+      c.startState[i] = 1
+      if (c.startFirst < 0) c.startFirst = i
+      c.startPhase[i] = phase
+      c.startOff[i].copy(_stand[i]).sub(_gait[i])
+      c.startTurn[i].copy(_gaitQ[i]).invert().multiply(_standQ[i])
+    }
+    let k = 0
+    let arc = 0
+    if (c.startState[i] === 1) {
+      const whole = cyc(land - c.startPhase[i])
+      const u = whole > 1e-6 ? cyc(phase - c.startPhase[i]) / whole : 1
+      // landed: the progress has run past the landing
+      if (u >= 1 || (!swinging && cyc(phase - land) < 0.5 * span && u > 0.5)) c.startState[i] = 2
+      else {
+        k = 1 - u * u * (3 - 2 * u)
+        arc = Math.sin(Math.PI * u) ** G.startLiftPower
+      }
+    }
+    _startP[i] = c.startState[i] === 0 ? 1 : k
+    if (c.startState[i] === 0) {
+      _startT[i].copy(_stand[i])
+      _startQ[i].copy(_standQ[i])
+    } else {
+      _startT[i].copy(_gait[i]).addScaledVector(c.startOff[i], k)
+      // lifted over the stand's miss as a settling step is (it skimmed the ground)
+      _startT[i].y += G.settleStepLift * Math.hypot(c.startOff[i].x, c.startOff[i].z) * arc
+      _startQ[i].copy(_gaitQ[i]).slerp(_liveQ.copy(_gaitQ[i]).multiply(c.startTurn[i]), k)
+    }
+  })
+}
+
 /**
  * THE SETTLING STEP (point 1330): while the walk weight blends the legs
  * between the code's stand and the gait, each foot steps from the gait's
@@ -396,7 +616,7 @@ function ankleAt(bones: Record<string, THREE.Bone>, s: 'L' | 'R', out: THREE.Vec
  * in the air as it goes, a landed one by a lifted re-step at the end. `share` (0 … 1): how much of this correction is drawn over the plain
  * bone blend (a kneel setting in takes it out).
  */
-function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: ClipLayers, w: number, share: number, legScale: number): void {
+function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: ClipLayers, w: number, share: number, legScale: number, ease = 0): number {
   const hips = bones.hips
   if (hips.parent) _base.copy(hips.parent.matrixWorld).invert()
   else _base.identity()
@@ -408,11 +628,19 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
   hips.quaternion.copy(_codeHipsQ)
   hips.position.copy(_codeHipsP)
   LEG_SIDES.forEach((s, i) => legChain(bones, s).forEach((b, k) => b.quaternion.copy(_codeLeg[i][k])))
-  LEG_SIDES.forEach((s, i) => ankleAt(bones, s, _stand[i], _standQ[i]))
+  LEG_SIDES.forEach((s, i) => {
+    ankleAt(bones, s, _stand[i], _standQ[i])
+    if (!c.starting) return
+    inBody(bones[`toe.${s}`], _ball[i], _q)
+    _ball[i].sub(_stand[i]).applyQuaternion(_q.copy(_standQ[i]).invert())
+  })
   hips.quaternion.copy(c.local[hi])
   hips.position.copy(c.hips)
   LEG_SIDES.forEach((s) => legChain(bones, s).forEach((b, k) => b.quaternion.copy(gaitLocal(asset, c, s, k))))
-  LEG_SIDES.forEach((s, i) => ankleAt(bones, s, _gait[i], _gaitQ[i]))
+  LEG_SIDES.forEach((s, i) => {
+    ankleAt(bones, s, _gait[i], _gaitQ[i])
+    if (c.starting) inBody(bones[`toe.${s}`], _gaitBall[i], _q)
+  })
   hips.quaternion.copy(_blendHipsQ)
   hips.position.copy(_blendHipsP)
   const body = c.ground
@@ -435,11 +663,14 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     })
   }
   // stopping, the gait's feet stay where they stood as the walk let go
-  if (c.stop > 0 && body) {
+  // (after a start cut short, as the start left them, height too)
+  const held = Math.max(c.stop, c.anchor)
+  if (held > 0 && body) {
     LEG_SIDES.forEach((_, i) => {
       worldToBody(body, c.settleGait[i], _ik[3].copy(_gait[i]))
-      _gait[i].lerp(_ik[3], c.stop)
-      _gaitQ[i].slerp(_liveQ.copy(c.settleGaitTurn[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, -body.yaw)), c.stop)
+      _ik[3].y += (c.settleGaitY[i] - _gait[i].y) * (c.anchor / held)
+      _gait[i].lerp(_ik[3], held)
+      _gaitQ[i].slerp(_liveQ.copy(c.settleGaitTurn[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, -body.yaw)), held)
     })
   }
   // the stand's feet where and as they stood as the blend began, drawn onto
@@ -448,10 +679,42 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
   // in the air only: one landed on the stand holds its spot and turn until
   // the last G.settleRestep of the weight, then steps the miss over, lifted
   // (a smooth share of it, met at 0)
+  // a start cut short: the shares give the foot that has to step (the one
+  // in the air, else the one off the stand) the step still under way — the
+  // first's above half weight, the second's below — so the other stands
+  if (c.handoff) {
+    const air = c.startState.indexOf(1)
+    const off = air >= 0 ? air : c.startState[0] === 2 ? 0 : 1
+    c.settleFirst = w > 0.5 ? off : 1 - off
+  }
+  // standing while the body moves: each foot held out to G.standHoldReach
+  // and G.standHoldTurn off the body's stand, eased back by `ease` (figure
+  // units; the turn in proportion); the miss left, as a share of those
+  let miss = 0
+  if (c.holding && body) {
+    const unit = body.unit || 1
+    const turnEase = (ease * G.standHoldTurn) / G.standHoldReach
+    LEG_SIDES.forEach((_, i) => {
+      bodyToWorld(body, _stand[i], _liveW)
+      const dx = c.settleStand[i].x - _liveW.x
+      const dz = c.settleStand[i].z - _liveW.z
+      const d = Math.hypot(dx, dz) / unit
+      const keepD = Math.min(G.standHoldReach, Math.max(0, d - ease))
+      const k = d > 1e-9 ? keepD / d : 0
+      c.settleStand[i].x = _liveW.x + dx * k
+      c.settleStand[i].z = _liveW.z + dz * k
+      _liveQ.copy(_standQ[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, body.yaw))
+      const a = c.settleTurn[i].angleTo(_liveQ)
+      const keepA = Math.min(G.standHoldTurn, Math.max(0, a - turnEase))
+      if (a > 1e-9) c.settleTurn[i].slerp(_liveQ, 1 - keepA / a)
+      miss = Math.max(miss, keepD / G.standHoldReach, keepA / G.standHoldTurn)
+    })
+  }
   const shares = settleShares(w, c.settleFirst)
   const falling = w < c.settleW && c.settleW > 0
   const keep = falling ? (w / c.settleW) ** 2 : 1
-  const R = G.settleRestep
+  // (after a start cut short below it, over the weight left at the handoff)
+  const R = c.anchor > 0 ? Math.min(G.settleRestep, c.handW) : G.settleRestep
   const left = (x: number) => 1 - stepPlace(1 - Math.min(1, x / R), 1)
   const restep = falling && w < R ? (left(c.settleW) > 0 ? left(w) / left(c.settleW) : 0) : 1
   LEG_SIDES.forEach((_, i) => {
@@ -476,47 +739,63 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     _standQ[i].copy(c.settleTurn[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, -yaw))
   })
   c.settleW = w
+  if (c.starting) startFeet(c, body)
+  if (c.handoff && body) handFeet(c, body, shares, w)
   // each leg's blended chain and its ankle's target
   let drop = 0
   hips.updateMatrixWorld(true)
   LEG_SIDES.forEach((s, i) => {
-    const step = shares[i]
-    const p = stepPlace(step, c.stop)
+    const step = c.starting ? 0 : shares[i]
+    // starting, the leg drawn as the clip draws it (its knee bent where the clip bends it)
+    const p = c.starting ? 0 : handPlace(c, i, stepPlace(step, c.stop))
     legChain(bones, s).forEach((b, k) => b.quaternion.copy(_codeLeg[i][k]).slerp(gaitLocal(asset, c, s, k), 1 - p))
     const T = _target[i]
-    T.copy(_gait[i]).lerp(_stand[i], p)
+    if (c.starting) T.copy(_startT[i])
+    else T.copy(_gait[i]).lerp(_stand[i], p)
     // lifted at mid-step by a share of the ground it covers (and a landed
     // foot's re-step). Stopping, by the square of the arc's sine: a knee near
     // straight bends by the root of the lift, so a lift rising with the
     // sine itself snapped the knee up at the step's start and down at its
     // landing. Starting, the step keeps pace with the walk's fade-in (a body
     // walking off leaves no time for a slower one).
-    const cover = Math.hypot(_gait[i].x - _stand[i].x, _gait[i].z - _stand[i].z)
+    // (after a handoff, what was left of the way then: the gait spot was set out beyond it)
+    const cover = Math.hypot(_gait[i].x - _stand[i].x, _gait[i].z - _stand[i].z) * (1 - c.handP[i] * c.anchor)
     const arc = Math.sin(Math.PI * step)
     T.y += G.settleStepLift * cover * arc * (1 - c.stop + c.stop * arc) + _lift[i] / (body?.unit || 1)
+    if (c.anchor > 0 && c.handW > 0) T.y += c.handY[i] * Math.min(1, w / c.handW)
     // stopping, the pelvis lowered just as far as each leg needs to reach its target
     // no straighter than its blended chain: a foot held while the hips leave
     // the gait was pulled out to a straight knee, which the step then bent
     // by a jump (a leg's bend goes with the root of its shortening there)
     const chain = legChain(bones, s)
     chain[0].updateMatrixWorld(true)
-    const [H, , A] = _ik
+    const [H, K, A] = _ik
     inBody(chain[0], H, _q)
+    inBody(chain[1], K, _q)
     inBody(chain[2], A, _q)
-    const reach = H.distanceTo(A)
+    // starting, the legs are the clip's own: a foot on the stand needs the
+    // hips lowered only past the leg's full reach
+    const reach = c.starting ? H.distanceTo(K) + K.distanceTo(A) : H.distanceTo(A)
     const flat = (T.x - H.x) ** 2 + (T.z - H.z) ** 2
     const dy = H.y - T.y
-    drop = Math.max(drop, flat < reach * reach ? dy - Math.sqrt(reach * reach - flat) : dy)
+    const need = flat < reach * reach ? dy - Math.sqrt(reach * reach - flat) : dy
+    // starting, by the foot standing on (or stepping off) the stand (point
+    // 1582 review): a body turning or shoved sideways as it sets off carried
+    // the hips past that leg's reach and dragged the planted foot; its need
+    // fades with its step's share of the stand
+    if (!c.starting) drop = Math.max(drop, need)
+    else if (i !== c.startFirst && c.startState[i] <= 1) drop = Math.max(drop, need * _startP[i])
   })
-  hips.position.y -= Math.min(drop, G.pelvisDropMax * legScale) * share * c.stop
+  hips.position.y -= Math.min(drop, G.pelvisDropMax * legScale) * share * (c.starting || c.holding ? 1 : c.stop)
   LEG_SIDES.forEach((s, i) => {
     const step = shares[i]
-    const p = stepPlace(step, c.stop)
+    const p = handPlace(c, i, stepPlace(step, c.stop))
     const chain = legChain(bones, s)
     const [H, K, A, , pole] = _ik
     const T = _target[i]
     // the foot turned from the gait's turn to the stand's with its step
-    _footQ.copy(_gaitQ[i]).slerp(_standQ[i], p)
+    if (c.starting) _footQ.copy(_startQ[i])
+    else _footQ.copy(_gaitQ[i]).slerp(_standQ[i], p)
     hips.updateMatrixWorld(true)
     inBody(chain[0], H, _q)
     inBody(chain[1], K, _q)
@@ -551,7 +830,93 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     // drawn over the plain blend by `share`
     if (share < 1) chain.forEach((bn, k) => bn.quaternion.copy(_plain[i][k].clone().slerp(bn.quaternion, share)))
     chain[0].updateMatrixWorld(true)
+    // where and as this foot was drawn, for a start cut short next frame
+    const at = c.lastAt[i]
+    c.lastMove[i].copy(at)
+    inBody(chain[2], at, c.lastTurn[i])
+    if (body) {
+      bodyToWorld(body, at, _liveW)
+      at.set(_liveW.x, at.y, _liveW.z)
+      c.lastTurn[i].premultiply(_yawQ.setFromAxisAngle(_yAxis, body.yaw))
+    }
+    c.lastMove[i].subVectors(at, c.lastMove[i])
   })
+  return miss
+}
+
+/** After a handoff, foot `i`'s step place `p` past where it was then
+ *  eased in: the foot sets out from the pace it had, not at the step's. */
+function handPlace(c: ClipLayers, i: number, p: number): number {
+  const p0 = c.handP[i]
+  if (c.anchor <= 0 || p0 <= 0 || p <= p0) return p
+  const q = (p - p0) / (1 - p0)
+  return p0 + (1 - p0) * q * q * (3 - 2 * q)
+}
+
+/** `q` raised to the power `t` (its turn's angle times `t` about its axis). */
+function powQ(q: THREE.Quaternion, t: number): THREE.Quaternion {
+  if (q.w < 0) q.set(-q.x, -q.y, -q.z, -q.w)
+  const half = Math.acos(Math.min(1, q.w))
+  const s = Math.sin(half)
+  if (s < 1e-9) return q.identity()
+  const k = Math.sin(half * t) / s
+  return q.set(q.x * k, q.y * k, q.z * k, Math.cos(half * t))
+}
+
+/**
+ * A START CUT SHORT BY A STOP (point 1582 review): the stop's step targets
+ * were anchored where the gait stood as the start began, so its first frame
+ * jumped each foot off where the start had drawn it. Each foot's stop spots
+ * are set so this frame's target and turn are exactly the last drawn ones:
+ * one with a share of its step still to go keeps the stand's spot and takes
+ * a gait spot (held in the world, height too) that puts it there; one the
+ * shares put on the stand takes that spot as its stand, the height it is
+ * still off the ground coming down with the weight.
+ */
+function handFeet(c: ClipLayers, body: GroundBody, shares: [number, number], w: number): void {
+  const unit = body.unit || 1
+  _yawQ.setFromAxisAngle(_yAxis, -body.yaw)
+  LEG_SIDES.forEach((_, i) => {
+    const step = shares[i]
+    const p = stepPlace(step, c.stop)
+    // on from there at the pace it went (a foot standing stays)
+    const R = _ik[3]
+    const mv = c.lastMove[i]
+    worldToBody(body, { x: c.lastAt[i].x + mv.x, z: c.lastAt[i].z + mv.z }, R)
+    R.y = c.lastAt[i].y + mv.y
+    const RQ = _liveQ.copy(c.lastTurn[i]).premultiply(_yawQ)
+    const S = _stand[i]
+    c.handY[i] = 0
+    c.handP[i] = 0
+    if (p < 1 - 1e-3) {
+      const g = _gait[i]
+      g.x = (R.x - p * S.x) / (1 - p)
+      g.z = (R.z - p * S.z) / (1 - p)
+      c.handP[i] = p
+      const cover = Math.hypot(R.x - S.x, R.z - S.z)
+      const arc = Math.sin(Math.PI * step)
+      const lift = G.settleStepLift * cover * arc * (1 - c.stop + c.stop * arc) + _lift[i] / unit
+      g.y = (R.y - lift - p * S.y) / (1 - p)
+      // the turn the slerp to the stand's by p leaves at the drawn one
+      const d = powQ(_q.copy(RQ).invert().multiply(_standQ[i]), 1 / (1 - p))
+      _gaitQ[i].copy(_standQ[i]).multiply(d.invert())
+    } else {
+      S.x = R.x
+      S.z = R.z
+      _standQ[i].copy(RQ)
+      bodyToWorld(body, S, c.settleStand[i])
+      c.settleTurn[i].copy(RQ).premultiply(_yawQ2.setFromAxisAngle(_yAxis, body.yaw))
+      _gait[i].copy(R)
+      _gaitQ[i].copy(RQ)
+      c.handY[i] = R.y - S.y - _lift[i] / unit
+    }
+    bodyToWorld(body, _gait[i], c.settleGait[i])
+    c.settleGaitY[i] = _gait[i].y
+    c.settleGaitTurn[i].copy(_gaitQ[i]).premultiply(_yawQ2.setFromAxisAngle(_yAxis, body.yaw))
+  })
+  c.anchor = 1
+  c.handW = w
+  c.handoff = false
 }
 
 /**

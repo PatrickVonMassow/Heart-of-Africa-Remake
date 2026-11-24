@@ -90,7 +90,7 @@ import {
 } from './waterStand'
 import { workSpan, workStop, type StopMode } from './taskWalkerStop'
 import { correctAim, gripPoints, handlingPose, LOAD_GROUND, loadHandling, loadPlacement, type LoadHandling, type V3 } from './taskWalkerLoad'
-import { approach, steerHeading, wayHeading } from '../../render/figureWalk'
+import { approach, keptPace, setOffSpeed, steerHeading, wayHeading } from '../../render/figureWalk'
 import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type TaskLoad } from './headLoads'
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
@@ -2500,6 +2500,8 @@ function TaskWalker({
     timer: startDelay,
     /** This stop's kneeling time (`workSpan`). */
     span: 0,
+    /** Its body's pace now (m/s), gained setting off (`setOffSpeed`). */
+    pace: 0,
   })
 
   // This walker for the bug report's `placeLife` section, in every build.
@@ -2610,6 +2612,7 @@ function TaskWalker({
         : [[home.x, home.z] as [number, number], home.door, target]
 
     if (s.mode === 'inside') {
+      s.pace = 0
       stand.visible = false
       kneels.current = false
       // The body follows the state while it is at home (point 509): it may not
@@ -2631,6 +2634,7 @@ function TaskWalker({
       // onto its head — the figure folding down and standing up on its own
       // short transition, held on the spot until the hands let go on the head.
       // The load is never hidden: it is always where the hands have it.
+      s.pace = 0
       const next = workStop(s.mode, s.timer, dt, s.span)
       kneels.current = next.kneels
       s.mode = next.mode
@@ -2668,17 +2672,20 @@ function TaskWalker({
     const dz = tgt[1] - s.z
     const d = Math.hypot(dx, dz)
     const speed = 1.2
-    const step = speed * dt
+    s.pace = setOffSpeed(s.pace, speed, dt)
+    const step = s.pace * dt
     // The home leg (center ↔ door) passes through the own dwelling.
     const throughDoor = s.mode === 'go' ? s.seg === 0 : s.seg === route.length - 2
     if (d <= step + (throughDoor ? 0.08 : 0.3)) {
       s.seg++
     } else if (throughDoor) {
       // Turned toward the way, never snapped (a planted foot rides a snap).
-      const turn = steerHeading(s.yaw, Math.atan2(dx, dz), speed, dt)
+      // at the pace its body has: setting off, no tighter than VILLAGER_MOTION.turnRadius
+      const turn = steerHeading(s.yaw, Math.atan2(dx, dz), s.pace, dt)
       s.yaw = turn.yaw
       s.x += Math.sin(s.yaw) * step * turn.pace
       s.z += Math.cos(s.yaw) * step * turn.pace
+      s.pace = keptPace(s.pace, step * turn.pace, step)
     } else {
       // Point 657: another inhabitant on the way is walked round, not walked
       // into.
@@ -2688,9 +2695,13 @@ function TaskWalker({
       const [tx, tz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
       if (Math.hypot(tx - s.x, tz - s.z) < step * 0.25) s.seg++ // blocked: skip ahead
       const way = wayHeading(s.x, s.z, tx, tz, dx, dz, step)
-      const turn = steerHeading(s.yaw, way, speed, dt)
+      // at the pace its body has: setting off, no tighter than VILLAGER_MOTION.turnRadius
+      const turn = steerHeading(s.yaw, way, s.pace, dt)
       s.yaw = turn.yaw
+      const [fromX, fromZ] = [s.x, s.z]
       ;[s.x, s.z] = resolveMove(colliders, s.x + Math.sin(s.yaw) * step * turn.pace, s.z + Math.cos(s.yaw) * step * turn.pace, NPC_RADIUS, [s.x, s.z])
+      // held by its turn or blocked, it sets off on the ramp again
+      s.pace = keptPace(s.pace, Math.hypot(s.x - fromX, s.z - fromZ), step)
       // Point 578: pushed clear of the other inhabitants where the step left it.
       // The door leg is left out — it runs through its own hut, where every
       // direction is blocked anyway.
@@ -2763,6 +2774,8 @@ interface WalkerState {
   /** Errand points reached so far (design.md §19.10: the meetings must not
    *  keep the errands from arriving). */
   arrivals: number
+  /** Its body's pace now (m/s), gained setting off (`setOffSpeed`). */
+  pace: number
 }
 
 /**
@@ -2830,6 +2843,7 @@ function Walkers({
       stuck: 0,
       pinned: 0,
       arrivals: 0,
+      pace: 0,
     }))
   }
   const refs = useRef<Array<THREE.Group | null>>([])
@@ -3025,6 +3039,7 @@ function Walkers({
       if (import.meta.env.DEV && heldWalker.current === i) return
 
       if (s.mode === 'inside') {
+        s.pace = 0
         settleBody(i, s, false)
         // Invisible while at home; step out through the door when done. The
         // transform follows the state HERE too (point 509): this branch used to
@@ -3059,6 +3074,7 @@ function Walkers({
         // turn rate, the greeting carried by the facing, a brief bow and the
         // pause itself. Standing still is no wedge: the unstuck clocks hold.
         const other = states.current[meeting.a === i ? meeting.b : meeting.a]
+        s.pace = 0
         settleBody(i, s, true)
         if (other) s.yaw = turnYawToward(s.yaw, facingYaw(s, other), VILLAGER_MOTION.spotTurnRate * dt)
         const lean = bowLean(meeting, tuning.bowLean)
@@ -3073,6 +3089,7 @@ function Walkers({
       if (s.pause > 0) {
         // Linger at the errand: slight idle sway, no bob.
         s.pause -= dt
+        s.pace = 0
         settleBody(i, s, true)
         g.position.set(s.x, groundHeight(s.x, s.z), s.z)
         g.rotation.y = s.yaw + Math.sin(t * 0.6 + i) * 0.35
@@ -3091,7 +3108,10 @@ function Walkers({
       const dx = target[0] - s.x
       const dz = target[1] - s.z
       const d = Math.hypot(dx, dz)
-      const step = def.speed * dt
+      // setting off from a stand, the body gains its pace (a full pace on the
+      // first frame raced the stride far past the walk clip's cadence)
+      s.pace = setOffSpeed(s.pace, def.speed, dt)
+      const step = s.pace * dt
       // Door segments (home center ↔ door) pass through the own dwelling:
       // no collision there, the walker slips through the entrance door.
       const throughDoor = s.seg === 0 || s.seg === s.route.length - 2
@@ -3106,10 +3126,12 @@ function Walkers({
         }
       } else if (throughDoor) {
         // Turned toward the way, never snapped (a planted foot rides a snap).
-        const turn = steerHeading(s.yaw, Math.atan2(dx, dz), def.speed, dt)
+        // at the pace its body has: setting off, no tighter than VILLAGER_MOTION.turnRadius
+        const turn = steerHeading(s.yaw, Math.atan2(dx, dz), s.pace, dt)
         s.yaw = turn.yaw
         s.x += Math.sin(s.yaw) * step * turn.pace
         s.z += Math.cos(s.yaw) * step * turn.pace
+        s.pace = keptPace(s.pace, step * turn.pace, step)
         turning = turn.pace < 0.3
       } else {
         // Solid objects block inhabitants too; slide along and skip the
@@ -3123,9 +3145,12 @@ function Walkers({
         const moved = Math.hypot(tx - s.x, tz - s.z)
         // The body turns toward where it can really go and steps along its
         // heading: a snapped turn swings a planted foot across the ground.
-        const turn = steerHeading(s.yaw, wayHeading(s.x, s.z, tx, tz, dx, dz, step), def.speed, dt)
+        // at the pace its body has: setting off, no tighter than VILLAGER_MOTION.turnRadius
+        const turn = steerHeading(s.yaw, wayHeading(s.x, s.z, tx, tz, dx, dz, step), s.pace, dt)
         s.yaw = turn.yaw
         ;[s.x, s.z] = resolveMove(colliders, s.x + Math.sin(s.yaw) * step * turn.pace, s.z + Math.cos(s.yaw) * step * turn.pace, NPC_RADIUS, [s.x, s.z])
+        // held by its turn or blocked, it sets off on the ramp again
+        s.pace = keptPace(s.pace, Math.hypot(s.x - oldX, s.z - oldZ), step)
         turning = turn.pace < 0.3
         if (moved < step * 0.3) {
           s.stuck += dt
@@ -3366,6 +3391,8 @@ function ErrandVillagers({
       route: NavPoint[] | null
       routeTo: NavPoint | null
       replan: number
+      /** Its body's pace now (m/s), gained setting off (`setOffSpeed`). */
+      pace: number
     }>
   >([])
   if (idle.current.length !== count) {
@@ -3382,6 +3409,7 @@ function ErrandVillagers({
           route: null,
           routeTo: null,
           replan: 0,
+          pace: 0,
         },
     )
   }
@@ -3562,6 +3590,7 @@ function ErrandVillagers({
       if (!goal) {
         state.route = null
         state.routeTo = null
+        state.pace = 0
       }
       if (goal) {
         const dx = goal.x - me.x
@@ -3569,6 +3598,8 @@ function ErrandVillagers({
         const d = Math.hypot(dx, dz)
         const arriveAt = task ? workArrivalRadius(task) : 0.9
         if (d <= arriveAt) {
+          // standing: the next walk sets off from a stand again
+          state.pace = 0
           if (!task) {
             state.target = null
             state.pause = 3 + rand() * 6
@@ -3608,7 +3639,8 @@ function ErrandVillagers({
           const ad = Math.hypot(ax, az) || 1
           // Land on the turn instead of oscillating across it when the next
           // exact goal is standable but falls in a blocked navigation cell.
-          const step = Math.min(Math.max(0, cfg.pace) * dt, ad)
+          state.pace = setOffSpeed(state.pace, Math.max(0, cfg.pace), dt)
+          const step = Math.min(state.pace * dt, ad)
           // Point 657: a child (or anyone else) standing on the straight line is
           // walked ROUND — these strolls cross the children's play ground, and a
           // walker that discovered a body only by pressing on it is what the
@@ -3633,7 +3665,8 @@ function ErrandVillagers({
           // way far off its heading slows it nearly to a stand while it turns.
           // The step stays the way round bodies and walls, only shortened by
           // that pace, so the turn never walks it into a body it routes round.
-          const turn = steerHeading(yaws.current[i], wayHeading(me.x, me.z, tx, tz, ax, az, step), cfg.pace, dt)
+          // at the pace its body has: setting off, no tighter than VILLAGER_MOTION.turnRadius
+          const turn = steerHeading(yaws.current[i], wayHeading(me.x, me.z, tx, tz, ax, az, step), state.pace, dt)
           yaws.current[i] = turn.yaw
           faceTo.current[i] = null
           const sx = me.x + (tx - me.x) * turn.pace
@@ -3642,6 +3675,8 @@ function ErrandVillagers({
           const moved = Math.hypot(nx - me.x, nz - me.z)
           me.x = nx
           me.z = nz
+          // held by its turn or blocked, it sets off on the ramp again
+          state.pace = keptPace(state.pace, moved, step)
           // Use the same escape ladder as the household walkers. A body turning
           // nearly on the spot is not stuck.
           if (moved < step * 0.25 && turn.pace >= 0.3) {
@@ -3961,7 +3996,6 @@ function ErrandVillagers({
   // The adults for the bug report's `placeLife` section, in every build: each
   // villager's errand and the scheduler `__placeErrands` reports.
   usePlaceLifeSource('errands', () => {
-    const cfg = balance.villageLife.adultErrands
     const inhabitants: PlaceLifeInhabitant[] = people.map((p, i) => {
       const task = taskOf(work, i)
       const yaw = yaws.current[i] ?? 0
@@ -3970,12 +4004,7 @@ function ErrandVillagers({
       refs.current[i]?.traverse((o) => {
         if (speed === null && o.userData.walk) speed = (o.userData.walk as { speed: number }).speed
       })
-      const dwell = !task || !task.arrived
-        ? null
-        : task.phase === 'dig' ? cfg.digSeconds - task.dug
-          : task.phase === 'fill' ? balance.bankFillSeconds - task.dug
-            : task.phase === 'take' ? balance.waterJarTakeSeconds - task.dug
-              : null
+      const dwell = dwellOf(task)
       return {
         id: `errands/${i}`,
         kind: 'adult',
@@ -3989,7 +4018,7 @@ function ErrandVillagers({
           phase: task ? task.phase : null,
           target: task ? { x: task.x, z: task.z } : null,
           arrived: task ? task.arrived : false,
-          dwellRemaining: dwell === null ? null : Math.max(0, dwell),
+          dwellRemaining: dwell,
         },
       }
     })
@@ -4101,7 +4130,7 @@ function ErrandVillagers({
                 pending: task.pendingWord?.concept ?? null, childrenHear: view.childrenHear(p.x, p.z),
                 // The take at the stand and where he stands for it (work-order 1405).
                 taking: task.arrived && task.phase === 'take' ? Math.min(1, task.dug / balance.waterJarTakeSeconds) : null,
-                tableSpot: task.tableSpot ?? null }
+                tableSpot: task.tableSpot ?? null, dwellRemaining: dwellOf(task) }
             : null,
           gesture: gestures.current[i] ? { ...gestures.current[i].current } : null,
         }
@@ -5030,4 +5059,14 @@ export function PlaceLife({
       </LimbDetailContext.Provider>
     </ColdCloaksContext.Provider>
   )
+}
+
+/** Seconds an arrived errand still stays at its stop; null while walking or for a phase without a timed stay. */
+function dwellOf(task: ReturnType<typeof taskOf>): number | null {
+  if (!task || !task.arrived) return null
+  const left = task.phase === 'dig' ? balance.villageLife.adultErrands.digSeconds - task.dug
+    : task.phase === 'fill' ? balance.bankFillSeconds - task.dug
+      : task.phase === 'take' ? balance.waterJarTakeSeconds - task.dug
+        : null
+  return left === null ? null : Math.max(0, left)
 }

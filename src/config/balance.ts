@@ -3868,6 +3868,15 @@ export const VILLAGER_MOTION = {
   /** The heading error (rad) at which a walker stops to turn; its pace eases
    *  from full (heading on its way) to nothing at this error. */
   turnStopAngle: 1.75,
+  /** A walker setting off from a stand gains its pace at this rate (m/s²),
+   *  never at once: a body at full pace on its first frame raced the stride,
+   *  scaled by the smoothed ground speed, to ~1.8x the walk clip's cadence.
+   *  Stopping stays immediate. Calibratable. */
+  setOffAccel: 2.75,
+  /** A walker whose body got less than this share of the step it took
+   *  (held by its turn or blocked) keeps no pace: it sets off on the ramp
+   *  again instead of at a pace built up standing. Calibratable. */
+  setOffHeldShare: 0.1,
 } as const
 
 /**
@@ -4451,6 +4460,28 @@ export const VILLAGER_GLTF = {
    *  (`walkFadeRate`), so a step swings about as fast as the walk clip's own
    *  (at 0.1 s a step, the knee snapped). Calibratable. */
   settleStepSeconds: 0.4,
+  /** Starting from the stand, how far into its swing the foot that steps
+   *  first is as the gait takes the legs (0 its lift-off … 1 its landing;
+   *  the other foot then stands short of mid-stance under the body). Calibratable. */
+  startSwingShare: 0.65,
+  /** Starting, a foot swinging off the stand is lifted by G.settleStepLift
+   *  of the stand's miss times the swing's sine to this power (1 lifted the
+   *  knee fastest at once, higher skimmed the ground). Calibratable. */
+  startLiftPower: 1.5,
+  /** Starting, the seconds over which a foot still on the stand takes up the
+   *  walk clip's roll off its heel once the legs are on the walk (held flat
+   *  through the blend, it then left the stand by a jump). Calibratable. */
+  startRollSeconds: 0.15,
+  /** Standing (the walk weight still 0) while the body moves, as in the
+   *  frames before a start's walk weight rises or under a jostle: the
+   *  stand's feet stay where they stood, out to this miss (figure units)
+   *  and this turn (rad) off the body's own stand, past which they are
+   *  carried along; once the body no longer moves they are drawn back onto
+   *  its stand at `standHoldSettle` (units/s; the turn in proportion), never
+   *  a step. Calibratable. */
+  standHoldReach: 0.05,
+  standHoldTurn: 0.35,
+  standHoldSettle: 0.15,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Where the hair is painted on the glTF head, as shares of chin → crown
