@@ -447,6 +447,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     start?: boolean
     /** Starting, the seconds the walk stops again at (a start cut short): the walk weight falls from there. */
     stopAt?: number
+    /** Stopping, the seconds the walk takes up again at (a walk resumed mid-stop). */
+    resumeAt?: number
     /** Frames a second (60 by default). */
     hz?: number
     /** Per frame: the body's heading, its sideways drift (m/s) and the kneel, by time and walk weight. */
@@ -474,9 +476,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     let w = r.start ? 0 : 1
     let speed = r.start ? 0 : v
     const frames: Sole[] = []
-    for (let t = 0; t < Math.max(r.cut, r.stopAt ?? 0) + 1.5; t += dt) {
+    for (let t = 0; t < Math.max(r.cut, r.stopAt ?? 0, r.resumeAt ?? 0) + 1.5; t += dt) {
       const yaw = r.yaw?.(t) ?? 0
-      const step = (r.start ? t >= r.cut && t < (r.stopAt ?? Infinity) : t < r.cut) ? v * dt : 0
+      const step = (r.start ? t >= r.cut && t < (r.stopAt ?? Infinity) : t < r.cut || t >= (r.resumeAt ?? Infinity)) ? v * dt : 0
       x += Math.sin(yaw) * step + (r.drift?.(t, w) ?? 0) * dt
       z += Math.cos(yaw) * step
       speed += (step / dt - speed) * (1 - Math.exp(-dt / 0.12))
@@ -657,11 +659,48 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     }
   })
 
-  it('a start cut short by a stop in a corner: past the reversal\'s step-share flip, the knee bends no faster than the walk clip bends it', () => {
-    // a stop reversing a start still in its blend kept sampling the live gait
-    // through the turn and snapped to the stand at its end (cross-vendor
-    // review 24.11.2026)
-    for (const turn of [2.8, -2.8]) {
+  /** The worst knee step over a whole run, from its first frame. */
+  const worstKnee = (frames: Sole[]) => {
+    let worst = 0
+    for (let k = 1; k < frames.length; k++) worst = Math.max(worst, kneeStep(frames, k))
+    return worst
+  }
+  const seen = { start: 0, resume: 0, reversal: 0 }
+
+  it('starting, straight or into a corner: the knee bends no faster through the blend than the walk clip bends it', () => {
+    // setting off straight turned the shin 0.656 rad on the first blend frame,
+    // then by 0.24-0.42 rad steps (finding 24.11.2026 from point 1422)
+    for (const turn of [0, 2.8, -2.8, 1.5, -1.5]) {
+      const clip = clipKneeStep(turn)
+      for (let cut = 1; cut < 1.6; cut += 0.05) {
+        const worst = worstKnee(settle({ cut, start: true, yaw: (t) => Math.max(0, t - cut) * turn }))
+        seen.start = Math.max(seen.start, worst)
+        expect(worst, `turning ${turn} rad/s, start at ${cut.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
+      }
+    }
+  })
+
+  it('a walk taken up again mid-stop: the knee bends no faster than the walk clip bends it', () => {
+    // resuming while the legs still left the gait bent the knee by 0.3-0.5 rad a
+    // frame (finding 24.11.2026 from point 1422)
+    for (const turn of [0, 2.8, -2.8]) {
+      const clip = clipKneeStep(turn)
+      for (let pause = 0.05; pause < 0.8; pause += 0.05) {
+        const cut = 1.2
+        const frames = settle({ cut, resumeAt: cut + pause, yaw: (t) => Math.max(0, t - cut + 0.3) * turn })
+        const worst = worstKnee(frames)
+        seen.resume = Math.max(seen.resume, worst)
+        expect(worst, `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
+      }
+    }
+  })
+
+  it('a start cut short by a stop, straight or in a corner: the knee bends no faster than the walk clip bends it, the reversal included', () => {
+    // a stop reversing a start still in its blend jumped 0.32-0.60 rad in the
+    // frame after the reversal as the step shares flipped (finding 24.11.2026
+    // from point 1422), and kept sampling the live gait through the turn
+    // (cross-vendor review 24.11.2026)
+    for (const turn of [0, 2.8, -2.8]) {
       const clip = clipKneeStep(turn)
       for (let run = 0.05; run < 0.2; run += 0.025) {
         const cut = 0.5
@@ -669,16 +708,15 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const falls = Math.round((cut + run) * 60)
         expect(frames[falls].w, 'the stop falls inside the start blend').toBeGreaterThan(0)
         expect(frames[falls].w, 'the stop falls inside the start blend').toBeLessThan(1)
-        let worst = 0
-        // from the second frame after the reversal: the reversing frame and the
-        // one after it carry the step-share flip, and the start's own onset is
-        // not this case either; both belong to point 1582, whose start and
-        // reversal cases bound them (measured 24.11.2026: the only frame over
-        // the clip's range was the one after the reversal, 0.322 rad at 2.8 rad/s)
-        for (let k = falls + 2; k < frames.length; k++) worst = Math.max(worst, kneeStep(frames, k))
+        const worst = worstKnee(frames)
+        seen.reversal = Math.max(seen.reversal, worst)
         expect(worst, `turning ${turn} rad/s, walking ${run.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
       }
     }
+  })
+
+  it.runIf(process.env.KNEE_LOG)('logs the worst knee steps', () => {
+    console.log('KNEE', JSON.stringify(seen), clipKneeStep(0).toFixed(3), clipKneeStep(2.8).toFixed(3))
   })
 
   it('the step shares: the first foot over the first half of the way to the stand, the other over the second', () => {
