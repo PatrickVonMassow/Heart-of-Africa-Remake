@@ -867,14 +867,19 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   })
 
   // OPEN: point 1583 — the resume hands the held stop back to the live gait by a jump
+  // (measured 25.11.2026, rewind and rise cap: 0.18-0.42 rad at 0.35-0.75 s)
   it.skip('a walk taken up again mid-stop: the knee bends no faster than the walk clip bends it', () => {
     // resuming while the legs still left the gait bent the knee by 0.3-0.5 rad a
     // frame (finding 24.11.2026 from point 1422)
+    // only a stop begun: a pause shorter than 0.35 s never takes the legs off
+    // the walk, and the gait's own landing at the lowered pace belongs to
+    // point 1423 (heel strike)
     for (const turn of [0, 2.8, -2.8]) {
       const clip = clipKneeStep(turn)
-      for (let pause = 0.05; pause < 0.8; pause += 0.05) {
+      for (let pause = 0.35; pause < 0.8; pause += 0.05) {
         const cut = 1.2
         const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
+        expect(Math.min(...frames.map((f) => f.w)), `the stop has begun, resumed after ${pause.toFixed(2)} s`).toBeLessThan(1)
         const worst = worstKnee(frames)
         expect(worst, `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
       }
