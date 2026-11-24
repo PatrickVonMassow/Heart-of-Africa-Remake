@@ -1,6 +1,9 @@
 // The burn scar's uniform packing (design.md §19.8/§19.13): what the terrain
 // shader reads must be the shape grassFireFront.ts computes, and a switched-off
 // fire must upload nothing that could tint or glow.
+// The terrain shader replaced a strip of flat dark quads floated above the
+// ground, which drew a hard-edged dark rectangle in the burning-grass frame;
+// the soft, curved scar itself is asserted in grassFireFront.test.ts.
 
 import { describe, it, expect } from 'vitest'
 import { balance } from '../../config/balance'
