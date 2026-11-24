@@ -107,14 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1396. Two walking villagers stand inside each other at the village centre
-  Queue position: with point 1383 (Dorfleben), after the planted-soles work of point 1330.
-  Source: finding 20.10.2026 10:54 from the point-1330 picture check: verification/1295-village-walker-mid-stride-webgl2.png at f59ddaa0a shows a walking woman and a man behind her standing inside each other at the village centre (WebGL 2). Villager separation, not the planted-soles gait; WebGPU not yet judged for it.
-  Final state: two villagers moving through the village never interpenetrate; their bodies keep a visible gap while walking past or behind each other.
-  Verifiable: a Vitest case on the villager movement layer asserts a minimum body distance between every pair of walking villagers over a simulated village walk; the 1295 walk frame shows no overlapping bodies on both backends.
-  Criticality: medium - visible in the village walk frame.
-  Bundle: Dorfleben.
-
 - [ ] 1422. Villager knee snaps when a walker leaves the walk gait in a corner
   Source: finding 22.10.2026 09:46 from the point-1402 moving capture (seed 42, walker 0, WebGPU 60 Hz fixed clock): while the walk share drops 1 -> 0 in a ~2.8 rad/s corner the knee jumps 0.49-0.66 rad per frame (shin.L 0.836 -> 1.499) into a deep-knee pose; present on main 9ecb039 before 1402, same on WebGL 2.
   Final state: the knee angle changes smoothly through the walk-to-idle gait blend in a corner; no per-frame knee jump beyond the clip's own range.
