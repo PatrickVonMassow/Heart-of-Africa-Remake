@@ -100,6 +100,14 @@ export interface ClipLayers {
   startPhase: [number, number]
   startOff: [THREE.Vector3, THREE.Vector3]
   startTurn: [THREE.Quaternion, THREE.Quaternion]
+  /** Per foot, the gait's foot turn (world) as the start took it up: a foot
+   *  on the stand rolls about its ball as the clip's foot rolls off this. */
+  startFlat: [THREE.Quaternion, THREE.Quaternion]
+  /** Per foot, the height of the gait's ball (toe joint, body frame) as the start took it up. */
+  startBall: [number, number]
+  /** How far a foot on the stand takes up the clip's roll off its heel (0 … 1):
+   *  none while the walk weight blends the legs, then over G.startRollSeconds. */
+  startRoll: number
 }
 
 export function clipLayers(asset: VillagerAsset): ClipLayers {
@@ -135,6 +143,9 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     startPhase: [0, 0],
     startOff: [new THREE.Vector3(), new THREE.Vector3()],
     startTurn: [new THREE.Quaternion(), new THREE.Quaternion()],
+    startFlat: [new THREE.Quaternion(), new THREE.Quaternion()],
+    startBall: [0, 0],
+    startRoll: 0,
   }
 }
 
@@ -240,7 +251,8 @@ export function applyClipLayers(
   // the legs leave the gait at the settling steps' own pace (each foot's
   // step a swing's time, not a share of the walk's fade)
   const before = c.legs
-  c.legs = Math.max(m.weight, c.legs - c.dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
+  const dt = c.dt
+  c.legs = Math.max(m.weight, c.legs - dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
   c.dt = 0
   // A START FROM THE STAND: the gait set G.startSwingShare into the swing
   // of the foot that steps first (the other under the body as on the
@@ -248,6 +260,7 @@ export function applyClipLayers(
   if (!c.starting && before <= 0 && c.legs > 0 && c.legs < 1 && m.kneel <= 0 && c.dig < 1) {
     c.starting = true
     c.startState = [-1, -1]
+    c.startRoll = 0
     c.gait.phase = startPhase(asset, c.gait.phase)
   } else if (c.starting && (c.legs < before || m.kneel > 0)) c.starting = false
   if (c.starting && c.startState[0] === 2 && c.startState[1] === 2) c.starting = false
@@ -300,6 +313,7 @@ export function applyClipLayers(
     blendInto(asset, bones, LEGS.slice(1), c.local, w)
     blendInto(asset, bones, ['hips'], c.local, hw)
     blendHips(bones, c.hips, hw)
+    if (c.starting && c.legs >= 1) c.startRoll = Math.min(1, c.startRoll + dt / Math.max(1e-6, G.startRollSeconds))
     if (settle > 0) settleFeet(asset, bones, c, w, settle, f.legScale)
     blendInto(asset, bones, TRUNK, c.local, walking)
     blendInto(asset, bones, ARM('L'), c.local, walking * c.arms[0])
@@ -358,6 +372,10 @@ const _plain = LEG_SIDES.map(() => [0, 1, 2, 3].map(() => new THREE.Quaternion()
 const _yAxis = new THREE.Vector3(0, 1, 0)
 const _ik = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
 const _target = [new THREE.Vector3(), new THREE.Vector3()]
+/** Per foot, the ball (the toe's joint) off the ankle in the stand's foot frame. */
+const _ball = [new THREE.Vector3(), new THREE.Vector3()]
+/** Per foot, the gait's ball (body frame). */
+const _gaitBall = [new THREE.Vector3(), new THREE.Vector3()]
 
 /** The code-built legs and hips, before the gait blends over them. */
 function takeCodeLegs(bones: Record<string, THREE.Bone>): void {
@@ -440,7 +458,8 @@ const _startQ = [new THREE.Quaternion(), new THREE.Quaternion()]
  * a straight leg in a tenth of a second and snapped the knee). The foot that
  * is mid-swing as the start sets the gait (`startPhase`) swings at once.
  */
-function startFeet(c: ClipLayers, onWalk: boolean): void {
+function startFeet(c: ClipLayers, body: GroundBody | null): void {
+  const yaw = body?.yaw ?? 0
   const cyc = (x: number) => ((x % 1) + 1) % 1
   const phase = c.gait.phase
   LEG_SIDES.forEach((_, i) => {
@@ -448,12 +467,31 @@ function startFeet(c: ClipLayers, onWalk: boolean): void {
     const span = lift - land
     // in the clip's swing: past its lift, before its next landing
     const swinging = span > 1e-6 && cyc(phase - land) >= span
-    if (c.startState[i] === -1) c.startState[i] = 0
-    // the foot on the stand leaves it as the clip lifts it, or (the clip
-    // rolling it off its heel already) as soon as the other has landed —
-    // the second foot only once the legs are fully on the walk, so one foot
-    // stands through the whole blend
-    if (c.startState[i] === 0 && (swinging || c.startState[1 - i] === 2) && (onWalk || c.startState[1 - i] <= 0)) {
+    if (c.startState[i] === -1) {
+      c.startState[i] = 0
+      c.startFlat[i].copy(_gaitQ[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, yaw))
+      c.startBall[i] = _gaitBall[i].y
+    }
+    // a foot on the stand rolls off its heel about its ball as the clip's
+    // foot rolls off the turn it had as the start began, and rises off its
+    // toes as the clip's ball does (held flat, the hips walking on stretched
+    // the leg to the clip's lift, and the foot left the stand by a jump onto
+    // the clip's rolled foot); flat while the walk weight blends the legs,
+    // taken up over G.startRollSeconds once they are on the walk
+    if (c.startState[i] === 0 && c.startRoll > 0) {
+      const r = c.startRoll * c.startRoll * (3 - 2 * c.startRoll)
+      _yawQ.setFromAxisAngle(_yAxis, -yaw)
+      const roll = _liveQ.copy(_yawQ).multiply(c.startFlat[i]).invert().premultiply(_gaitQ[i])
+      roll.slerp(_q.identity(), 1 - r)
+      const toBall = _ik[4].copy(_ball[i]).applyQuaternion(_standQ[i])
+      _stand[i].add(toBall).sub(toBall.applyQuaternion(roll))
+      _standQ[i].premultiply(roll)
+      _stand[i].y += Math.max(0, _gaitBall[i].y - c.startBall[i]) * r
+    }
+    // the foot on the stand leaves it only while the clip swings it (left in
+    // the clip's stance, it drifted off the stand for nearly a cycle), and
+    // never while the other is in the air, so one foot always stands
+    if (c.startState[i] === 0 && swinging && c.startState[1 - i] !== 1) {
       c.startState[i] = 1
       c.startPhase[i] = phase
       c.startOff[i].copy(_stand[i]).sub(_gait[i])
@@ -509,11 +547,19 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
   hips.quaternion.copy(_codeHipsQ)
   hips.position.copy(_codeHipsP)
   LEG_SIDES.forEach((s, i) => legChain(bones, s).forEach((b, k) => b.quaternion.copy(_codeLeg[i][k])))
-  LEG_SIDES.forEach((s, i) => ankleAt(bones, s, _stand[i], _standQ[i]))
+  LEG_SIDES.forEach((s, i) => {
+    ankleAt(bones, s, _stand[i], _standQ[i])
+    if (!c.starting) return
+    inBody(bones[`toe.${s}`], _ball[i], _q)
+    _ball[i].sub(_stand[i]).applyQuaternion(_q.copy(_standQ[i]).invert())
+  })
   hips.quaternion.copy(c.local[hi])
   hips.position.copy(c.hips)
   LEG_SIDES.forEach((s) => legChain(bones, s).forEach((b, k) => b.quaternion.copy(gaitLocal(asset, c, s, k))))
-  LEG_SIDES.forEach((s, i) => ankleAt(bones, s, _gait[i], _gaitQ[i]))
+  LEG_SIDES.forEach((s, i) => {
+    ankleAt(bones, s, _gait[i], _gaitQ[i])
+    if (c.starting) inBody(bones[`toe.${s}`], _gaitBall[i], _q)
+  })
   hips.quaternion.copy(_blendHipsQ)
   hips.position.copy(_blendHipsP)
   const body = c.ground
@@ -576,10 +622,8 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     if (body) worldToBody(body, c.settleStand[i], _stand[i])
     _standQ[i].copy(c.settleTurn[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, -yaw))
   })
-  // starting, the legs were fully on the walk the frame before
-  const onWalk = c.settleW >= 1
   c.settleW = w
-  if (c.starting) startFeet(c, onWalk)
+  if (c.starting) startFeet(c, body)
   // each leg's blended chain and its ankle's target
   let drop = 0
   hips.updateMatrixWorld(true)

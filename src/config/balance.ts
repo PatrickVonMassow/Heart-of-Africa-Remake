@@ -4464,6 +4464,10 @@ export const VILLAGER_GLTF = {
    *  of the stand's miss times the swing's sine to this power (1 lifted the
    *  knee fastest at once, higher skimmed the ground). Calibratable. */
   startLiftPower: 1.5,
+  /** Starting, the seconds over which a foot still on the stand takes up the
+   *  walk clip's roll off its heel once the legs are on the walk (held flat
+   *  through the blend, it then left the stand by a jump). Calibratable. */
+  startRollSeconds: 0.15,
   /** Seconds a change of activity (walk ↔ dig ↔ carry ↔ kneel) blends over. */
   transitionSeconds: 0.35,
   /** Where the hair is painted on the glTF head, as shares of chin → crown

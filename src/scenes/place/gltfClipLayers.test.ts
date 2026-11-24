@@ -9,7 +9,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { VILLAGER_ASSET, VILLAGER_GLTF, VILLAGER_POSE } from '../../config/balance'
 import { distributeLean, gazeDirection, LEAN_BONES, newGaze, stepGaze } from '../../render/figureRig'
 import { parseVillager, type VillagerAsset } from '../../render/villagerAsset'
-import { clipGaitPose, clipPoseAt, shovelOnHungHand, toHung } from '../../render/villagerClipPose'
+import { clipGaitPose, clipPoseAt, gaitStance, shovelOnHungHand, toHung } from '../../render/villagerClipPose'
 import { newPose } from '../../render/villagerRig'
 import { setOffSpeed } from '../../render/figureWalk'
 import { createGltfSkeleton, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
@@ -431,7 +431,10 @@ describe('the posable clavicles (natural-villager-motion step 11)', () => {
 })
 
 describe('starting and stopping on the glTF figure (point 1330)', () => {
-  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[] }
+  /** Per frame: the legs' share of the gait, each foot's world points, the
+   *  shins' turns, and the start's state per foot (`ClipLayers.startState`,
+   *  -1 when no start runs) with whether the walk clip swings that foot. */
+  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; swing: boolean[] }
   /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
   function soleOf(bones: Record<string, THREE.Bone>) {
     const f = person.frame
@@ -497,7 +500,11 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       stepClipLayers(asset, person, c, step, speed, { x, z, yaw, unit: 1 }, null, dt)
       applyClipLayers(asset, person, bones, c, { speed, weight: w, kneel }, [true, true])
       group.updateMatrixWorld(true)
-      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()) })
+      const swing = [0, 1].map((i) => {
+        const [land, lift] = gaitStance(i)
+        return lift - land > 1e-6 && ((((c.gait.phase - land) % 1) + 1) % 1) >= lift - land
+      })
+      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], swing })
     }
     return frames
   }
@@ -548,6 +555,37 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         let worst = 0
         for (const k of span) frames[k].feet[first].forEach((p, j) => (worst = Math.max(worst, Math.hypot(p.x - from[j].x, p.z - from[j].z))))
         expect(worst, `turning ${turn} rad/s from ${cut.toFixed(1)} s`).toBeLessThan(0.002)
+      }
+    }
+  })
+
+  it('starting, each foot leaves the stand only as the walk clip swings it: none drifts off it through the clip\'s stance', () => {
+    // the second foot left the stand as soon as the first had landed and the
+    // legs were on the walk, in the clip's stance too, and then took nearly a
+    // whole cycle to settle, drifting over the ground while the clip stood
+    // on it (cross-vendor review 24.11.2026)
+    for (const turn of [0, 1.5, -1.5, 2.8, -2.8]) {
+      for (let cut = 1; cut < 1.6; cut += 0.05) {
+        const frames = settle({ cut, start: true, yaw: (t) => Math.max(0, t - cut) * turn })
+        const where = `turning ${turn} rad/s, start at ${cut.toFixed(2)} s`
+        let left = 0
+        let worst = 0
+        for (let k = 1; k < frames.length; k++) {
+          for (let i = 0; i < 2; i++) {
+            if (frames[k - 1].start[i] <= 0 && frames[k].start[i] >= 1) {
+              left++
+              expect(frames[k].swing[i], `${where}: foot ${i} leaves the stand in the clip's stance`).toBe(true)
+            }
+            // a foot on the stand keeps its ball where it stands (its heel
+            // rolls off with the clip's)
+            if (frames[k].start[i] === 0 && frames[k - 1].start[i] === 0) {
+              const [b, a] = [frames[k].feet[i][2], frames[k - 1].feet[i][2]]
+              worst = Math.max(worst, Math.hypot(b.x - a.x, b.z - a.z))
+            }
+          }
+        }
+        expect(left, where).toBe(2)
+        expect(worst, where).toBeLessThan(0.002)
       }
     }
   })
