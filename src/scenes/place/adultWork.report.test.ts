@@ -13,7 +13,7 @@ import * as collision from './collision'
 import * as routing from './routing'
 import * as inhabitants from './inhabitantBodies'
 import { insidePlace } from './boundary'
-import { steerHeading, wayHeading } from '../../render/figureWalk'
+import { setOffSpeed, steerHeading, wayHeading } from '../../render/figureWalk'
 
 beforeAll(setupGeodata)
 
@@ -29,7 +29,7 @@ function sceneMovement() {
   expect(end).toBeGreaterThan(start)
   const movement = ts.transpile(source.slice(start, end) + '\n}', { target: ts.ScriptTarget.ES2022 })
   const deps = {
-    ...workApi, ...collision, ...routing, ...inhabitants, insidePlace, balance, steerHeading, wayHeading,
+    ...workApi, ...collision, ...routing, ...inhabitants, insidePlace, balance, setOffSpeed, steerHeading, wayHeading,
     NPC_RADIUS: collision.WALKER_RADIUS, WAYPOINT_RADIUS: 1.2,
   }
   const move = new Function(...Object.keys(deps), 'env', `
@@ -60,7 +60,7 @@ it.each([0.1, 1 / 30, 1 / 60, 1 / 107])('completes the first reported village wa
   const work = workApi.createAdultWork(people.length, cfg)
   const idle = { current: people.map((_, i) => ({
     target: null, pause: 1 + i * 0.7, walked: 0, dug: 0, stuck: 0,
-    route: null, routeTo: null, replan: 0,
+    route: null, routeTo: null, replan: 0, pace: 0,
   })) }
   const standable = (x: number, z: number) => insidePlace(layout, x, z, collision.WALKER_RADIUS * 2) &&
     collision.standingClear(layout.colliders, x, z, collision.WALKER_RADIUS)

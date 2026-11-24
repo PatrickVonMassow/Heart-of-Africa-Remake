@@ -3579,6 +3579,7 @@ function ErrandVillagers({
       if (!goal) {
         state.route = null
         state.routeTo = null
+        state.pace = 0
       }
       if (goal) {
         const dx = goal.x - me.x
@@ -3586,6 +3587,8 @@ function ErrandVillagers({
         const d = Math.hypot(dx, dz)
         const arriveAt = task ? workArrivalRadius(task) : 0.9
         if (d <= arriveAt) {
+          // standing: the next walk sets off from a stand again
+          state.pace = 0
           if (!task) {
             state.target = null
             state.pause = 3 + rand() * 6
@@ -3683,8 +3686,6 @@ function ErrandVillagers({
           }
         }
       }
-      // standing, the next walk sets off from a stand again
-      if (!walking) state.pace = 0
 
       // THE BODY (point 578), resolved where this villager's own step left it,
       // against every other inhabitant of the settlement.
