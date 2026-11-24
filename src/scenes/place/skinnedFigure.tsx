@@ -545,7 +545,8 @@ export function SkinnedFigure({
       const reachFor = (i: number) => reachOfPose(i) ?? releasing.current[i] ?? undefined
       const contactArm = [0, 1].map((i) => {
         const v = arms.current[i]
-        if (!pose || !v || !virtualHands.current[i]) return false
+        // a self-driven gesture (the `gesture` prop alone) is shown as well
+        if (!shownNow || !v || !virtualHands.current[i]) return false
         if (reachFor(i) !== undefined) return true
         const rest = REST_POSE_ARMS[i]
         return !armAtRest({ pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z }, rest)
@@ -657,7 +658,8 @@ export function SkinnedFigure({
         let wants = false
         ;(['L', 'R'] as const).forEach((s, i) => {
           const vh = virtualHands.current[i]
-          if (!vh || !contactArm[i]) return
+          // an aimed gesture arm is no contact to lean toward
+          if (!vh || !crouchArm[i]) return
           const reach = reachOf(s)
           loc(b[`upperArm.${s}`], _s)
           handTarget(s, i, vh, _t)
@@ -688,7 +690,7 @@ export function SkinnedFigure({
             let short = -Infinity
             ;(['L', 'R'] as const).forEach((s, i) => {
               const vh = virtualHands.current[i]
-              if (!vh || !contactArm[i]) return
+              if (!vh || !crouchArm[i]) return
               short = Math.max(short, loc(b[`upperArm.${s}`], _s).distanceTo(handTarget(s, i, vh, _t)) - reachOf(s) * 0.995)
             })
             return short
