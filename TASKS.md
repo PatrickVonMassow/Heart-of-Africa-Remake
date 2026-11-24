@@ -112,6 +112,14 @@ put it is the mistake this line exists to stop.
   Final state: the knee angle changes smoothly through the walk-to-idle gait blend in a corner; no per-frame knee jump beyond the clip's own range.
   Verifiable: a Vitest on the villager pose layer bounds the per-frame knee change across a gait blend in a turn; a moving capture shows no leg snap on both backends.
   Criticality: medium - visible leg snap when villagers turn.
+  Review note (24.11.2026): the 1422 author narrowed the stance-slide test window ('no planted foot slides more than 4 cm in one stance') to exclude the final stop frames (weight < settleRestep x settleStepSetDown); the reviewer must judge it. Open after review a6a969c56: the reversal case in gltfClipLayers.test.ts is red at 0.075-0.10 s of walking (frame after the reversal, step-share flip) - fix here or narrow to 1582 with reason.
+  Bundle: Dorfleben.
+
+- [ ] 1582. Villager knee snaps when a walk starts or a start reverses into a stop
+  Source: findings 24.11.2026 10:59 and 11:14 from point 1422 (gltfClipLayers.test.ts settle harness, 60 Hz): starting straight, the shin turns 0.656 rad on the first blend frame (w 0.083), then 0.24-0.42 rad steps, identical with main's gltfClipLayers.ts; resuming mid-stop bends 0.3-0.5 rad a frame; a stop reversing a start mid-blend jumps 0.32-0.60 rad in the frame after the reversal as the step shares flip. The walk clip's own range is 0.235 rad a frame (sampled at 240 Hz).
+  Final state: through a start, a resumed walk and a start cut short by a stop, the knee changes no faster per frame than the clip's own range.
+  Verifiable: gltfClipLayers.test.ts start and reversal cases bounded by the clip's 240 Hz range; a moving capture on both backends.
+  Criticality: medium - visible leg snap whenever a villager sets off.
   Bundle: Dorfleben.
 
 - [ ] 1423. Villager heel strike stops the swinging foot dead

@@ -832,6 +832,12 @@
       "why": "low-criticality review follow-up of landed 1396; follows the ranked walker points",
       "origin": "machine",
       "place": "last"
+    },
+    "1582": {
+      "at": "2026-11-24T11:14:28.619Z",
+      "why": "follows 1422 in Dorfleben; same pose layer, after the stop fix lands",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -842,7 +848,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-24T10:36:54.160Z",
+    "at": "2026-11-24T11:14:28.623Z",
     "points": [
       184,
       200,
@@ -1029,7 +1035,8 @@
       1577,
       1578,
       1580,
-      1581
+      1581,
+      1582
     ]
   }
 }
