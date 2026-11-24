@@ -11,6 +11,7 @@ import { distributeLean, gazeDirection, LEAN_BONES, newGaze, stepGaze } from '..
 import { parseVillager, type VillagerAsset } from '../../render/villagerAsset'
 import { clipGaitPose, clipPoseAt, shovelOnHungHand, toHung } from '../../render/villagerClipPose'
 import { newPose } from '../../render/villagerRig'
+import { setOffSpeed } from '../../render/figureWalk'
 import { createGltfSkeleton, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { AGE_GROUPS, SEXES } from '../../systems/appearance'
 import { applyClipLayers, clipLayers, gazeHead, gripShaft, handShapes, leanTrunk, newTrunkBase, placeShovel, poseShoulders, settleShares, stepClipLayers, takeTrunkBase, TRUNK, type ClipLayers } from './gltfClipLayers'
@@ -475,10 +476,13 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     let z = 0
     let w = r.start ? 0 : 1
     let speed = r.start ? 0 : v
+    // the body's own pace, gained setting off as the game's walkers gain it
+    let pace = speed
     const frames: Sole[] = []
     for (let t = 0; t < Math.max(r.cut, r.stopAt ?? 0, r.resumeAt ?? 0) + 1.5; t += dt) {
       const yaw = r.yaw?.(t) ?? 0
-      const step = (r.start ? t >= r.cut && t < (r.stopAt ?? Infinity) : t < r.cut || t >= (r.resumeAt ?? Infinity)) ? v * dt : 0
+      pace = setOffSpeed(pace, (r.start ? t >= r.cut && t < (r.stopAt ?? Infinity) : t < r.cut || t >= (r.resumeAt ?? Infinity)) ? v : 0, dt)
+      const step = pace * dt
       x += Math.sin(yaw) * step + (r.drift?.(t, w) ?? 0) * dt
       z += Math.cos(yaw) * step
       speed += (step / dt - speed) * (1 - Math.exp(-dt / 0.12))
@@ -699,7 +703,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     // review 24.11.2026)
     for (const turn of [2.8, -2.8]) {
       const clip = clipKneeStep(turn)
-      for (let run = 0.05; run < 0.2; run += 0.025) {
+      // the stop inside the start blend: the walk weight takes up once the
+      // body, gaining its pace (VILLAGER_MOTION.setOffAccel), has a stride
+      for (let run = 0.125; run < 0.3; run += 0.025) {
         const cut = 0.5
         const frames = settle({ cut, start: true, stopAt: cut + run, yaw: (t) => Math.max(0, t - cut) * turn })
         const falls = Math.round((cut + run) * 60)
@@ -725,7 +731,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     // (cross-vendor review 24.11.2026)
     for (const turn of [0, 2.8, -2.8]) {
       const clip = clipKneeStep(turn)
-      for (let run = 0.05; run < 0.2; run += 0.025) {
+      // the stop inside the start blend: the walk weight takes up once the
+      // body, gaining its pace (VILLAGER_MOTION.setOffAccel), has a stride
+      for (let run = 0.125; run < 0.3; run += 0.025) {
         const cut = 0.5
         const frames = settle({ cut, start: true, stopAt: cut + run, yaw: (t) => Math.max(0, t - cut) * turn })
         const falls = Math.round((cut + run) * 60)

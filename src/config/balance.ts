@@ -3868,6 +3868,11 @@ export const VILLAGER_MOTION = {
   /** The heading error (rad) at which a walker stops to turn; its pace eases
    *  from full (heading on its way) to nothing at this error. */
   turnStopAngle: 1.75,
+  /** A walker setting off from a stand gains its pace at this rate (m/s²),
+   *  never at once: a body at full pace on its first frame raced the stride,
+   *  scaled by the smoothed ground speed, to ~1.8x the walk clip's cadence.
+   *  Stopping stays immediate. Calibratable. */
+  setOffAccel: 2.75,
 } as const
 
 /**

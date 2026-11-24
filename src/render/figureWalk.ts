@@ -237,6 +237,13 @@ export function steerHeading(yaw: number, desired: number, speed: number, dt: nu
   return { yaw: yaw + turn, pace }
 }
 
+/** A walker's body speed this frame, from last frame's `v` toward its pace
+ *  `target`: gained at VILLAGER_MOTION.setOffAccel setting off, dropped at
+ *  once (a stop or a slower pace). */
+export function setOffSpeed(v: number, target: number, dt: number): number {
+  return target > v ? Math.min(target, v + M.setOffAccel * dt) : target
+}
+
 /** The heading a walker turns toward: where a full step toward its waypoint
  *  really goes (slid along a wall, round another body) — unless that is
  *  hardly a step, or a shove back, which never turns it about. */
