@@ -550,6 +550,11 @@ export function SkinnedFigure({
         const rest = REST_POSE_ARMS[i]
         return !armAtRest({ pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z }, rest)
       })
+      // A GESTURE arm (the pointing hand of a point or an indication) is aimed,
+      // not placed: it never counts for the crouch, or the primitive's straight
+      // arm, longer than the drawn reach, squats the body as it lowers (point 1395).
+      const pointHand = extras?.pointHand ?? shownNow?.pointHand
+      const crouchArm = contactArm.map((c, i) => c && ((i === 0 ? pointHand?.left : pointHand?.right) ?? 0) <= 0)
       const contact = contactArm[0] || contactArm[1]
       // the contacts that stand at their pose from the first frame (a touch)
       const arrives = [0, 1].map((i) => contactArm[i] && !!(i === 0 ? extras?.arrive?.left : extras?.arrive?.right))
@@ -746,7 +751,7 @@ export function SkinnedFigure({
       b.hips.updateWorldMatrix(false, true)
       // THE CONTACT'S CROUCH, chosen on the established body (the clips, the
       // dig's share and the posed clavicles already on).
-      if (contact && !kneelNow && Math.abs(m.speed) <= VILLAGER_MOTION.moveSpeed) {
+      if ((crouchArm[0] || crouchArm[1]) && !kneelNow && Math.abs(m.speed) <= VILLAGER_MOTION.moveSpeed) {
         // Every pose is solved from STANDING height: a contact's crouch is
         // found afresh each time, never inherited, so a held contact cannot
         // alternate between crouched and standing. Each crouch is tried WITH
@@ -755,7 +760,7 @@ export function SkinnedFigure({
           Math.max(
             ...(['L', 'R'] as const).map((s, i) => {
               const vh = virtualHands.current[i]
-              return vh && contactArm[i] ? loc(b[`upperArm.${s}`], _s).distanceTo(handTarget(s, i, vh, _t)) - reachOf(s) * 0.995 : -1
+              return vh && crouchArm[i] ? loc(b[`upperArm.${s}`], _s).distanceTo(handTarget(s, i, vh, _t)) - reachOf(s) * 0.995 : -1
             }),
           )
         const hipY = b.hips.position.y

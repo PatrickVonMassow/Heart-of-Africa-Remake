@@ -1873,68 +1873,6 @@ export const RED_CHARGES = [
       + '(point 1465), so the charge holds on both backends. The charge dies with point 1270.',
   },
   {
-    point: 1395,
-    suite: 'polish-speech',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^the man and his word offer their keys at the same time \(point 1139\)$/i,
-    // Only the measured shape: the drummer's prompt stands while a villager's note is targeted.
-    detailMatch: /^\{"prompt":"Space — Ask the drummer","invite":"E — guess meaning","targeted":"villager-\d+","guessKeyArmed":true\}$/,
-    why:
-      'MEASURED 29.10.2026 by point 1465 on 97ecef7d0, red on webgpu AND webgl: bisected (first parent) to the merge '
-      + 'of point 1295 (2eb4f1384, glTF walking villagers). A per-frame trace after the word shows the drummer\'s hand '
-      + 'rise to 0.82 and drop to 0.34 below its 0.65 rest within a second: the point gesture squats the glTF body and '
-      + 'never lifts the arm level, which is point 1395 (user report 21.10.2026 names this drummer). The keys check is '
-      + 'its consequence: the test waits for the raised arm until the drummer\'s note has expired, so only a villager\'s '
-      + 'note is left to target. The charge dies with point 1395.',
-  },
-  {
-    point: 1395,
-    suite: 'polish-speech',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    kind: 'check',
-    match: /^the man and his word offer their keys at the same time \(point 1139\)$/i,
-    // Only the measured shape: the drummer's prompt stands while a villager's note is targeted.
-    detailMatch: /^\{"prompt":"Space — Ask the drummer","invite":"E — guess meaning","targeted":"villager-\d+","guessKeyArmed":true\}$/,
-    why:
-      'MEASURED 29.10.2026 by point 1465 on 97ecef7d0, red on webgpu AND webgl: bisected (first parent) to the merge '
-      + 'of point 1295 (2eb4f1384, glTF walking villagers). A per-frame trace after the word shows the drummer\'s hand '
-      + 'rise to 0.82 and drop to 0.34 below its 0.65 rest within a second: the point gesture squats the glTF body and '
-      + 'never lifts the arm level, which is point 1395 (user report 21.10.2026 names this drummer). The keys check is '
-      + 'its consequence: the test waits for the raised arm until the drummer\'s note has expired, so only a villager\'s '
-      + 'note is left to target. The charge dies with point 1395.',
-  },
-  {
-    point: 1395,
-    suite: 'polish-speech',
-    backend: 'webgl',
-    kind: 'check',
-    match: /^the drummer.s arm is raised in the pointing frame \(point 1272\)$/i,
-    why:
-      'MEASURED 29.10.2026 by point 1465 on 97ecef7d0, red on webgpu AND webgl: bisected (first parent) to the merge '
-      + 'of point 1295 (2eb4f1384, glTF walking villagers). A per-frame trace after the word shows the drummer\'s hand '
-      + 'rise to 0.82 and drop to 0.34 below its 0.65 rest within a second: the point gesture squats the glTF body and '
-      + 'never lifts the arm level, which is point 1395 (user report 21.10.2026 names this drummer). The keys check is '
-      + 'its consequence: the test waits for the raised arm until the drummer\'s note has expired, so only a villager\'s '
-      + 'note is left to target. The charge dies with point 1395.',
-  },
-  {
-    point: 1395,
-    suite: 'polish-speech',
-    backend: 'webgpu',
-    featureLevel: 'compatibility',
-    kind: 'check',
-    match: /^the drummer.s arm is raised in the pointing frame \(point 1272\)$/i,
-    why:
-      'MEASURED 29.10.2026 by point 1465 on 97ecef7d0, red on webgpu AND webgl: bisected (first parent) to the merge '
-      + 'of point 1295 (2eb4f1384, glTF walking villagers). A per-frame trace after the word shows the drummer\'s hand '
-      + 'rise to 0.82 and drop to 0.34 below its 0.65 rest within a second: the point gesture squats the glTF body and '
-      + 'never lifts the arm level, which is point 1395 (user report 21.10.2026 names this drummer). The keys check is '
-      + 'its consequence: the test waits for the raised arm until the drummer\'s note has expired, so only a villager\'s '
-      + 'note is left to target. The charge dies with point 1395.',
-  },
-  {
     point: 1466,
     suite: 'polish-speech',
     backend: 'webgl',
