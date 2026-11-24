@@ -244,6 +244,14 @@ export function setOffSpeed(v: number, target: number, dt: number): number {
   return target > v ? Math.min(target, v + M.setOffAccel * dt) : target
 }
 
+/** The pace a walker keeps once its step is resolved: none when its body
+ *  `moved` less than VILLAGER_MOTION.setOffHeldShare of the `step` it took
+ *  (held by its turn or blocked), so a body let go sets off on the ramp
+ *  again rather than at the pace it built up standing. */
+export function keptPace(pace: number, moved: number, step: number): number {
+  return moved < step * M.setOffHeldShare ? 0 : pace
+}
+
 /** The heading a walker turns toward: where a full step toward its waypoint
  *  really goes (slid along a wall, round another body) — unless that is
  *  hardly a step, or a shove back, which never turns it about. */

@@ -6,12 +6,12 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as THREE from 'three/webgpu'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { VILLAGER_ASSET, VILLAGER_GLTF, VILLAGER_POSE } from '../../config/balance'
+import { VILLAGER_ASSET, VILLAGER_GLTF, VILLAGER_MOTION, VILLAGER_POSE } from '../../config/balance'
 import { distributeLean, gazeDirection, LEAN_BONES, newGaze, stepGaze } from '../../render/figureRig'
 import { parseVillager, type VillagerAsset } from '../../render/villagerAsset'
 import { clipGaitPose, clipPoseAt, gaitStance, shovelOnHungHand, toHung } from '../../render/villagerClipPose'
 import { newPose } from '../../render/villagerRig'
-import { setOffSpeed } from '../../render/figureWalk'
+import { keptPace, setOffSpeed } from '../../render/figureWalk'
 import { createGltfSkeleton, gltfPerson, type GltfPerson } from '../../render/villagerFigureBody'
 import { AGE_GROUPS, SEXES } from '../../systems/appearance'
 import { applyClipLayers, clipLayers, gazeHead, gripShaft, handShapes, leanTrunk, newTrunkBase, placeShovel, poseShoulders, settleShares, stepClipLayers, takeTrunkBase, TRUNK, type ClipLayers } from './gltfClipLayers'
@@ -434,7 +434,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   /** Per frame: the legs' share of the gait, each foot's world points, the
    *  shins' turns, and the start's state per foot (`ClipLayers.startState`,
    *  -1 when no start runs) with whether the walk clip swings that foot. */
-  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; swing: boolean[] }
+  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; swing: boolean[]; step: number }
   /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
   function soleOf(bones: Record<string, THREE.Bone>) {
     const f = person.frame
@@ -459,6 +459,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     yaw?: (t: number) => number
     drift?: (t: number, w: number) => number
     kneel?: (t: number, w: number) => number
+    /** Seconds the body is held where it stands (blocked) while it wants to walk. */
+    held?: (t: number) => boolean
   }
   /** Walk at `v`, stop (or start) with the walk weight easing as the code
    *  walk eases it, the skeleton in a figure group placed and turned as the
@@ -485,7 +487,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     for (let t = 0; t < Math.max(r.cut, r.stopAt ?? 0, r.resumeAt ?? 0) + 1.5; t += dt) {
       const yaw = r.yaw?.(t) ?? 0
       pace = setOffSpeed(pace, (r.start ? t >= r.cut && t < (r.stopAt ?? Infinity) : t < r.cut || t >= (r.resumeAt ?? Infinity)) ? v : 0, dt)
-      const step = pace * dt
+      // held, the body gets none of its step, and keeps no pace (as the game's walkers)
+      const step = r.held?.(t) ? 0 : pace * dt
+      pace = keptPace(pace, step, pace * dt)
       x += Math.sin(yaw) * step + (r.drift?.(t, w) ?? 0) * dt
       z += Math.cos(yaw) * step
       speed += (step / dt - speed) * (1 - Math.exp(-dt / 0.12))
@@ -504,7 +508,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const [land, lift] = gaitStance(i)
         return lift - land > 1e-6 && ((((c.gait.phase - land) % 1) + 1) % 1) >= lift - land
       })
-      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], swing })
+      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], swing, step })
     }
     return frames
   }
@@ -608,6 +612,21 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
           expect(worst, `turning ${turn} rad/s, shoved ${drift} m/s, start at ${cut.toFixed(2)} s`).toBeLessThan(0.002)
         }
       }
+    }
+  })
+
+  it('a walker held where it stands while it wants to walk sets off on the ramp once let go', () => {
+    // its pace was gained before its step was resolved, so a body blocked
+    // (or held by its turn) built up its full pace standing and set off at
+    // it (cross-vendor review 24.11.2026)
+    const dt = 1 / 60
+    for (const hold of [0.2, 0.5, 1]) {
+      const cut = 1
+      const frames = settle({ cut, start: true, held: (t) => t >= cut && t < cut + hold })
+      let worst = 0
+      for (let k = 1; k < frames.length; k++) worst = Math.max(worst, (frames[k].step - frames[k - 1].step) / dt)
+      expect(frames.some((f) => f.step > 0), `held ${hold} s`).toBe(true)
+      expect(worst / dt, `held ${hold} s`).toBeLessThanOrEqual(VILLAGER_MOTION.setOffAccel + 1e-6)
     }
   })
 

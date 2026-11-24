@@ -13,7 +13,7 @@ import * as collision from './collision'
 import * as routing from './routing'
 import * as inhabitants from './inhabitantBodies'
 import { insidePlace } from './boundary'
-import { setOffSpeed, steerHeading, wayHeading } from '../../render/figureWalk'
+import { keptPace, setOffSpeed, steerHeading, wayHeading } from '../../render/figureWalk'
 
 beforeAll(setupGeodata)
 
@@ -29,7 +29,7 @@ function sceneMovement() {
   expect(end).toBeGreaterThan(start)
   const movement = ts.transpile(source.slice(start, end) + '\n}', { target: ts.ScriptTarget.ES2022 })
   const deps = {
-    ...workApi, ...collision, ...routing, ...inhabitants, insidePlace, balance, setOffSpeed, steerHeading, wayHeading,
+    ...workApi, ...collision, ...routing, ...inhabitants, insidePlace, balance, keptPace, setOffSpeed, steerHeading, wayHeading,
     NPC_RADIUS: collision.WALKER_RADIUS, WAYPOINT_RADIUS: 1.2,
   }
   const move = new Function(...Object.keys(deps), 'env', `

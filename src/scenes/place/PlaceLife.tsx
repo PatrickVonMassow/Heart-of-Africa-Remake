@@ -90,7 +90,7 @@ import {
 } from './waterStand'
 import { workSpan, workStop, type StopMode } from './taskWalkerStop'
 import { correctAim, gripPoints, handlingPose, LOAD_GROUND, loadHandling, loadPlacement, type LoadHandling, type V3 } from './taskWalkerLoad'
-import { approach, setOffSpeed, steerHeading, wayHeading } from '../../render/figureWalk'
+import { approach, keptPace, setOffSpeed, steerHeading, wayHeading } from '../../render/figureWalk'
 import { TASK_BUNDLE, TASK_JAR, WALKER_BASKET, steadiedLoad, taskLoadShape, type TaskLoad } from './headLoads'
 import { RiverFishery, type FisheryFireEnv } from './RiverFishery'
 import { Pounder } from './Pounder'
@@ -2684,6 +2684,7 @@ function TaskWalker({
       s.yaw = turn.yaw
       s.x += Math.sin(s.yaw) * step * turn.pace
       s.z += Math.cos(s.yaw) * step * turn.pace
+      s.pace = keptPace(s.pace, step * turn.pace, step)
     } else {
       // Point 657: another inhabitant on the way is walked round, not walked
       // into.
@@ -2695,7 +2696,10 @@ function TaskWalker({
       const way = wayHeading(s.x, s.z, tx, tz, dx, dz, step)
       const turn = steerHeading(s.yaw, way, speed, dt)
       s.yaw = turn.yaw
+      const [fromX, fromZ] = [s.x, s.z]
       ;[s.x, s.z] = resolveMove(colliders, s.x + Math.sin(s.yaw) * step * turn.pace, s.z + Math.cos(s.yaw) * step * turn.pace, NPC_RADIUS, [s.x, s.z])
+      // held by its turn or blocked, it sets off on the ramp again
+      s.pace = keptPace(s.pace, Math.hypot(s.x - fromX, s.z - fromZ), step)
       // Point 578: pushed clear of the other inhabitants where the step left it.
       // The door leg is left out — it runs through its own hut, where every
       // direction is blocked anyway.
@@ -3124,6 +3128,7 @@ function Walkers({
         s.yaw = turn.yaw
         s.x += Math.sin(s.yaw) * step * turn.pace
         s.z += Math.cos(s.yaw) * step * turn.pace
+        s.pace = keptPace(s.pace, step * turn.pace, step)
         turning = turn.pace < 0.3
       } else {
         // Solid objects block inhabitants too; slide along and skip the
@@ -3140,6 +3145,8 @@ function Walkers({
         const turn = steerHeading(s.yaw, wayHeading(s.x, s.z, tx, tz, dx, dz, step), def.speed, dt)
         s.yaw = turn.yaw
         ;[s.x, s.z] = resolveMove(colliders, s.x + Math.sin(s.yaw) * step * turn.pace, s.z + Math.cos(s.yaw) * step * turn.pace, NPC_RADIUS, [s.x, s.z])
+        // held by its turn or blocked, it sets off on the ramp again
+        s.pace = keptPace(s.pace, Math.hypot(s.x - oldX, s.z - oldZ), step)
         turning = turn.pace < 0.3
         if (moved < step * 0.3) {
           s.stuck += dt
@@ -3663,6 +3670,8 @@ function ErrandVillagers({
           const moved = Math.hypot(nx - me.x, nz - me.z)
           me.x = nx
           me.z = nz
+          // held by its turn or blocked, it sets off on the ramp again
+          state.pace = keptPace(state.pace, moved, step)
           // Use the same escape ladder as the household walkers. A body turning
           // nearly on the spot is not stuck.
           if (moved < step * 0.25 && turn.pace >= 0.3) {

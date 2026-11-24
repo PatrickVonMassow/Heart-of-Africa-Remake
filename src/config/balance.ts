@@ -3873,6 +3873,10 @@ export const VILLAGER_MOTION = {
    *  scaled by the smoothed ground speed, to ~1.8x the walk clip's cadence.
    *  Stopping stays immediate. Calibratable. */
   setOffAccel: 2.75,
+  /** A walker whose body got less than this share of the step it took
+   *  (held by its turn or blocked) keeps no pace: it sets off on the ramp
+   *  again instead of at a pace built up standing. Calibratable. */
+  setOffHeldShare: 0.1,
 } as const
 
 /**
