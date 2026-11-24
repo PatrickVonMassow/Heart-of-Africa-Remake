@@ -246,11 +246,11 @@ export function applyClipLayers(
     })
     if (hold > 0) c.hips.lerp(c.heldHips, hold)
     else c.heldHips.copy(c.hips)
-    // the hips over the second step by the square of the weight: a leg near
+    // stopping, the hips over the second step by the square of the weight: a leg near
     // straight on the stand bends by the root of the hips' drop, so a drop
     // linear in the weight still held a bent knee the frame before the
     // stand took over
-    const hw = w - settle * (w - w * Math.min(1, 2 * w))
+    const hw = w - settle * hold * (w - w * Math.min(1, 2 * w))
     blendInto(asset, bones, LEGS.slice(1), c.local, w)
     blendInto(asset, bones, ['hips'], c.local, hw)
     blendHips(bones, c.hips, hw)
@@ -491,7 +491,7 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     const cover = Math.hypot(_gait[i].x - _stand[i].x, _gait[i].z - _stand[i].z)
     const arc = Math.sin(Math.PI * step)
     T.y += G.settleStepLift * cover * arc * (1 - c.stop + c.stop * arc) + _lift[i] / (body?.unit || 1)
-    // the pelvis lowered just as far as each leg needs to reach its target
+    // stopping, the pelvis lowered just as far as each leg needs to reach its target
     // no straighter than its blended chain: a foot held while the hips leave
     // the gait was pulled out to a straight knee, which the step then bent
     // by a jump (a leg's bend goes with the root of its shortening there)
@@ -505,7 +505,7 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     const dy = H.y - T.y
     drop = Math.max(drop, flat < reach * reach ? dy - Math.sqrt(reach * reach - flat) : dy)
   })
-  hips.position.y -= Math.min(drop, G.pelvisDropMax * legScale) * share
+  hips.position.y -= Math.min(drop, G.pelvisDropMax * legScale) * share * c.stop
   LEG_SIDES.forEach((s, i) => {
     const step = shares[i]
     const p = stepPlace(step, c.stop)
