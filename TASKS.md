@@ -5209,3 +5209,10 @@ put it is the mistake this line exists to stop.
   Verifiable: Vitest that no errand stop of the village layout lies on a water cell; the set-off captures of polish-villagers --section=adult-errands on both backends show the feet on the bank.
   Criticality: medium - a villager visibly walking on the river in a filmed village view.
   Bundle: Dorfleben.
+
+- [ ] 1592. Villager rear foot flung up while ball and toe still count as held in sharp curves
+  Source: finding 25.11.2026 11:17 UTC from the point-1423 author (feat/1423-heel-strike-deceleration 106c5770e): at 1.4 per leg in the sharp-curve case of villagerClipPose.test.ts the rear foot is flung up to 0.6 m while ball and toe are still flagged held; on release it turns up to 34.7 rad/s (same on main). The sharp-curve bound was raised to 40 rad/s because of it (otherwise max 23.5). Also: the swinging foot turns back in the air at hand-over up to 17.5 rad/s (main 16.3), bounded at -20.
+  Final state: a foot whose ball or toe counts as held stays on the ground in sharp curves, its release turns no faster than the other curve cases, and the sharp-curve bound returns to the ordinary curve bound.
+  Verifiable: villagerClipPose.test.ts sharp-curve case at its ordinary turn-rate bound with a held-contact height check; a moving capture on both backends.
+  Criticality: medium - visibly flung foot in village walks.
+  Bundle: Dorfleben.
