@@ -50,9 +50,12 @@ const ease = (v: number) => smooth(v)
  * empty jar's mount in the hand (posed this frame): at 0 the full jar is
  * exactly where that one hangs. On the way it hangs from the same hand by the
  * same grip but turned upright, as a carried jar is, whatever the wrist does,
- * and toward the end it settles onto `rest` on the crown. At 1 it is the rest.
+ * and from `settleFrom` of the lift on it settles onto `rest` on the crown. At
+ * 1 it is the rest. A body whose hand rises with the jar lets the hand carry it
+ * most of the way (LIFT_SETTLE); one without (the primitive, which balances its
+ * load hands-free) passes 0, so the jar rises from the hand over the whole lift.
  */
-export function placeLiftedJar(jar: THREE.Object3D, hand: THREE.Object3D, share: number, rest: JarRest): void {
+export function placeLiftedJar(jar: THREE.Object3D, hand: THREE.Object3D, share: number, rest: JarRest, settleFrom = LIFT_SETTLE): void {
   const parent = jar.parent
   const mount = hand.parent
   if (share >= 1 || !parent || !mount) {
@@ -73,10 +76,10 @@ export function placeLiftedJar(jar: THREE.Object3D, hand: THREE.Object3D, share:
   // upright early, before the wrist turns with the rising arm
   jar.quaternion.slerpQuaternions(_localQ, rest.quaternion, ease(share / LIFT_UPRIGHT))
   jar.position.copy(_hang).applyQuaternion(jar.quaternion).add(_anchor)
-  jar.position.lerp(rest.position, ease((share - LIFT_SETTLE) / (1 - LIFT_SETTLE)))
+  jar.position.lerp(rest.position, ease((share - settleFrom) / (1 - settleFrom)))
 }
 
 /** The share of the lift by which the jar stands upright in the hand. */
 const LIFT_UPRIGHT = 0.3
-/** The share of the lift after which the jar settles from the hand onto the crown. */
-const LIFT_SETTLE = 0.6
+/** The share of the lift after which the jar settles from the lifting hand onto the crown. */
+export const LIFT_SETTLE = 0.6

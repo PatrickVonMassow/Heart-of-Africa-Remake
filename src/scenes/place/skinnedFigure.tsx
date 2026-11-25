@@ -31,7 +31,7 @@ import { createGltfSkeleton, gltfFigureGeometry, gltfLayerGeometry, gltfPerson, 
 import { gaitWeights } from '../../render/villagerRig'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildLayerGeometry, figureMaterial } from '../../render/figureDress'
-import { contactCrouch, contactLean, contactWantsLean, gazeAngles, gestureArmEuler, hangToward, holdsPosedReach, LEAN_BONES, FOREARM_ROLL_SHARE, leastLean, newGaze, nextRelease, palmNormal, palmRollAngle, palmRollCenter, searchDeepBend, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
+import { contactCrouch, contactLean, contactWantsLean, gazeAngles, gestureArmEuler, hangToward, holdsPosedReach, LEAN_BONES, FOREARM_ROLL_SHARE, leastLean, liftReachable, newGaze, nextRelease, palmNormal, palmRollAngle, palmRollCenter, searchDeepBend, solveTwoBone, stepGaze, unsquashHead } from '../../render/figureRig'
 import {
   approach,
   armAtRest,
@@ -352,6 +352,9 @@ const _turnB = new THREE.Quaternion()
 const _liftFrom = new THREE.Vector3()
 const _liftHand = new THREE.Quaternion()
 const _liftTo = new THREE.Vector3()
+/** The lifting arm as it hung and as the finished grip has it (headLift). */
+const _liftHung = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion()] as const
+const _liftRim = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion()] as const
 const _pole = new THREE.Vector3()
 const _euler = new THREE.Euler()
 const _here = new THREE.Vector3()
@@ -593,6 +596,11 @@ export function SkinnedFigure({
         const rest = REST_POSE_ARMS[i]
         return !armAtRest({ pitch: v.rotation.x, yaw: v.rotation.y, roll: v.rotation.z }, rest)
       })
+      // A HEAD LOAD ON ITS WAY UP (headLift) is lifted by the hand it starts
+      // from — the hand prop's, rig.hands[0], the left — whatever that arm's
+      // pose would have it do: it is the steadying arm for the lift, never a
+      // contact (else the right would steady while the load rose from the left).
+      if (headSteady && (headLift?.current ?? 1) < 1 && rig.crown.children.some((c) => c.visible)) contactArm[0] = false
       // A GESTURE arm (the pointing hand of a point or an indication) is aimed,
       // not placed: it never counts for the crouch, or the primitive's straight
       // arm, longer than the drawn reach, squats the body as it lowers (point 1395).
@@ -755,6 +763,7 @@ export function SkinnedFigure({
       b.hips.updateWorldMatrix(false, true)
       // THE STEADYING HAND on a head load: the first free arm, left before right.
       const loadShown = rig.crown.children.some((c) => c.visible)
+      const liftNow = Math.min(1, Math.max(0, headLift?.current ?? 1))
       const steadyArm = headSteady && loadShown && m.kneel < 0.5 ? (!contactArm[0] ? 0 : !contactArm[1] ? 1 : -1) : -1
       // THE ARMS THE CODE GESTURES WITH (and every arm's fallback): the pose's
       // direction carried onto the bones.
@@ -880,8 +889,8 @@ export function SkinnedFigure({
           const a = loc(fore, _e).distanceTo(loc(up, _s))
           const reach = wrist ? a + loc(b[`hand.${s}`], _w).distanceTo(_e) : reachOf(s)
           loc(up, _s)
-          // a wrist target is brought within the arm's reach
-          if (wrist && target.distanceTo(_s) > reach * 0.999) target.sub(_s).setLength(reach * 0.999).add(_s)
+          // a wrist target is brought within the arm's reach, both limits
+          if (wrist) liftReachable(target, _s, a, reach - a)
           const sol = solveTwoBone(_s, target, a, reach - a, pole)
           if (!sol.reached) return false
           // the arm's own parent (the clavicle on the glTF body, else the chest)
@@ -908,6 +917,9 @@ export function SkinnedFigure({
           if (lift < 1) {
             loc(b[`hand.${s}`], _liftFrom)
             qIn(b[`hand.${s}`], _liftHand)
+            _liftHung[0].copy(up.quaternion)
+            _liftHung[1].copy(fore.quaternion)
+            _liftHung[2].copy(b[`hand.${s}`].quaternion)
           }
           done = solveTo(_grip, _pole)
           // the palm on the load, not the back of the hand: the wrist rolled
@@ -931,8 +943,20 @@ export function SkinnedFigure({
             loc(b[`hand.${s}`], _liftTo)
             _liftTo.lerpVectors(_liftFrom, _liftTo, lift)
             _liftTo.x += (i === 0 ? 1 : -1) * VILLAGER_POSE.headLiftOut * Math.sin(Math.PI * lift)
+            _liftRim[0].copy(up.quaternion)
+            _liftRim[1].copy(fore.quaternion)
+            _liftRim[2].copy(b[`hand.${s}`].quaternion)
             done = solveTo(_liftTo, _pole, true)
-            if (done) {
+            if (!done) {
+              // (a wrist target the arm cannot take — solveTo brings it within
+              // both reach limits, so only a target on the shoulder itself):
+              // the arm as it hung turned toward the grip by the lift, never
+              // the finished grip ahead of its time
+              up.quaternion.copy(_liftHung[0]).slerp(_liftRim[0], lift)
+              fore.quaternion.copy(_liftHung[1]).slerp(_liftRim[1], lift)
+              b[`hand.${s}`].quaternion.copy(_liftHung[2]).slerp(_liftRim[2], lift)
+              done = true
+            } else {
               fore.quaternion.multiply(_q.setFromAxisAngle(_up, lift * roll * FOREARM_ROLL_SHARE))
               const was = liftTurn.current
               turnWithoutFlip(_liftHand, turned, lift, was)
@@ -1004,6 +1028,11 @@ export function SkinnedFigure({
           // as much the bone's as the clips drew the hand (a reach given back or
           // taken anew), so neither end of the hand-over swings what hangs there
           if (clipShown[i] > 0) anchor.quaternion.slerp(_q.identity(), clipShown[i])
+        } else if (i === steadyArm && liftNow < 1) {
+          // a lift from a hand that held its prop in a contact's turn: that turn
+          // given back to the bone's with the lift, so the load never swings
+          // round in the frame the lift takes the arm
+          anchor.quaternion.slerp(_q.identity(), liftNow)
         } else anchor.quaternion.identity()
         anchor.updateWorldMatrix(false, true)
       })

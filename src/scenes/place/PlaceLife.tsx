@@ -85,7 +85,7 @@ import { insidePlace, type ObservedGround } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
-import { jarLiftShare, placeLiftedJar, stepJarLift, type JarRest } from './jarLift'
+import { LIFT_SETTLE, jarLiftShare, placeLiftedJar, stepJarLift, type JarRest } from './jarLift'
 import {
   SPARE_JAR_LOCAL, aimFromShoulder, standJarLocal, toFigureFrame, standToWorld, standYaw, takeJarTravel, takePose,
 } from './waterStand'
@@ -3311,7 +3311,7 @@ function ErrandVillagers({
   const villagerAsset = figureLook?.villager ?? null
   const gltfBody = !!villagerAsset
   /** The skinned body (glTF or code-built) steadies a head load with a hand,
-   *  so it lifts the full jar with it (jarLift.ts); the primitive does not. */
+   *  so its hand carries the full jar up (jarLift.ts); the primitive does not. */
   const steadyingBody = !!figureLook
   /** The stroke the dig progress counts strikes on: the drawn body's own —
    *  the glTF dig clip's period and blade contact, the primitive's otherwise —
@@ -3767,11 +3767,11 @@ function ErrandVillagers({
       // shaft rides the stroke instead of swinging beside an empty-handed man.
       const carry = carryOf(work, i)
       // THE FULL JAR IS LIFTED, not swapped (jarLift.ts): from the hand at the
-      // hip onto the head, the steadying hand rising with it. The primitive
-      // body has no steadying hand, so its jar goes straight onto the head.
-      // OPEN: the low preset's primitive balances the jar hands-free; whether it should lift it too is a design call.
+      // hip onto the head, on the skinned body with the steadying hand rising
+      // with it; the primitive, which balances its load hands-free, raises it
+      // over the same eased lift without a hand under it.
       const lift = (jarLifts.current[i] ??= { seconds: null, carry })
-      lift.seconds = steadyingBody ? stepJarLift(lift.seconds, carry, lift.carry, dt) : null
+      lift.seconds = stepJarLift(lift.seconds, carry, lift.carry, dt)
       lift.carry = carry
       const liftShare = (liftShares.current[i] ??= { current: 1 })
       liftShare.current = jarLiftShare(lift.seconds)
@@ -3894,7 +3894,7 @@ function ErrandVillagers({
       }
       if (pose) applyFigurePose(limbs.current[i]?.current ?? null, pose)
       // the full jar where the hand, posed just now, has brought it
-      if (headJar && handJar) placeLiftedJar(headJar, handJar, liftShare.current, HEAD_JAR_REST)
+      if (headJar && handJar) placeLiftedJar(headJar, handJar, liftShare.current, HEAD_JAR_REST, steadyingBody ? LIFT_SETTLE : 0)
 
       const g = refs.current[i]
       if (g) {
