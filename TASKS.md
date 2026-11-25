@@ -5196,3 +5196,10 @@ put it is the mistake this line exists to stop.
   Verifiable: a full polish-villagers run on both backends with both captures green and non-empty detail on any red.
   Criticality: medium - the render guard cannot close villager points while the full pass carries uncharged reds.
   Bundle: Dorfleben.
+
+- [ ] 1588. Villager knee steps when a resumed start is stopped again during its hold
+  Source: finding 25.11.2026 from point 1587 and its cross review: stopped again 0.15 s or 0.35 s into a resumed start (resume case of gltfClipLayers.test.ts with stopAgainAt), the knee steps 0.33-0.39 rad a frame against the clip's 0.20-0.23, measured alike on main before 1587. The stop during the hold reuses the first stop's heldLegs/heldHips/heldPhase, and the cut-short handoff sets anchor 1, which blocks a second resume (both as on main).
+  Final state: a resumed start stopped again during its hold keeps the knee within the clip's per-frame range, and a walk can resume a second time after such a stop.
+  Verifiable: the stop-during-hold case of gltfClipLayers.test.ts bounded by the clip's 240 Hz range instead of its 0.4 regression bound; a second-resume case that begins a resumed start.
+  Criticality: low - a knee step when a hesitating villager stops again at once.
+  Bundle: Dorfleben.
