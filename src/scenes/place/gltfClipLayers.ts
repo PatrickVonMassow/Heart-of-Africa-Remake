@@ -402,7 +402,9 @@ export function applyClipLayers(
   }
   // THE GAIT
   if (legs > 1e-3 && under) {
-    clipGaitPose(c.gait, asset, f, m.speed, c.ground, c.pose)
+    // (a start steps its feet off the stand onto the clip's landing itself:
+    // the heel strike's brake re-timed that landing under it)
+    clipGaitPose(c.gait, asset, f, m.speed, c.ground, c.pose, asset.clips.walk, c.starting ? 0 : 1)
     // the gait grounds its contacts at 0 (the rest A-pose's sole), not at the hung rest's
     toHung(asset, f, c.pose, c.local, c.hips, 0)
     const w = legs

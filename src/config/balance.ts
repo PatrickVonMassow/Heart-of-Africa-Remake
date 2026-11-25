@@ -4385,6 +4385,18 @@ export const VILLAGER_GLTF = {
    *  once firm (foot 2.8x the clip's fastest turn at 144 Hz, 3.9x at 240 Hz,
    *  measured 25.11.2026). Calibratable. */
   plantFirm: 1,
+  /** The walk's heel strike (villagerClipPose.ts `heelBrake`): the clip
+   *  still swings its heel forward ~2 m/s as it touches down and the hold
+   *  stopped it within a frame. Over `heelBrakeCycle` of the cycle before
+   *  it lands, the heel plays its own path re-timed to arrive with no
+   *  speed `heelBrakeLead` of the cycle before the stance's landing (the hold
+   *  takes it at ~0.01 before, measured 25.11.2026), at the spot the clip
+   *  reaches `heelLandAt` past that landing. Not taken by then, the re-timing
+   *  fades out over `heelBrakeHold`. Calibratable. */
+  heelBrakeCycle: 0.12,
+  heelBrakeLead: 0.01,
+  heelLandAt: 0,
+  heelBrakeHold: 0.06,
   /** The stance foot on the ground (villagerClipPose.ts `gaitFootGround`):
    *  the blended gait's stance is read over `groundSamples` phases, at
    *  `groundLevels` steps across each cross-fade band (interpolated between).

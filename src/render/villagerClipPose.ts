@@ -70,6 +70,9 @@ export interface ClipGait {
   /** Per leg, its hand-over from one pivot of the rolling foot to the next
    *  or to the clip's swing (`LiftOff`). */
   lift: [LiftOff, LiftOff]
+  /** Per foot, the share of its heel strike's brake (`heelBrake`) taken as
+   *  its brake began, kept to its end; null outside a brake. */
+  brake: [number | null, number | null]
 }
 
 /** thigh, shin, foot, toe: a quaternion (x, y, z, w) each, plain data */
@@ -96,7 +99,7 @@ export interface LiftOff {
 
 const freeLift = (): LiftOff => ({ on: null, to: null, left: 0, toes: 0, last: legTurns(), from: legTurns() })
 
-export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0, flatYaw: [null, null], planted: [false, false], headingKeep: [0, 0], lift: [freeLift(), freeLift()] })
+export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0, flatYaw: [null, null], planted: [false, false], headingKeep: [0, 0], lift: [freeLift(), freeLift()], brake: [null, null] })
 
 /** Let both feet go (standing: nothing is held for the next walk). */
 export function releaseClipGait(g: ClipGait): void {
@@ -106,6 +109,7 @@ export function releaseClipGait(g: ClipGait): void {
   g.planted = [false, false]
   g.headingKeep = [0, 0]
   g.lift = [freeLift(), freeLift()]
+  g.brake = [null, null]
 }
 
 /** How far above the ground a contact takes hold (person units); a held
@@ -511,6 +515,52 @@ function blendGait(asset: VillagerAsset, frame: PersonFrame, phase: number, w: G
 }
 
 /**
+ * The walk's heel strike (VILLAGER_GLTF.heelBrakeCycle): the clip still
+ * swings its heel forward ~2 m/s as it touches down, and the hold stopped it
+ * dead within a frame. Over the brake the swinging foot plays its own path
+ * re-timed instead — ahead of the clip at first, its speed easing to none
+ * G.heelBrakeLead before its stance lands, at the spot the clip reaches
+ * G.heelLandAt past that landing — so the hold takes a heel already at rest
+ * where it sets down (on the ground the heel never slides). Into `out`
+ * (person x, z; y 0): the correction the foot `i` takes, by the walk's share,
+ * against `heel`, its clip heel now (stride warped); false outside the
+ * brake. Read from the clip sampled ahead on the walked ground (straight on).
+ */
+function heelBrake(asset: VillagerAsset, frame: PersonFrame, gait: ReturnType<typeof gaitAt>, walkClip: VillagerClip, phase: number, i: number, heel: THREE.Vector3, out: THREE.Vector3): boolean {
+  out.set(0, 0, 0)
+  const L = Math.max(1e-6, G.heelBrakeCycle)
+  const end = _blendStance[i][0] - G.heelBrakeLead
+  // phase past the brake's end, in (-0.5, 0.5]
+  const x = ((((phase - end) % 1) + 1.5) % 1) - 0.5
+  const hold = Math.max(1e-6, G.heelBrakeHold)
+  if (x < -L || x >= 2 * hold || gait.phasePerUnit <= 0) return false
+  // the re-timed phase: a cubic from the clip's own pace at the brake's
+  // start to no pace at its end, held there after it
+  const s = Math.min(1, (x + L) / L)
+  const rise = L + G.heelBrakeLead + G.heelLandAt
+  const h = (s * s * s - 2 * s * s + s) * L + (3 * s * s - 2 * s * s * s) * rise
+  const ahead = h - (x + L)
+  // past the hold not yet taken, faded out (never a jump)
+  const keep = gait.walk * smoothstep(Math.min(1, Math.max(0, (2 * hold - Math.max(hold, x)) / hold)))
+  if (keep <= 0) return false
+  const n = asset.bones.length
+  const pose = blendGait(asset, frame, (((phase + ahead) % 1) + 1) % 1, gait, walkClip, ensure(_bkPose, n))
+  const world = ensureWorld(_bkWorld, n)
+  forwardKinematics(asset, frame.rest0, pose, world)
+  const s0 = SIDES[i]
+  const foot = asset.bones.indexOf(`foot.${s0}`)
+  const hips = asset.bones.indexOf('hips')
+  const at = contactPoints(asset, world, frame.legScale)[s0].heel
+  // the clip's heel then, stride warped, on the ground walked by then
+  at.z += (world.p[foot].z - world.p[hips].z) * (gait.stride - 1) + ahead / gait.phasePerUnit
+  out.set((at.x - heel.x) * keep, 0, (at.z - heel.z) * keep)
+  return true
+}
+const _bkPose = newPose(0)
+const _bkWorld = newWorld(0)
+const _brk = new THREE.Vector3()
+
+/**
  * How high each foot's lowest sole contact stands over the ground through its
  * stance in the gait blend `w` on this person (person units, [L, R]; 0
  * without a stance). The clips are authored on the basis body and their hips
@@ -604,6 +654,7 @@ export function clipGaitPose(
   body: GroundBody | null,
   out: VillagerPose,
   walkClip: VillagerClip = asset.clips.walk,
+  heelBraking = 1,
 ): VillagerPose {
   const n = asset.bones.length
   ensure(out, n)
@@ -795,6 +846,17 @@ export function clipGaitPose(
       _miss.multiplyScalar(limit / far)
       for (const k of CONTACTS) if (held[k]) held[k] = toWorld(frame, body, _h.copy(c[k]).add(_miss))
     }
+    // the walk's heel strike lands its heel at rest (`heelBrake`; the slip
+    // carried on is the hold's own)
+    // (by the share asked for as its brake began: a share changed within
+    // it moved the foot by a jump)
+    _brk.set(0, 0, 0)
+    if (body && gait.walk > 0 && !(held.heel || held.ball || held.tip) && catching(i) && heelBrake(asset, frame, gait, walkClip, g.phase, i, c.heel, _brk)) {
+      g.brake[i] ??= heelBraking
+      _brk.multiplyScalar(g.brake[i]!)
+      _miss.x += _brk.x
+      _miss.z += _brk.z
+    } else g.brake[i] = null
     if (body) {
       // a contact takes hold where it touches down, by its height: the clips'
       // support intervals (step 5) already pace each leg's stance in a blend
@@ -817,8 +879,8 @@ export function clipGaitPose(
         _caught[i] = true
       }
     }
-    slip.x = _miss.x
-    slip.z = _miss.z
+    slip.x = _miss.x - _brk.x
+    slip.z = _miss.z - _brk.z
     _target[i].set(_t.x + _miss.x, _t.y, _t.z + _miss.z)
     // THE FLAT FOOT on the ground pivots on one held contact — its heel
     // after the landing, its ball from G.footPivotSwitch of the stance on (the
