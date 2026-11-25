@@ -610,8 +610,10 @@ function startFeet(c: ClipLayers, body: GroundBody | null): void {
     }
     // the foot on the stand leaves it only while the clip swings it (left in
     // the clip's stance, it drifted off the stand for nearly a cycle), and
-    // never while the other is in the air, so one foot always stands
-    if (c.startState[i] === 0 && swinging && c.startState[1 - i] !== 1) {
+    // never while the other is in the air, so one foot always stands; a
+    // start resumed from a stop lifts it once the other has landed (left for
+    // the clip's lift, the body walked its leg straight: point 1583)
+    if (c.startState[i] === 0 && (swinging || (c.resumed && c.startState[1 - i] === 2)) && c.startState[1 - i] !== 1) {
       c.startState[i] = 1
       if (c.startFirst < 0) c.startFirst = i
       c.startPhase[i] = phase
