@@ -871,6 +871,37 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   // clip's range (measured 25.11.2026: 0.24-0.53 rad against 0.20-0.23; the clip's
   // lift of the waiting stand foot 40-44 frames on, the take-over at +11 and the
   // first landing at +26-28); until then this bounds the measured state
+  it.only('PROBE resume', () => {
+    let out = ''
+    for (const turn of [0, 2.8, -2.8]) {
+      const clip = clipKneeStep(turn)
+      const worst = [0, 0]; const at = ['', '']
+      for (let pause = 0.35; pause < 0.8; pause += 0.05) {
+        const cut = 1.2
+        const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
+        const r0 = Math.round((cut + pause) * 60)
+        let first = -1; let fi = -1
+        for (let k = r0; k < frames.length; k++) { fi = frames[k].start.indexOf(2); if (fi >= 0) { first = k; break } }
+        for (let k = first + 1; k < frames.length; k++) [1 - fi, fi].forEach((i, j) => { const s = frames[k].knee[i].angleTo(frames[k - 1].knee[i]); if (s > worst[j]) { worst[j] = s; at[j] = `p${pause.toFixed(2)} +${k - r0} (land +${first - r0}) st${frames[k].start} w${frames[k].w.toFixed(2)}` } })
+      }
+      out += `turn ${turn} clip ${clip.toFixed(3)} waiting ${worst[0].toFixed(3)} ${at[0]} · first ${worst[1].toFixed(3)} ${at[1]}\n`
+    }
+    console.log(out)
+  })
+  it.only('PROBE detail', () => {
+    for (const [turn, pause] of [[0, 0.75], [2.8, 0.65], [-2.8, 0.75]]) {
+      const cut = 1.2
+      const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
+      const r0 = Math.round((cut + pause) * 60)
+      const rows: string[] = []
+      for (let k = r0 - 2; k < r0 + 46; k++) {
+        const ks = frames[k].knee.map((q, i) => q.angleTo(frames[k - 1].knee[i]))
+        const bend = frames[k].knee.map((q) => 2 * Math.acos(Math.min(1, Math.abs(q.w))))
+        rows.push(`+${k - r0} L${ks[0].toFixed(2)}/${bend[0].toFixed(2)} R${ks[1].toFixed(2)}/${bend[1].toFixed(2)} yL${frames[k].feet[0][0].y.toFixed(3)} st${frames[k].start} sw${frames[k].swing.map(Number).join('')} w${frames[k].w.toFixed(2)}`)
+      }
+      console.log(`turn ${turn} pause ${pause}\n` + rows.join('\n'))
+    }
+  })
   it('a walk taken up again mid-stop: the knee bends no faster than the resumed start\'s measured bound', () => {
     // resuming while the legs still left the gait bent the knee by 0.3-0.5 rad a
     // frame (finding 24.11.2026 from point 1422)
