@@ -986,7 +986,12 @@ export function clipGaitPose(
         forwardKinematics(asset, frame.rest0, out, world)
         if (on) {
           _hoPv.sub(contactPoints(asset, world, frame.legScale)[s][on])
-          correctLeg(asset, frame.rest0, out, world, thigh, shin, foot, _hoPv.add(world.p[foot]), P.kneePoleMin * frame.legScale)
+          // (at most the one reach the first solve stops at: past it the
+          // knee snapped near straight for the frame)
+          _hoPv.add(world.p[foot])
+          const off = hip.distanceTo(_hoPv)
+          if (off > reach) _hoPv.sub(hip).multiplyScalar(reach / off).add(hip)
+          correctLeg(asset, frame.rest0, out, world, thigh, shin, foot, _hoPv, P.kneePoleMin * frame.legScale)
           setWorldRotation(asset, out, world, foot, _hoTw)
           forwardKinematics(asset, frame.rest0, out, world)
         }

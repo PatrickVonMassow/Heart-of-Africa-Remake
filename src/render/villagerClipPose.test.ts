@@ -603,6 +603,7 @@ describe('the clip gait on the ground', () => {
     const contacts = ['heel', 'ball', 'tip'] as const
     let flatChecked = 0
     let spotChecked = 0
+    let catchChecked = 0
     for (const yawRate of [3.5, -3.5]) {
       for (const sex of SEXES) {
         for (const age of AGE_GROUPS) {
@@ -638,7 +639,17 @@ describe('the clip gait on the ground', () => {
                   const held = g.held[i]
                   const holding = !!(held.heel || held.ball || held.tip)
                   if (!holding) caught[i] = null
-                  else caught[i] ??= heading
+                  else if (caught[i] === null) {
+                    caught[i] = heading
+                    // the heading kept from the catch on is the one drawn on
+                    // the catch frame, never one kept from an earlier plant
+                    const kept = g.flatYaw[i]
+                    if (kept !== null && g.headingKeep[i] > 0) {
+                      catchChecked++
+                      const e = kept - heading
+                      expect(Math.abs(Math.atan2(Math.sin(e), Math.cos(e))), `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, foot ${s} caught`).toBeLessThan(1e-3)
+                    }
+                  }
                   const where = `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, foot ${s} at phase ${g.phase.toFixed(3)}`
                   for (const kk of contacts) {
                     const p = c[s][kk]
@@ -688,6 +699,108 @@ describe('the clip gait on the ground', () => {
     }
     expect(flatChecked).toBeGreaterThan(1000)
     expect(spotChecked).toBeGreaterThan(1000)
+    expect(catchChecked).toBeGreaterThan(500)
+  })
+
+  it('stopping and walking on in a sharp curve, a foot handed between its pivots bends its knee no faster than the clip, and keeps the heading drawn at its catch', () => {
+    // cross-vendor review 25.11.2026: the hand-over of a heading-keeping
+    // foot moved its ankle target past the reach the first solve stops at,
+    // so the knee snapped near straight for the frame (2.5x the clip's
+    // fastest knee on the female child, 144-240 Hz); and the heading kept
+    // from a catch was read before the solve drew the foot, or kept from
+    // an earlier plant
+    const n = asset.bones.length
+    const legs = ['L', 'R'].map((s) => ['thigh', 'shin', 'foot'].map((b) => asset.bones.indexOf(`${b}.${s}`)))
+    const shins = legs.map((l) => l[1])
+    const qa = new THREE.Quaternion()
+    const qb = new THREE.Quaternion()
+    const ease = (x: number) => {
+      const c = Math.min(1, Math.max(0, x))
+      return c * c * (3 - 2 * c)
+    }
+    let handed = 0
+    let caughtN = 0
+    let staleN = 0
+    let worstKnee = 0
+    let worstCatch = 0
+    for (const sex of SEXES) {
+      for (const age of AGE_GROUPS) {
+        const f = gltfPerson(asset, sex, age, 0).frame
+        for (const perLeg of [1.0, 1.4]) {
+          const full = perLeg * f.legScale * f.scale
+          const cycle = gaitAt(asset.clips as unknown as GaitClips, full / f.scale, f.legScale)
+          const perSecond = (full / f.scale) * cycle.phasePerUnit
+          // the clip's own fastest knee (rad/s at this pace)
+          let clipMax = 0
+          const steps = 2000
+          const a = samplePhase(asset.clips.walk, 0, f, newPose(n))
+          const b = newPose(n)
+          for (let k = 1; k <= steps; k++) {
+            samplePhase(asset.clips.walk, k / steps, f, b)
+            for (const sh of shins) clipMax = Math.max(clipMax, qa.fromArray(a.rot, sh * 4).angleTo(qb.fromArray(b.rot, sh * 4)) * steps * perSecond)
+            for (let c = 0; c < b.rot.length; c++) a.rot[c] = b.rot[c]
+          }
+          for (const yawRate of [3.5, -3.5]) {
+            for (const hz of [60, 240]) {
+              // walking on through the curve, or stopping in it (0.3 s down,
+              // a pause, 0.3 s up), the body turning with its pace
+              for (const pause of [null, 0.05, 0.15, 0.3]) {
+                const dt = 1 / hz
+                const pace = (t: number) => {
+                  if (pause === null || t < 1.5) return full
+                  if (t < 1.8) return full * (1 - ease((t - 1.5) / 0.3))
+                  if (t < 1.8 + pause) return 0
+                  return full * ease((t - 1.8 - pause) / 0.3)
+                }
+                const g = newClipGait()
+                const pose = newPose(n)
+                const world = newWorld(n)
+                const prev = Array.from(pose.rot)
+                const wasHeld = [false, false]
+                let x = 0
+                let z = 0
+                let yaw = 0
+                for (let k = 0; k * dt < 3.5; k++) {
+                  const speed = pace(k * dt)
+                  yaw += yawRate * (speed / full) * dt
+                  x += Math.sin(yaw) * speed * dt
+                  z += Math.cos(yaw) * speed * dt
+                  const before = [g.flatYaw[0], g.flatYaw[1]]
+                  stepClipGait(g, asset, f, speed * dt, speed)
+                  clipGaitPose(g, asset, f, speed, { x, z, yaw, unit: 1 }, pose)
+                  forwardKinematics(asset, f.rest0, pose, world)
+                  const where = `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, pause ${pause}, t ${(k * dt).toFixed(3)}`
+                  legs.forEach(([, shin, foot], i) => {
+                    const held = g.held[i]
+                    const holding = !!(held.heel || held.ball || held.tip)
+                    if (holding && !wasHeld[i] && g.headingKeep[i] > 0 && g.flatYaw[i] !== null) {
+                      caughtN++
+                      if (before[i] !== null) staleN++
+                      const q = world.q[foot]
+                      const e = g.flatYaw[i]! - (2 * Math.atan2(q.y, q.w) + yaw)
+                      const miss = Math.abs(Math.atan2(Math.sin(e), Math.cos(e)))
+                      worstCatch = Math.max(worstCatch, miss)
+                      // the heading kept from the catch is the one drawn there
+                      expect(miss, `${where}, foot ${i} caught`).toBeLessThan(1e-3)
+                    }
+                    wasHeld[i] = holding
+                    if (k * dt < 1 || !(g.lift[i].left > 0 && g.planted[i])) return
+                    handed++
+                    const rate = qa.fromArray(prev, shin * 4).angleTo(qb.fromArray(pose.rot, shin * 4)) / dt / clipMax
+                    worstKnee = Math.max(worstKnee, rate)
+                    // (measured 0.99 of the clip's fastest; 2.5 before)
+                    expect(rate, `${where}, shin ${i} handed over`).toBeLessThan(1)
+                  })
+                  for (let c = 0; c < pose.rot.length; c++) prev[c] = pose.rot[c]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(handed).toBeGreaterThan(1000)
+    expect(caughtN).toBeGreaterThan(500)
   })
 
   it('two villagers drawn in turn pose their legs and toes as each drawn alone, through every toe release', () => {
