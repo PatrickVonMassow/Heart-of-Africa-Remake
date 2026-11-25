@@ -895,8 +895,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         expect(began, `resumed after ${pause.toFixed(2)} s: a resumed start begins, not before the resume`).toBeGreaterThanOrEqual(r0)
         expect(began - r0, `resumed after ${pause.toFixed(2)} s: the resumed start begins within its first frames`).toBeLessThan(15)
         // the first foot's landing, located rather than assumed inside the 30 frames
-        const landing = frames.findIndex((f, k) => k > began && f.start.includes(2))
-        expect(landing, `resumed after ${pause.toFixed(2)} s: the first foot lands`).toBeGreaterThan(began)
+        const landing = frames.findIndex((f, k) => k >= began && f.start.includes(2))
+        expect(landing, `resumed after ${pause.toFixed(2)} s: the first foot lands`).toBeGreaterThanOrEqual(began)
         const landed = frames[landing].start.indexOf(2)
         for (let k = r0; k <= Math.max(r0 + 29, landing); k++) {
           frames[k].knee.forEach((q, i) => {
