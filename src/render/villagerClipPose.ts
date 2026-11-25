@@ -368,15 +368,20 @@ export function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shi
       const kb = A.dot(Q)
       const K = (A.lengthSq() + T.lengthSq() - keepFar * keepFar) / 2
       const r0 = Math.hypot(ka, kb)
-      // none where the sphere is missed or the pitch would pass
-      // G.rollKeepPitchMax (a foot lifted off its pivot, near upright)
-      if (r0 <= 1e-9 || Math.abs(K) > r0) continue
+      if (r0 <= 1e-9) continue
+      // where the sphere is missed, the pitch bringing the ankle nearest to
+      // it (the tangent's own: dropped there, the foot jumped back by it),
+      // faded out as the miss grows (G.rollKeepMissFade of r0); and faded out
+      // toward G.rollKeepPitchMax (a foot lifted off its pivot, near
+      // upright), never cut off at it
       const phi = Math.atan2(kb, ka)
-      const c = Math.acos(K / r0)
+      const c = Math.acos(Math.max(-1, Math.min(1, K / r0)))
       const a1 = wrapAngle(phi + c)
       const a2 = wrapAngle(phi - c)
       const alpha = Math.abs(a1) < Math.abs(a2) ? a1 : a2
-      if (Math.abs(alpha) <= G.rollKeepPitchMax) _hoQ.premultiply(_hoR.setFromAxisAngle(n, alpha))
+      const miss = smoothstep(Math.min(1, Math.max(0, 1 - (Math.abs(K) / r0 - 1) / Math.max(1e-6, G.rollKeepMissFade))))
+      const fade = miss * smoothstep(Math.min(1, Math.max(0, (G.rollKeepPitchMax - Math.abs(alpha)) / Math.max(1e-6, G.rollKeepPitchFade))))
+      if (fade > 0) _hoQ.premultiply(_hoR.setFromAxisAngle(n, alpha * fade))
     }
   }
   footQ.premultiply(_hoQ)

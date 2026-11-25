@@ -4429,6 +4429,14 @@ export const VILLAGER_GLTF = {
    *  `heelOff`); beyond it the foot is near upright off its pivot and the
    *  ankle is pulled in instead. Calibratable. */
   rollKeepPitchMax: 0.6,
+  /** The band (rad) below G.rollKeepPitchMax over which that further pitch
+   *  fades out: dropped whole at the limit, the foot's pitch and ankle
+   *  jumped as the pitch asked for crossed it. Calibratable. */
+  rollKeepPitchFade: 0.2,
+  /** How far (share of its reach circle) a rolling foot's ankle may miss the
+   *  leg's reach before the further pitch toward it has faded out
+   *  (villagerClipPose.ts `heelOff`). Calibratable. */
+  rollKeepMissFade: 0.5,
   /** Share of the cycle over which the walk eases a sole contact onto the
    *  ground after its authored touch and off it before its authored lift
    *  (the retargeted clip lifts its trailing ball and toe early).

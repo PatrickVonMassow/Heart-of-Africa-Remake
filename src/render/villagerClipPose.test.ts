@@ -764,6 +764,59 @@ describe('the clip gait on the ground', () => {
     expect(fine.turn).toBeLessThan(coarse.turn / 2)
   })
 
+  it('a rolling foot that keeps its heading moves its ankle and pitch without a jump, a hip off its line included', () => {
+    // review 25.11.2026: the further pitch that keeps the ankle on the reach
+    // was applied whole up to G.rollKeepPitchMax and dropped above it, and
+    // dropped too where the reach sphere was just missed (the tangent's
+    // pitch, 0.16 rad, lost in one step); the continuity case above runs
+    // without a kept heading and so never reached it
+    const n = asset.bones.length
+    const f = adult.frame
+    const world = newWorld(n)
+    forwardKinematics(asset, f.rest0, newPose(n), world)
+    const [thigh, shin, foot] = ['thigh.L', 'shin.L', 'foot.L'].map((b) => asset.bones.indexOf(b))
+    const hip = world.p[thigh]
+    let rolled = 0
+    for (const toPivot of [new THREE.Vector3(0, -0.02, 0.1), new THREE.Vector3(0.03, -0.05, 0.16)]) {
+      for (const keepYaw of [0.5, 1]) {
+        for (const side of [0.15, 0.3, 0.5]) {
+          for (const lift of [0, 0.05, 0.15]) {
+            // the ankle target at the foot's rest height (plus a lift), swept
+            // from behind the hip to in front of it, off its line by `side`
+            const solve = (x: number) => {
+              const target = new THREE.Vector3(hip.x + side * x, world.p[foot].y + lift, hip.z + x)
+              const q = new THREE.Quaternion()
+              const out = heelOff(f, world, thigh, shin, foot, target, toPivot, q, keepYaw)
+              if (out === 'rolled') rolled++
+              return { target, q }
+            }
+            // the steepest step at a 0.1 mm spacing, then sampled 100 times
+            // finer where it lies: a continuous change (steep as a root near
+            // a tangent) shrinks with the spacing, a jump keeps its size
+            const steps = (from: number, to: number, h: number) => {
+              let prev = solve(from)
+              const m = { ankle: 0, turn: 0, atAnkle: from, atTurn: from }
+              for (let x = from + h; x <= to + 1e-12; x += h) {
+                const s = solve(x)
+                const a = s.target.distanceTo(prev.target)
+                const t = s.q.angleTo(prev.q)
+                if (a > m.ankle) Object.assign(m, { ankle: a, atAnkle: x })
+                if (t > m.turn) Object.assign(m, { turn: t, atTurn: x })
+                prev = s
+              }
+              return m
+            }
+            const where = `keepYaw ${keepYaw}, side ${side}, lift ${lift}`
+            const coarse = steps(-1.5, 1.5, 1e-4)
+            expect(steps(coarse.atAnkle - 1e-4, coarse.atAnkle, 1e-6).ankle, where).toBeLessThan(coarse.ankle / 3)
+            expect(steps(coarse.atTurn - 1e-4, coarse.atTurn, 1e-6).turn, where).toBeLessThan(coarse.turn / 3)
+          }
+        }
+      }
+    }
+    expect(rolled).toBeGreaterThan(1000)
+  })
+
   it('walk → jog → sprint is continuous: a small change of pace moves no joint by a jump', () => {
     const n = asset.bones.length
     const f = adult.frame
