@@ -434,7 +434,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   /** Per frame: the legs' share of the gait, each foot's world points, the
    *  shins' turns, and the start's state per foot (`ClipLayers.startState`,
    *  -1 when no start runs) with whether the walk clip swings that foot. */
-  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number; hold: number; resumed: boolean; brake: (number | null)[]; held: boolean[]; heel: boolean[]; starting: boolean }
+  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number; hold: number; resumed: boolean; brake: (number | null)[]; held: boolean[]; heel: boolean[]; starting: boolean; legs: number; anchor: number }
   /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
   function soleOf(bones: Record<string, THREE.Bone>) {
     const f = person.frame
@@ -454,6 +454,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     /** Stopping, the seconds the walk takes up again at (a walk resumed mid-stop). */
     resumeAt?: number
     /** Resumed, the seconds the walk stops once more at (a stop during the resumed start's hold). */
+    /** The walk weight set at once to 1 walking and 0 standing (no fade). */
+    jump?: boolean
     stopAgainAt?: number
     /** Frames a second (60 by default). */
     hz?: number
@@ -494,7 +496,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     let yaw = 0
     const frames: Sole[] = []
     for (let t = 0; t < Math.max(r.cut, r.stopAt ?? 0, r.resumeAt ?? 0, r.stopAgainAt ?? 0) + (r.tail ?? 1.5); t += dt) {
-      pace = setOffSpeed(pace, (r.start ? t >= r.cut && t < (r.stopAt ?? Infinity) : t < r.cut || (t >= (r.resumeAt ?? Infinity) && t < (r.stopAgainAt ?? Infinity))) ? v : 0, dt)
+      const resumed = t >= (r.resumeAt ?? Infinity)
+      pace = setOffSpeed(pace, (r.start ? t >= r.cut && (t < (r.stopAt ?? Infinity) || resumed) : t < r.cut || (t >= (r.resumeAt ?? Infinity) && t < (r.stopAgainAt ?? Infinity))) ? v : 0, dt)
       // turned as the game's walkers turn: a corner rounded at its pace no
       // tighter than VILLAGER_MOTION.turnRadius, none standing
       const from = { x, z, yaw }
@@ -508,7 +511,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       // the ground the feet step and the speed the walk weight reads, as stepWalk measures them
       const walked = groundStepped(x - from.x, z - from.z, from.yaw, yaw)
       speed += (walked / dt - speed) * (1 - Math.exp(-dt / VILLAGER_MOTION.speedSmoothing))
-      w = Math.abs(speed) > VILLAGER_MOTION.moveSpeed && !(r.stopAt !== undefined && t >= r.stopAt) && !(r.stopAgainAt !== undefined && t >= r.stopAgainAt) ? Math.min(1, w + VILLAGER_MOTION.walkFadeRate * dt) : Math.max(0, w - VILLAGER_MOTION.walkFadeRate * dt)
+      const moving = Math.abs(speed) > VILLAGER_MOTION.moveSpeed && !(r.stopAt !== undefined && t >= r.stopAt && !(r.start && resumed)) && !(r.stopAgainAt !== undefined && t >= r.stopAgainAt)
+      w = r.jump ? (moving ? 1 : 0) : moving ? Math.min(1, w + VILLAGER_MOTION.walkFadeRate * dt) : Math.max(0, w - VILLAGER_MOTION.walkFadeRate * dt)
       const kneel = r.kneel?.(t, w) ?? 0
       group.position.set(x, 0, z)
       group.rotation.y = yaw
@@ -523,7 +527,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const [land, lift] = gaitStance(i)
         return lift - land > 1e-6 && ((((c.gait.phase - land) % 1) + 1) % 1) >= lift - land
       })
-      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step, hold: c.stop, resumed: c.resumed, brake: c.gait.brake.map((b) => b?.share ?? null), held: c.gait.held.map((h) => !!(h.heel || h.ball || h.tip)), heel: c.gait.held.map((h) => !!h.heel), starting: c.starting })
+      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step, hold: c.stop, resumed: c.resumed, brake: c.gait.brake.map((b) => b?.share ?? null), held: c.gait.held.map((h) => !!(h.heel || h.ball || h.tip)), heel: c.gait.held.map((h) => !!h.heel), starting: c.starting, legs: c.legs, anchor: c.anchor })
     }
     return frames
   }
@@ -838,9 +842,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
    *  its HEEL (`ClipGait.held[i].heel`: a ball or tip caught first is not
    *  the heel's touchdown, and a toe caught again where it rose is no
    *  landing), the frame its last contact let go before it (-1: not seen),
-   *  whether it is the foot's first landing since a start or resume began
-   *  (read from the start's own begin and the foot leaving the stand, never
-   *  from the brake), and whether the foot still stood on the stand (`stand`:
+   *  whether it is the foot's first landing since the legs' weight set off
+   *  rising (a start, a resume, a figure set walking: read from the legs'
+   *  weight and the foot leaving the stand, never from the brake), and whether the foot still stood on the stand (`stand`:
    *  the gait's landing, not drawn). */
   const touchdowns = (frames: Sole[]) =>
     [0, 1].map((i) => {
@@ -848,9 +852,13 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       let off = -1
       let heeled = false
       let landed = false
-      let owed = false
+      // (owed at each onset of a rise of the legs' weight, the run's first
+      // frame's from none included)
+      let owed = frames[0].legs > 0
+      let rising = owed
       for (let k = 1; k < frames.length; k++) {
-        if (frames[k].starting && !frames[k - 1].starting) owed = true
+        if (frames[k].legs > frames[k - 1].legs && !rising) owed = true
+        if (frames[k].legs !== frames[k - 1].legs) rising = frames[k].legs > frames[k - 1].legs
         const any = frames[k].held[i]
         if (frames[k - 1].held[i] && !any) {
           off = k
@@ -1014,6 +1022,55 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     expect(stepping, 'brakes begun into a foot\'s first landing since the start').toBeGreaterThan(0)
     expect(handed, 'unbraked brakes of a foot handed to the clip before its first landing').toBeGreaterThan(0)
     heel.check()
+  })
+
+  it('each foot\'s first landing after the legs\' weight sets off rising lands unbraked: a walk taken up past a start a stop cut short, and a weight from 0 to 1 at once', () => {
+    // cross-vendor review of point 1591: the first landing was owed again
+    // only by the start's two branches; a walk taken up while the stop that
+    // cut a start short still anchored its feet, or a weight set from 0 to 1
+    // at once, began no start and braked a foot's first landing after it
+    // (OPEN: point 1594 brakes that landing; until then it lands unbraked)
+    let cutShort = 0
+    let jumped = 0
+    for (const turn of [0, 2.8]) {
+      const runs = [
+        ...[0.35, 0.45, 0.55].map((stop) => ({ kind: 'cut short', frames: settle({ cut: 1, start: true, stopAt: 1 + stop, resumeAt: 1 + stop + 0.15, turn: (t) => (t > 1 ? turn : 0), tail: 2.5 }) })),
+        { kind: 'jump', frames: settle({ cut: 1, start: true, jump: true, turn: (t) => (t > 1 ? turn : 0), tail: 2.5 }) },
+      ]
+      for (const { kind, frames } of runs) {
+        // the onsets of a rise of the legs' weight, read off the frames
+        const onsets: number[] = []
+        let rising = false
+        for (let k = 1; k < frames.length; k++) {
+          if (frames[k].legs > frames[k - 1].legs && !rising) onsets.push(k)
+          if (frames[k].legs !== frames[k - 1].legs) rising = frames[k].legs > frames[k - 1].legs
+        }
+        const last = onsets[onsets.length - 1]
+        const where = `${kind}, turning ${turn} rad/s`
+        if (kind === 'jump') {
+          expect(frames.some((f) => f.starting), `${where}: no start runs`).toBe(false)
+          expect(onsets.length, `${where}: one rise`).toBe(1)
+          jumped++
+        } else {
+          // the path read: the start cut short anchored its feet to the stop
+          // as the walk was taken up, and that began no resumed start
+          expect(onsets.length, `${where}: a start, then a rise again`).toBe(2)
+          if (!(frames[last - 1].anchor > 0) || frames.slice(last).some((f) => f.resumed)) continue
+          cutShort++
+        }
+        // per foot, the first brake begun after the last rise's onset is
+        // unbraked (into its first landing), the next one braked
+        for (const i of [0, 1]) {
+          const begun: (number | null)[] = []
+          for (let k = last + 1; k < frames.length; k++) if (frames[k - 1].brake[i] === null && frames[k].brake[i] !== null) begun.push(frames[k].brake[i])
+          expect(begun.length, `${where}, foot ${i}: brakes begun after the rise`).toBeGreaterThan(1)
+          expect(begun[0], `${where}, foot ${i}: its first landing after the rise`).toBe(0)
+          expect(begun[1], `${where}, foot ${i}: its next landing`).toBe(1)
+        }
+      }
+    }
+    expect(cutShort, 'walks taken up past a start a stop cut short, its anchor held').toBeGreaterThan(0)
+    expect(jumped).toBeGreaterThan(0)
   })
 
   it('stopping in a corner: the knee bends no faster through the blend than the walk clip itself bends it', () => {

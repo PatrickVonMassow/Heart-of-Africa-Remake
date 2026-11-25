@@ -119,9 +119,14 @@ export interface ClipLayers {
    *  heel strike lands unbraked (OPEN: point 1594), every later one braked,
    *  told by the gait taking hold of its heel off the stand, not by the
    *  start's handoff (a resumed foot lifted in the clip's stance is handed to
-   *  the clip at its lift, before its first landing). */
+   *  the clip at its lift, before its first landing). Owed again at every
+   *  onset of a rise of the legs' weight (`rising`: it rose last time it
+   *  changed), whichever branch draws it: a walk taken up again past a start
+   *  a stop cut short (its anchor blocks the resumed start) or a weight
+   *  from 0 to 1 at once (no start) kept the flag of an earlier landing. */
   firstLand: [boolean, boolean]
   heelDown: [boolean, boolean]
+  rising: boolean
   /** Per foot, where and as the last settle drew it (ankle: world x, z and
    *  body y; turn: world), so a start cut short hands its feet on from there. */
   lastAt: [THREE.Vector3, THREE.Vector3]
@@ -213,8 +218,9 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     startBall: [0, 0],
     startFirst: -1,
     startRoll: 0,
-    firstLand: [false, false],
-    heelDown: [false, false],
+    firstLand: [true, true],
+    heelDown: [true, true],
+    rising: false,
     lastAt: [new THREE.Vector3(), new THREE.Vector3()],
     lastTurn: [new THREE.Quaternion(), new THREE.Quaternion()],
     lastMove: [new THREE.Vector3(), new THREE.Vector3()],
@@ -351,6 +357,9 @@ export function applyClipLayers(
   if ((c.stop > 0 || c.resumed) && c.legs > before) c.legs = Math.min(c.legs, before + dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
   c.resumeEase = dt
   c.dt = 0
+  // each foot's first landing is owed again as the legs' weight sets off rising
+  if (c.legs > before && !c.rising) c.firstLand = [true, true]
+  if (c.legs !== before) c.rising = c.legs > before
   // A START FROM THE STAND: the gait set G.startSwingShare into the swing
   // of the foot that steps first (the other under the body as on the
   // stand); the start's feet step on past the blend until both are on the clip
@@ -358,7 +367,6 @@ export function applyClipLayers(
     c.starting = true
     c.startState = [-1, -1]
     c.startFirst = -1
-    c.firstLand = [true, true]
     c.startRoll = 0
     c.handoff = false
     c.anchor = 0
@@ -372,7 +380,6 @@ export function applyClipLayers(
     c.starting = true
     c.startState = [-1, -1]
     c.startFirst = -1
-    c.firstLand = [true, true]
     c.startRoll = 0
     c.resumed = true
     c.resumeNew = true
@@ -415,7 +422,9 @@ export function applyClipLayers(
     blendInto(asset, bones, ARM('R'), c.local, c.arms[1])
   }
   // THE GAIT
-  if (!(legs > 1e-3 && under)) c.heelDown = [false, false]
+  // (off the gait, a heel counts as down: the gait's first frame takes hold
+  // of a foot on the ground where it stands, which is no landing)
+  if (!(legs > 1e-3 && under)) c.heelDown = [true, true]
   if (legs > 1e-3 && under) {
     // (a foot's first landing since a start or resume began lands unbraked;
     // once landed it walks on the clip, its later heel strikes braked. Per
