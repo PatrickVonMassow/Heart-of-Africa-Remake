@@ -4046,7 +4046,7 @@ if (section('water-jar-carried')) {
     e.dwellSeconds = 1
     e.digSeconds = 3
     // the shipped pace, for the jar-lift capture below (point 1425)
-    window.__errandShippedPace ??= e.pace
+    window.__jarLiftShippedPace ??= e.pace
     e.pace = 6
     e.villagerCount = 10
   })
@@ -4276,7 +4276,7 @@ if (section('water-jar-carried')) {
   // shares of the lift read from the drawn state (`lift`, 0 in the hand … 1 on
   // the head): start, ~25 %, ~50 %, ~75 % and settled on the crown.
   if (live) {
-    await page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = window.__errandShippedPace })
+    await page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = window.__jarLiftShippedPace })
     const out = await awaitPhase('walk-out', null)
     const filler = out ? await (async () => { await freezeLife(false); return awaitPhase('fill', out.who) })() : null
     check('jar lift: a water carrier reaches his fill (point 1425)', !!filler, filler ? `villager ${filler.who}` : 'not within 240 s')
