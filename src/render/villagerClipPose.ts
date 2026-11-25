@@ -73,6 +73,9 @@ export interface ClipGait {
   /** Per foot, the share of its heel strike's brake (`heelBrake`) taken as
    *  its brake began, kept to its end; null outside a brake. */
   brake: [number | null, number | null]
+  /** The body's turn as the heel strike's brake predicts it (`heelBrake`):
+   *  its yaw last drawn (null without a body) and its turn per cycle walked. */
+  turn: { yaw: number | null; rate: number }
 }
 
 /** thigh, shin, foot, toe: a quaternion (x, y, z, w) each, plain data */
@@ -99,7 +102,7 @@ export interface LiftOff {
 
 const freeLift = (): LiftOff => ({ on: null, to: null, left: 0, toes: 0, last: legTurns(), from: legTurns() })
 
-export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0, flatYaw: [null, null], planted: [false, false], headingKeep: [0, 0], lift: [freeLift(), freeLift()], brake: [null, null] })
+export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0, flatYaw: [null, null], planted: [false, false], headingKeep: [0, 0], lift: [freeLift(), freeLift()], brake: [null, null], turn: { yaw: null, rate: 0 } })
 
 /** Let both feet go (standing: nothing is held for the next walk). */
 export function releaseClipGait(g: ClipGait): void {
@@ -110,6 +113,7 @@ export function releaseClipGait(g: ClipGait): void {
   g.headingKeep = [0, 0]
   g.lift = [freeLift(), freeLift()]
   g.brake = [null, null]
+  g.turn = { yaw: null, rate: 0 }
 }
 
 /** How far above the ground a contact takes hold (person units); a held
@@ -526,10 +530,10 @@ function blendGait(asset: VillagerAsset, frame: PersonFrame, phase: number, w: G
  * against `heel`, its clip heel now (stride warped); false outside the
  * brake. Read from the clip sampled ahead on the walked ground (straight on).
  */
-function heelBrake(asset: VillagerAsset, frame: PersonFrame, gait: ReturnType<typeof gaitAt>, walkClip: VillagerClip, phase: number, i: number, heel: THREE.Vector3, out: THREE.Vector3): boolean {
+function heelBrake(asset: VillagerAsset, frame: PersonFrame, gait: ReturnType<typeof gaitAt>, walkClip: VillagerClip, phase: number, walked: number, begun: boolean, turn: number, i: number, heel: THREE.Vector3, out: THREE.Vector3): boolean {
   out.set(0, 0, 0)
   const [land, lift] = _blendStance[i]
-  const before = heelTouch(asset, frame, walkClip, i) + G.heelBrakeLead
+  const before = heelTouch(asset, frame, walkClip, gait, i) + G.heelBrakeLead
   const end = land - before
   // begun no earlier than the walk's catch may hold the foot (`catching`:
   // from the swing's middle on), never by a jump
@@ -539,6 +543,9 @@ function heelBrake(asset: VillagerAsset, frame: PersonFrame, gait: ReturnType<ty
   const x = ((((phase - end) % 1) + 1.5) % 1) - 0.5
   const hold = Math.max(1e-6, G.heelBrakeHold)
   if (x < -L || x >= 2 * hold || gait.phasePerUnit <= 0) return false
+  // begun only by walking into its start: entered within (a gait set into
+  // its phase, a hold let go there) it moved the foot by a jump
+  if (!begun && x - walked >= -L) return false
   // the re-timed phase: a cubic from the clip's own pace at the brake's
   // start to no pace at its end, held there after it
   const s = Math.min(1, (x + L) / L)
@@ -556,9 +563,19 @@ function heelBrake(asset: VillagerAsset, frame: PersonFrame, gait: ReturnType<ty
   const foot = asset.bones.indexOf(`foot.${s0}`)
   const hips = asset.bones.indexOf('hips')
   const at = contactPoints(asset, world, frame.legScale)[s0].heel
-  // the clip's heel then, stride warped, on the ground walked by then
-  at.z += (world.p[foot].z - world.p[hips].z) * (gait.stride - 1) + ahead / gait.phasePerUnit
-  out.set((at.x - heel.x) * keep, 0, (at.z - heel.z) * keep)
+  // the clip's heel then, stride warped, on the ground walked by then: the
+  // body carried on along the arc it turns (`turn`, rad per cycle; read
+  // straight ahead, a turning body swung the heel's target round with it,
+  // and the hold stopped that sideways pace dead)
+  at.z += (world.p[foot].z - world.p[hips].z) * (gait.stride - 1)
+  const d = ahead / gait.phasePerUnit
+  const th = turn * ahead
+  const c = Math.cos(th)
+  const sn = Math.sin(th)
+  const r = Math.abs(th) > 1e-6 ? d / th : 0
+  const ax = Math.abs(th) > 1e-6 ? r * (1 - c) : 0
+  const az = Math.abs(th) > 1e-6 ? r * sn : d
+  out.set((ax + at.x * c + at.z * sn - heel.x) * keep, 0, (az - at.x * sn + at.z * c - heel.z) * keep)
   return true
 }
 const _bkPose = newPose(0)
@@ -567,60 +584,84 @@ const _brk = new THREE.Vector3()
 const BRAKE_BOTH = [1, 1] as const
 
 /**
- * How far (share of the cycle) before its stance lands the walk clip's heel
- * of foot `i` comes down to the hold's touch height on this person: the
- * heel's height over the lowest contact as the walk settles onto it, eased
- * onto the ground over its authored support as the hold reads it. A morphed
- * body's heel touches otherwise than the basis body's (a woman's ~0.024
- * against ~0.01, measured 25.11.2026). Cached per person and walk clip.
+ * How far (share of the cycle) before its blended stance lands foot `i`
+ * first takes hold in the gait blend `gait` on this person: the phase a
+ * contact of it comes down to the hold's touch height as the hold reads it
+ * (the stance heights and the walk's settle onto its lowest contact, eased
+ * onto the ground over the walk's authored support). A morphed body's heel
+ * touches otherwise than the basis body's (a woman's ~0.024 against ~0.01,
+ * measured 25.11.2026); in the walk-jog band the blended swing is shorter and
+ * the jog's foot comes down otherwise. Read at `groundLevels` steps across
+ * the band and interpolated between, cached per person and gait clips.
  */
-function heelTouch(asset: VillagerAsset, frame: PersonFrame, walkClip: VillagerClip, i: number): number {
+function heelTouch(asset: VillagerAsset, frame: PersonFrame, walkClip: VillagerClip, w: GaitWeights, i: number): number {
+  const q = Math.max(1, G.groundLevels)
+  const fa = Math.min(q, Math.max(0, (1 - w.walk) * q))
+  const a0 = Math.min(q - 1, Math.floor(fa))
+  const t = fa - a0
+  const lo = touchLevel(asset, frame, walkClip, a0, q)[i]
+  return t > 0 ? lo + (touchLevel(asset, frame, walkClip, a0 + 1, q)[i] - lo) * t : lo
+}
+
+/** heelTouch at the grid level `ia` of q steps across the walk-jog band. */
+function touchLevel(asset: VillagerAsset, frame: PersonFrame, walkClip: VillagerClip, ia: number, q: number): [number, number] {
   let perFrame = _touch.get(frame)
   if (!perFrame) _touch.set(frame, (perFrame = new WeakMap()))
-  let hit = perFrame.get(walkClip)
-  if (!hit) {
-    // (the ground levels read the blend's stances afresh: kept as drawn)
-    const kept = _blendStance.map((b) => [...b] as [number, number])
-    const ground = gaitFootGround(asset, frame, walkClip, { walk: 1, jog: 0, sprint: 0 })
-    const sink = Math.max(ground[0], ground[1])
-    const lift = [sink - ground[0], sink - ground[1]]
-    const n = asset.bones.length
-    const world = ensureWorld(_bkWorld, n)
-    const touch = PLANT_TOUCH * frame.legScale
-    const e = Math.max(1e-6, G.supportEase)
-    hit = [0, 0]
-    for (const [j, side] of SIDES.entries()) {
-      const land = stanceOf(walkClip, side)[0]
-      const sup = walkClip.contacts?.support?.[side].heel ?? []
-      const a = sup.length ? Math.min(...sup.map((x) => x[0])) : land
-      const b = sup.length ? Math.max(...sup.map((x) => x[1])) : land
-      // from late in the swing on, the first phase the hold would take it
-      const steps = 120
-      for (let k = 0; k <= steps; k++) {
-        const d = 0.15 - (0.25 * k) / steps
-        const ph = land - d
-        samplePhase(walkClip, (((ph % 1) + 1) % 1), frame, _bkPose)
-        forwardKinematics(asset, frame.rest0, _bkPose, world)
-        const c = contactPoints(asset, world, frame.legScale)
-        let low = Infinity
-        SIDES.forEach((s, m) => {
-          for (const q of CONTACTS) low = Math.min(low, c[s][q].y + lift[m])
-        })
-        let y = c[side].heel.y + lift[j] - low
-        const x = (((ph - a) % 1) + 1) % 1
-        if (x < b - a) y *= 1 - smoothstep(Math.min(1, x / e, (b - a - x) / e))
-        if (y < touch) {
-          hit[j] = d
-          break
+  let cached = perFrame.get(walkClip)
+  if (!cached || cached.jog !== asset.clips.jog) perFrame.set(walkClip, (cached = { jog: asset.clips.jog, levels: new Map() }))
+  let hit = cached.levels.get(ia)
+  if (hit) return hit
+  // (the ground levels and the blend read the stances afresh: kept as drawn)
+  const kept = _blendStance.map((b) => [...b] as [number, number])
+  const w = { walk: 1 - ia / q, jog: ia / q, sprint: 0 }
+  const ground = gaitFootGround(asset, frame, walkClip, w)
+  const sink = Math.max(ground[0], ground[1])
+  const lift = [sink - ground[0], sink - ground[1]]
+  const n = asset.bones.length
+  const world = ensureWorld(_bkWorld, n)
+  const pose = ensure(_bkPose, n)
+  const touch = PLANT_TOUCH * frame.legScale
+  const e = Math.max(1e-6, G.supportEase)
+  blendGait(asset, frame, 0, w, walkClip, pose)
+  const lands = _blendStance.map((b) => b[0])
+  hit = [0, 0]
+  for (const [j, side] of SIDES.entries()) {
+    const sup = walkClip.contacts?.support?.[side]
+    // from late in the swing on, the first phase the hold would take it
+    const steps = 120
+    for (let k = 0; k <= steps; k++) {
+      const d = 0.15 - (0.25 * k) / steps
+      const ph = (((lands[j] - d) % 1) + 1) % 1
+      blendGait(asset, frame, ph, w, walkClip, pose)
+      pose.hips.y -= sink
+      forwardKinematics(asset, frame.rest0, pose, world)
+      const c = contactPoints(asset, world, frame.legScale)
+      let low = Infinity
+      SIDES.forEach((s, m) => {
+        for (const p of CONTACTS) low = Math.min(low, c[s][p].y + lift[m])
+      })
+      let first = Infinity
+      for (const p of CONTACTS) {
+        let y = c[side][p].y + lift[j] - low * w.walk
+        if (sup && sup[p].length) {
+          const a = Math.min(...sup[p].map((x) => x[0]))
+          const b = Math.max(...sup[p].map((x) => x[1]))
+          const x = (((ph - a) % 1) + 1) % 1
+          if (x < b - a) y *= 1 - w.walk * smoothstep(Math.min(1, x / e, (b - a - x) / e))
         }
+        first = Math.min(first, y)
+      }
+      if (first < touch) {
+        hit[j] = d
+        break
       }
     }
-    perFrame.set(walkClip, hit)
-    kept.forEach((b, j) => (_blendStance[j] = b))
   }
-  return hit[i]
+  cached.levels.set(ia, hit)
+  kept.forEach((b, j) => (_blendStance[j] = b))
+  return hit
 }
-const _touch = new WeakMap<PersonFrame, WeakMap<VillagerClip, [number, number]>>()
+const _touch = new WeakMap<PersonFrame, WeakMap<VillagerClip, { jog: VillagerClip; levels: Map<number, [number, number]> }>>()
 
 /**
  * How high each foot's lowest sole contact stands over the ground through its
@@ -797,6 +838,13 @@ export function clipGaitPose(
   // how far a lifted foot's correction fades this call: by the cycle walked
   const walkedPhase = (((g.phase - g.slipPhase) % 1) + 1) % 1
   g.slipPhase = g.phase
+  // the body's turn per cycle walked, for the heel strike's brake (kept
+  // standing: no cycle walked turns nothing)
+  if (!body) g.turn.yaw = null
+  else {
+    if (g.turn.yaw !== null && walkedPhase > 1e-5) g.turn.rate = wrapAngle(body.yaw - g.turn.yaw) / walkedPhase
+    g.turn.yaw = body.yaw
+  }
   const fade = Math.min(1, walkedPhase / Math.max(1e-6, G.plantFadeCycle))
   // a hand-over walks on toward the leg's new pivot (or swing) alone
   SIDES.forEach((_, i) => (g.lift[i].left = Math.max(0, g.lift[i].left - walkedPhase / Math.max(1e-6, G.liftOffBlendCycle))))
@@ -913,7 +961,7 @@ export function clipGaitPose(
     // (by the share asked for as its brake began: a share changed within
     // it moved the foot by a jump)
     _brk.set(0, 0, 0)
-    if (body && gait.walk > 0 && !(held.heel || held.ball || held.tip) && catching(i) && heelBrake(asset, frame, gait, walkClip, g.phase, i, c.heel, _brk)) {
+    if (body && gait.walk > 0 && !(held.heel || held.ball || held.tip) && catching(i) && heelBrake(asset, frame, gait, walkClip, g.phase, walkedPhase, g.brake[i] !== null, g.turn.rate, i, c.heel, _brk)) {
       g.brake[i] ??= heelBraking[i]
       _brk.multiplyScalar(g.brake[i]!)
       _miss.x += _brk.x

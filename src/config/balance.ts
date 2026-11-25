@@ -4397,8 +4397,8 @@ export const VILLAGER_GLTF = {
    *  of 0.01, break the stop/resume knee cases of gltfClipLayers.test.ts or
    *  leave 10 % (measured 25.11.2026). Calibratable. */
   heelBrakeCycle: 0.12,
-  heelBrakeLead: 0.015,
-  heelLandAt: 0,
+  heelBrakeLead: 0.0067,
+  heelLandAt: 0.0083,
   heelBrakeHold: 0.06,
   /** The stance foot on the ground (villagerClipPose.ts `gaitFootGround`):
    *  the blended gait's stance is read over `groundSamples` phases, at

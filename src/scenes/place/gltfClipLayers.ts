@@ -408,7 +408,7 @@ export function applyClipLayers(
     // the heel strike's brake re-timed that landing under it; a foot landed
     // walks on the clip, its later heel strikes braked. Per foot, latched as
     // its brake begins, so a foot landing mid-brake keeps the share it began)
-    for (const i of [0, 1]) _braking[i] = c.starting && c.startState[i] < 2 ? 0 : 1
+    for (const i of [0, 1]) _braking[i] = (c.starting && c.startState[i] < 2) || legs < 1 ? 0 : 1
     clipGaitPose(c.gait, asset, f, m.speed, c.ground, c.pose, asset.clips.walk, _braking)
     // the gait grounds its contacts at 0 (the rest A-pose's sole), not at the hung rest's
     toHung(asset, f, c.pose, c.local, c.hips, 0)
