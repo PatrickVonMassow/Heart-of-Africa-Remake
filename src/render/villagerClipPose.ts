@@ -396,8 +396,9 @@ export function nearPitch(ka: number, kb: number, K: number, r0: number): { alph
   const a2 = wrapAngle(phi - c)
   const alpha = Math.abs(a1) < Math.abs(a2) ? a1 : a2
   // (by how far apart they are, the jump a change of sides would make: a
-  // tangent's two pitches coincide and keep their full weight)
-  const jump = Math.abs(a1 - a2)
+  // tangent's two pitches coincide and keep their full weight. The weight
+  // itself steps only where both meet at 0, so the pitch α · weight never)
+  const jump = Math.abs(wrapAngle(a1 - a2))
   const weight = jump <= 1e-9 ? 1 : smoothstep(Math.min(1, Math.abs(Math.abs(a1) - Math.abs(a2)) / Math.min(jump, Math.max(1e-6, G.rollKeepPitchFade))))
   return { alpha, weight }
 }
