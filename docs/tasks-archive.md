@@ -47926,3 +47926,10 @@ Measured 25.11.2026 (checkpoint 7b20084e6, kept): the stand foot lifted once the
   Verifiable: the reversal case of gltfClipLayers.test.ts (straight and ±2.8 rad/s) bounded by the clip's 240 Hz range; a moving capture on both backends.
   Criticality: low - only when a villager stops within a fraction of a second of setting off.
   Bundle: Dorfleben.
+
+- [x] 1423. Villager flat foot drops its kept heading in sharp curves, and the heel strike snaps back
+  Source: finding 22.10.2026 09:46 from the point-1402 joint-speed sweep: at 3.5 rad/s yaw the flat foot gives up its kept heading at the end of flat stance (foot reversal 4.1-4.6 rad/s); a landing contact firms up only at 0.6, so the foot runs on with the clip and snaps back ~1.4 cm. Split on 25.11.2026: the dead stop itself moved to point 1591.
+  Final state: a flat foot keeps its heading through sharp curves, a landing contact holds firm from the frame it takes hold without a snap-back, and the 3x foot-speed margin in villagerClipPose.test.ts drops.
+  Verifiable: villagerClipPose.test.ts with a tightened foot-speed margin (240 Hz included) and a sharp-curve heading case; the short-pause resumes of gltfClipLayers.test.ts (0.05-0.30 s, gait never left) stay green; a moving capture on both backends.
+  Criticality: medium - visible foot jerk in village walks.
+  Bundle: Dorfleben.

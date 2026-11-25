@@ -107,13 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1423. Villager flat foot drops its kept heading in sharp curves, and the heel strike snaps back
-  Source: finding 22.10.2026 09:46 from the point-1402 joint-speed sweep: at 3.5 rad/s yaw the flat foot gives up its kept heading at the end of flat stance (foot reversal 4.1-4.6 rad/s); a landing contact firms up only at 0.6, so the foot runs on with the clip and snaps back ~1.4 cm. Split on 25.11.2026: the dead stop itself moved to point 1591.
-  Final state: a flat foot keeps its heading through sharp curves, a landing contact holds firm from the frame it takes hold without a snap-back, and the 3x foot-speed margin in villagerClipPose.test.ts drops.
-  Verifiable: villagerClipPose.test.ts with a tightened foot-speed margin (240 Hz included) and a sharp-curve heading case; the short-pause resumes of gltfClipLayers.test.ts (0.05-0.30 s, gait never left) stay green; a moving capture on both backends.
-  Criticality: medium - visible foot jerk in village walks.
-  Bundle: Dorfleben.
-
 - [ ] 1591. Villager heel strike stops the swinging foot dead
   Source: split from point 1423 on 25.11.2026: the clip still swings the heel forward ~2 m/s at contact (on the ground until phase ~0.555), and the plant stops it within one frame. A ground brake breaks the no-slide case (4 mm/frame); an airborne landing brake lands up to 5 cm short and breaks three stop/resume knee cases of gltfClipLayers.test.ts narrowly (0.415 vs 0.4, 0.2546 vs 0.25). Likely needs a predicted heel rest point for the landing. The OPEN in gltfClipLayers.test.ts charging the +2.8 rad/s knee bound to point 1423 moves here.
   Final state: heel strike decelerates the foot without a dead stop, with no foot slide and the stop/resume knee bounds unchanged.
