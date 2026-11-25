@@ -10,7 +10,7 @@ import { balance, VILLAGER_ASSET, VILLAGER_GLTF, VILLAGER_POSE } from '../config
 import { CHILD_FIGURE_SCALE } from './figures'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { isColumnBone, parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
-import { clipGaitPose, clipPoseAt, gaitFootGround, heelOff, kneeTurn, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
+import { clipGaitPose, clipPoseAt, gaitFootGround, heelOff, kneeTurn, nearPitch, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
 import { contactPoints, forwardKinematics, gaitAt, gaitWeights, newPose, newWorld, sprintWeight, toolInHand, type GaitClips } from './villagerRig'
 
@@ -536,9 +536,11 @@ describe('the clip gait on the ground', () => {
     // 144 Hz). Each joint's local turn per frame is bounded against the walk
     // clip's own fastest turn of that joint at that pace. The margin: the
     // stride warp (up to 1.35) and the hold's catch-up take the thigh to
-    // 2.1×, the shin to 1.7×, and the heel strike the foot to 2.8× at 144 Hz
-    // (measured 22.10.2026; OPEN: the heel is caught while its clip still
-    // swings it forward, a separate point).
+    // 2.1×, the shin to 1.7×, and the foot lying down flat to 2.5× (measured
+    // 25.11.2026, 15-240 Hz). The heel caught while its clip still swung it
+    // forward snapped onto its hold once held firm: the foot to 2.8× at
+    // 144 Hz and 3.9× at 240 Hz (measured 22.10. and 25.11.2026; the margin
+    // was 3×).
     const n = asset.bones.length
     const bones = ['thigh', 'shin', 'foot'].flatMap((b) => ['L', 'R'].map((s) => `${b}.${s}`))
     const index = bones.map((b) => asset.bones.indexOf(b))
@@ -562,7 +564,7 @@ describe('the clip gait on the ground', () => {
             index.forEach((bone, j) => (clipMax[j] = Math.max(clipMax[j], turn(a.rot, b.rot, bone) * steps * perSecond)))
             for (let c = 0; c < b.rot.length; c++) a.rot[c] = b.rot[c]
           }
-          for (const hz of [15, 20, 30, 60, 144]) {
+          for (const hz of [15, 20, 30, 60, 144, 240]) {
             const dt = 1 / hz
             const g = newClipGait()
             const pose = newPose(n)
@@ -575,7 +577,7 @@ describe('the clip gait on the ground', () => {
               if (k * dt > 1) {
                 index.forEach((bone, j) => {
                   const rate = turn(prev, pose.rot, bone) / dt
-                  expect(rate, `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${bones[j]} at phase ${g.phase.toFixed(3)}`).toBeLessThan(3 * clipMax[j])
+                  expect(rate, `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${bones[j]} at phase ${g.phase.toFixed(3)}`).toBeLessThan(2.75 * clipMax[j])
                 })
               }
               for (let c = 0; c < pose.rot.length; c++) prev[c] = pose.rot[c]
@@ -584,6 +586,247 @@ describe('the clip gait on the ground', () => {
         }
       }
     }
+  })
+
+  it('in a sharp curve a planted foot keeps its heading and its spot, and never turns back against the curve', () => {
+    // finding 22.10.2026 (point-1402 joint-speed sweep): at 3.5 rad/s yaw
+    // the flat foot's heel-off roll turned it back against the curve (up to
+    // 9 rad/s on the ground) and the kept heading, let go with the flat share,
+    // swung round at up to 61 rad/s (16 rad/s with heel and ball still flat
+    // on the ground; measured 25.11.2026). Cross-vendor review 25.11.2026:
+    // the heading read a frame after the catch (0.12 rad later at 30 Hz), a
+    // roll's undone turn pulled in past the reach slid the pivot (2.0 cm
+    // from its touchdown), and heading and spot were never compared with
+    // the touchdown.
+    const n = asset.bones.length
+    const feet = ['L', 'R'].map((s) => asset.bones.indexOf(`foot.${s}`))
+    const contacts = ['heel', 'ball', 'tip'] as const
+    let flatChecked = 0
+    let spotChecked = 0
+    let catchChecked = 0
+    let rollChecked = 0
+    for (const yawRate of [3.5, -3.5]) {
+      for (const sex of SEXES) {
+        for (const age of AGE_GROUPS) {
+          const f = gltfPerson(asset, sex, age, 0).frame
+          for (const perLeg of [1.0, 1.4]) {
+            const speed = perLeg * f.legScale * f.scale
+            for (const hz of [30, 60, 144]) {
+              const dt = 1 / hz
+              const g = newClipGait()
+              const pose = newPose(n)
+              const world = newWorld(n)
+              let x = 0
+              let z = 0
+              let yaw = 0
+              const last = [0, 0]
+              // per foot, the contacts held on the frame before
+              const heldBefore = [{ heel: false, ball: false, tip: false }, { heel: false, ball: false, tip: false }]
+              // per foot, its heading on the frame it took hold (null: in the air)
+              const caught: (number | null)[] = [null, null]
+              // per foot and contact, where it lay when it came down held
+              const spot: Record<string, { x: number; z: number } | null> = {}
+              for (let k = 0; k * dt < 4; k++) {
+                yaw += yawRate * dt
+                x += Math.sin(yaw) * speed * dt
+                z += Math.cos(yaw) * speed * dt
+                // whether each foot still keeps a heading from its last plant
+                // (its keep or its toes still letting go of it)
+                const keptBefore = [g.flatYaw[0] !== null, g.flatYaw[1] !== null]
+                stepClipGait(g, asset, f, speed * dt, speed)
+                clipGaitPose(g, asset, f, speed, { x, z, yaw, unit: 1 }, pose)
+                forwardKinematics(asset, f.rest0, pose, world)
+                const c = contactPoints(asset, world, f.legScale)
+                ;(['L', 'R'] as const).forEach((s, i) => {
+                  const q = world.q[feet[i]]
+                  const heading = 2 * Math.atan2(q.y, q.w) + yaw
+                  const d = heading - last[i]
+                  last[i] = heading
+                  const held = g.held[i]
+                  const holding = !!(held.heel || held.ball || held.tip)
+                  // a hold handed from old contacts to new ones within one frame
+                  // would be a catch this sweep never sees (it never happens)
+                  const was = heldBefore[i]
+                  if (holding && (was.heel || was.ball || was.tip)) expect(contacts.some((kk) => !!held[kk] && was[kk]), `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, foot ${s} handed its hold over`).toBe(true)
+                  for (const kk of contacts) was[kk] = !!held[kk]
+                  if (!holding) caught[i] = null
+                  else if (caught[i] === null) {
+                    caught[i] = heading
+                    // the heading kept from the catch on is the one drawn on
+                    // the catch frame, never one kept from an earlier plant
+                    const kept = g.flatYaw[i]
+                    if (kept !== null && g.headingKeep[i] > 0) {
+                      catchChecked++
+                      // (the catch keeps the heading drawn on its frame: that
+                      // is the clip's own only where nothing of the last plant's
+                      // heading is kept before it — measured so at every catch)
+                      expect(keptBefore[i], `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, foot ${s} caught while still keeping`).toBe(false)
+                      const e = kept - heading
+                      expect(Math.abs(Math.atan2(Math.sin(e), Math.cos(e))), `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, foot ${s} caught`).toBeLessThan(1e-3)
+                    }
+                  }
+                  const where = `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, foot ${s} at phase ${g.phase.toFixed(3)}`
+                  for (const kk of contacts) {
+                    const p = c[s][kk]
+                    const key = s + kk
+                    // the spot is kept for the whole hold: a contact lifted
+                    // within it and set down again comes back to it
+                    if (!held[kk]) {
+                      spot[key] = null
+                      continue
+                    }
+                    if (p.y > 0.003) continue
+                    const w = { x: x + (p.x * Math.cos(yaw) + p.z * Math.sin(yaw)) * f.scale, z: z + (-p.x * Math.sin(yaw) + p.z * Math.cos(yaw)) * f.scale }
+                    if (!spot[key]) spot[key] = w
+                    else if (k * dt > 1) {
+                      spotChecked++
+                      // a held contact on the ground stays where it came down
+                      // (measured to 0.9 cm over the whole hold, main before 1.3 cm)
+                      expect(Math.hypot(w.x - spot[key]!.x, w.z - spot[key]!.z), `${where}, ${kk}`).toBeLessThan(0.012)
+                    }
+                  }
+                  if (k * dt < 1) return
+                  // the foot's world turn this frame, rad/s (+: with the curve)
+                  const rate = (Math.atan2(Math.sin(d), Math.cos(d)) / dt) * Math.sign(yawRate)
+                  // on the ground, or still letting go of its heading, it never
+                  // turns back against the curve
+                  if (Math.min(c[s].heel.y, c[s].ball.y, c[s].tip.y) <= 0.01 || g.headingKeep[i] > 0) expect(rate, where).toBeGreaterThan(-0.1)
+                  // OPEN: past its release, the swinging foot's hand-over into
+                  // the clip's swing turns it back by up to 17.5 rad/s at 30 Hz
+                  // (main before: 16.3)
+                  else expect(rate, where).toBeGreaterThan(-20)
+                  // lying on heel and ball it keeps the heading it took hold with
+                  // (measured to 1e-4 rad)
+                  if (c[s].heel.y <= 0.003 && c[s].ball.y <= 0.003 && caught[i] !== null) {
+                    flatChecked++
+                    const e = heading - caught[i]!
+                    expect(Math.abs(Math.atan2(Math.sin(e), Math.cos(e))), where).toBeLessThan(0.03)
+                  } else if (caught[i] !== null && g.headingKeep[i] >= 1 && contacts.filter((kk) => held[kk] && c[s][kk].y <= 0.003).length === 1) {
+                    // and rolling on a single held contact, until its release
+                    // begins (measured to 1e-7 rad; letting go it turns by up
+                    // to 0.42 rad while a contact is still down, by design)
+                    rollChecked++
+                    const e = heading - caught[i]!
+                    expect(Math.abs(Math.atan2(Math.sin(e), Math.cos(e))), `${where}, rolling`).toBeLessThan(0.03)
+                  }
+                  // and it lets go of it without a snap (main before: 61 rad/s).
+                  // OPEN: at 1.4 per leg the trailing foot is thrown up to
+                  // 0.6 m while its ball and tip still count as held (main
+                  // before alike); letting go up there it turns at up to
+                  // 34.7 rad/s at 30 Hz, elsewhere at most 23.5
+                  expect(rate, where).toBeLessThan(40)
+                })
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(flatChecked).toBeGreaterThan(1000)
+    expect(spotChecked).toBeGreaterThan(1000)
+    // (8465 frames on exactly one held contact, measured 25.11.2026)
+    expect(rollChecked).toBeGreaterThan(1000)
+    expect(catchChecked).toBeGreaterThan(500)
+  })
+
+  it('stopping and walking on in a sharp curve, a foot handed between its pivots bends its knee no faster than the clip, and keeps the heading drawn at its catch', () => {
+    // cross-vendor review 25.11.2026: the hand-over of a heading-keeping
+    // foot moved its ankle target past the reach the first solve stops at,
+    // so the knee snapped near straight for the frame (2.5x the clip's
+    // fastest knee on the female child, 144-240 Hz); and the heading kept
+    // from a catch was read before the solve drew the foot, or kept from
+    // an earlier plant
+    const n = asset.bones.length
+    const legs = ['L', 'R'].map((s) => ['thigh', 'shin', 'foot'].map((b) => asset.bones.indexOf(`${b}.${s}`)))
+    const shins = legs.map((l) => l[1])
+    const qa = new THREE.Quaternion()
+    const qb = new THREE.Quaternion()
+    const ease = (x: number) => {
+      const c = Math.min(1, Math.max(0, x))
+      return c * c * (3 - 2 * c)
+    }
+    let handed = 0
+    let caughtN = 0
+    for (const sex of SEXES) {
+      for (const age of AGE_GROUPS) {
+        const f = gltfPerson(asset, sex, age, 0).frame
+        for (const perLeg of [1.0, 1.4]) {
+          const full = perLeg * f.legScale * f.scale
+          const cycle = gaitAt(asset.clips as unknown as GaitClips, full / f.scale, f.legScale)
+          const perSecond = (full / f.scale) * cycle.phasePerUnit
+          // the clip's own fastest knee (rad/s at this pace)
+          let clipMax = 0
+          const steps = 2000
+          const a = samplePhase(asset.clips.walk, 0, f, newPose(n))
+          const b = newPose(n)
+          for (let k = 1; k <= steps; k++) {
+            samplePhase(asset.clips.walk, k / steps, f, b)
+            for (const sh of shins) clipMax = Math.max(clipMax, qa.fromArray(a.rot, sh * 4).angleTo(qb.fromArray(b.rot, sh * 4)) * steps * perSecond)
+            for (let c = 0; c < b.rot.length; c++) a.rot[c] = b.rot[c]
+          }
+          for (const yawRate of [3.5, -3.5]) {
+            for (const hz of [60, 240]) {
+              // walking on through the curve, or stopping in it (0.3 s down,
+              // a pause, 0.3 s up), the body turning with its pace
+              for (const pause of [null, 0.05, 0.15, 0.3]) {
+                const dt = 1 / hz
+                const pace = (t: number) => {
+                  if (pause === null || t < 1.5) return full
+                  if (t < 1.8) return full * (1 - ease((t - 1.5) / 0.3))
+                  if (t < 1.8 + pause) return 0
+                  return full * ease((t - 1.8 - pause) / 0.3)
+                }
+                const g = newClipGait()
+                const pose = newPose(n)
+                const world = newWorld(n)
+                const prev = Array.from(pose.rot)
+                const wasHeld = [false, false]
+                const heldBefore = [{ heel: false, ball: false, tip: false }, { heel: false, ball: false, tip: false }]
+                let x = 0
+                let z = 0
+                let yaw = 0
+                for (let k = 0; k * dt < 3.5; k++) {
+                  const speed = pace(k * dt)
+                  yaw += yawRate * (speed / full) * dt
+                  x += Math.sin(yaw) * speed * dt
+                  z += Math.cos(yaw) * speed * dt
+                  stepClipGait(g, asset, f, speed * dt, speed)
+                  clipGaitPose(g, asset, f, speed, { x, z, yaw, unit: 1 }, pose)
+                  forwardKinematics(asset, f.rest0, pose, world)
+                  const where = `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, pause ${pause}, t ${(k * dt).toFixed(3)}`
+                  legs.forEach(([, shin, foot], i) => {
+                    const held = g.held[i]
+                    const holding = !!(held.heel || held.ball || held.tip)
+                    // (every catch is a frame from no hold to a hold here too:
+                    // a hold is never handed to other contacts within a frame)
+                    const was = heldBefore[i]
+                    if (holding && (was.heel || was.ball || was.tip)) expect((['heel', 'ball', 'tip'] as const).some((kk) => !!held[kk] && was[kk]), `${where}, foot ${i} handed its hold over`).toBe(true)
+                    for (const kk of ['heel', 'ball', 'tip'] as const) was[kk] = !!held[kk]
+                    if (holding && !wasHeld[i] && g.headingKeep[i] > 0 && g.flatYaw[i] !== null) {
+                      caughtN++
+                      const q = world.q[foot]
+                      const e = g.flatYaw[i]! - (2 * Math.atan2(q.y, q.w) + yaw)
+                      const miss = Math.abs(Math.atan2(Math.sin(e), Math.cos(e)))
+                      // the heading kept from the catch is the one drawn there
+                      expect(miss, `${where}, foot ${i} caught`).toBeLessThan(1e-3)
+                    }
+                    wasHeld[i] = holding
+                    if (k * dt < 1 || !(g.lift[i].left > 0 && g.planted[i])) return
+                    handed++
+                    const rate = qa.fromArray(prev, shin * 4).angleTo(qb.fromArray(pose.rot, shin * 4)) / dt / clipMax
+                    // (measured 0.99 of the clip's fastest; 2.5 before)
+                    expect(rate, `${where}, shin ${i} handed over`).toBeLessThan(1)
+                  })
+                  for (let c = 0; c < pose.rot.length; c++) prev[c] = pose.rot[c]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(handed).toBeGreaterThan(1000)
+    expect(caughtN).toBeGreaterThan(500)
   })
 
   it('two villagers drawn in turn pose their legs and toes as each drawn alone, through every toe release', () => {
@@ -658,6 +901,59 @@ describe('the clip gait on the ground', () => {
     const fine = largest(1e-4)
     expect(fine.ankle).toBeLessThan(coarse.ankle / 2)
     expect(fine.turn).toBeLessThan(coarse.turn / 2)
+  })
+
+  it('a rolling foot that keeps its heading moves its ankle and pitch without a jump, a hip off its line included', () => {
+    // review 25.11.2026: the further pitch that keeps the ankle on the reach
+    // was applied whole up to G.rollKeepPitchMax and dropped above it, and
+    // dropped too where the reach sphere was just missed (the tangent's
+    // pitch, 0.16 rad, lost in one step); the continuity case above runs
+    // without a kept heading and so never reached it
+    const n = asset.bones.length
+    const f = adult.frame
+    const world = newWorld(n)
+    forwardKinematics(asset, f.rest0, newPose(n), world)
+    const [thigh, shin, foot] = ['thigh.L', 'shin.L', 'foot.L'].map((b) => asset.bones.indexOf(b))
+    const hip = world.p[thigh]
+    let rolled = 0
+    for (const toPivot of [new THREE.Vector3(0, -0.02, 0.1), new THREE.Vector3(0.03, -0.05, 0.16)]) {
+      for (const keepYaw of [0.5, 1]) {
+        for (const side of [0.15, 0.3, 0.5]) {
+          for (const lift of [0, 0.05, 0.15]) {
+            // the ankle target at the foot's rest height (plus a lift), swept
+            // from behind the hip to in front of it, off its line by `side`
+            const solve = (x: number) => {
+              const target = new THREE.Vector3(hip.x + side * x, world.p[foot].y + lift, hip.z + x)
+              const q = new THREE.Quaternion()
+              const out = heelOff(f, world, thigh, shin, foot, target, toPivot, q, keepYaw)
+              if (out === 'rolled') rolled++
+              return { target, q }
+            }
+            // the steepest step at a 0.1 mm spacing, then sampled 100 times
+            // finer where it lies: a continuous change (steep as a root near
+            // a tangent) shrinks with the spacing, a jump keeps its size
+            const steps = (from: number, to: number, h: number) => {
+              let prev = solve(from)
+              const m = { ankle: 0, turn: 0, atAnkle: from, atTurn: from }
+              for (let x = from + h; x <= to + 1e-12; x += h) {
+                const s = solve(x)
+                const a = s.target.distanceTo(prev.target)
+                const t = s.q.angleTo(prev.q)
+                if (a > m.ankle) Object.assign(m, { ankle: a, atAnkle: x })
+                if (t > m.turn) Object.assign(m, { turn: t, atTurn: x })
+                prev = s
+              }
+              return m
+            }
+            const where = `keepYaw ${keepYaw}, side ${side}, lift ${lift}`
+            const coarse = steps(-1.5, 1.5, 1e-4)
+            expect(steps(coarse.atAnkle - 1e-4, coarse.atAnkle, 1e-6).ankle, where).toBeLessThan(coarse.ankle / 3)
+            expect(steps(coarse.atTurn - 1e-4, coarse.atTurn, 1e-6).turn, where).toBeLessThan(coarse.turn / 3)
+          }
+        }
+      }
+    }
+    expect(rolled).toBeGreaterThan(1000)
   })
 
   it('walk → jog → sprint is continuous: a small change of pace moves no joint by a jump', () => {
@@ -900,5 +1196,77 @@ describe('the corrective leg solve (natural-villager-motion step 10)', () => {
       expect(runs, `stride ${k}`).toBeGreaterThan(4)
       expect(drift, `stride ${k}`).toBeLessThan(0.001)
     }
+  })
+})
+
+describe('a rolled foot\'s further pitch', () => {
+  it('stays continuous where its two solutions change sides', () => {
+    // cross-vendor review 25.11.2026: with ka < 0, kb crossing 0 and
+    // K / r0 = -cos(0.3), the nearer root switched between about -0.3 and
+    // +0.3 rad at full weight, a 0.6 rad jump of the applied pitch
+    const K = -Math.cos(0.3)
+    let last: number | null = null
+    let maxStep = 0
+    for (let k = -200; k <= 200; k++) {
+      const kb = k * 1e-4
+      const ka = -Math.sqrt(1 - kb * kb)
+      const { alpha, weight } = nearPitch(ka, kb, K, 1)
+      const applied = alpha * weight
+      if (last !== null) maxStep = Math.max(maxStep, Math.abs(applied - last))
+      last = applied
+    }
+    expect(maxStep).toBeLessThan(0.01)
+    // away from the tie the nearer root carries its full weight
+    const away = nearPitch(Math.cos(0.5), Math.sin(0.5), Math.cos(0.3), 1)
+    expect(away.alpha).toBeCloseTo(0.2, 6)
+    expect(away.weight).toBe(1)
+    // a tangent's (and a just missed sphere's) coinciding pitches keep their
+    // full weight (review round 4: the tie fade had zeroed them)
+    for (const K2 of [1, 1.2]) {
+      const t = nearPitch(Math.cos(0.4), Math.sin(0.4), K2, 1)
+      expect(t.alpha).toBeCloseTo(0.4, 6)
+      expect(t.weight).toBe(1)
+    }
+    // and keep it from the tangent inward while both lie on one side
+    // (the pitch itself follows the root's own slope there)
+    for (let k = 0; k <= 400; k++) expect(nearPitch(Math.cos(0.4), Math.sin(0.4), 1 - k * 1e-4, 1).weight).toBe(1)
+    // review round 5: where the tangent meets the side change (both pitches
+    // at 0) the weight steps but the applied pitch runs on through 0, and a
+    // pitch wrapping through ±π keeps its weight
+    // approached with a nonzero pitch (phi and K running to 0 and the
+    // tangent together), the applied pitch tends to 0 without a step
+    let prev: number | null = null
+    let worst = 0
+    let largest = 0
+    for (let k = 400; k >= 0; k--) {
+      const phi = k * 5e-4
+      const { alpha, weight } = nearPitch(Math.cos(phi), Math.sin(phi), Math.cos(phi / 2), 1)
+      const applied = alpha * weight
+      largest = Math.max(largest, Math.abs(applied))
+      if (prev !== null) worst = Math.max(worst, Math.abs(applied - prev))
+      prev = applied
+    }
+    expect(largest).toBeGreaterThan(0.05)
+    expect(Math.abs(prev!)).toBeLessThan(1e-9)
+    expect(worst).toBeLessThan(0.01)
+    // and with its two pitches straddling 0 (3 phi and -phi) the same
+    prev = null
+    worst = 0
+    largest = 0
+    for (let k = 400; k >= 0; k--) {
+      const phi = k * 2.5e-4
+      const { alpha, weight } = nearPitch(Math.cos(phi), Math.sin(phi), Math.cos(2 * phi), 1)
+      const applied = alpha * weight
+      largest = Math.max(largest, Math.abs(applied))
+      if (prev !== null) worst = Math.max(worst, Math.abs(applied - prev))
+      prev = applied
+    }
+    expect(largest).toBeGreaterThan(0.05)
+    expect(Math.abs(prev!)).toBeLessThan(1e-9)
+    expect(worst).toBeLessThan(0.01)
+    const c = 0.05
+    const before = nearPitch(Math.cos(Math.PI - c - 1e-6), Math.sin(Math.PI - c - 1e-6), Math.cos(c), 1)
+    const after = nearPitch(Math.cos(Math.PI - c + 1e-6), Math.sin(Math.PI - c + 1e-6), Math.cos(c), 1)
+    expect(Math.abs(before.weight - after.weight)).toBeLessThan(1e-3)
   })
 })

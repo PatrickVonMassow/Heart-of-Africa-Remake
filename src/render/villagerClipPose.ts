@@ -64,6 +64,9 @@ export interface ClipGait {
   flatYaw: [number | null, number | null]
   /** Per foot, whether the planted foot (rather than the clip's hold) placed it last. */
   planted: [boolean, boolean]
+  /** Per foot, the share of VILLAGER_GLTF.footHeadingRelease still to walk
+   *  before a foot no longer lying flat has let go of its kept heading. */
+  headingKeep: [number, number]
   /** Per leg, its hand-over from one pivot of the rolling foot to the next
    *  or to the clip's swing (`LiftOff`). */
   lift: [LiftOff, LiftOff]
@@ -93,7 +96,7 @@ export interface LiftOff {
 
 const freeLift = (): LiftOff => ({ on: null, to: null, left: 0, toes: 0, last: legTurns(), from: legTurns() })
 
-export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0, flatYaw: [null, null], planted: [false, false], lift: [freeLift(), freeLift()] })
+export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0, flatYaw: [null, null], planted: [false, false], headingKeep: [0, 0], lift: [freeLift(), freeLift()] })
 
 /** Let both feet go (standing: nothing is held for the next walk). */
 export function releaseClipGait(g: ClipGait): void {
@@ -101,6 +104,7 @@ export function releaseClipGait(g: ClipGait): void {
   g.slip = [{ x: 0, z: 0 }, { x: 0, z: 0 }]
   g.flatYaw = [null, null]
   g.planted = [false, false]
+  g.headingKeep = [0, 0]
   g.lift = [freeLift(), freeLift()]
 }
 
@@ -225,15 +229,40 @@ const _standing = [false, false]
 const _flat = [0, 0]
 const _support = [0, 0]
 const _stanceU = [0, 0]
+/** Whether foot `i` takes hold as the walk's catch: before its stance lies
+ *  flat (in the swing's second half, or the stance's start; a toe skimming
+ *  the ground after its toe-off is none). */
+function catching(i: number): boolean {
+  const span = _blendStance[i][1] - _blendStance[i][0]
+  const u = _stanceU[i]
+  return u < G.footFlatFrom || (u >= 1 && span * u >= (1 + span) / 2)
+}
+const wrapAngle = (x: number) => Math.atan2(Math.sin(x), Math.cos(x))
 /** A rotation's heading about the vertical (rad; its twist about +y). */
 const headingOf = (q: THREE.Quaternion) => 2 * Math.atan2(q.y, q.w)
-/** Each foot's flat turn (person frame): its kept heading alone. */
-const _flatQ = [new THREE.Quaternion(), new THREE.Quaternion()]
+/** Each foot's kept heading (rad, person frame). */
+const _keptYaw = [0, 0]
+/** Each foot's share of its kept heading (at least its flat share). */
+const _turnW = [0, 0]
+/** Whether each foot was caught (took its first hold) this call. */
+const _caught = [false, false]
 const _up = new THREE.Vector3(0, 1, 0)
-/** Turn a rotation by `w` toward the flat turn `flat` (no pitch or roll). */
-function flatten(q: THREE.Quaternion, flat: THREE.Quaternion, w: number): THREE.Quaternion {
-  return q.slerp(flat, Math.min(1, w))
+/**
+ * Turn a world rotation onto the kept heading `yaw` (person frame) by `turn`,
+ * a twist about the vertical alone, then by `flat` toward lying flat at the
+ * heading it has then (no pitch or roll). A slerp of the whole rotation onto
+ * the flat turn mixed the heading with the pitch, and a foot pitching off in
+ * a curve turned back against it.
+ */
+function keepTurn(q: THREE.Quaternion, yaw: number, flat: number, turn: number): THREE.Quaternion {
+  if (turn > 0) {
+    const d = yaw - headingOf(q)
+    q.premultiply(_kt.setFromAxisAngle(_up, Math.atan2(Math.sin(d), Math.cos(d)) * Math.min(1, turn)))
+  }
+  if (flat > 0) q.slerp(_kt.setFromAxisAngle(_up, headingOf(q)), Math.min(1, flat))
+  return q
 }
+const _kt = new THREE.Quaternion()
 
 /**
  * The ankle's height (person units) on a foot lying flat: its rest height,
@@ -266,7 +295,7 @@ function flatAnkle(asset: VillagerAsset, frame: PersonFrame, side: 'L' | 'R'): n
  * defined, or where the target lies on the hip–pivot line while the reach
  * circle still has a radius.
  */
-export function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shin: number, foot: number, target: THREE.Vector3, toPivot: THREE.Vector3, footQ: THREE.Quaternion): 'reached' | 'rolled' | 'out' {
+export function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shin: number, foot: number, target: THREE.Vector3, toPivot: THREE.Vector3, footQ: THREE.Quaternion, keepYaw = 0): 'reached' | 'rolled' | 'out' {
   const hip = world.p[thigh]
   const reach = (legLength(frame.rest0, thigh, shin, foot) - 1e-4) * G.legReach
   if (hip.distanceTo(target) <= reach) return 'reached'
@@ -310,8 +339,68 @@ export function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shi
     _hoQ.setFromAxisAngle(_hoN.crossVectors(v0, v1).normalize(), Math.max(0, pitch - give))
     target.copy(pivot).sub(_hoU.copy(toPivot).applyQuaternion(_hoQ))
   }
+  if (keepYaw > 0) {
+    // a foot keeping its heading rolls without turning it (`keepYaw` of the
+    // roll's turn about the vertical undone round the pivot): the shortest
+    // roll toward a hip off the foot's line turned a foot planted in a sharp
+    // curve against the curve
+    // — the ankle kept on the leg's reach by pitching the foot further about
+    // its own (level) cross axis through the pivot: a target past the reach
+    // was pulled in with the foot's turn kept, and the pivot slid. A pitch
+    // of a rolled foot turns it a little, so both alternate.
+    const before = headingOf(footQ)
+    // (the soft pitch may leave the ankle past the reach on purpose: kept so)
+    const keepFar = Math.max(reach, target.distanceTo(hip))
+    const allowed = (1 - Math.min(1, keepYaw)) * wrapAngle(headingOf(_hoR.copy(_hoQ).multiply(footQ)) - before)
+    for (let pass = 0; pass < 3; pass++) {
+      const turned = headingOf(_hoR.copy(_hoQ).multiply(footQ)) - before - allowed
+      _hoQ.premultiply(_hoR.setFromAxisAngle(_up, -wrapAngle(turned)))
+      const t = _hoU.copy(toPivot).applyQuaternion(_hoQ)
+      target.copy(pivot).sub(t)
+      if (pass === 2 || target.distanceTo(hip) <= keepFar + 1e-9) continue
+      // ankle(α) = pivot − R(n, α)·t on the sphere |ankle − hip| = keepFar:
+      // with t = t∥ n + T and Q = n × T, a cos α + b sin α = K
+      const h = headingOf(_hoR.copy(_hoQ).multiply(footQ))
+      const n = _hoN.set(Math.cos(h), 0, -Math.sin(h))
+      const along = t.dot(n)
+      const T = _hoV0.copy(t).addScaledVector(n, -along)
+      const Q = _hoV1.crossVectors(n, T)
+      const A = _hoAx.copy(pivot).addScaledVector(n, -along).sub(hip)
+      const ka = A.dot(T)
+      const kb = A.dot(Q)
+      const K = (A.lengthSq() + T.lengthSq() - keepFar * keepFar) / 2
+      const r0 = Math.hypot(ka, kb)
+      if (r0 <= 1e-9) continue
+      // where the sphere is missed, the pitch bringing the ankle nearest to
+      // it (the tangent's own: dropped there, the foot jumped back by it),
+      // faded out as the miss grows (G.rollKeepMissFade of r0); and faded out
+      // toward G.rollKeepPitchMax (a foot lifted off its pivot, near
+      // upright), never cut off at it
+      const { alpha, weight: tie } = nearPitch(ka, kb, K, r0)
+      const miss = smoothstep(Math.min(1, Math.max(0, 1 - (Math.abs(K) / r0 - 1) / Math.max(1e-6, G.rollKeepMissFade))))
+      const fade = tie * miss * smoothstep(Math.min(1, Math.max(0, (G.rollKeepPitchMax - Math.abs(alpha)) / Math.max(1e-6, G.rollKeepPitchFade))))
+      if (fade > 0) _hoQ.premultiply(_hoR.setFromAxisAngle(n, alpha * fade))
+    }
+  }
   footQ.premultiply(_hoQ)
   return 'rolled'
+}
+/** The pitch α of `ka cos α + kb sin α = K` nearest to 0 (r0 = |(ka, kb)|;
+ * past the tangent, the nearest pitch to it), and its weight: faded out
+ * where two distinct pitches lie equally near, since there the nearer one
+ * changes sides and the pitch jumped across by both. */
+export function nearPitch(ka: number, kb: number, K: number, r0: number): { alpha: number; weight: number } {
+  const phi = Math.atan2(kb, ka)
+  const c = Math.acos(Math.max(-1, Math.min(1, K / r0)))
+  const a1 = wrapAngle(phi + c)
+  const a2 = wrapAngle(phi - c)
+  const alpha = Math.abs(a1) < Math.abs(a2) ? a1 : a2
+  // (by how far apart they are, the jump a change of sides would make: a
+  // tangent's two pitches coincide and keep their full weight. The weight
+  // itself steps only where both meet at 0, so the pitch α · weight never)
+  const jump = Math.abs(wrapAngle(a1 - a2))
+  const weight = jump <= 1e-9 ? 1 : smoothstep(Math.min(1, Math.abs(Math.abs(a1) - Math.abs(a2)) / Math.min(jump, Math.max(1e-6, G.rollKeepPitchFade))))
+  return { alpha, weight }
 }
 const _hoN = new THREE.Vector3()
 const _hoV0 = new THREE.Vector3()
@@ -326,6 +415,9 @@ const _hoAx = new THREE.Vector3()
 const _hoC = new THREE.Vector3()
 const _hoU = new THREE.Vector3()
 const _hoQ = new THREE.Quaternion()
+const _hoR = new THREE.Quaternion()
+const _hoTw = new THREE.Quaternion()
+const _hoPv = new THREE.Vector3()
 const _t = new THREE.Vector3()
 const _miss = new THREE.Vector3()
 const smoothstep = (x: number) => x * x * (3 - 2 * x)
@@ -562,17 +654,31 @@ export function clipGaitPose(
     _flat[i] = body ? smoothstep(rise) * smoothstep(fall) * gait.walk : 0
   })
   // a flat foot keeps the world heading it lay down with (a turn of the body
-  // or of the clip's foot slides no planted toe round its heel)
+  // or of the clip's foot slides no planted toe round its heel), and lets it
+  // go only once it no longer lies flat, over G.footHeadingRelease of the
+  // cycle walked: let go with the flat share, a foot in a sharp curve swung
+  // its whole stance's turn round in a few frames
+  const walkedNow = (((g.phase - g.slipPhase) % 1) + 1) % 1
   SIDES.forEach((s, i) => {
+    _caught[i] = false
+    const keep = g.headingKeep
+    // (and from the walk's catch on, before it lies flat: a heel taking hold
+    // in a curve turned back toward the heading it touched down with)
+    const held = g.held[i]
+    const caught = (held.heel || held.ball || held.tip) && catching(i) ? gait.walk : 0
+    // (let go once the flat share is half gone: from its first fall the
+    // heading turned while heel and ball still lay on the ground)
+    keep[i] = !body ? 0 : Math.max(_flat[i] >= 0.5 ? 1 : caught, keep[i] - walkedNow / Math.max(1e-6, G.footHeadingRelease))
+    _turnW[i] = Math.max(_flat[i], smoothstep(keep[i]))
     // (kept while the toes are still letting go after the tip's hold: their
     // flat turn is this figure's own, rebuilt every call)
-    if (!body || (_flat[i] <= 0 && !g.held[i].tip && g.lift[i].toes <= 0)) {
+    if (!body || (_turnW[i] <= 0 && !g.held[i].tip && g.lift[i].toes <= 0)) {
       g.flatYaw[i] = null
       return
     }
     const foot = asset.bones.indexOf(`foot.${s}`)
     g.flatYaw[i] ??= headingOf(world.q[foot]) + body.yaw
-    _flatQ[i].setFromAxisAngle(_up, g.flatYaw[i]! - body.yaw)
+    _keptYaw[i] = g.flatYaw[i]! - body.yaw
   })
   const hips = asset.bones.indexOf('hips')
   // how far a lifted foot's correction fades this call: by the cycle walked
@@ -649,11 +755,15 @@ export function clipGaitPose(
       }
       if (!held[k]) continue
       // a contact rising off the ground lets go gradually, never in one frame
-      // (fully held up to 60 % of the touch height: a short leg's toe still
-      // carries where the no-slide test counts it as down), and over a band
-      // above the touch height, so its share of the hold fades over frames
-      const w = smoothstep(Math.min(1, (letGo - y) / (letGo - 0.6 * touch)))
+      // (fully held up to G.plantFirm of the touch height: a landing contact
+      // is held firm from the frame it takes hold, a softer hold lagged behind
+      // the clip's swing and snapped onto the hold once firm), and over a band
+      // above it, so its share of the hold fades over frames
+      const w = smoothstep(Math.min(1, (letGo - y) / (letGo - G.plantFirm * touch)))
       if (k === 'tip') tipHold = w
+      // a heel held firm on the ground holds the walk's heading on (its
+      // release begins once the heel has lifted, at most a frame late)
+      if (k === 'heel' && w >= 1 && body) g.headingKeep[i] = Math.max(g.headingKeep[i], gait.walk)
       toPerson(frame, body, held[k]!, _h.set(0, 0, 0))
       _miss.x += w * (_h.x - p.x)
       _miss.z += w * (_h.z - p.z)
@@ -691,9 +801,20 @@ export function clipGaitPose(
       // (`stanceSync`); gating a hold by them left a contact touching just
       // outside its blended stance unheld, sliding 0.008 at the walk ↔ jog band
       // (measured 18.10.2026, natural-villager-motion step 10)
+      const wasHeld = held.heel || held.ball || held.tip
       for (const k of CONTACTS) {
         const p = c[k]
         if (_yHold[k] < touch && !held[k]) held[k] = toWorld(frame, body, _h.copy(p).add(_miss))
+      }
+      // the walk's catch keeps the heading the foot is drawn with on the
+      // frame it takes hold (read a frame later, the body had turned on)
+      // (a new plant: never one kept from an earlier plant still letting
+      // go; read again once the legs are solved, `_caught`)
+      if (!wasHeld && (held.heel || held.ball || held.tip) && catching(i) && gait.walk > 0) {
+        g.headingKeep[i] = Math.max(g.headingKeep[i], gait.walk)
+        g.flatYaw[i] = headingOf(keepTurn(_fq.copy(world.q[foot]), _keptYaw[i], fw, _turnW[i])) + body.yaw
+        _keptYaw[i] = g.flatYaw[i]! - body.yaw
+        _caught[i] = true
       }
     }
     slip.x = _miss.x
@@ -724,12 +845,12 @@ export function clipGaitPose(
         for (const k of CONTACTS) if (held[k]) held[k] = toWorld(frame, body, _h.copy(c[k]).add(_miss))
       }
       if (piv) {
-        flatten(_fq.copy(world.q[foot]), _flatQ[i], fw)
+        keepTurn(_fq.copy(world.q[foot]), _keptYaw[i], fw, _turnW[i])
         const l = _h.copy(asset.contactPoints[s][piv]).multiplyScalar(frame.legScale)
         if (piv === 'tip') {
           const toe = asset.bones.indexOf(`toe.${s}`)
           const r0 = frame.rest0
-          l.applyQuaternion(flatten(_tq.copy(world.q[toe]), _flatQ[i], _toeW[i]))
+          l.applyQuaternion(keepTurn(_tq.copy(world.q[toe]), _keptYaw[i], _toeW[i], _turnW[i]))
           l.add(_pv.set(r0[toe * 3] - r0[foot * 3], r0[toe * 3 + 1] - r0[foot * 3 + 1], r0[toe * 3 + 2] - r0[foot * 3 + 2]).applyQuaternion(_fq))
         } else l.applyQuaternion(_fq)
         toPerson(frame, body, held[piv]!, _pv.set(0, 0, 0))
@@ -822,7 +943,7 @@ export function clipGaitPose(
     // otherwise stays where it is)
     const now = _pivoted[i] ? _pivotOn[i] : null
     const handing = lift.left > 0 && now === lift.to && CONTACTS.every((k) => k === now || !g.held[i][k])
-    if (!far && fw <= 0 && tw <= 0 && !handing) {
+    if (!far && fw <= 0 && tw <= 0 && _turnW[i] <= 0 && !handing) {
       for (let k = 0; k < 16; k++) lift.last[k] = k % 4 === 3 ? 1 : 0
       return
     }
@@ -830,8 +951,8 @@ export function clipGaitPose(
     // share turns them onto their heading alone (the rest foot lies flat)
     _keep.copy(world.q[foot])
     _keepToe.copy(world.q[toe])
-    if (tw > 0) flatten(_keepToe, _flatQ[i], tw)
-    if (fw > 0) flatten(_keep, _flatQ[i], fw)
+    if (tw > 0) keepTurn(_keepToe, _keptYaw[i], tw, _turnW[i])
+    keepTurn(_keep, _keptYaw[i], fw, _turnW[i])
     if (_pivoted[i]) {
       const k = _pivotOn[i]
       const v = _hoP.copy(asset.contactPoints[s][k]).multiplyScalar(frame.legScale)
@@ -841,7 +962,7 @@ export function clipGaitPose(
         const r0 = frame.rest0
         v.set(r0[toe * 3] - r0[foot * 3], r0[toe * 3 + 1] - r0[foot * 3 + 1], r0[toe * 3 + 2] - r0[foot * 3 + 2]).applyQuaternion(_keep)
       } else v.applyQuaternion(_keep)
-      const roll = heelOff(frame, world, thigh, shin, foot, _target[i], v, _keep)
+      const roll = heelOff(frame, world, thigh, shin, foot, _target[i], v, _keep, _turnW[i])
       _standing[i] = roll !== 'out'
       if (roll === 'rolled' && k !== 'tip') {
         // the toes rolled over lift their tip a share of the foot's pitch
@@ -872,6 +993,29 @@ export function clipGaitPose(
         _qw2.slerp(_qw3, r).toArray(out.rot, b * 4)
       })
       forwardKinematics(asset, frame.rest0, out, world)
+      if (_turnW[i] > 0) {
+        // the hand-over blends the leg's locals, which turn with the body: a
+        // foot keeping its heading keeps it through the hand-over too, turned
+        // round the contact it pivots on (turned round the ankle, the held
+        // contact moved and was handed on as the next frame's hold)
+        const d = headingOf(_keep) - headingOf(world.q[foot])
+        _hoTw.setFromAxisAngle(_up, wrapAngle(d) * Math.min(1, _turnW[i])).multiply(world.q[foot])
+        const on = _pivoted[i] ? _pivotOn[i] : null
+        if (on) _hoPv.copy(contactPoints(asset, world, frame.legScale)[s][on])
+        setWorldRotation(asset, out, world, foot, _hoTw)
+        forwardKinematics(asset, frame.rest0, out, world)
+        if (on) {
+          _hoPv.sub(contactPoints(asset, world, frame.legScale)[s][on])
+          // (at most the one reach the first solve stops at: past it the
+          // knee snapped near straight for the frame)
+          _hoPv.add(world.p[foot])
+          const off = hip.distanceTo(_hoPv)
+          if (off > reach) _hoPv.sub(hip).multiplyScalar(reach / off).add(hip)
+          correctLeg(asset, frame.rest0, out, world, thigh, shin, foot, _hoPv, P.kneePoleMin * frame.legScale)
+          setWorldRotation(asset, out, world, foot, _hoTw)
+          forwardKinematics(asset, frame.rest0, out, world)
+        }
+      }
     }
     legBones.forEach((b, j) => _qw3.fromArray(out.rot, b * 4).multiply(_qw2.copy(_clipLocal[j]).invert()).toArray(lift.last, j * 4))
     // a pivoted flat foot hands its held contacts the places drawn, and its
@@ -912,6 +1056,11 @@ export function clipGaitPose(
       solveLegs()
     }
   }
+  // a foot caught this frame keeps the heading it is drawn with once solved
+  // (its roll and hand-over can turn it after the catch read it)
+  if (body) SIDES.forEach((s, i) => {
+    if (_caught[i]) g.flatYaw[i] = headingOf(world.q[asset.bones.indexOf(`foot.${s}`)]) + body.yaw
+  })
   // THE WALK STANDS ON A SOLE: where no planted foot stands after the solve
   // (a run's long stride coming back to the walk leaves its trailing foot
   // beyond reach and the leading one still in the air), the walk settles
