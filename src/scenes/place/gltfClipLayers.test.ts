@@ -867,16 +867,13 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   })
 
   // HANDOVER 25.11.2026 (remove before landing): cross-review of 0aabbc195
-  // (GPT-6.2 Sol, receipt cffecf8def9d33ac) said do-not-merge:
-  // P1 the start ends (startState 2/2, legs 1) before resumeHoldT reaches 1 and
-  //    drops the held pose and resumeP by a jump (gltfClipLayers.ts ~373);
-  // P1 a stop during the hold reuses the first stop's heldLegs/heldHips/
-  //    heldPhase and switches from resumeP to the stop's step share at once;
-  //    the cut-short handoff sets anchor 1, which blocks a second resume;
-  // P2 the test's gait exception: compare per shin, require full weight on the
-  //    frame before and a landing, sample gk before the hold slerp, and assert
-  //    the resumed start actually began on r0.
-  // polish-villagers is ladder-refused: run --section=adult-errands first.
+  // (GPT-6.2 Sol, receipt cffecf8def9d33ac) said do-not-merge. Answered in the
+  // next commit: the early start exit (P1) and the test's gait exception (P2).
+  // Open: a stop during the hold reuses the first stop's heldLegs/heldHips/
+  // heldPhase (as on main) and switches from resumeP to the stop's step share
+  // at once (new); the cut-short handoff's anchor 1 blocks a second resume (as
+  // on main). Then re-review, polish-villagers --section=adult-errands (the
+  // ladder refuses the whole suite), both backends.
   const RESUME_KNEE_STEP_BOUND = 0.25 // rad a frame; measured 0.224 (point 1587), main before it 0.62
   it('a walk taken up again mid-stop: over its first 30 frames the knee bends no faster than the walk clip bends it', () => {
     // resuming while the legs still left the gait bent the knee by 0.3-0.5 rad a
@@ -891,6 +888,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
         expect(Math.min(...frames.map((f) => f.w)), `the stop has begun, resumed after ${pause.toFixed(2)} s`).toBeLessThan(1)
         const r0 = Math.round((cut + pause) * 60)
+        const began = frames.findIndex((f, k) => k >= r0 - 1 && f.start[0] >= 0)
+        expect(began - r0, `resumed after ${pause.toFixed(2)} s: the resumed start begins within its first frames`).toBeLessThan(15)
         for (let k = r0; k < r0 + 30; k++) {
           const where = `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s, +${k - r0} (clip ${clip.toFixed(3)})`
           const step = kneeStep(frames, k)
@@ -899,8 +898,11 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
           // pace: at full weight the gait itself steps the knee past the clip's
           // range there (measured: turning 0, resumed after 0.40 s, +28 drawn
           // 0.215, the gait 0.217) and the start draws it no faster
-          const gait = Math.max(...frames[k].gk.map((q, i) => q.angleTo(frames[k - 1].gk[i])))
-          expect(frames[k].w, `${where}: past the clip only on the gait at full weight`).toBeGreaterThanOrEqual(1)
+          // per shin: the knee past the clip's range is the one the gait itself steps as fast
+          const i = frames[k].knee.findIndex((q, j) => q.angleTo(frames[k - 1].knee[j]) === step)
+          const gait = frames[k].gk[i].angleTo(frames[k - 1].gk[i])
+          expect(frames[k - 1].w, `${where}: past the clip only on the gait at full weight`).toBeGreaterThanOrEqual(1)
+          expect(frames[k].start[i], `${where}: only on the first foot's way to its landing`).toBeLessThanOrEqual(1)
           expect(step, `${where}: no faster than the gait's own landing`).toBeLessThanOrEqual(gait + 1e-3)
         }
         // OPEN: past the first 30 frames, turning -2.8 rad/s and resumed after

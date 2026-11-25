@@ -370,7 +370,9 @@ export function applyClipLayers(
     c.starting = false
     c.handoff = true
   }
-  if (c.starting && c.startState[0] === 2 && c.startState[1] === 2 && c.legs >= 1) c.starting = false
+  // a resumed start ends only once its hold is released (ended on the feet, it
+  // dropped the rest of the held pose by a jump)
+  if (c.starting && c.startState[0] === 2 && c.startState[1] === 2 && c.legs >= 1 && (!c.resumed || c.resumeHoldT >= 1)) c.starting = false
   if (!c.starting) c.resumed = false
   const legs = c.legs * (1 - m.kneel)
   // standing while the body moves (point 1582): the stand's feet stay where
