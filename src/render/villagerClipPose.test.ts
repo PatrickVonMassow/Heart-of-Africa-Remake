@@ -628,6 +628,8 @@ describe('the clip gait on the ground', () => {
                 yaw += yawRate * dt
                 x += Math.sin(yaw) * speed * dt
                 z += Math.cos(yaw) * speed * dt
+                // the heading each foot still keeps from its last plant (0: let go)
+                const keptBefore = [g.flatYaw[0] !== null ? g.headingKeep[0] : 0, g.flatYaw[1] !== null ? g.headingKeep[1] : 0]
                 stepClipGait(g, asset, f, speed * dt, speed)
                 clipGaitPose(g, asset, f, speed, { x, z, yaw, unit: 1 }, pose)
                 forwardKinematics(asset, f.rest0, pose, world)
@@ -647,6 +649,10 @@ describe('the clip gait on the ground', () => {
                     const kept = g.flatYaw[i]
                     if (kept !== null && g.headingKeep[i] > 0) {
                       catchChecked++
+                      // (the catch keeps the heading drawn on its frame: that
+                      // is the clip's own only while the last plant's keep has
+                      // been let go before it — measured 0 at every catch)
+                      expect(keptBefore[i], `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, foot ${s} caught while still keeping`).toBe(0)
                       const e = kept - heading
                       expect(Math.abs(Math.atan2(Math.sin(e), Math.cos(e))), `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, foot ${s} caught`).toBeLessThan(1e-3)
                     }
@@ -687,7 +693,7 @@ describe('the clip gait on the ground', () => {
                     flatChecked++
                     const e = heading - caught[i]!
                     expect(Math.abs(Math.atan2(Math.sin(e), Math.cos(e))), where).toBeLessThan(0.03)
-                  } else if (caught[i] !== null && g.headingKeep[i] >= 1 && contacts.some((kk) => held[kk] && c[s][kk].y <= 0.003)) {
+                  } else if (caught[i] !== null && g.headingKeep[i] >= 1 && contacts.filter((kk) => held[kk] && c[s][kk].y <= 0.003).length === 1) {
                     // and rolling on a single held contact, until its release
                     // begins (measured to 1e-7 rad; letting go it turns by up
                     // to 0.42 rad while a contact is still down, by design)
@@ -710,6 +716,7 @@ describe('the clip gait on the ground', () => {
     }
     expect(flatChecked).toBeGreaterThan(1000)
     expect(spotChecked).toBeGreaterThan(1000)
+    // (8465 frames on exactly one held contact, measured 25.11.2026)
     expect(rollChecked).toBeGreaterThan(1000)
     expect(catchChecked).toBeGreaterThan(500)
   })
