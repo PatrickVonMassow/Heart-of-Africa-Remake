@@ -4406,7 +4406,9 @@ export const VILLAGER_GLTF = {
   /** A heel strike's brake whose start a pace change moved past the foot
    *  between two frames begins where the foot stands, if at least this share
    *  of its length is left to ease the heel to rest (less, the heel would
-   *  swing faster than the clip to reach its spot in time). Calibratable. */
+   *  swing faster than the clip to reach its spot in time); with less left,
+   *  a frame that walked from before its start (a hitch) runs it from its
+   *  own start. Calibratable. */
   heelBrakeLate: 0.5,
   /** The heel strike's brake re-times the whole blended heel in the walk-jog
    *  band down to this share of the walk, fading out below it toward the
