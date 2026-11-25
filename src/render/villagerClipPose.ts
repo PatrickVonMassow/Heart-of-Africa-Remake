@@ -649,10 +649,11 @@ export function clipGaitPose(
       }
       if (!held[k]) continue
       // a contact rising off the ground lets go gradually, never in one frame
-      // (fully held up to 60 % of the touch height: a short leg's toe still
-      // carries where the no-slide test counts it as down), and over a band
-      // above the touch height, so its share of the hold fades over frames
-      const w = smoothstep(Math.min(1, (letGo - y) / (letGo - 0.6 * touch)))
+      // (fully held up to G.plantFirm of the touch height: a landing contact
+      // is held firm from the frame it takes hold, a softer hold lagged behind
+      // the clip's swing and snapped onto the hold once firm), and over a band
+      // above it, so its share of the hold fades over frames
+      const w = smoothstep(Math.min(1, (letGo - y) / (letGo - G.plantFirm * touch)))
       if (k === 'tip') tipHold = w
       toPerson(frame, body, held[k]!, _h.set(0, 0, 0))
       _miss.x += w * (_h.x - p.x)

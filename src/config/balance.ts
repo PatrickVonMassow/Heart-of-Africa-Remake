@@ -4373,12 +4373,18 @@ export const VILLAGER_GLTF = {
    *  the clip's swing (villagerClipPose.ts `LiftOff`). Calibratable. */
   liftOffBlendCycle: 0.15,
   /** How high (multiples of the touch height) a held sole contact rises
-   *  before it lets go; its share of the foot's hold fades from 0.6 touch up
+   *  before it lets go; its share of the foot's hold fades from `plantFirm` touch up
    *  to here. A heel rolling off over a planted ball carries its own miss,
    *  and dropped within one frame it shifted the held ball by a third of the
    *  difference (0.0044 per 60 Hz frame mid walk↔jog band, measured
    *  15.10.2026). Calibratable. */
   plantLetGo: 2,
+  /** Up to which height (multiples of the touch height) a held sole contact
+   *  is held firm. At 0.6 a heel caught at the touch height was held at four
+   *  fifths while its clip still swung it forward, and snapped onto its hold
+   *  once firm (foot 2.8x the clip's fastest turn at 144 Hz, 3.9x at 240 Hz,
+   *  measured 25.11.2026). Calibratable. */
+  plantFirm: 1,
   /** The stance foot on the ground (villagerClipPose.ts `gaitFootGround`):
    *  the blended gait's stance is read over `groundSamples` phases, at
    *  `groundLevels` steps across each cross-fade band (interpolated between).
