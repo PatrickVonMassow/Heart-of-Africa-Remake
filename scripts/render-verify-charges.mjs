@@ -893,6 +893,7 @@ export const RED_CHARGES = [
     point: 1585,
     suite: 'polish-villagers',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'check',
     match: /an errand adult is caught about to set off from its stop/i,
     why:
