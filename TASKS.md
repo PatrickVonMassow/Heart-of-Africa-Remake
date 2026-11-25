@@ -108,7 +108,7 @@ put it is the mistake this line exists to stop.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
 - [ ] 1591. Villager heel strike stops the swinging foot dead
-  Source: split from point 1423 on 25.11.2026: the clip still swings the heel forward ~2 m/s at contact (on the ground until phase ~0.555), and the plant stops it within one frame. A ground brake breaks the no-slide case (4 mm/frame); an airborne landing brake lands up to 5 cm short and breaks three stop/resume knee cases of gltfClipLayers.test.ts narrowly (0.415 vs 0.4, 0.2546 vs 0.25). Likely needs a predicted heel rest point for the landing. The OPEN in gltfClipLayers.test.ts charging the +2.8 rad/s knee bound to point 1423 moves here.
+  Source: split from point 1423 on 25.11.2026: the clip still swings the heel forward ~2 m/s at contact (on the ground until phase ~0.555), and the plant stops it within one frame. A ground brake breaks the no-slide case (4 mm/frame); an airborne landing brake lands up to 5 cm short and breaks three stop/resume knee cases of gltfClipLayers.test.ts narrowly (0.415 vs 0.4, 0.2546 vs 0.25). Likely needs a predicted heel rest point for the landing. The OPEN in gltfClipLayers.test.ts charging the +2.8 rad/s knee bound to point 1423 moves here. Split 25.11.2026 after four unsuccessful review rounds: the first landing of each foot after a start or resume moved to point 1594; this point keeps every later strike.
   Final state: heel strike decelerates the foot without a dead stop, with no foot slide and the stop/resume knee bounds unchanged.
   Verifiable: villagerClipPose.test.ts heel-contact deceleration case; gltfClipLayers.test.ts stop/resume knee cases green at their current bounds; a moving capture on both backends.
   Criticality: medium - visible foot jerk in village walks.
@@ -126,6 +126,13 @@ put it is the mistake this line exists to stop.
   Final state: the empty jar stays with the hand through a gesture start, without a one-frame jump.
   Verifiable: a Vitest bounds the jar's per-frame displacement across a gesture start; a moving capture on both backends.
   Criticality: medium - visible jar pop on gesturing water carriers.
+  Bundle: Dorfleben.
+
+- [ ] 1594. First villager heel strike after a start or resume still stops dead
+  Source: split from point 1591 on 25.11.2026 after four unsuccessful review rounds (second cross review at 87bf636, GPT-6.2 Sol): `applyClipLayers` requests no braking for a foot until its start state reaches 2, so the first landing of each foot after a start or resume still loses 1.5-3.0 m/s in one frame; braking it on that path gave 3.6 cm of slide and broke the stop/resume knee bounds.
+  Final state: the first heel strike of each foot after a start or resume decelerates without a dead stop, with no foot slide and the stop/resume knee bounds unchanged.
+  Verifiable: gltfClipLayers.test.ts start and resume cases measure each foot's first landing (touchdown speed and planted displacement) and stay green at their current knee bounds; a moving capture on both backends.
+  Criticality: medium - visible foot jerk when villagers set off.
   Bundle: Dorfleben.
 
 - [ ] 1425. Carried water jar jumps from hip to shoulder within a few frames
