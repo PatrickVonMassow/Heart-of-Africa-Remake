@@ -850,6 +850,12 @@
       "why": "medium Dorfleben-Befund ohne Nutzerauftrag; folgt dem Bündel hinter den offenen Knie-Punkten",
       "origin": "machine",
       "place": "last"
+    },
+    "1592": {
+      "at": "2026-11-25T11:33:37.614Z",
+      "why": "Same villager-rig file as 1591; placed directly behind it in the village-life bundle",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -860,7 +866,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-25T11:00:10.022Z",
+    "at": "2026-11-25T11:33:37.620Z",
     "points": [
       184,
       200,
@@ -1051,7 +1057,8 @@
       1588,
       1589,
       1590,
-      1591
+      1591,
+      1592
     ]
   }
 }
