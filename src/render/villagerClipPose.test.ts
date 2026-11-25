@@ -241,7 +241,7 @@ describe('the clip gait on the ground', () => {
    *  pace the gait is drawn at, and the body's turn that frame (rad). */
   type HeelStep = { walked: number; speed: number; dyaw: number }
   /** One heel strike of `heelStrikeRun`. */
-  type HeelStrike = { i: number; k: number; into: number; drop: number; stop: number; land: number; slide: number; walk: number; braked: boolean }
+  type HeelStrike = { i: number; k: number; into: number; drop: number; stop: number; land: number; slide: number; walk: number; braked: boolean; leap: number }
   /**
    * The walk's heel strikes over a run of `frames` frames at `hz`, the
    * planted walk beside the clip's own (nothing held). Every landing of a
@@ -277,6 +277,7 @@ describe('the clip gait on the ground', () => {
     const held: Record<(typeof KEYS)[number], boolean>[][] = [[], []]
     const braked: boolean[][] = [[], []]
     const walkAt: number[] = []
+    const frameDt: number[] = []
     let x = 0
     let z = 0
     let yaw = 0
@@ -286,6 +287,8 @@ describe('the clip gait on the ground', () => {
       x += Math.sin(yaw) * s.walked
       z += Math.cos(yaw) * s.walked
       walkAt.push(gaitWeights(s.speed / f.scale, f.legScale).walk)
+      // (each frame's own length: a hitch walks a longer one)
+      frameDt.push(s.speed > 0 ? s.walked / s.speed : dt)
       const cy = Math.cos(yaw)
       const sy = Math.sin(yaw)
       const toWorld = (p: THREE.Vector3) => {
@@ -315,7 +318,7 @@ describe('the clip gait on the ground', () => {
     let unheeled = 0
     const any = (i: number, k: number) => KEYS.some((p) => held[i][k][p])
     for (const i of [0, 1]) {
-      const pace = (j: number, of = drawn) => of[i][j].distanceTo(of[i][j - 1]) / dt
+      const pace = (j: number, of = drawn) => of[i][j].distanceTo(of[i][j - 1]) / frameDt[j]
       // the frame its last contact let go (-1: not seen), and whether its
       // heel has taken hold since
       let off = -1
@@ -370,7 +373,11 @@ describe('the clip gait on the ground', () => {
         // (against the clip's step that frame, or of a 60 Hz one where frames
         // are shorter)
         const land = (drawn[i][k].distanceTo(clip[i][k]) - pace(k, clip) / Math.min(hz, 60)) / per
-        out.push({ i, k, into: pace(k) / peak, drop, stop, land, slide, walk: walkAt[k], braked: braked[i].slice(off, k).some(Boolean) })
+        // (the share of its way to its touchdown spot the heel covers on its
+        // brake's first frame: 1, the brake drawn on no frame before)
+        const b0 = braked[i].findIndex((b, j) => j > off && j <= k && b)
+        const leap = b0 > 0 ? 1 - drawn[i][b0].distanceTo(drawn[i][k]) / Math.max(1e-9, drawn[i][b0 - 1].distanceTo(drawn[i][k])) : 1
+        out.push({ i, k, into: pace(k) / peak, drop, stop, land, slide, walk: walkAt[k], braked: braked[i].slice(off, k).some(Boolean), leap })
       }
     }
     return Object.assign(out, { unheeled })
@@ -565,23 +572,40 @@ describe('the clip gait on the ground', () => {
     // the heel unbraked on the next frame. One hitch of the figure's frame
     // clamp (0.1 s, GIZA_ACTIVITY.maxFrame) at every offset through a cycle
     let hitches = 0
+    let onHitch = 0
     for (const person of [adult, child]) {
       const per = person.frame.legScale * person.frame.scale
-      for (const v of [0.6, 1.0, 1.45]) {
+      // (walking, and at the band's middle and upper half, where a hitch
+      // walks furthest through the brake)
+      for (const v of [0.6, 1.0, 1.45, VILLAGER_GLTF.jogThreshold, VILLAGER_GLTF.jogThreshold + 0.5 * VILLAGER_GLTF.jogBand]) {
         const speed = v * per
         const hz = 60
-        for (let at = hz; at < 2.2 * hz; at += 2) {
+        for (let at = hz; at < 2.2 * hz; at += 1) {
           const strikes = heelStrikeRun(person, hz, 3 * hz, (k) => ({ walked: (speed * (k === at ? 0.1 : 1 / hz)), speed, dyaw: 0 }))
           for (const s of strikes) {
-            if (s.k <= at) continue
+            // (the hitch frame's own catch included: a brake begun on it is
+            // no brake drawn into the catch)
+            if (s.k < at) continue
             if (s.k <= at + 0.2 * hz) hitches++
-            expect(s.braked, `${v} per leg, hitch at frame ${at}, leg ${person.frame.legScale.toFixed(2)}: frame ${s.k}, foot ${s.i}: its brake ran`).toBe(true)
+            if (s.k === at) onHitch++
+            const where = `${v} per leg, hitch at frame ${at}, leg ${person.frame.legScale.toFixed(2)}: frame ${s.k}, foot ${s.i}`
+            expect(s.braked, `${where}: its brake ran`).toBe(true)
+            // never set from its swing onto its touchdown spot in one frame:
+            // a frame walking past the brake's end took the heel from its
+            // swing to 0.99 of its way there and the hold took it (cross-
+            // vendor review of point 1591); measured at most 0.75 with the
+            // brake lagging the clip after the hitch, and into its catch at
+            // most 0.18 of its swing's pace over the frame's own length
+            // (25.11.2026)
+            expect(s.leap, `${where}: its way to its touchdown spot covered in its brake's first frame`).toBeLessThan(0.9)
+            expect(s.into, `${where}: into its catch, of its swing's pace`).toBeLessThan(0.25)
           }
         }
       }
     }
-    // (strikes landed within 0.2 s after the hitch)
+    // (strikes landed within 0.2 s after the hitch, and on the hitch frame)
     expect(hitches).toBeGreaterThan(50)
+    expect(onHitch, 'catches on the hitch frame itself').toBeGreaterThan(0)
   }, 120_000)
 
   it('a short step while turning swings no braking heel round: the turn the brake predicts is the walk\'s, not one frame\'s', () => {

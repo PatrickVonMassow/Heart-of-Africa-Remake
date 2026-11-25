@@ -4410,6 +4410,15 @@ export const VILLAGER_GLTF = {
    *  a frame that walked from before its start (a hitch) runs it from its
    *  own start. Calibratable. */
   heelBrakeLate: 0.5,
+  /** A frame walking more than `heelBrakeHitch` times the last frame's share
+   *  of the cycle (and more than `heelBrakeHitchFloor` of the heel strike's
+   *  brake) is a hitch (villagerClipPose.ts `heelBrake`): the brake takes
+   *  only that much of it, and runs on on its own clock over the frames
+   *  after (walked whole, a frame walking past the brake's end set the heel
+   *  from its swing onto its rest, and the hold took it there).
+   *  Calibratable. */
+  heelBrakeHitch: 2,
+  heelBrakeHitchFloor: 0.25,
   /** The heel strike's brake re-times the whole blended heel in the walk-jog
    *  band down to this share of the walk, fading out below it toward the
    *  pure jog (which has no brake: the runs land their heel moving). Re-timed

@@ -81,6 +81,9 @@ export interface ClipGait {
    *  its yaw last drawn (null without a body) and its turn per cycle walked,
    *  averaged over the cycle walked (`heelBrakeTurnCycle`). */
   turn: { yaw: number | null; rate: number }
+  /** The share of the cycle the last frame drawn walked (the heel strike's
+   *  brake tells a hitch by it: `heelBrake`). */
+  walkedLast: number
 }
 
 /** thigh, shin, foot, toe: a quaternion (x, y, z, w) each, plain data */
@@ -112,11 +115,16 @@ export interface HeelBraking {
   /** Where its heel comes to rest, in the world (x, z): predicted at
    *  `heelBrakeFreeze` of the brake, kept to its end; null before. */
   rest: { x: number; z: number } | null
+  /** Its share last drawn, and how far (share of the cycle) its own phase
+   *  lags the clip's after a hitch (`heelBrake`): lagging, the hold is held
+   *  off until it rests. */
+  last: number
+  lag: number
 }
 
 const freeLift = (): LiftOff => ({ on: null, to: null, left: 0, toes: 0, last: legTurns(), from: legTurns() })
 
-export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0, flatYaw: [null, null], planted: [false, false], headingKeep: [0, 0], lift: [freeLift(), freeLift()], brake: [null, null], brakeArmed: [false, false], turn: { yaw: null, rate: 0 } })
+export const newClipGait = (): ClipGait => ({ phase: 0, held: [freeFoot(), freeFoot()], slip: [{ x: 0, z: 0 }, { x: 0, z: 0 }], slipPhase: 0, flatYaw: [null, null], planted: [false, false], headingKeep: [0, 0], lift: [freeLift(), freeLift()], brake: [null, null], brakeArmed: [false, false], turn: { yaw: null, rate: 0 }, walkedLast: 0 })
 
 /** Let both feet go (standing: nothing is held for the next walk). */
 export function releaseClipGait(g: ClipGait): void {
@@ -546,7 +554,7 @@ function blendGait(asset: VillagerAsset, frame: PersonFrame, phase: number, w: G
  * state (`st`, begun here when null) while it runs, null outside it. Read
  * from the clip sampled ahead on the walked ground.
  */
-function heelBrake(asset: VillagerAsset, frame: PersonFrame, body: GroundBody, gait: ReturnType<typeof gaitAt>, walkClip: VillagerClip, phase: number, walked: number, st: HeelBraking | null, share: number, armed: boolean, turn: number, i: number, heel: THREE.Vector3, out: THREE.Vector3): HeelBraking | null {
+function heelBrake(asset: VillagerAsset, frame: PersonFrame, body: GroundBody, gait: ReturnType<typeof gaitAt>, walkClip: VillagerClip, phase: number, walked: number, walkedLast: number, st: HeelBraking | null, share: number, armed: boolean, turn: number, i: number, heel: THREE.Vector3, out: THREE.Vector3): HeelBraking | null {
   out.set(0, 0, 0)
   _brakeEarly = false
   const [land, lift] = _blendStance[i]
@@ -556,9 +564,19 @@ function heelBrake(asset: VillagerAsset, frame: PersonFrame, body: GroundBody, g
   // from the swing's middle on), never by a jump
   const most = Math.min(G.heelBrakeCycle, (1 - (lift - land)) / 2 - before - 1e-4)
   if (most <= 1e-6 || gait.phasePerUnit <= 0) return null
-  // phase past the brake's end, in [-0.5, 0.5)
-  const x = wrapPhase(phase - end)
   const hold = Math.max(1e-6, G.heelBrakeHold)
+  // the cycle the brake takes in this frame: no more than G.heelBrakeHitch
+  // times the last frame's (or G.heelBrakeHitchFloor of the brake); a frame
+  // walking further is a hitch (the figure's frames are clamped at 0.1 s),
+  // the brake's own phase lagging the clip's by the rest (`lag`) until it
+  // ends, the hold held off until its heel rests (walked whole, a frame
+  // walking past the brake's end set the heel from its swing onto its rest
+  // or past its fade onto the clip's, and the hold took it there:
+  // cross-vendor review of point 1591)
+  const advance = Math.min(Math.max(0, walked), Math.max(G.heelBrakeHitch * walkedLast, G.heelBrakeHitchFloor * most))
+  if (st) st.lag += walked - advance
+  // phase past the brake's end, in [-0.5, 0.5)
+  let x = wrapPhase(phase - (st?.lag ?? 0) - end)
   if (x >= 2 * hold) return null
   if (st === null) {
     _brakeEarly = x < -most
@@ -570,27 +588,31 @@ function heelBrake(asset: VillagerAsset, frame: PersonFrame, body: GroundBody, g
     // a hold let go there) it moved the foot by a jump. Begun late, the
     // brake runs from where the foot stands, over what is left of it, if
     // enough is left to ease the heel to rest; with less left, a frame that
-    // walked from before its start (a hitch: the figure's frames are
-    // clamped at 0.1 s) runs it from its own start, the heel set onto its
-    // path there (begun on no frame, the hold took the heel unbraked on the
-    // next: cross-vendor review of point 1591).
+    // walked from before its start (a hitch) runs it from the phase last
+    // drawn, the heel on its clip swing there (begun on no frame, the hold
+    // took the heel unbraked on the next; from the brake's own start, a
+    // frame walking past its end set the heel from its swing onto its rest:
+    // cross-vendor reviews of point 1591).
     if (x + walked < -most) return null
     const crossed = armed || x - walked < -most
     if (x >= -most && !crossed) return null
     const late = x >= -G.heelBrakeLate * most
-    st = { share, from: late ? end - most : phase, rest: null }
+    st = late ? { share, from: phase - walked, rest: null, last: 0, lag: walked - advance } : { share, from: phase, rest: null, last: 0, lag: 0 }
+    x = wrapPhase(phase - st.lag - end)
   }
   const from = st.from
   // the brake as drawn now: from its start, its end read at this pace (a
   // pace changed within it moves its end, never its start)
   const L = wrapPhase(end - from)
-  const w = Math.max(0, wrapPhase(phase - from))
+  const w = Math.max(0, wrapPhase(phase - st.lag - from))
   // the re-timed phase: a cubic from the clip's own pace at the brake's
   // start to no pace at its end, held there after it
   const s = L > 1e-6 ? Math.min(1, w / L) : 1
+  st.last = s
   const rise = L + G.heelBrakeLead + G.heelLandAt
   const h = (s * s * s - 2 * s * s + s) * L + (3 * s * s - 2 * s * s * s) * rise
-  const ahead = h - w
+  // (the clip read ahead of its own phase: the brake's lags it by `lag`)
+  const ahead = h - w - st.lag
   // past the hold not yet taken, faded out (never a jump)
   const keep = Math.min(1, gait.walk / Math.max(1e-6, G.heelBrakeWalk)) * smoothstep(Math.min(1, Math.max(0, (2 * hold - Math.max(hold, x)) / hold)))
   if (keep <= 0) return null
@@ -605,7 +627,7 @@ function heelBrake(asset: VillagerAsset, frame: PersonFrame, body: GroundBody, g
     out.set((now.x - heel.x) * keep, 0, (now.z - heel.z) * keep)
     return st
   }
-  const fin = s >= 1 ? now : clipHeelAhead(asset, frame, gait, walkClip, phase, rise - w, turn, i, _fin)
+  const fin = s >= 1 ? now : clipHeelAhead(asset, frame, gait, walkClip, phase, rise - w - st.lag, turn, i, _fin)
   st.rest ??= toWorld(frame, body, fin)
   toPerson(frame, body, st.rest, _rest)
   out.set((now.x + _rest.x - fin.x - heel.x) * keep, 0, (now.z + _rest.z - fin.z - heel.z) * keep)
@@ -939,6 +961,8 @@ export function clipGaitPose(
   const hips = asset.bones.indexOf('hips')
   // how far a lifted foot's correction fades this call: by the cycle walked
   const walkedPhase = (((g.phase - g.slipPhase) % 1) + 1) % 1
+  const walkedLast = g.walkedLast
+  g.walkedLast = walkedPhase
   g.slipPhase = g.phase
   // the body's turn per cycle walked, for the heel strike's brake: averaged
   // over G.heelBrakeTurnCycle of the cycle walked, each frame's turn counted
@@ -1068,10 +1092,11 @@ export function clipGaitPose(
     // the walk's heel strike lands its heel at rest (`heelBrake`; the slip
     // carried on is the hold's own)
     // (by the share asked for as its brake began: a share changed within
-    // it moved the foot by a jump)
+    // it moved the foot by a jump; once begun, on to its end, past the
+    // catch's window after a hitch)
     _brk.set(0, 0, 0)
     _brakeEarly = false
-    g.brake[i] = body && gait.walk > 0 && !(held.heel || held.ball || held.tip) && catching(i) ? heelBrake(asset, frame, body, gait, walkClip, g.phase, walkedPhase, g.brake[i], heelBraking[i], g.brakeArmed[i], g.turn.rate, i, c.heel, _brk) : null
+    g.brake[i] = body && gait.walk > 0 && !(held.heel || held.ball || held.tip) && (catching(i) || !!g.brake[i]) ? heelBrake(asset, frame, body, gait, walkClip, g.phase, walkedPhase, walkedLast, g.brake[i], heelBraking[i], g.brakeArmed[i], g.turn.rate, i, c.heel, _brk) : null
     g.brakeArmed[i] = _brakeEarly
     if (g.brake[i]) {
       _brk.multiplyScalar(g.brake[i]!.share)
@@ -1085,9 +1110,11 @@ export function clipGaitPose(
       // outside its blended stance unheld, sliding 0.008 at the walk ↔ jog band
       // (measured 18.10.2026, natural-villager-motion step 10)
       const wasHeld = held.heel || held.ball || held.tip
+      // (a brake lagging the clip after a hitch takes no hold until its heel rests)
+      const lagging = !!g.brake[i] && g.brake[i]!.lag > 0 && g.brake[i]!.last < 1
       for (const k of CONTACTS) {
         const p = c[k]
-        if (_yHold[k] < touch && !held[k]) held[k] = toWorld(frame, body, _h.copy(p).add(_miss))
+        if (_yHold[k] < touch && !held[k] && !lagging) held[k] = toWorld(frame, body, _h.copy(p).add(_miss))
       }
       // the walk's catch keeps the heading the foot is drawn with on the
       // frame it takes hold (read a frame later, the body had turned on)
