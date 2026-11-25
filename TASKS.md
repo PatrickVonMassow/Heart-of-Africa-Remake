@@ -109,8 +109,10 @@ put it is the mistake this line exists to stop.
 
 - [ ] 1583. Villager knee jumps when a stopping walk resumes
   Source: split from point 1582 on 24.11.2026: a resumed walk hands the held stop pose back to the live walk clip whose phase moved on, so the knee jumps 0.715 rad a frame (pauses 0.05-0.75 s, harness on feat/1582-knee-start-snap 33ce8dfe1).
-  Final state: a resumed walk lines the walk clip's phase up with the held pose (on the start mechanism of 1582), so the knee changes no faster per frame than the clip's own range.
-  Verifiable: the resume case of gltfClipLayers.test.ts bounded by the clip's 240 Hz range; a moving capture on both backends.
+  Scope (decided 25.11.2026 after the author's measurement): only resumes where the stop has begun, i.e. the legs' walk weight has left 1 (pauses ~0.35-0.75 s); there the legs rise at the walk fade rate (0.58 to 1 in five frames, knee up to 0.62 rad) and a plain phase rewind does not help. Shorter pauses never leave the gait; their 0.24-0.27 rad excess is the landing of the gait alone and belongs to 1423.
+  Final state: a resume from a begun stop hands the legs back to the walk clip on the start mechanism of 1582 (each foot swung onto the clip from where the settle left it, the legs' rise no faster than their fall), so the knee changes no faster per frame than the clip's own range.
+  Measured 25.11.2026 (branch feat/1583-knee-resume-snap 2187bfdb9, kept): rewinding the gait to the held phase and capping the legs' rise roughly halve the peaks (0.24-0.62 to 0.18-0.42 rad), but the foot left at its stop spot lifts from a straight leg while the body walks on and makes up ~0.22 off the clip's ankle in a shortened swing. Decided 25.11.2026: that foot is brought back under the body by the stand's own return (as for a jostled standing body, without a step) before the start hands it to the clip.
+  Verifiable: the resume case of gltfClipLayers.test.ts over pauses where the legs' weight left 1, bounded by the clip's 240 Hz range; a moving capture on both backends.
   Criticality: medium - visible leg snap when a villager hesitates and walks on.
   Bundle: Dorfleben.
 
@@ -125,7 +127,7 @@ put it is the mistake this line exists to stop.
   Also: a flat foot drops its kept heading in sharp curves.
   Source: finding 22.10.2026 09:46 from the point-1402 joint-speed sweep: the heel is caught while the clip still swings it forward ~2 m/s (foot up to 2.8x clip max speed, shin ~4 rad/s reversal at 144 Hz); at 3.5 rad/s yaw the flat foot gives up its kept heading at the end of flat stance (foot reversal 4.1-4.6 rad/s). Pre-existing; the 3x margin in villagerClipPose.test.ts exists because of the heel strike.
   Final state: heel strike decelerates the foot without a dead stop, and a flat foot keeps its heading through sharp curves; the 3x margin in villagerClipPose.test.ts can drop.
-  Verifiable: villagerClipPose.test.ts with a tightened foot-speed margin and a sharp-curve heading case; a moving capture on both backends.
+  Verifiable: villagerClipPose.test.ts with a tightened foot-speed margin and a sharp-curve heading case; the short-pause resumes of gltfClipLayers.test.ts (0.05-0.30 s, gait never left) within the clip's 240 Hz knee range; a moving capture on both backends.
   Criticality: medium - visible foot jerk in village walks.
   Bundle: Dorfleben.
 
@@ -5188,4 +5190,11 @@ put it is the mistake this line exists to stop.
   - The polish-villagers stride-gap check refuses an empty scan and uses the pair's actual radii; the WebGL 2 kneel charge in `render-verify-charges.mjs` requires the zero-kneeler census it cites.
   Verifiable: the extended Vitest cases red on the old code where they test behaviour; village-walk section green on both backends.
   Criticality: low - review findings; the steering-order one is a small visible gap overlap on start-up.
+  Bundle: Dorfleben.
+
+- [ ] 1585. Errand set-off and walk-on captures miss their adult in the full villager pass
+  Source: finding 24.11.2026 22:59 from the full WebGPU polish-villagers run on main cbe76ad2a: 'an errand adult is caught about to set off from its stop, to film its start (point 1582)' and 'the filmed errand adult walks on between moving-capture frames 3 and 4 (point 1404)' are red with empty detail in the full run, green in --section=adult-errands on both backends at 5c0eb8aa3; the errand state after earlier sections likely differs. The full suite also outruns the default 45-min VERIFY_SUITE_TIMEOUT_MS.
+  Final state: both errand captures find and film their adult in the full polish-villagers run as in the section run, and a red names what it missed instead of an empty detail; the full pass finishes inside its suite timeout.
+  Verifiable: a full polish-villagers run on both backends with both captures green and non-empty detail on any red.
+  Criticality: medium - the render guard cannot close villager points while the full pass carries uncharged reds.
   Bundle: Dorfleben.
