@@ -157,6 +157,14 @@ export interface ClipLayers {
   /** Per foot, whether its start step lifted it in the clip's stance (a
    *  resumed start's waiting stand foot): its step ends on the clip's lift. */
   startStance: [boolean, boolean]
+  /** A resumed start's hold of the stop's legs as it began, released over
+   *  `G.resumeHoldSeconds` (`resumeHoldT` 0..1) rather than with the legs'
+   *  weight, which ended it by a jump at full weight (point 1587). */
+  resumeHold: number
+  resumeHoldT: number
+  /** Per leg, the stop's code-leg share last drawn, faded with the hold into
+   *  the resumed start's clip-drawn leg. */
+  resumeP: [number, number]
 }
 
 export function clipLayers(asset: VillagerAsset): ClipLayers {
@@ -214,6 +222,9 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     resumeEase: 0,
     resumeSoft: [0, 0],
     startStance: [false, false],
+    resumeHold: 0,
+    resumeHoldT: 0,
+    resumeP: [0, 0],
   }
 }
 
@@ -323,8 +334,9 @@ export function applyClipLayers(
   const dt = c.dt
   c.legs = Math.max(m.weight, c.legs - dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
   // taken up again mid-stop, the legs rise back no faster than they fell (the
-  // walk's fade-in handed the held stop to the gait in five frames)
-  if (c.stop > 0 && c.legs > before) c.legs = Math.min(c.legs, before + dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
+  // walk's fade-in handed the held stop to the gait in five frames), on
+  // through a resumed start once its hold is released (point 1587)
+  if ((c.stop > 0 || c.resumed) && c.legs > before) c.legs = Math.min(c.legs, before + dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
   c.resumeEase = dt
   c.dt = 0
   // A START FROM THE STAND: the gait set G.startSwingShare into the swing
@@ -350,13 +362,17 @@ export function applyClipLayers(
     c.startRoll = 0
     c.resumed = true
     c.resumeNew = true
+    c.resumeHold = c.stop
+    c.resumeHoldT = 0
     c.gait.phase = c.heldPhase
   } else if (c.starting && (c.legs < before || m.kneel > 0)) {
     // cut short: the stop takes the feet on from where the start drew them
     c.starting = false
     c.handoff = true
   }
-  if (c.starting && c.startState[0] === 2 && c.startState[1] === 2 && c.legs >= 1) c.starting = false
+  // a resumed start ends only once its hold is released (ended on the feet, it
+  // dropped the rest of the held pose by a jump)
+  if (c.starting && c.startState[0] === 2 && c.startState[1] === 2 && c.legs >= 1 && (!c.resumed || c.resumeHoldT >= 1)) c.starting = false
   if (!c.starting) c.resumed = false
   const legs = c.legs * (1 - m.kneel)
   // standing while the body moves (point 1582): the stand's feet stay where
@@ -402,7 +418,11 @@ export function applyClipLayers(
     }
     // stopping, the legs and hips stay as the gait last drew them walking
     if (settle > 0 && c.settleFirst < 0) c.stop = c.legs < before ? 1 : 0
-    else if (c.stop > 0 && c.legs > before) c.stop *= before < 1 ? (1 - c.legs) / (1 - before) : 0
+    else if (c.resumed && c.resumeHold > 0) {
+      c.resumeHoldT = Math.min(1, c.resumeHoldT + dt / Math.max(1e-6, G.resumeHoldSeconds))
+      const u = c.resumeHoldT
+      c.stop = c.resumeHold * (1 - u * u * (3 - 2 * u))
+    } else if (c.stop > 0 && c.legs > before) c.stop *= before < 1 ? (1 - c.legs) / (1 - before) : 0
     if (c.anchor > 0 && c.legs > before) c.anchor *= before < 1 ? (1 - c.legs) / (1 - before) : 0
     // a stop reversing a start mid-blend takes the hold in as the legs fall,
     // full at the stand, from the gait as it was drawn the frame before
@@ -835,7 +855,8 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
   LEG_SIDES.forEach((s, i) => {
     const step = c.starting ? 0 : shares[i]
     // starting, the leg drawn as the clip draws it (its knee bent where the clip bends it)
-    const p = c.starting ? 0 : handPlace(c, i, stepPlace(step, c.stop))
+    const p = c.starting ? (c.resumed && c.resumeHold > 0 ? c.resumeP[i] * (c.stop / c.resumeHold) : 0) : handPlace(c, i, stepPlace(step, c.stop))
+    if (!c.starting) c.resumeP[i] = p
     legChain(bones, s).forEach((b, k) => b.quaternion.copy(_codeLeg[i][k]).slerp(gaitLocal(asset, c, s, k), 1 - p))
     const T = _target[i]
     if (c.starting) T.copy(_startT[i])
