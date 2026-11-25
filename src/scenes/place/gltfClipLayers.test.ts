@@ -434,7 +434,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   /** Per frame: the legs' share of the gait, each foot's world points, the
    *  shins' turns, and the start's state per foot (`ClipLayers.startState`,
    *  -1 when no start runs) with whether the walk clip swings that foot. */
-  type Sole = { gk: THREE.Quaternion[]; w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number; hold: number; resumed: boolean }
+  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number; hold: number; resumed: boolean }
   /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
   function soleOf(bones: Record<string, THREE.Bone>) {
     const f = person.frame
@@ -515,15 +515,13 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       for (const b of Object.values(bones)) b.quaternion.identity()
       bones.hips.position.copy(hipRest)
       stepClipLayers(asset, person, c, walked, speed, { x, z, yaw, unit: 1 }, null, dt)
-      // the gait's own shins, read before applyClipLayers slerps them toward a stop's hold
-      const gk = (['L', 'R'] as const).map((sd) => c.local[asset.bones.indexOf(`shin.${sd}`)].clone())
       applyClipLayers(asset, person, bones, c, { speed, weight: w, kneel }, [true, true])
       group.updateMatrixWorld(true)
       const swing = [0, 1].map((i) => {
         const [land, lift] = gaitStance(i)
         return lift - land > 1e-6 && ((((c.gait.phase - land) % 1) + 1) % 1) >= lift - land
       })
-      frames.push({ gk, w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step, hold: c.stop, resumed: c.resumed })
+      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step, hold: c.stop, resumed: c.resumed })
     }
     return frames
   }
@@ -895,8 +893,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
             if (step <= clip) return
             // OPEN: point 1589: the first foot's landing while the hold is not yet
             // released steps past the clip's range (measured once: turning 0,
-            // resumed after 0.40 s, +28, 0.215 drawn against the gait's 0.191,
-            // the hold still 0.167: the hold, not the heel strike of point 1423)
+            // resumed after 0.40 s, +28, 0.215 drawn, the hold still 0.167;
+            // hold or heel strike (point 1423) is 1589's to measure)
             expect(frames[k - 1].w, `${where}: past the clip only at full weight`).toBeGreaterThanOrEqual(1)
             expect(frames[k].start[i], `${where}: only on the first foot's swing to its landing`).toBe(1)
             expect(frames[k].hold, `${where}: only while the hold is still released`).toBeGreaterThan(0)
@@ -922,10 +920,11 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const began = frames.findIndex((f, k) => k >= Math.round((cut + pause) * 60) - 1 && f.resumed)
         expect(began, `${where}: a resumed start begins`).toBeGreaterThan(0)
         const released = frames.findIndex((f, k) => k > began && f.hold === 0)
+        expect(released, `${where}: the hold is released`).toBeGreaterThan(began)
         expect(released - began, `${where}: the hold is released on its own clock`).toBeLessThanOrEqual(holdFrames)
         for (let k = began; k < released; k++) {
           expect(frames[k].start[0], `${where}, +${k - began}: still starting while the hold lasts`).toBeGreaterThanOrEqual(0)
-          if (frames[k].w >= 1) heldAtFullWeight++
+          if (frames[k].w >= 1 && frames[k].hold > 0) heldAtFullWeight++
         }
       }
     }
@@ -933,20 +932,27 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     expect(heldAtFullWeight, 'frames the hold outlives the legs\' full weight').toBeGreaterThan(0)
   })
 
-  it('a walk stopped again during a resumed start\'s hold: the knee steps no faster than on main before point 1587', () => {
+  it('a walk stopped again during a resumed start\'s hold: the knee stays within a fixed 0.4 rad a frame (main before point 1587: 0.33-0.39)', () => {
     // OPEN: stopped again 0.15 s (or 0.35 s) into a resumed start, the knee
     // steps 0.33-0.39 rad a frame against the clip's 0.20-0.23, measured
     // alike on main before point 1587 (filed as its own finding); this case
     // only keeps the hold release from making it worse
+    let duringHold = 0
     for (const turn of [0, 2.8, -2.8]) {
       for (const pause of [0.4, 0.55, 0.7]) {
         for (const again of [0.08, 0.15, 0.25, 0.35]) {
           const cut = 1.2
           const frames = settle({ cut, resumeAt: cut + pause, stopAgainAt: cut + pause + again, turn: (t) => (t > cut - 0.3 ? turn : 0) })
-          expect(worstKnee(frames), `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s, stopped again after ${again.toFixed(2)} s`).toBeLessThanOrEqual(0.4)
+          const at = `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s, stopped again after ${again.toFixed(2)} s`
+          // stopped before the resumed start began, a run checks only the bound
+          const began = frames.findIndex((f) => f.resumed)
+          const s2 = Math.round((cut + pause + again) * 60)
+          if (began > 0 && frames.slice(began, s2 + 1).some((f) => f.hold > 0)) duringHold++
+          expect(worstKnee(frames), at).toBeLessThanOrEqual(0.4)
         }
       }
     }
+    expect(duringHold, 'runs stopped again while the resumed start\'s hold lasts').toBeGreaterThanOrEqual(6)
   })
 
   it('a walk taken up again mid-stop: past the first foot\'s landing, the waiting stand foot\'s knee bends no faster than the walk clip bends it', () => {
