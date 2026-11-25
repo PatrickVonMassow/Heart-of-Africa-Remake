@@ -453,6 +453,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     stopAt?: number
     /** Stopping, the seconds the walk takes up again at (a walk resumed mid-stop). */
     resumeAt?: number
+    /** Resumed, the seconds the walk stops once more at (a stop during the resumed start's hold). */
+    stopAgainAt?: number
     /** Frames a second (60 by default). */
     hz?: number
     /** Per frame: the turn the body wants (rad/s; turned as steerHeading
@@ -489,8 +491,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     let pace = speed
     let yaw = 0
     const frames: Sole[] = []
-    for (let t = 0; t < Math.max(r.cut, r.stopAt ?? 0, r.resumeAt ?? 0) + 1.5; t += dt) {
-      pace = setOffSpeed(pace, (r.start ? t >= r.cut && t < (r.stopAt ?? Infinity) : t < r.cut || t >= (r.resumeAt ?? Infinity)) ? v : 0, dt)
+    for (let t = 0; t < Math.max(r.cut, r.stopAt ?? 0, r.resumeAt ?? 0, r.stopAgainAt ?? 0) + 1.5; t += dt) {
+      pace = setOffSpeed(pace, (r.start ? t >= r.cut && t < (r.stopAt ?? Infinity) : t < r.cut || (t >= (r.resumeAt ?? Infinity) && t < (r.stopAgainAt ?? Infinity))) ? v : 0, dt)
       // turned as the game's walkers turn: a corner rounded at its pace no
       // tighter than VILLAGER_MOTION.turnRadius, none standing
       const from = { x, z, yaw }
@@ -504,7 +506,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       // the ground the feet step and the speed the walk weight reads, as stepWalk measures them
       const walked = groundStepped(x - from.x, z - from.z, from.yaw, yaw)
       speed += (walked / dt - speed) * (1 - Math.exp(-dt / VILLAGER_MOTION.speedSmoothing))
-      w = Math.abs(speed) > VILLAGER_MOTION.moveSpeed && !(r.stopAt !== undefined && t >= r.stopAt) ? Math.min(1, w + VILLAGER_MOTION.walkFadeRate * dt) : Math.max(0, w - VILLAGER_MOTION.walkFadeRate * dt)
+      w = Math.abs(speed) > VILLAGER_MOTION.moveSpeed && !(r.stopAt !== undefined && t >= r.stopAt) && !(r.stopAgainAt !== undefined && t >= r.stopAgainAt) ? Math.min(1, w + VILLAGER_MOTION.walkFadeRate * dt) : Math.max(0, w - VILLAGER_MOTION.walkFadeRate * dt)
       const kneel = r.kneel?.(t, w) ?? 0
       group.position.set(x, 0, z)
       group.rotation.y = yaw
@@ -866,14 +868,6 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     }
   })
 
-  // HANDOVER 25.11.2026 (remove before landing): cross-review of 0aabbc195
-  // (GPT-6.2 Sol, receipt cffecf8def9d33ac) said do-not-merge. Answered in the
-  // next commit: the early start exit (P1) and the test's gait exception (P2).
-  // Open: a stop during the hold reuses the first stop's heldLegs/heldHips/
-  // heldPhase (as on main) and switches from resumeP to the stop's step share
-  // at once (new); the cut-short handoff's anchor 1 blocks a second resume (as
-  // on main). Then re-review, polish-villagers --section=adult-errands (the
-  // ladder refuses the whole suite), both backends.
   const RESUME_KNEE_STEP_BOUND = 0.25 // rad a frame; measured 0.224 (point 1587), main before it 0.62
   it('a walk taken up again mid-stop: over its first 30 frames the knee bends no faster than the walk clip bends it', () => {
     // resuming while the legs still left the gait bent the knee by 0.3-0.5 rad a
@@ -909,6 +903,22 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         // 0.50-0.60 s, the landed foot's knee steps 0.220-0.224 at +36/37 with
         // the hips dropping 35-41 mm in the frame (as on main before point 1587)
         expect(worstKnee(frames), `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s`).toBeLessThanOrEqual(RESUME_KNEE_STEP_BOUND)
+      }
+    }
+  })
+
+  it('a walk stopped again during a resumed start\'s hold: the knee steps no faster than on main before point 1587', () => {
+    // OPEN: stopped again 0.15 s (or 0.35 s) into a resumed start, the knee
+    // steps 0.33-0.39 rad a frame against the clip's 0.20-0.23, measured
+    // alike on main before point 1587 (filed as its own finding); this case
+    // only keeps the hold release from making it worse
+    for (const turn of [0, 2.8, -2.8]) {
+      for (const pause of [0.4, 0.55, 0.7]) {
+        for (const again of [0.08, 0.15, 0.25, 0.35]) {
+          const cut = 1.2
+          const frames = settle({ cut, resumeAt: cut + pause, stopAgainAt: cut + pause + again, turn: (t) => (t > cut - 0.3 ? turn : 0) })
+          expect(worstKnee(frames), `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s, stopped again after ${again.toFixed(2)} s`).toBeLessThanOrEqual(0.4)
+        }
       }
     }
   })
