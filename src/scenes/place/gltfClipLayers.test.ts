@@ -434,7 +434,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   /** Per frame: the legs' share of the gait, each foot's world points, the
    *  shins' turns, and the start's state per foot (`ClipLayers.startState`,
    *  -1 when no start runs) with whether the walk clip swings that foot. */
-  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number; hold: number; resumed: boolean; brake: (number | null)[] }
+  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number; hold: number; resumed: boolean; brake: (number | null)[]; held: boolean[] }
   /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
   function soleOf(bones: Record<string, THREE.Bone>) {
     const f = person.frame
@@ -521,7 +521,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const [land, lift] = gaitStance(i)
         return lift - land > 1e-6 && ((((c.gait.phase - land) % 1) + 1) % 1) >= lift - land
       })
-      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step, hold: c.stop, resumed: c.resumed, brake: [...c.gait.brake] })
+      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step, hold: c.stop, resumed: c.resumed, brake: [...c.gait.brake], held: c.gait.held.map((h) => !!(h.heel || h.ball || h.tip)) })
     }
     return frames
   }
@@ -832,6 +832,52 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       return (clip * hz) / 60
     })
 
+  /** The walk's heel strikes over a run, in the world: each time a heel
+   *  whose brake ran at full share (`ClipGait.brake`) over the frames before
+   *  comes to rest on the ground, its world speed (m/s) in the last frame it
+   *  moved, and its largest loss of speed in one frame on the way in. The
+   *  shin's turn alone passes a foot stopped dead (cross-vendor review of
+   *  point 1591); a stop anywhere in the way in is that loss. */
+  const heelStrikes = (frames: Sole[], hz = 60) => {
+    const pace = (k: number, i: number) => Math.hypot(frames[k].feet[i][1].x - frames[k - 1].feet[i][1].x, frames[k].feet[i][1].z - frames[k - 1].feet[i][1].z) * hz
+    const rest = 0.03
+    const back = Math.round(0.25 * hz)
+    const out = { n: 0, into: 0, intoAt: '', drop: 0, dropAt: '' }
+    for (let k = back + 1; k < frames.length; k++) {
+      for (const i of [0, 1]) {
+        if (!(pace(k, i) <= rest && pace(k - 1, i) > rest)) continue
+        // the body walking the whole way in (a stop's first frame takes the
+        // body's pace, and the gait's with it: that frame is the stop's)
+        if (!frames.slice(k - back, k + 1).every((f) => f.step > 0)) continue
+        if (!frames.slice(k - back, k).some((f) => f.brake[i] === 1)) continue
+        out.n++
+        const at = `frame ${k}, foot ${i}`
+        if (pace(k - 1, i) > out.into) [out.into, out.intoAt] = [pace(k - 1, i), at]
+        for (let j = k - back + 1; j <= k; j++) if (pace(j - 1, i) - pace(j, i) > out.drop) [out.drop, out.dropAt] = [pace(j - 1, i) - pace(j, i), at]
+      }
+    }
+    return out
+  }
+  /** The worst of `heelStrikes` over many runs, with where it was. */
+  const strikes = () => {
+    const all = { n: 0, into: 0, intoAt: '', drop: 0, dropAt: '' }
+    const add = (frames: Sole[], where: string) => {
+      const s = heelStrikes(frames)
+      all.n += s.n
+      if (s.into > all.into) [all.into, all.intoAt] = [s.into, `${where}, ${s.intoAt}`]
+      if (s.drop > all.drop) [all.drop, all.dropAt] = [s.drop, `${where}, ${s.dropAt}`]
+    }
+    /** Every run's braked heel strikes slow the heel over frames into its
+     *  rest: at most `into` m/s the frame before, `drop` m/s lost in a frame
+     *  (a dead stop: its whole swing, 3-6 m/s, in one frame). */
+    const check = (into: number, drop: number) => {
+      expect(all.n, 'braked heel strikes read').toBeGreaterThan(0)
+      expect(all.into, `${all.intoAt}: the heel's speed into its rest`).toBeLessThanOrEqual(into)
+      expect(all.drop, `${all.dropAt}: the heel's largest loss of speed in a frame`).toBeLessThanOrEqual(drop)
+    }
+    return { add, check }
+  }
+
   it('a start or resumed walk brakes the heel strike per foot: a foot landed is braked while the other still steps off the stand, each brake keeps the share it began with', () => {
     // the brake was off for both feet until both had landed and a resumed
     // start's hold had run out, so a foot already back on the clip struck its
@@ -873,17 +919,23 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   it('stopping in a corner: the knee bends no faster through the blend than the walk clip itself bends it', () => {
     // a walker leaving the gait in a ~2.8 rad/s corner snapped its knee by
     // 0.49-0.66 rad a frame into a deep bend (finding 22.10.2026, seed 42 walker 0)
+    const heel = strikes()
     for (const turn of [2.8, -2.8, 1.5, -1.5, 0]) {
       const clip = clipKneeStep(turn)
       for (let cut = 1; cut < 1.6; cut += 0.05) {
         // turning into the corner from shortly before the stop, on through it
         const frames = settle({ cut, turn: (t) => (t > cut - 0.3 ? turn : 0) })
+        heel.add(frames, `turning ${turn} rad/s, stop at ${cut.toFixed(2)} s`)
         let worst = 0
         // from before the blend to the run's end: the legs settle on past the walk's fade
         for (let k = Math.max(1, blendFrames(frames)[0] - 5); k < frames.length; k++) worst = Math.max(worst, kneeStep(frames, k))
         expect(worst, `turning ${turn} rad/s, stop at ${cut.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
       }
     }
+    // the heel strikes walking into the stop: into its rest at most 0.095 m/s,
+    // a frame's loss at most 2.372 (measured 25.11.2026; the clip's own heel
+    // strike, unbraked, comes into its rest at 2.9-3.2 m/s)
+    heel.check(0.12, 2.6)
   })
 
   /** The worst knee step over a whole run, from its first frame. */
@@ -896,6 +948,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   it('starting, straight or into a corner: the knee bends no faster through the blend than the walk clip bends it', () => {
     // setting off straight turned the shin 0.656 rad on the first blend frame,
     // then by 0.24-0.42 rad steps (finding 24.11.2026 from point 1422)
+    const heel = strikes()
     for (const turn of [0, 2.8, -2.8, 1.5, -1.5]) {
       const clip = clipKneeStep(turn)
       // OPEN: at +2.8 rad/s past the start the gait alone passes the clip's
@@ -923,6 +976,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const blend = frames.findIndex((f) => f.w > 0)
         const full = frames.findIndex((f, k) => k > blend && f.w >= 1)
         const where = `turning ${turn} rad/s, start at ${cut.toFixed(2)} s`
+        heel.add(frames, where)
         expect(blend > 0 && full > blend, where).toBe(true)
         let start = 0
         for (let k = 1; k <= full; k++) start = Math.max(start, kneeStep(frames, k))
@@ -930,6 +984,10 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         expect(worstKnee(frames), `${where} (bound ${after.toFixed(3)})`).toBeLessThanOrEqual(after)
       }
     }
+    // the heel strikes past the start: into its rest at most 0.264 m/s, a
+    // frame's loss at most 1.529 (measured 25.11.2026; the start's own steps
+    // off the stand land unbraked, see the OPEN in applyClipLayers)
+    heel.check(0.3, 1.8)
   })
 
   const RESUME_LANDING_BOUND = 0.22 // rad a frame; measured 0.215 (point 1587), owned by point 1589
@@ -941,11 +999,13 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     // first landing at +26-28 then still stepped it 0.24-0.38 rad (point 1587)
     // only a stop begun: a pause shorter than 0.35 s never takes the legs off
     // the walk
+    const heel = strikes()
     for (const turn of [0, 2.8, -2.8]) {
       const clip = clipKneeStep(turn)
       for (let pause = 0.35; pause < 0.8; pause += 0.05) {
         const cut = 1.2
         const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
+        heel.add(frames, `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s`)
         expect(Math.min(...frames.map((f) => f.w)), `the stop has begun, resumed after ${pause.toFixed(2)} s`).toBeLessThan(1)
         const r0 = frameAt(cut + pause) // the frame the resume acts on, on settle's own clock
         // the first resumed frame of the whole run: none before the resume acts
@@ -977,6 +1037,13 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         expect(worstKnee(frames), `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s`).toBeLessThanOrEqual(RESUME_KNEE_STEP_BOUND)
       }
     }
+    // the heel strikes of the resumed walk: a frame's loss at most 1.675 m/s
+    // (measured 25.11.2026; unbraked it comes to rest from 2.98-3.21)
+    // OPEN: resumed after 0.40-0.50 s and accelerating, the braked heel comes
+    // into its catch at up to 0.787 m/s (walking on at most 0.26): its brake
+    // ends after the hold already takes it (the heel on the ground for two
+    // frames before); measured 25.11.2026, cause not yet located
+    heel.check(0.85, 1.9)
   })
 
   it('a walk taken up again mid-stop: the hold outlives the legs\' weight, ends on its own clock, and the start lasts until it is released', () => {
