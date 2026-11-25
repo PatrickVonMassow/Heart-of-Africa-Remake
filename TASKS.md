@@ -121,6 +121,13 @@ put it is the mistake this line exists to stop.
   Criticality: medium - visibly flung foot in village walks.
   Bundle: Dorfleben.
 
+- [ ] 1593. Empty water jar jumps when a villager starts a gesture
+  Source: finding 25.11.2026 16:37 UTC from the point-1425 author (feat/1425-jar-lift-transition 4011ab913): when a villager starts a gesture with the empty jar in hand, the jar moves ~0.074 m in one frame. Outside 1425's lift.
+  Final state: the empty jar stays with the hand through a gesture start, without a one-frame jump.
+  Verifiable: a Vitest bounds the jar's per-frame displacement across a gesture start; a moving capture on both backends.
+  Criticality: medium - visible jar pop on gesturing water carriers.
+  Bundle: Dorfleben.
+
 - [ ] 1425. Carried water jar jumps from hip to shoulder within a few frames
   Source: finding 22.10.2026 19:24 from the point-1404 moving capture (WebGL 2, seed 42, Bambara village, errand villager 1, frames 255-261 at 60 Hz, branch e962c7841): the carried jar swings from hanging low at the hip to raised beside the shoulder within ~6 frames (~0.1 s) while the carrier walks on.
   Final state: the jar moves from hip to shoulder as a visible lift over a natural duration, never as a pop between two carry poses.
