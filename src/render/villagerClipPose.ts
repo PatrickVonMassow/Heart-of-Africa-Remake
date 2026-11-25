@@ -564,6 +564,7 @@ function heelBrake(asset: VillagerAsset, frame: PersonFrame, gait: ReturnType<ty
 const _bkPose = newPose(0)
 const _bkWorld = newWorld(0)
 const _brk = new THREE.Vector3()
+const BRAKE_BOTH = [1, 1] as const
 
 /**
  * How far (share of the cycle) before its stance lands the walk clip's heel
@@ -715,7 +716,7 @@ export function clipGaitPose(
   body: GroundBody | null,
   out: VillagerPose,
   walkClip: VillagerClip = asset.clips.walk,
-  heelBraking = 1,
+  heelBraking: readonly [number, number] = BRAKE_BOTH,
 ): VillagerPose {
   const n = asset.bones.length
   ensure(out, n)
@@ -913,7 +914,7 @@ export function clipGaitPose(
     // it moved the foot by a jump)
     _brk.set(0, 0, 0)
     if (body && gait.walk > 0 && !(held.heel || held.ball || held.tip) && catching(i) && heelBrake(asset, frame, gait, walkClip, g.phase, i, c.heel, _brk)) {
-      g.brake[i] ??= heelBraking
+      g.brake[i] ??= heelBraking[i]
       _brk.multiplyScalar(g.brake[i]!)
       _miss.x += _brk.x
       _miss.z += _brk.z
