@@ -114,6 +114,14 @@ export interface ClipLayers {
   /** How far a foot on the stand takes up the clip's roll off its heel (0 … 1):
    *  none while the walk weight blends the legs, then over G.startRollSeconds. */
   startRoll: number
+  /** Per foot, its first landing since a start (or resumed start) began is
+   *  still to come, and whether the gait held its heel last frame: its first
+   *  heel strike lands unbraked (OPEN: point 1594), every later one braked,
+   *  told by the gait taking hold of its heel off the stand, not by the
+   *  start's handoff (a resumed foot lifted in the clip's stance is handed to
+   *  the clip at its lift, before its first landing). */
+  firstLand: [boolean, boolean]
+  heelDown: [boolean, boolean]
   /** Per foot, where and as the last settle drew it (ankle: world x, z and
    *  body y; turn: world), so a start cut short hands its feet on from there. */
   lastAt: [THREE.Vector3, THREE.Vector3]
@@ -205,6 +213,8 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     startBall: [0, 0],
     startFirst: -1,
     startRoll: 0,
+    firstLand: [false, false],
+    heelDown: [false, false],
     lastAt: [new THREE.Vector3(), new THREE.Vector3()],
     lastTurn: [new THREE.Quaternion(), new THREE.Quaternion()],
     lastMove: [new THREE.Vector3(), new THREE.Vector3()],
@@ -348,6 +358,7 @@ export function applyClipLayers(
     c.starting = true
     c.startState = [-1, -1]
     c.startFirst = -1
+    c.firstLand = [true, true]
     c.startRoll = 0
     c.handoff = false
     c.anchor = 0
@@ -361,6 +372,7 @@ export function applyClipLayers(
     c.starting = true
     c.startState = [-1, -1]
     c.startFirst = -1
+    c.firstLand = [true, true]
     c.startRoll = 0
     c.resumed = true
     c.resumeNew = true
@@ -403,17 +415,24 @@ export function applyClipLayers(
     blendInto(asset, bones, ARM('R'), c.local, c.arms[1])
   }
   // THE GAIT
+  if (!(legs > 1e-3 && under)) c.heelDown = [false, false]
   if (legs > 1e-3 && under) {
-    // (a start steps a foot off the stand onto the clip's landing itself:
-    // the heel strike's brake re-timed that landing under it; a foot landed
-    // walks on the clip, its later heel strikes braked. Per foot, latched as
-    // its brake begins, so a foot landing mid-brake keeps the share it began)
+    // (a foot's first landing since a start or resume began lands unbraked;
+    // once landed it walks on the clip, its later heel strikes braked. Per
+    // foot, latched as its brake begins, so a foot landing mid-brake keeps
+    // the share it began)
     // OPEN: point 1594: a start's own steps off the stand still land
     // unbraked, their heel stopped from 1.5-3.0 m/s in a frame (braked, they
     // slide 3.6 cm and pass the start and resume knee bounds narrowly:
     // measured 25.11.2026)
-    for (const i of [0, 1]) _braking[i] = c.starting && c.startState[i] < 2 ? 0 : 1
+    for (const i of [0, 1]) _braking[i] = c.firstLand[i] ? 0 : 1
     clipGaitPose(c.gait, asset, f, m.speed, c.ground, c.pose, asset.clips.walk, _braking)
+    for (const i of [0, 1]) {
+      const down = !!c.gait.held[i].heel
+      // landed: the gait takes hold of its heel off the stand
+      if (down && !c.heelDown[i] && !(c.starting && c.startState[i] <= 0)) c.firstLand[i] = false
+      c.heelDown[i] = down
+    }
     // the gait grounds its contacts at 0 (the rest A-pose's sole), not at the hung rest's
     toHung(asset, f, c.pose, c.local, c.hips, 0)
     const w = legs
