@@ -1045,11 +1045,16 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       for (let run = 0.125; run < 0.3; run += 0.025) {
         const cut = 0.5
         const frames = settle({ cut, start: true, stopAt: cut + run, turn: (t) => (t > cut ? turn : 0) })
-        const falls = Math.round((cut + run) * 60)
-        expect(frames[falls].w, 'the stop falls inside the start blend').toBeGreaterThan(0)
-        expect(frames[falls].w, 'the stop falls inside the start blend').toBeLessThan(1)
+        const where = `turning ${turn} rad/s, walking ${run.toFixed(2)} s`
+        // the reversal: the first frame the legs' share falls, the start still in its blend
+        const at = frames.findIndex((f, k) => k > 0 && f.w < frames[k - 1].w)
+        expect(at, `${where}: the legs' share reverses`).toBeGreaterThan(0)
+        expect(frames[at - 1].w, `${where}: the stop falls inside the start blend`).toBeGreaterThan(0)
+        expect(frames[at - 1].w, `${where}: the stop falls inside the start blend`).toBeLessThan(1)
+        // the legs come back to the stand, so the bound covers the whole way there
+        expect(frames[frames.length - 1].w, `${where}: back on the stand`).toBe(0)
         const worst = worstKnee(frames)
-        expect(worst, `turning ${turn} rad/s, walking ${run.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
+        expect(worst, `${where} (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
       }
     }
   })
