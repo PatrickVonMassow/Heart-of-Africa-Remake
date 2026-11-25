@@ -4405,6 +4405,14 @@ export const VILLAGER_GLTF = {
    *  ball (share of the stance; the foot lies flat there, so the hand-over
    *  moves nothing). Calibratable. */
   footPivotSwitch: 0.4,
+  /** Share of the gait cycle over which a foot that no longer lies flat lets
+   *  go of the heading it kept (villagerClipPose.ts). Let go with the flat
+   *  share, a foot in a 3.5 rad/s curve swung its stance's turn round at up
+   *  to 61 rad/s; at 0.2 at most 23 rad/s, mostly in the air (measured
+   *  25.11.2026). 0.15-0.22 keep the start/stop knee cases of
+   *  gltfClipLayers.test.ts within their bounds, 0.25 and 0.35 do not.
+   *  Calibratable. */
+  footHeadingRelease: 0.2,
   /** Share of a rolling foot's pitch its toes lift their tip by while the
    *  foot rolls over its ball (villagerClipPose.ts `heelOff`). Calibratable. */
   toeLift: 0.3,
