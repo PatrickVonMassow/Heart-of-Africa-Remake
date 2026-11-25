@@ -890,8 +890,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
         expect(Math.min(...frames.map((f) => f.w)), `the stop has begun, resumed after ${pause.toFixed(2)} s`).toBeLessThan(1)
         const r0 = frameAt(cut + pause) // the frame the resume acts on, on settle's own clock
-        const began = frames.findIndex((f, k) => k >= r0 - 1 && f.resumed)
-        expect(began, `resumed after ${pause.toFixed(2)} s: a resumed start begins`).toBeGreaterThanOrEqual(r0 - 1)
+        // the first resumed frame of the whole run: none before the resume acts
+        const began = frames.findIndex((f) => f.resumed)
+        expect(began, `resumed after ${pause.toFixed(2)} s: a resumed start begins, not before the resume`).toBeGreaterThanOrEqual(r0)
         expect(began - r0, `resumed after ${pause.toFixed(2)} s: the resumed start begins within its first frames`).toBeLessThan(15)
         // the first foot's landing, located rather than assumed inside the 30 frames
         const landing = frames.findIndex((f, k) => k > began && f.start.includes(2))
