@@ -47904,3 +47904,10 @@ Measured 25.11.2026 (checkpoint 7b20084e6, kept): the stand foot lifted once the
   Verifiable: the resume case of gltfClipLayers.test.ts over pauses where the legs' weight left 1, bounded by the clip's 240 Hz range; a moving capture on both backends.
   Criticality: medium - visible leg snap when a villager hesitates and walks on.
   Bundle: Dorfleben.
+
+- [x] 1586. Villager knee jumps as the walk clip lifts a resumed start's waiting stand foot
+  Source: split from point 1583 on 25.11.2026: in a walk resumed from a begun stop (pauses 0.35-0.75 s), the stand foot still mid-swing is taken by the clip's own lift 40-44 frames on and the knee steps up to 0.53 rad (worst turning -2.8 rad/s, 0.41-0.53 at 0.50-0.75 s; straight 0.75 s 0.50), against the clip's 0.20-0.23 (resume case of gltfClipLayers.test.ts, branch feat/1583-knee-resume-snap 7b20084e6).
+  Final state: the waiting stand foot's own swing ends before or blends into the clip's lift, so no frame past the first foot's landing steps the knee faster than the clip's range.
+  Verifiable: the resume case of gltfClipLayers.test.ts with frames past the first foot's landing bounded by the clip's 240 Hz range; a moving capture on both backends.
+  Criticality: medium - visible leg snap when a villager hesitates and walks on.
+  Bundle: Dorfleben.

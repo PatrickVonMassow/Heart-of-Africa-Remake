@@ -107,12 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1586. Villager knee jumps as the walk clip lifts a resumed start's waiting stand foot
-  Source: split from point 1583 on 25.11.2026: in a walk resumed from a begun stop (pauses 0.35-0.75 s), the stand foot still mid-swing is taken by the clip's own lift 40-44 frames on and the knee steps up to 0.53 rad (worst turning -2.8 rad/s, 0.41-0.53 at 0.50-0.75 s; straight 0.75 s 0.50), against the clip's 0.20-0.23 (resume case of gltfClipLayers.test.ts, branch feat/1583-knee-resume-snap 7b20084e6).
-  Final state: the waiting stand foot's own swing ends before or blends into the clip's lift, so no frame past the first foot's landing steps the knee faster than the clip's range.
-  Verifiable: the resume case of gltfClipLayers.test.ts with frames past the first foot's landing bounded by the clip's 240 Hz range; a moving capture on both backends.
-  Criticality: medium - visible leg snap when a villager hesitates and walks on.
-  Bundle: Dorfleben.
 - [ ] 1587. Villager knee steps at a resumed start's take-over and first landing
   Source: split from point 1583 on 25.11.2026: unmoved by every resume variant measured that day, the take-over at +11 frames and the first foot's own landing at +26-28 frames step the knee 0.24-0.38 rad against the clip's 0.20-0.23 (resume case of gltfClipLayers.test.ts, 7b20084e6); the landing part may share the heel strike of point 1423.
   Final state: the take-over and the first landing of a resumed start step the knee no faster than the clip's range, or the landing excess is charged to 1423 with a measurement that shows it is the heel strike.
