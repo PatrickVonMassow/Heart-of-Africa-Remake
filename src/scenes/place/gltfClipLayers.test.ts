@@ -889,7 +889,10 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     }
   })
 
-  // WIP probe for point 1587 (remove before landing)
+  // WIP probe for point 1587 (remove before landing). Handover 25.11.2026: the
+  // waiting-foot failure (turn 0, pause 0.70, +37) comes from the time-based hold
+  // release alone (the chain fade disabled leaves it at 0.230); the landing
+  // excess left (turn 0, pause 0.40, +28: 0.215) is the gait's own (gR 0.217)
   it.skip('PROBE1587', () => {
     for (const turn of [0, 2.8, -2.8]) {
       const clip = clipKneeStep(turn)
