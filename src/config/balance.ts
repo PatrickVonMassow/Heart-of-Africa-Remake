@@ -4424,6 +4424,11 @@ export const VILLAGER_GLTF = {
    *  line without its pitch snapping onto it (villagerClipPose.ts `heelOff`).
    *  Calibratable. */
   rollSoftPitch: 0.3,
+  /** The most (rad) a rolling foot that keeps its heading pitches on past
+   *  its roll to keep the ankle on the leg's reach (villagerClipPose.ts
+   *  `heelOff`); beyond it the foot is near upright off its pivot and the
+   *  ankle is pulled in instead. Calibratable. */
+  rollKeepPitchMax: 0.6,
   /** Share of the cycle over which the walk eases a sole contact onto the
    *  ground after its authored touch and off it before its authored lift
    *  (the retargeted clip lifts its trailing ball and toe early).
