@@ -559,6 +559,31 @@ describe('the clip gait on the ground', () => {
     }
   }, 240_000)
 
+  it('a frame hitch stepping past the brake\'s start still brakes the heel strike it walks into', () => {
+    // cross-vendor review of point 1591: a frame crossing from before the
+    // brake's start past its late cutoff began no brake, and the hold took
+    // the heel unbraked on the next frame. One hitch of the figure's frame
+    // clamp (0.1 s, GIZA_ACTIVITY.maxFrame) at every offset through a cycle
+    let hitches = 0
+    for (const person of [adult, child]) {
+      const per = person.frame.legScale * person.frame.scale
+      for (const v of [0.6, 1.0, 1.45]) {
+        const speed = v * per
+        const hz = 60
+        for (let at = hz; at < 2.2 * hz; at += 2) {
+          const strikes = heelStrikeRun(person, hz, 3 * hz, (k) => ({ walked: (speed * (k === at ? 0.1 : 1 / hz)), speed, dyaw: 0 }))
+          for (const s of strikes) {
+            if (s.k <= at) continue
+            if (s.k <= at + 0.2 * hz) hitches++
+            expect(s.braked, `${v} per leg, hitch at frame ${at}, leg ${person.frame.legScale.toFixed(2)}: frame ${s.k}, foot ${s.i}: its brake ran`).toBe(true)
+          }
+        }
+      }
+    }
+    // (strikes landed within 0.2 s after the hitch)
+    expect(hitches).toBeGreaterThan(50)
+  }, 120_000)
+
   it('a short step while turning swings no braking heel round: the turn the brake predicts is the walk\'s, not one frame\'s', () => {
     // review 25.11.2026: a frame walking 0.0001 of a cycle while the body
     // turned 0.01 rad read a turn of 100 rad a cycle, and the brake swung the

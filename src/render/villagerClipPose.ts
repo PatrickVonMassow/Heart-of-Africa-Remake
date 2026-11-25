@@ -569,10 +569,16 @@ function heelBrake(asset: VillagerAsset, frame: PersonFrame, body: GroundBody, g
     // earlier between the two); entered within (a gait set into its phase,
     // a hold let go there) it moved the foot by a jump. Begun late, the
     // brake runs from where the foot stands, over what is left of it, if
-    // enough is left to ease the heel to rest.
-    if (x + walked < -most || x >= -G.heelBrakeLate * most) return null
-    if (x >= -most && !armed && x - walked >= -most) return null
-    st = { share, from: phase, rest: null }
+    // enough is left to ease the heel to rest; with less left, a frame that
+    // walked from before its start (a hitch: the figure's frames are
+    // clamped at 0.1 s) runs it from its own start, the heel set onto its
+    // path there (begun on no frame, the hold took the heel unbraked on the
+    // next: cross-vendor review of point 1591).
+    if (x + walked < -most) return null
+    const crossed = armed || x - walked < -most
+    if (x >= -most && !crossed) return null
+    const late = x >= -G.heelBrakeLate * most
+    st = { share, from: late ? end - most : phase, rest: null }
   }
   const from = st.from
   // the brake as drawn now: from its start, its end read at this pace (a
