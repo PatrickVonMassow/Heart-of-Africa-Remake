@@ -434,7 +434,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   /** Per frame: the legs' share of the gait, each foot's world points, the
    *  shins' turns, and the start's state per foot (`ClipLayers.startState`,
    *  -1 when no start runs) with whether the walk clip swings that foot. */
-  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number; hold: number; resumed: boolean }
+  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number; hold: number; resumed: boolean; brake: (number | null)[] }
   /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
   function soleOf(bones: Record<string, THREE.Bone>) {
     const f = person.frame
@@ -521,7 +521,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const [land, lift] = gaitStance(i)
         return lift - land > 1e-6 && ((((c.gait.phase - land) % 1) + 1) % 1) >= lift - land
       })
-      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step, hold: c.stop, resumed: c.resumed })
+      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step, hold: c.stop, resumed: c.resumed, brake: [...c.gait.brake] })
     }
     return frames
   }
@@ -831,6 +831,44 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         for (let k = hz / 2; k < hz * 2.8; k++) clip = Math.max(clip, kneeStep(walk, k))
       return (clip * hz) / 60
     })
+
+  it('a start or resumed walk brakes the heel strike per foot: a foot landed is braked while the other still steps off the stand, each brake keeps the share it began with', () => {
+    // the brake was off for both feet until both had landed and a resumed
+    // start's hold had run out, so a foot already back on the clip struck its
+    // heel unbraked (cross-vendor review of point 1591). At the hold's own
+    // length a landed foot is not yet swinging again when the start ends, so
+    // the hold here lasts 1.5 s: the landed feet walk on within the start
+    const g = VILLAGER_GLTF as { resumeHoldSeconds: number }
+    const was = g.resumeHoldSeconds
+    let landed = 0
+    let stepping = 0
+    try {
+      g.resumeHoldSeconds = 1.5
+      for (const turn of [0, 2.8, -2.8]) {
+        const runs = [settle({ cut: 1, start: true, turn: (t) => (t > 1 ? turn : 0) }), ...[0.4, 0.6].map((pause) => settle({ cut: 1.2, resumeAt: 1.2 + pause, turn: (t) => (t > 0.9 ? turn : 0) }))]
+        runs.forEach((frames, r) => {
+          for (let k = 1; k < frames.length; k++) {
+            for (const i of [0, 1]) {
+              const [before, now] = [frames[k - 1].brake[i], frames[k].brake[i]]
+              const where = `turning ${turn} rad/s, run ${r}, frame ${k}, foot ${i}`
+              // latched: a share never changes within its brake
+              if (before !== null && now !== null) expect(now, `${where}: the share its brake began with`).toBe(before)
+              if (before !== null || now === null) continue
+              // a brake begun: unbraked only on a foot still stepping off the stand
+              const off = frames[k].start[i] === 0 || frames[k].start[i] === 1
+              expect(now, `${where}: start state ${frames[k].start[i]}`).toBe(off ? 0 : 1)
+              if (off) stepping++
+              else if (frames[k].start[i] === 2) landed++
+            }
+          }
+        })
+      }
+    } finally {
+      g.resumeHoldSeconds = was
+    }
+    expect(landed, 'brakes begun on a landed foot while the start still runs').toBeGreaterThan(0)
+    expect(stepping, 'brakes begun on a foot still stepping off the stand').toBeGreaterThan(0)
+  })
 
   it('stopping in a corner: the knee bends no faster through the blend than the walk clip itself bends it', () => {
     // a walker leaving the gait in a ~2.8 rad/s corner snapped its knee by
