@@ -237,6 +237,70 @@ describe('the clip gait on the ground', () => {
     }
   }, 240_000)
 
+  it('the walk\'s heel strike slows the swinging heel to rest before it takes hold: no dead stop, landing where the clip lands it', () => {
+    // the clip still swings its heel forward ~2 m/s as it touches down, and
+    // the hold stopped it from 2.05 m/s to rest within one frame (adult, 1 m/s)
+    const n = asset.bones.length
+    let catches = 0
+    let into = 0
+    let drop = 0
+    let land = 0
+    for (const person of [adult, child, gltfPerson(asset, 'female', 'adult', 1)]) {
+      const f = person.frame
+      const per = f.legScale * f.scale
+      for (const hz of [60, 120]) {
+        for (const v of [0.6, 1.0, VILLAGER_GLTF.jogThreshold - VILLAGER_GLTF.jogBand]) {
+          const speed = v * per
+          const dt = 1 / hz
+          // the planted walk and the clip's own (nothing held) side by side
+          const runs = [true, false].map((hold) => ({ hold, g: newClipGait(), pose: newPose(n), world: newWorld(n), heels: [[], []] as THREE.Vector3[][] }))
+          const caught: number[][] = [[], []]
+          let z = 0
+          for (let k = 0; k < 3 * hz; k++) {
+            z += speed * dt
+            for (const r of runs) {
+              const was = r.g.held.map((h) => h.heel)
+              stepClipGait(r.g, asset, f, speed * dt, speed)
+              clipGaitPose(r.g, asset, f, speed, r.hold ? { x: 0, z, yaw: 0, unit: 1 } : null, r.pose)
+              forwardKinematics(asset, f.rest0, r.pose, r.world)
+              const c = contactPoints(asset, r.world, f.legScale)
+              ;(['L', 'R'] as const).forEach((s, i) => {
+                r.heels[i].push(new THREE.Vector3(c[s].heel.x * f.scale, 0, c[s].heel.z * f.scale + z))
+                if (r.hold && k > hz && !was[i] && r.g.held[i].heel) caught[i].push(k)
+              })
+            }
+          }
+          const [drawn, clip] = [runs[0].heels, runs[1].heels]
+          for (const i of [0, 1]) {
+            expect(caught[i].length, `${v} per leg at ${hz} Hz, leg ${f.legScale.toFixed(2)}, foot ${i}: its heel is caught`).toBeGreaterThan(0)
+            for (const k of caught[i]) {
+              // the heel's ground speed (m/s) over the swing's last frames into its catch
+              const pace = (j: number) => drawn[i][j].distanceTo(drawn[i][j - 1]) / dt
+              const back = Math.round(0.35 * hz)
+              const peak = Math.max(...Array.from({ length: back }, (_, j) => pace(k - j)))
+              into = Math.max(into, pace(k) / peak)
+              // over the last four 60 Hz frames into the catch and the one after it
+              for (let j = k - (4 * hz) / 60 + 1; j <= k + 1; j++) drop = Math.max(drop, ((pace(j - 1) - pace(j)) / peak) * (hz / 60))
+              // where the clip's heel touches down: at most its own last step off
+              land = Math.max(land, (drawn[i][k].distanceTo(clip[i][k]) - clip[i][k].distanceTo(clip[i][k - 1])) / per)
+              catches++
+            }
+          }
+        }
+      }
+    }
+    expect(catches).toBeGreaterThanOrEqual(3 * 2 * 3 * 2)
+    // into its catch the heel has nearly come to rest (measured 0.043 of its
+    // swing's pace; the dead stop 0.735) …
+    expect(into).toBeLessThan(0.1)
+    // … slowing over frames: per 60 Hz frame it loses at most 0.299 of that
+    // pace (the dead stop 1.47, its whole pace and the clip's noise on it) …
+    expect(drop).toBeLessThan(0.4)
+    // … and sets down where the clip's heel touches, not short of it (at most
+    // 1.3 cm per unit of leg past the clip's own step that frame)
+    expect(land).toBeLessThan(0.02)
+  })
+
   it('a held foot shoved off its clip lets go by easing, never by a jump when its last contact lifts', () => {
     const n = asset.bones.length
     const f = adult.frame

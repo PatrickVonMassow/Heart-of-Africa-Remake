@@ -845,23 +845,12 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     // then by 0.24-0.42 rad steps (finding 24.11.2026 from point 1422)
     for (const turn of [0, 2.8, -2.8, 1.5, -1.5]) {
       const clip = clipKneeStep(turn)
-      // OPEN: point 1423 (heel strike) owns the clip-range bound at +2.8 rad/s
-      // after the start: there the run past it adds nothing over walking into
-      // that corner without one (the gait alone passes the clip's range at landing)
-      let after = clip
-      if (turn === 2.8) {
-        for (let cut = 1; cut < 1.6; cut += 0.05) {
-          const walk = settle({ cut: 3, turn: (t) => (t > cut ? turn : 0) })
-          for (let k = 1; k < 170; k++) after = Math.max(after, kneeStep(walk, k))
-        }
-      }
+      // (at +2.8 rad/s the gait alone passed the clip's range at its heel
+      // strike, 0.266 against 0.245, until the heel landed at rest)
       for (let cut = 1; cut < 1.6; cut += 0.05) {
         const frames = settle({ cut, start: true, turn: (t) => (t > cut ? turn : 0) })
-        // the start's blend itself (from the stand to full weight) within the
-        // clip's own range at every corner, the raised bound only past it, where
-        // the gait at full weight draws the knee (measured: +2.8 rad/s peaks at
-        // 0.249 at full weight on the second foot's clip swing, walking into the
-        // corner without a start at 0.271; cross-vendor review 24.11.2026)
+        // the start's blend itself (from the stand to full weight) and the
+        // walk on past it within the clip's own range at every corner
         const blend = frames.findIndex((f) => f.w > 0)
         const full = frames.findIndex((f, k) => k > blend && f.w >= 1)
         const where = `turning ${turn} rad/s, start at ${cut.toFixed(2)} s`
@@ -869,7 +858,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         let start = 0
         for (let k = 1; k <= full; k++) start = Math.max(start, kneeStep(frames, k))
         expect(start, `${where} (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
-        expect(worstKnee(frames), `${where} (bound ${after.toFixed(3)})`).toBeLessThanOrEqual(after)
+        expect(worstKnee(frames), `${where} (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
       }
     }
   })
