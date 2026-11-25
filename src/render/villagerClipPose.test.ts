@@ -604,6 +604,7 @@ describe('the clip gait on the ground', () => {
     let flatChecked = 0
     let spotChecked = 0
     let catchChecked = 0
+    let rollChecked = 0
     for (const yawRate of [3.5, -3.5]) {
       for (const sex of SEXES) {
         for (const age of AGE_GROUPS) {
@@ -654,16 +655,19 @@ describe('the clip gait on the ground', () => {
                   for (const kk of contacts) {
                     const p = c[s][kk]
                     const key = s + kk
-                    if (!held[kk] || p.y > 0.003) {
+                    // the spot is kept for the whole hold: a contact lifted
+                    // within it and set down again comes back to it
+                    if (!held[kk]) {
                       spot[key] = null
                       continue
                     }
+                    if (p.y > 0.003) continue
                     const w = { x: x + (p.x * Math.cos(yaw) + p.z * Math.sin(yaw)) * f.scale, z: z + (-p.x * Math.sin(yaw) + p.z * Math.cos(yaw)) * f.scale }
                     if (!spot[key]) spot[key] = w
                     else if (k * dt > 1) {
                       spotChecked++
                       // a held contact on the ground stays where it came down
-                      // (measured to 0.9 cm, main before 1.3 cm)
+                      // (measured to 0.9 cm over the whole hold, main before 1.3 cm)
                       expect(Math.hypot(w.x - spot[key]!.x, w.z - spot[key]!.z), `${where}, ${kk}`).toBeLessThan(0.012)
                     }
                   }
@@ -683,6 +687,13 @@ describe('the clip gait on the ground', () => {
                     flatChecked++
                     const e = heading - caught[i]!
                     expect(Math.abs(Math.atan2(Math.sin(e), Math.cos(e))), where).toBeLessThan(0.03)
+                  } else if (caught[i] !== null && g.headingKeep[i] >= 1 && contacts.some((kk) => held[kk] && c[s][kk].y <= 0.003)) {
+                    // and rolling on a single held contact, until its release
+                    // begins (measured to 1e-7 rad; letting go it turns by up
+                    // to 0.42 rad while a contact is still down, by design)
+                    rollChecked++
+                    const e = heading - caught[i]!
+                    expect(Math.abs(Math.atan2(Math.sin(e), Math.cos(e))), `${where}, rolling`).toBeLessThan(0.03)
                   }
                   // and it lets go of it without a snap (main before: 61 rad/s).
                   // OPEN: at 1.4 per leg the trailing foot is thrown up to
@@ -699,6 +710,7 @@ describe('the clip gait on the ground', () => {
     }
     expect(flatChecked).toBeGreaterThan(1000)
     expect(spotChecked).toBeGreaterThan(1000)
+    expect(rollChecked).toBeGreaterThan(1000)
     expect(catchChecked).toBeGreaterThan(500)
   })
 
