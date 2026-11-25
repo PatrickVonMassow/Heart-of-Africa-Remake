@@ -732,9 +732,6 @@ describe('the clip gait on the ground', () => {
     }
     let handed = 0
     let caughtN = 0
-    let staleN = 0
-    let worstKnee = 0
-    let worstCatch = 0
     for (const sex of SEXES) {
       for (const age of AGE_GROUPS) {
         const f = gltfPerson(asset, sex, age, 0).frame
@@ -777,7 +774,6 @@ describe('the clip gait on the ground', () => {
                   yaw += yawRate * (speed / full) * dt
                   x += Math.sin(yaw) * speed * dt
                   z += Math.cos(yaw) * speed * dt
-                  const before = [g.flatYaw[0], g.flatYaw[1]]
                   stepClipGait(g, asset, f, speed * dt, speed)
                   clipGaitPose(g, asset, f, speed, { x, z, yaw, unit: 1 }, pose)
                   forwardKinematics(asset, f.rest0, pose, world)
@@ -787,11 +783,9 @@ describe('the clip gait on the ground', () => {
                     const holding = !!(held.heel || held.ball || held.tip)
                     if (holding && !wasHeld[i] && g.headingKeep[i] > 0 && g.flatYaw[i] !== null) {
                       caughtN++
-                      if (before[i] !== null) staleN++
                       const q = world.q[foot]
                       const e = g.flatYaw[i]! - (2 * Math.atan2(q.y, q.w) + yaw)
                       const miss = Math.abs(Math.atan2(Math.sin(e), Math.cos(e)))
-                      worstCatch = Math.max(worstCatch, miss)
                       // the heading kept from the catch is the one drawn there
                       expect(miss, `${where}, foot ${i} caught`).toBeLessThan(1e-3)
                     }
@@ -799,7 +793,6 @@ describe('the clip gait on the ground', () => {
                     if (k * dt < 1 || !(g.lift[i].left > 0 && g.planted[i])) return
                     handed++
                     const rate = qa.fromArray(prev, shin * 4).angleTo(qb.fromArray(pose.rot, shin * 4)) / dt / clipMax
-                    worstKnee = Math.max(worstKnee, rate)
                     // (measured 0.99 of the clip's fastest; 2.5 before)
                     expect(rate, `${where}, shin ${i} handed over`).toBeLessThan(1)
                   })
