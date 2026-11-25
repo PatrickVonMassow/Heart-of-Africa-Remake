@@ -781,6 +781,7 @@ describe('the clip gait on the ground', () => {
                 const world = newWorld(n)
                 const prev = Array.from(pose.rot)
                 const wasHeld = [false, false]
+                const heldBefore = [{ heel: false, ball: false, tip: false }, { heel: false, ball: false, tip: false }]
                 let x = 0
                 let z = 0
                 let yaw = 0
@@ -796,6 +797,11 @@ describe('the clip gait on the ground', () => {
                   legs.forEach(([, shin, foot], i) => {
                     const held = g.held[i]
                     const holding = !!(held.heel || held.ball || held.tip)
+                    // (every catch is a frame from no hold to a hold here too:
+                    // a hold is never handed to other contacts within a frame)
+                    const was = heldBefore[i]
+                    if (holding && (was.heel || was.ball || was.tip)) expect((['heel', 'ball', 'tip'] as const).some((kk) => !!held[kk] && was[kk]), `${where}, foot ${i} handed its hold over`).toBe(true)
+                    for (const kk of ['heel', 'ball', 'tip'] as const) was[kk] = !!held[kk]
                     if (holding && !wasHeld[i] && g.headingKeep[i] > 0 && g.flatYaw[i] !== null) {
                       caughtN++
                       const q = world.q[foot]
@@ -1227,13 +1233,21 @@ describe('a rolled foot\'s further pitch', () => {
     // review round 5: where the tangent meets the side change (both pitches
     // at 0) the weight steps but the applied pitch runs on through 0, and a
     // pitch wrapping through ±π keeps its weight
+    // approached with a nonzero pitch (phi and K running to 0 and the
+    // tangent together), the applied pitch tends to 0 without a step
     let prev: number | null = null
     let worst = 0
-    for (let k = 0; k <= 2000; k++) {
-      const { alpha, weight } = nearPitch(1, 0, 1 - k * 1e-7, 1)
-      if (prev !== null) worst = Math.max(worst, Math.abs(alpha * weight - prev))
-      prev = alpha * weight
+    let largest = 0
+    for (let k = 400; k >= 0; k--) {
+      const phi = k * 5e-4
+      const { alpha, weight } = nearPitch(Math.cos(phi), Math.sin(phi), Math.cos(phi / 2), 1)
+      const applied = alpha * weight
+      largest = Math.max(largest, Math.abs(applied))
+      if (prev !== null) worst = Math.max(worst, Math.abs(applied - prev))
+      prev = applied
     }
+    expect(largest).toBeGreaterThan(0.05)
+    expect(Math.abs(prev!)).toBeLessThan(1e-9)
     expect(worst).toBeLessThan(0.01)
     const c = 0.05
     const before = nearPitch(Math.cos(Math.PI - c - 1e-6), Math.sin(Math.PI - c - 1e-6), Math.cos(c), 1)
