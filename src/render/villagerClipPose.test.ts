@@ -1249,6 +1249,21 @@ describe('a rolled foot\'s further pitch', () => {
     expect(largest).toBeGreaterThan(0.05)
     expect(Math.abs(prev!)).toBeLessThan(1e-9)
     expect(worst).toBeLessThan(0.01)
+    // and with its two pitches straddling 0 (3 phi and -phi) the same
+    prev = null
+    worst = 0
+    largest = 0
+    for (let k = 400; k >= 0; k--) {
+      const phi = k * 2.5e-4
+      const { alpha, weight } = nearPitch(Math.cos(phi), Math.sin(phi), Math.cos(2 * phi), 1)
+      const applied = alpha * weight
+      largest = Math.max(largest, Math.abs(applied))
+      if (prev !== null) worst = Math.max(worst, Math.abs(applied - prev))
+      prev = applied
+    }
+    expect(largest).toBeGreaterThan(0.05)
+    expect(Math.abs(prev!)).toBeLessThan(1e-9)
+    expect(worst).toBeLessThan(0.01)
     const c = 0.05
     const before = nearPitch(Math.cos(Math.PI - c - 1e-6), Math.sin(Math.PI - c - 1e-6), Math.cos(c), 1)
     const after = nearPitch(Math.cos(Math.PI - c + 1e-6), Math.sin(Math.PI - c + 1e-6), Math.cos(c), 1)
