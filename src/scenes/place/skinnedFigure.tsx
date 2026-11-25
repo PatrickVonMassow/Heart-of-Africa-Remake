@@ -352,6 +352,11 @@ const _turnB = new THREE.Quaternion()
 const _liftFrom = new THREE.Vector3()
 const _liftHand = new THREE.Quaternion()
 const _liftTo = new THREE.Vector3()
+/** An arm's hand-over into or out of a lift (headLift): shoulder, elbow, wrist, hand. */
+const _ovS = new THREE.Vector3()
+const _ovE = new THREE.Vector3()
+const _ovW = new THREE.Vector3()
+const _ovQ = new THREE.Quaternion()
 const _pole = new THREE.Vector3()
 const _euler = new THREE.Euler()
 const _here = new THREE.Vector3()
@@ -487,6 +492,14 @@ export function SkinnedFigure({
    *  grip keeps to one way round instead of flipping where the two are
    *  half a turn apart; null when no lift runs. */
   const liftTurn = useRef<THREE.Quaternion | null>(null)
+  /** Each arm as drawn last frame, in the body's frame: its elbow and wrist
+   *  from the shoulder and its hand's turn; the arm that was lifting a head
+   *  load then (−1: none); and each arm's hand-over from what it drew into a
+   *  lift or out of one (headLift): the shape it eases from and how long it
+   *  has eased. */
+  const drawnArm = useRef(([0, 1] as const).map(() => ({ elbow: new THREE.Vector3(), wrist: new THREE.Vector3(), hand: new THREE.Quaternion(), drawn: false })))
+  const liftingArm = useRef(-1)
+  const liftHandOver = useRef<Array<{ elbow: THREE.Vector3; wrist: THREE.Vector3; hand: THREE.Quaternion; seconds: number } | null>>([null, null])
   const armRef = useMemo(() => restingArmRefs(arms.current, REST_POSE_ARMS), [])
   const owned = !!(pose && limbs)
   const dims = useMemo(() => legDims(rig.p), [rig])
@@ -874,6 +887,17 @@ export function SkinnedFigure({
       }
       // THE HANDS ON THE FINAL BODY: each contact and the steadying hand.
       let steadyShown = 0
+      // An arm taken into a lift or given back from one (to its gesture, its
+      // contact or its clips) eases from what it drew over
+      // VILLAGER_POSE.headLiftHandOver, never a snap at either end of the lift.
+      const lifting = headSteady && steadyArm >= 0 && liftNow < 1 ? steadyArm : -1
+      if (lifting !== liftingArm.current) {
+        for (const k of [liftingArm.current, lifting]) {
+          const d = k >= 0 ? drawnArm.current[k] : null
+          if (d?.drawn) liftHandOver.current[k] = { elbow: d.elbow.clone(), wrist: d.wrist.clone(), hand: d.hand.clone(), seconds: 0 }
+        }
+        liftingArm.current = lifting
+      }
       // how much of each solved hand the clips drew over (the prop anchor follows it)
       const clipShown = [0, 0]
       ;(['L', 'R'] as const).forEach((s, i) => {
@@ -978,6 +1002,29 @@ export function SkinnedFigure({
           fore.quaternion.slerp(armBase[i][1], share)
           b[`hand.${s}`].quaternion.slerp(armBase[i][2], share)
         }
+        const over = liftHandOver.current[i]
+        const hand = b[`hand.${s}`]
+        if (over) {
+          // the wrist and the elbow on straight ways from where they were drawn
+          // to where this frame has them, and the hand's turn with them — the
+          // shortest way, not each joint's own turn summed
+          over.seconds += Math.min(0.1, columnFrame.current.dt)
+          const t = Math.min(1, over.seconds / Math.max(1e-6, VILLAGER_POSE.headLiftHandOver))
+          const w = t * t * (3 - 2 * t)
+          const sh = loc(up, _ovS)
+          const elbow = loc(fore, _ovE).sub(sh).lerp(over.elbow, 1 - w)
+          const wrist = loc(hand, _ovW).sub(sh).lerp(over.wrist, 1 - w).add(sh)
+          const turn = qIn(hand, _ovQ).slerp(over.hand, 1 - w)
+          // (always solved: solveTo brings a wrist target within the arm's reach)
+          if (solveTo(wrist, elbow, true)) hand.quaternion.copy(qIn(fore, _q).invert().multiply(turn))
+          if (t >= 1) liftHandOver.current[i] = null
+        }
+        const d = drawnArm.current[i]
+        const sh = loc(up, _ovS)
+        loc(fore, d.elbow).sub(sh)
+        loc(hand, d.wrist).sub(sh)
+        qIn(hand, d.hand)
+        d.drawn = true
         if (i === steadyArm) steadyShown = done ? (1 - share) * lift : 0
       })
       // Dev: the steadying hand as drawn (which arm, how much of its solve

@@ -60,6 +60,8 @@ interface Trace {
   /** The jar hand's mount and (glTF) its wrist bone, in the body's frame. */
   mount: THREE.Vector3[]
   wrist: THREE.Vector3[]
+  /** The jar arm's elbow (its forearm bone), in the body's frame (glTF). */
+  elbow: THREE.Vector3[]
   /** The jar hand's wrist bone's turn, in the body's frame (glTF). */
   wristTurn: THREE.Quaternion[]
   /** The steadying hand as the skinned body reports it (dev userData). */
@@ -67,8 +69,8 @@ interface Trace {
   crown: THREE.Vector3
 }
 
-async function trace(opts: { body: 'gltf' | 'primitive'; leftBusy?: boolean; busyFrom?: number; lift?: boolean }): Promise<Trace> {
-  const { body, leftBusy = false, busyFrom = FULL_AT - 20, lift = true } = opts
+async function trace(opts: { body: 'gltf' | 'primitive'; leftBusy?: boolean; busyFrom?: number; busyReach?: number; lift?: boolean }): Promise<Trace> {
+  const { body, leftBusy = false, busyFrom = FULL_AT - 20, busyReach, lift = true } = opts
   const look: FigureLook | null =
     body === 'gltf' ? { peopleId: 'bambara', drivers: { coldness: 0, harmattan: 0, karif: 0 }, year: 1890, palette: PALETTE, radial: 16, villager: asset } : null
   const group = new THREE.Group()
@@ -90,7 +92,11 @@ async function trace(opts: { body: 'gltf' | 'primitive'; leftBusy?: boolean; bus
       if (jars.head) jars.head.visible = carry === 'fullJar'
       if (jars.hand) jars.hand.visible = carry === 'emptyJar'
       const p = pose.current!
-      p.left = leftBusy && frame >= busyFrom ? { ...BUSY_LEFT } : { ...REST_POSE.left }
+      const busy = leftBusy && frame >= busyFrom
+      p.left = busy ? { ...BUSY_LEFT } : { ...REST_POSE.left }
+      // a pose's own reach holds the hand where the contact solve puts it
+      // (a bent arm), not where the arm's direction alone would
+      p.reach = busy && busyReach !== undefined ? { left: busyReach } : undefined
       applyFigurePose(limbs.current, p)
       if (jars.head && jars.hand) placeLiftedJar(jars.head, jars.hand, share.current, REST, body === 'gltf' ? LIFT_SETTLE : 0)
     })
@@ -111,7 +117,7 @@ async function trace(opts: { body: 'gltf' | 'primitive'; leftBusy?: boolean; bus
   const gl = { render() {}, setSize() {}, setPixelRatio() {}, domElement: {} }
   await root.configure({ gl: gl as never, frameloop: 'never', size: { width: 1, height: 1, top: 0, left: 0 } })
   await act(async () => root.render(<Stage />))
-  const out: Trace = { jar: [], jarTurn: [], mount: [], wrist: [], wristTurn: [], steady: [], crown: new THREE.Vector3() }
+  const out: Trace = { jar: [], jarTurn: [], mount: [], wrist: [], elbow: [], wristTurn: [], steady: [], crown: new THREE.Vector3() }
   const bodyTurn = new THREE.Quaternion()
   const local = (o: THREE.Object3D) => group.worldToLocal(o.getWorldPosition(new THREE.Vector3()))
   for (frame = 0; frame < FRAMES; frame++) {
@@ -126,6 +132,7 @@ async function trace(opts: { body: 'gltf' | 'primitive'; leftBusy?: boolean; bus
     if (mesh?.skeleton) {
       const bone = mesh.skeleton.bones[asset.bones.indexOf('hand.L')]
       out.wrist.push(local(bone))
+      out.elbow.push(local(mesh.skeleton.bones[asset.bones.indexOf('forearm.L')]))
       out.wristTurn.push(bone.getWorldQuaternion(new THREE.Quaternion()).premultiply(bodyTurn))
     }
     const st = group.getObjectByName('inhabitant')?.userData.steady as { arm: string | null; weight: number } | undefined
@@ -281,6 +288,22 @@ describe('the carried jar through the change of carry, owned as PlaceLife owns i
     const last = FULL_AT + Math.floor(balance.waterJarLiftSeconds * FPS) - 1
     expect(t.mount[last].distanceTo(t.jar[last])).toBeLessThan(0.3)
     expect(t.jar[last].y).toBeGreaterThan(t.crown.y - 0.05)
+  }, 120_000)
+
+  it('glTF body, the jar arm held bent in a pose\'s reach before the fill ends and raised after: its wrist neither snaps into the lift nor out of it (review r2-1)', async () => {
+    // the arm a contact (a pose's reach, bent) well before the jar turns full,
+    // so the lift takes it over from that solve, and gives it back to that
+    // contact once the jar is on the head (the right hand steadying then)
+    const t = await trace({ body: 'gltf', leftBusy: true, busyFrom: 20, busyReach: 0.6 })
+    const end = FULL_AT + Math.ceil(balance.waterJarLiftSeconds * FPS)
+    expect(t.steady[end + 2]?.arm).toBe('right')
+    const from = FULL_AT - 5
+    expect(Math.max(...steps(t.wrist, from))).toBeLessThan(STEP_BAR)
+    expect(Math.max(...steps(t.elbow, from))).toBeLessThan(STEP_BAR)
+    expect(Math.max(...turns(t.wristTurn, from))).toBeLessThan(TURN_BAR)
+    expect(Math.max(...steps(t.jar, from))).toBeLessThan(STEP_BAR)
+    // and the hand does go back to its contact: the arm ends where the pose has it
+    expect(t.wrist[FRAMES - 1].distanceTo(t.wrist[end])).toBeGreaterThan(0.2)
   }, 120_000)
 
   it('glTF body without the lift input: the steadying hand comes in over the clips\' hand-over as before', async () => {

@@ -4605,6 +4605,11 @@ export const VILLAGER_POSE = {
    *  a head load it lifts from the hip, at mid-lift — calibratable: enough to
    *  clear the shoulder, little enough to read as a lift, not a heave. */
   headLiftOut: 0.12,
+  /** Seconds an arm eases from what it drew into a head-load lift, and out of
+   *  one into its gesture, contact or clips — calibratable: long enough that
+   *  a hand given back from the crown to a raised gesture never jumps
+   *  (~0.5 m), short enough that the lift still starts at once. */
+  headLiftHandOver: 0.7,
   /** The corrective leg solve (step 10): it runs only where the leg's target
    *  misses the clip's own ankle by more than this (person units per unit of
    *  leg). The concept's ~2 mm would leave a held foot up to 2 mm off its hold
