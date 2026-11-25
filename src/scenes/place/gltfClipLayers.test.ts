@@ -867,7 +867,10 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   })
 
   // OPEN: point 1583 — the resume hands the held stop back to the live gait by a jump
-  // (measured 25.11.2026, rewind and rise cap: 0.18-0.42 rad at 0.35-0.75 s)
+  // (measured 25.11.2026, rewind and rise cap: 0.18-0.42 rad at 0.35-0.75 s;
+  // resumed as a start from the stop's feet: 0.24-0.79 rad, the peaks in the
+  // feet's swings at full weight 25-45 frames after the resume, the longer
+  // pauses worst)
   it.skip('a walk taken up again mid-stop: the knee bends no faster than the walk clip bends it', () => {
     // resuming while the legs still left the gait bent the knee by 0.3-0.5 rad a
     // frame (finding 24.11.2026 from point 1422)

@@ -140,6 +140,16 @@ export interface ClipLayers {
    *  (`settleStand`, `settleTurn`) out to G.standHoldReach, and drawn back
    *  onto the body's stand once it no longer moves. */
   holding: boolean
+  /** A start taken up from a begun stop (point 1583): each foot starts from
+   *  where the stop drew it (`lastAt`), the stand drawing it back under the
+   *  body at G.standHoldSettle (no step) until the clip lifts it; `resumeY`
+   *  the height (body) a foot in the air there still has to come down,
+   *  `resumeEase` this frame's share of both (set per frame), `resumeNew` the
+   *  frame the feet are taken over. */
+  resumed: boolean
+  resumeNew: boolean
+  resumeY: [number, number]
+  resumeEase: number
 }
 
 export function clipLayers(asset: VillagerAsset): ClipLayers {
@@ -191,6 +201,10 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     handW: 0,
     walked: 0,
     holding: false,
+    resumed: false,
+    resumeNew: false,
+    resumeY: [0, 0],
+    resumeEase: 0,
   }
 }
 
@@ -302,6 +316,7 @@ export function applyClipLayers(
   // taken up again mid-stop, the legs rise back no faster than they fell (the
   // walk's fade-in handed the held stop to the gait in five frames)
   if (c.stop > 0 && c.legs > before) c.legs = Math.min(c.legs, before + dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
+  c.resumeEase = dt
   c.dt = 0
   // A START FROM THE STAND: the gait set G.startSwingShare into the swing
   // of the foot that steps first (the other under the body as on the
@@ -313,13 +328,27 @@ export function applyClipLayers(
     c.startRoll = 0
     c.handoff = false
     c.anchor = 0
+    c.resumed = false
     c.gait.phase = startPhase(asset, c.gait.phase)
+  } else if (!c.starting && c.stop > 0 && c.settleFirst >= 0 && !c.handoff && c.anchor <= 0 && before < 1 && c.legs > before && m.kneel <= 0 && c.dig < 1) {
+    // A WALK TAKEN UP FROM A BEGUN STOP (point 1583): a start from where the
+    // stop drew the feet, the gait set back to the phase the held legs were
+    // drawn at (the live clip, its phase moved on, took the held stop over by
+    // a jump)
+    c.starting = true
+    c.startState = [-1, -1]
+    c.startFirst = -1
+    c.startRoll = 0
+    c.resumed = true
+    c.resumeNew = true
+    c.gait.phase = c.heldPhase
   } else if (c.starting && (c.legs < before || m.kneel > 0)) {
     // cut short: the stop takes the feet on from where the start drew them
     c.starting = false
     c.handoff = true
   }
   if (c.starting && c.startState[0] === 2 && c.startState[1] === 2) c.starting = false
+  if (!c.starting) c.resumed = false
   const legs = c.legs * (1 - m.kneel)
   // standing while the body moves (point 1582): the stand's feet stay where
   // they stood rather than slide with the body — the frames before a start's
@@ -348,8 +377,6 @@ export function applyClipLayers(
   }
   // THE GAIT
   if (legs > 1e-3 && under) {
-    // a walk taken up again mid-stop: the clip goes on from the held pose
-    if (c.stop >= 1 && c.legs > before && !c.starting) c.gait.phase = c.heldPhase
     clipGaitPose(c.gait, asset, f, m.speed, c.ground, c.pose)
     // the gait grounds its contacts at 0 (the rest A-pose's sole), not at the hung rest's
     toHung(asset, f, c.pose, c.local, c.hips, 0)
@@ -723,6 +750,36 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
       miss = Math.max(miss, keepD / G.standHoldReach, keepA / G.standHoldTurn)
     })
   }
+  // a start from a begun stop: the feet from where the stop drew them, a
+  // foot still on the stand drawn back onto the body's (as a standing body
+  // jostled), one in the air set down over G.settleStepSeconds
+  if (c.resumed && body) {
+    const unit = body.unit || 1
+    LEG_SIDES.forEach((_, i) => {
+      if (c.resumeNew) {
+        c.settleStand[i].x = c.lastAt[i].x
+        c.settleStand[i].z = c.lastAt[i].z
+        c.settleTurn[i].copy(c.lastTurn[i])
+        c.resumeY[i] = Math.max(0, c.lastAt[i].y - _stand[i].y)
+        return
+      }
+      if (c.startState[i] > 0) return
+      c.resumeY[i] = Math.max(0, c.resumeY[i] - (c.resumeEase * (hips.position.y || 1)) / Math.max(1e-6, G.settleStepSeconds))
+      const ease = G.standHoldSettle * c.resumeEase
+      bodyToWorld(body, _stand[i], _liveW)
+      const dx = c.settleStand[i].x - _liveW.x
+      const dz = c.settleStand[i].z - _liveW.z
+      const d = Math.hypot(dx, dz) / unit
+      const k = d > 1e-9 ? Math.max(0, d - ease) / d : 0
+      c.settleStand[i].x = _liveW.x + dx * k
+      c.settleStand[i].z = _liveW.z + dz * k
+      _liveQ.copy(_standQ[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, body.yaw))
+      const a = c.settleTurn[i].angleTo(_liveQ)
+      const turnEase = (ease * G.standHoldTurn) / G.standHoldReach
+      if (a > 1e-9) c.settleTurn[i].slerp(_liveQ, Math.min(1, turnEase / a))
+    })
+    c.resumeNew = false
+  }
   const shares = settleShares(w, c.settleFirst)
   const falling = w < c.settleW && c.settleW > 0
   const keep = falling ? (w / c.settleW) ** 2 : 1
@@ -752,6 +809,7 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     _standQ[i].copy(c.settleTurn[i]).premultiply(_yawQ.setFromAxisAngle(_yAxis, -yaw))
   })
   c.settleW = w
+  if (c.resumed) LEG_SIDES.forEach((_, i) => (_stand[i].y += c.resumeY[i]))
   if (c.starting) startFeet(c, body)
   if (c.handoff && body) handFeet(c, body, shares, w)
   // each leg's blended chain and its ankle's target
