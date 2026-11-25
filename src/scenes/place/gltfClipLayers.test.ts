@@ -867,41 +867,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   })
 
   const RESUME_KNEE_STEP_BOUND = 0.55 // rad a frame; measured 0.53 at 7b20084e6, main 0.62
-  // OPEN: points 1586 and 1587 — the resumed start still steps the knee past the
-  // clip's range (measured 25.11.2026: 0.24-0.53 rad against 0.20-0.23; the clip's
-  // lift of the waiting stand foot 40-44 frames on, the take-over at +11 and the
-  // first landing at +26-28); until then this bounds the measured state
-  it.only('PROBE resume', () => {
-    let out = ''
-    for (const turn of [0, 2.8, -2.8]) {
-      const clip = clipKneeStep(turn)
-      const worst = [0, 0]; const at = ['', '']
-      for (let pause = 0.35; pause < 0.8; pause += 0.05) {
-        const cut = 1.2
-        const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
-        const r0 = Math.round((cut + pause) * 60)
-        let first = -1; let fi = -1
-        for (let k = r0; k < frames.length; k++) { fi = frames[k].start.indexOf(2); if (fi >= 0) { first = k; break } }
-        for (let k = first + 1; k < frames.length; k++) [1 - fi, fi].forEach((i, j) => { const s = frames[k].knee[i].angleTo(frames[k - 1].knee[i]); if (s > worst[j]) { worst[j] = s; at[j] = `p${pause.toFixed(2)} +${k - r0} (land +${first - r0}) st${frames[k].start} w${frames[k].w.toFixed(2)}` } })
-      }
-      out += `turn ${turn} clip ${clip.toFixed(3)} waiting ${worst[0].toFixed(3)} ${at[0]} · first ${worst[1].toFixed(3)} ${at[1]}\n`
-    }
-    console.log(out)
-  })
-  it.only('PROBE detail', () => {
-    for (const [turn, pause] of [[0, 0.75], [2.8, 0.65], [-2.8, 0.75]]) {
-      const cut = 1.2
-      const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
-      const r0 = Math.round((cut + pause) * 60)
-      const rows: string[] = []
-      for (let k = r0 - 2; k < r0 + 46; k++) {
-        const ks = frames[k].knee.map((q, i) => q.angleTo(frames[k - 1].knee[i]))
-        const bend = frames[k].knee.map((q) => 2 * Math.acos(Math.min(1, Math.abs(q.w))))
-        rows.push(`+${k - r0} L${ks[0].toFixed(2)}/${bend[0].toFixed(2)} R${ks[1].toFixed(2)}/${bend[1].toFixed(2)} yL${frames[k].feet[0][0].y.toFixed(3)} st${frames[k].start} sw${frames[k].swing.map(Number).join('')} w${frames[k].w.toFixed(2)}`)
-      }
-      console.log(`turn ${turn} pause ${pause}\n` + rows.join('\n'))
-    }
-  })
+  // OPEN: point 1587 — the resumed start's first foot still steps the knee past
+  // the clip's range (measured 25.11.2026: the take-over at +11 and the first
+  // landing at +26-28); until then this bounds the measured state
   it('a walk taken up again mid-stop: the knee bends no faster than the resumed start\'s measured bound', () => {
     // resuming while the legs still left the gait bent the knee by 0.3-0.5 rad a
     // frame (finding 24.11.2026 from point 1422)
@@ -917,6 +885,31 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         expect(Math.min(...frames.map((f) => f.w)), `the stop has begun, resumed after ${pause.toFixed(2)} s`).toBeLessThan(1)
         const worst = worstKnee(frames)
         expect(worst, `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(RESUME_KNEE_STEP_BOUND)
+      }
+    }
+  })
+
+  it('a walk taken up again mid-stop: past the first foot\'s landing, the waiting stand foot\'s knee bends no faster than the walk clip bends it', () => {
+    // the clip's lift of the waiting stand foot 40-44 frames on met the start's
+    // own step and bent its knee by 0.39-0.49 rad a frame (point 1586)
+    for (const turn of [0, 2.8, -2.8]) {
+      const clip = clipKneeStep(turn)
+      for (let pause = 0.35; pause < 0.8; pause += 0.05) {
+        const cut = 1.2
+        const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
+        const r0 = Math.round((cut + pause) * 60)
+        let first = -1
+        let foot = -1
+        for (let k = r0; k < frames.length && first < 0; k++) {
+          foot = frames[k].start.indexOf(2)
+          if (foot >= 0) first = k
+        }
+        const where = `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s (clip ${clip.toFixed(3)})`
+        expect(first, `${where}: the first foot lands`).toBeGreaterThan(r0)
+        const waiting = 1 - foot
+        let worst = 0
+        for (let k = first + 1; k < frames.length; k++) worst = Math.max(worst, frames[k].knee[waiting].angleTo(frames[k - 1].knee[waiting]))
+        expect(worst, where).toBeLessThanOrEqual(clip)
       }
     }
   })

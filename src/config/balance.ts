@@ -4468,6 +4468,10 @@ export const VILLAGER_GLTF = {
    *  of the stand's miss times the swing's sine to this power (1 lifted the
    *  knee fastest at once, higher skimmed the ground). Calibratable. */
   startLiftPower: 1.5,
+  /** A start resumed from a begun stop keeps a foot's soft reach while the
+   *  walk weight is short of this share's inverse (released over the last
+   *  1/20 of it, point 1586). Calibratable. */
+  resumeSoftRelease: 20,
   /** Starting, the seconds over which a foot still on the stand takes up the
    *  walk clip's roll off its heel once the legs are on the walk (held flat
    *  through the blend, it then left the stand by a jump). Calibratable. */
