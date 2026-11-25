@@ -434,7 +434,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   /** Per frame: the legs' share of the gait, each foot's world points, the
    *  shins' turns, and the start's state per foot (`ClipLayers.startState`,
    *  -1 when no start runs) with whether the walk clip swings that foot. */
-  type Sole = { hy?: number; gk?: THREE.Quaternion[]; sp?: number; w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number }
+  type Sole = { gk: THREE.Quaternion[]; w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number }
   /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
   function soleOf(bones: Record<string, THREE.Bone>) {
     const f = person.frame
@@ -519,7 +519,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const [land, lift] = gaitStance(i)
         return lift - land > 1e-6 && ((((c.gait.phase - land) % 1) + 1) % 1) >= lift - land
       })
-      frames.push({ hy: bones.hips.getWorldPosition(new THREE.Vector3()).y, sp: speed, gk: (['L', 'R'] as const).map((sd) => c.local[asset.bones.indexOf(`shin.${sd}`)].clone()), w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step })
+      frames.push({ gk: (['L', 'R'] as const).map((sd) => c.local[asset.bones.indexOf(`shin.${sd}`)].clone()), w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step })
     }
     return frames
   }
@@ -866,43 +866,36 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     }
   })
 
-  const RESUME_KNEE_STEP_BOUND = 0.55 // rad a frame; measured 0.53 at 7b20084e6, main 0.62
-  // OPEN: point 1587 — the resumed start's first foot still steps the knee past
-  // the clip's range (measured 25.11.2026: the take-over at +11 and the first
-  // landing at +26-28); until then this bounds the measured state
-  it('a walk taken up again mid-stop: the knee bends no faster than the resumed start\'s measured bound', () => {
+  const RESUME_KNEE_STEP_BOUND = 0.25 // rad a frame; measured 0.224 (point 1587), main before it 0.62
+  it('a walk taken up again mid-stop: over its first 30 frames the knee bends no faster than the walk clip bends it', () => {
     // resuming while the legs still left the gait bent the knee by 0.3-0.5 rad a
-    // frame (finding 24.11.2026 from point 1422)
+    // frame (finding 24.11.2026 from point 1422); the take-over at +11 and the
+    // first landing at +26-28 then still stepped it 0.24-0.38 rad (point 1587)
     // only a stop begun: a pause shorter than 0.35 s never takes the legs off
-    // the walk, and the gait's own landing at the lowered pace belongs to
-    // point 1423 (heel strike)
+    // the walk
     for (const turn of [0, 2.8, -2.8]) {
       const clip = clipKneeStep(turn)
-      expect(clip).toBeLessThan(RESUME_KNEE_STEP_BOUND)
       for (let pause = 0.35; pause < 0.8; pause += 0.05) {
         const cut = 1.2
         const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
         expect(Math.min(...frames.map((f) => f.w)), `the stop has begun, resumed after ${pause.toFixed(2)} s`).toBeLessThan(1)
-        const worst = worstKnee(frames)
-        expect(worst, `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(RESUME_KNEE_STEP_BOUND)
-      }
-    }
-  })
-
-  // WIP probe for point 1587 (remove before landing). Handover 25.11.2026: the
-  // waiting-foot failure (turn 0, pause 0.70, +37) comes from the time-based hold
-  // release alone (the chain fade disabled leaves it at 0.230); the landing
-  // excess left (turn 0, pause 0.40, +28: 0.215) is the gait's own (gR 0.217)
-  it.skip('PROBE1587', () => {
-    for (const turn of [0, 2.8, -2.8]) {
-      const clip = clipKneeStep(turn)
-      for (let pause = 0.35; pause < 0.8; pause += 0.05) {
-        const cut = 1.2
-        const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
         const r0 = Math.round((cut + pause) * 60)
-        const rows: string[] = []
-        for (let k = r0 - 2; k < r0 + 45; k++) { const s = kneeStep(frames, k); if (s > clip || (k - r0 >= 5 && k - r0 <= 13 && (pause < 0.37 || (turn > 0 && pause > 0.44 && pause < 0.46)))) rows.push(`+${k - r0}:${s.toFixed(3)} w${frames[k].w.toFixed(2)} st${frames[k].start.join('/')} sw${frames[k].swing.map(Number).join('')} R${frames[k].knee[1].angleTo(frames[k-1].knee[1]).toFixed(3)} gR${frames[k].gk![1].angleTo(frames[k-1].gk![1]).toFixed(3)} v${frames[k].sp!.toFixed(2)} dH${(1000*(frames[k].hy!-frames[k-1].hy!)).toFixed(1)} dA${(1000*frames[k].feet[1][0].distanceTo(frames[k-1].feet[1][0])).toFixed(1)}`) }
-        console.log(`turn ${turn} pause ${pause.toFixed(2)} clip ${clip.toFixed(3)} :: ${rows.join(' | ')}`)
+        for (let k = r0; k < r0 + 30; k++) {
+          const where = `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s, +${k - r0} (clip ${clip.toFixed(3)})`
+          const step = kneeStep(frames, k)
+          if (step <= clip) continue
+          // OPEN: point 1423 (heel strike) owns the first landing at the lowered
+          // pace: at full weight the gait itself steps the knee past the clip's
+          // range there (measured: turning 0, resumed after 0.40 s, +28 drawn
+          // 0.215, the gait 0.217) and the start draws it no faster
+          const gait = Math.max(...frames[k].gk.map((q, i) => q.angleTo(frames[k - 1].gk[i])))
+          expect(frames[k].w, `${where}: past the clip only on the gait at full weight`).toBeGreaterThanOrEqual(1)
+          expect(step, `${where}: no faster than the gait's own landing`).toBeLessThanOrEqual(gait + 1e-3)
+        }
+        // OPEN: past the first 30 frames, turning -2.8 rad/s and resumed after
+        // 0.50-0.60 s, the landed foot's knee steps 0.220-0.224 at +36/37 with
+        // the hips dropping 35-41 mm in the frame (as on main before point 1587)
+        expect(worstKnee(frames), `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s`).toBeLessThanOrEqual(RESUME_KNEE_STEP_BOUND)
       }
     }
   })

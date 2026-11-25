@@ -157,8 +157,13 @@ export interface ClipLayers {
   /** Per foot, whether its start step lifted it in the clip's stance (a
    *  resumed start's waiting stand foot): its step ends on the clip's lift. */
   startStance: [boolean, boolean]
+  /** A resumed start's hold of the stop's legs as it began, released over
+   *  `G.resumeHoldSeconds` (`resumeHoldT` 0..1) rather than with the legs'
+   *  weight, which ended it by a jump at full weight (point 1587). */
   resumeHold: number
   resumeHoldT: number
+  /** Per leg, the stop's code-leg share last drawn, faded with the hold into
+   *  the resumed start's clip-drawn leg. */
   resumeP: [number, number]
 }
 
@@ -329,8 +334,9 @@ export function applyClipLayers(
   const dt = c.dt
   c.legs = Math.max(m.weight, c.legs - dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
   // taken up again mid-stop, the legs rise back no faster than they fell (the
-  // walk's fade-in handed the held stop to the gait in five frames)
-  if (c.stop > 0 && c.legs > before) c.legs = Math.min(c.legs, before + dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
+  // walk's fade-in handed the held stop to the gait in five frames), on
+  // through a resumed start once its hold is released (point 1587)
+  if ((c.stop > 0 || c.resumed) && c.legs > before) c.legs = Math.min(c.legs, before + dt / (2 * Math.max(1e-6, G.settleStepSeconds)))
   c.resumeEase = dt
   c.dt = 0
   // A START FROM THE STAND: the gait set G.startSwingShare into the swing
