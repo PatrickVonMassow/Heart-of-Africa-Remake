@@ -108,7 +108,7 @@ put it is the mistake this line exists to stop.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
 - [ ] 1591. Villager heel strike stops the swinging foot dead
-  Source: split from point 1423 on 25.11.2026: the clip still swings the heel forward ~2 m/s at contact (on the ground until phase ~0.555), and the plant stops it within one frame. A ground brake breaks the no-slide case (4 mm/frame); an airborne landing brake lands up to 5 cm short and breaks three stop/resume knee cases of gltfClipLayers.test.ts narrowly (0.415 vs 0.4, 0.2546 vs 0.25). Likely needs a predicted heel rest point for the landing. The OPEN in gltfClipLayers.test.ts charging the +2.8 rad/s knee bound to point 1423 moves here. Split 25.11.2026 after four unsuccessful review rounds: the first landing of each foot after a start or resume moved to point 1594; this point keeps every later strike.
+  Source: split from point 1423 on 25.11.2026: the clip still swings the heel forward ~2 m/s at contact (on the ground until phase ~0.555), and the plant stops it within one frame. A ground brake breaks the no-slide case (4 mm/frame); an airborne landing brake lands up to 5 cm short and breaks three stop/resume knee cases of gltfClipLayers.test.ts narrowly (0.415 vs 0.4, 0.2546 vs 0.25). Likely needs a predicted heel rest point for the landing. The OPEN in gltfClipLayers.test.ts charging the +2.8 rad/s knee bound to point 1423 moves here. Split 25.11.2026 after four unsuccessful review rounds: the first landing of each foot after a start or resume moved to point 1594; this point keeps every later strike. Split again 25.11.2026 after the fifth round: the 30 Hz pace crossing into the walk-jog band during the brake moved to point 1595.
   Final state: heel strike decelerates the foot without a dead stop, with no foot slide and the stop/resume knee bounds unchanged.
   Verifiable: villagerClipPose.test.ts heel-contact deceleration case; gltfClipLayers.test.ts stop/resume knee cases green at their current bounds; a moving capture on both backends.
   Criticality: medium - visible foot jerk in village walks.
@@ -133,6 +133,13 @@ put it is the mistake this line exists to stop.
   Final state: the first heel strike of each foot after a start or resume decelerates without a dead stop, with no foot slide and the stop/resume knee bounds unchanged.
   Verifiable: gltfClipLayers.test.ts start and resume cases measure each foot's first landing (touchdown speed and planted displacement) and stay green at their current knee bounds; a moving capture on both backends.
   Criticality: medium - visible foot jerk when villagers set off.
+  Bundle: Dorfleben.
+
+- [ ] 1595. Villager heel strike at 30 Hz still stops dead when the pace crosses into the walk-jog band
+  Source: split from point 1591 on 25.11.2026 after five review rounds (round-5 author at 7f5fd0a): at 30 Hz a pace crossing into the walk-jog band within the four-frame heel brake still loses up to 0.74 of the swing's pace in the touchdown frame, as a dead stop does; re-planning each frame, extrapolating the pace change, a quartic ease and a five-frame brake all left it or broke the brake's start. The OPEN in villagerClipPose.test.ts leaving the 30 Hz `stop` bound unchecked in the pace-change case moves here.
+  Final state: at 30 Hz a heel strike during a pace crossing into the walk-jog band loses no more of its swing's pace in the touchdown frame than the 30 Hz stop bound allows, with no foot slide.
+  Verifiable: villagerClipPose.test.ts pace-change case checks `stop` at 30 Hz too; a moving capture on both backends.
+  Criticality: low - one-frame foot jerk only at low frame rates during pace changes.
   Bundle: Dorfleben.
 
 - [ ] 1425. Carried water jar jumps from hip to shoulder within a few frames
