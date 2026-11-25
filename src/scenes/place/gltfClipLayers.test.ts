@@ -1001,32 +1001,6 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     }
   })
 
-  it('a start cut short by a stop in a corner: past the reversal\'s step-share flip, the knee bends no faster than the walk clip bends it', () => {
-    // a stop reversing a start still in its blend kept sampling the live gait
-    // through the turn and snapped to the stand at its end (cross-vendor
-    // review 24.11.2026)
-    for (const turn of [2.8, -2.8]) {
-      const clip = clipKneeStep(turn)
-      // the stop inside the start blend: the walk weight takes up once the
-      // body, gaining its pace (VILLAGER_MOTION.setOffAccel), has a stride
-      for (let run = 0.125; run < 0.3; run += 0.025) {
-        const cut = 0.5
-        const frames = settle({ cut, start: true, stopAt: cut + run, turn: (t) => (t > cut ? turn : 0) })
-        const falls = Math.round((cut + run) * 60)
-        expect(frames[falls].w, 'the stop falls inside the start blend').toBeGreaterThan(0)
-        expect(frames[falls].w, 'the stop falls inside the start blend').toBeLessThan(1)
-        let worst = 0
-        // from the second frame after the reversal: the reversing frame and the
-        // one after it carry the step-share flip, which belongs to point 1584
-        // and its reversal case (the start's own onset to the start case)
-        // (measured 24.11.2026: the only frame over
-        // the clip's range was the one after the reversal, 0.322 rad at 2.8 rad/s)
-        for (let k = falls + 2; k < frames.length; k++) worst = Math.max(worst, kneeStep(frames, k))
-        expect(worst, `turning ${turn} rad/s, walking ${run.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(clip)
-      }
-    }
-  })
-
   it('a start cut short by a stop hands each foot on from where it was drawn: none jumps at the handoff', () => {
     // the first falling frame dropped the start's feet for the stop's step
     // targets, anchored where the gait stood as the start began: the foot on
@@ -1057,12 +1031,13 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     }
   })
 
-  // OPEN: point 1584 — the reversal flips the step shares by a jump
-  it.skip('a start cut short by a stop, straight or in a corner: the knee bends no faster than the walk clip bends it, the reversal included', () => {
+  it('a start cut short by a stop, straight or in a corner: the knee bends no faster than the walk clip bends it, the reversal included', () => {
     // a stop reversing a start still in its blend jumped 0.32-0.60 rad in the
     // frame after the reversal as the step shares flipped (finding 24.11.2026
     // from point 1422), and kept sampling the live gait through the turn
-    // (cross-vendor review 24.11.2026)
+    // (cross-vendor review 24.11.2026); handing each foot on from where it was
+    // drawn took the jump out (measured 25.11.2026: at most 0.202 rad the frame
+    // after the reversal against the clip's 0.234 at 2.8 rad/s)
     for (const turn of [0, 2.8, -2.8]) {
       const clip = clipKneeStep(turn)
       // the stop inside the start blend: the walk weight takes up once the
@@ -1078,12 +1053,6 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       }
     }
   })
-
-
-
-
-
-
 
   it('the step shares: the first foot over the first half of the way to the stand, the other over the second', () => {
     expect(settleShares(1, 0)).toEqual([0, 0])
