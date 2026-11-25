@@ -844,6 +844,12 @@
       "why": "follows 1588 on the resumed start in gltfClipLayers.ts",
       "origin": "machine",
       "place": "last"
+    },
+    "1590": {
+      "at": "2026-11-25T08:08:01.145Z",
+      "why": "medium Dorfleben-Befund ohne Nutzerauftrag; folgt dem Bündel hinter den offenen Knie-Punkten",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -854,7 +860,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-11-25T07:46:41.142Z",
+    "at": "2026-11-25T08:08:01.149Z",
     "points": [
       184,
       200,
@@ -1044,7 +1050,8 @@
       1584,
       1585,
       1588,
-      1589
+      1589,
+      1590
     ]
   }
 }
