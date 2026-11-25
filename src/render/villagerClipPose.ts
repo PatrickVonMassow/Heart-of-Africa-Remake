@@ -244,6 +244,8 @@ const headingOf = (q: THREE.Quaternion) => 2 * Math.atan2(q.y, q.w)
 const _keptYaw = [0, 0]
 /** Each foot's share of its kept heading (at least its flat share). */
 const _turnW = [0, 0]
+/** Whether each foot was caught (took its first hold) this call. */
+const _caught = [false, false]
 const _up = new THREE.Vector3(0, 1, 0)
 /**
  * Turn a world rotation onto the kept heading `yaw` (person frame) by `turn`,
@@ -645,6 +647,7 @@ export function clipGaitPose(
   // its whole stance's turn round in a few frames
   const walkedNow = (((g.phase - g.slipPhase) % 1) + 1) % 1
   SIDES.forEach((s, i) => {
+    _caught[i] = false
     const keep = g.headingKeep
     // (and from the walk's catch on, before it lies flat: a heel taking hold
     // in a curve turned back toward the heading it touched down with)
@@ -792,9 +795,13 @@ export function clipGaitPose(
       }
       // the walk's catch keeps the heading the foot is drawn with on the
       // frame it takes hold (read a frame later, the body had turned on)
+      // (a new plant: never one kept from an earlier plant still letting
+      // go; read again once the legs are solved, `_caught`)
       if (!wasHeld && (held.heel || held.ball || held.tip) && catching(i) && gait.walk > 0) {
         g.headingKeep[i] = Math.max(g.headingKeep[i], gait.walk)
-        g.flatYaw[i] ??= headingOf(keepTurn(_fq.copy(world.q[foot]), _keptYaw[i], fw, _turnW[i])) + body.yaw
+        g.flatYaw[i] = headingOf(keepTurn(_fq.copy(world.q[foot]), _keptYaw[i], fw, _turnW[i])) + body.yaw
+        _keptYaw[i] = g.flatYaw[i]! - body.yaw
+        _caught[i] = true
       }
     }
     slip.x = _miss.x
@@ -1036,6 +1043,11 @@ export function clipGaitPose(
       solveLegs()
     }
   }
+  // a foot caught this frame keeps the heading it is drawn with once solved
+  // (its roll and hand-over can turn it after the catch read it)
+  if (body) SIDES.forEach((s, i) => {
+    if (_caught[i]) g.flatYaw[i] = headingOf(world.q[asset.bones.indexOf(`foot.${s}`)]) + body.yaw
+  })
   // THE WALK STANDS ON A SOLE: where no planted foot stands after the solve
   // (a run's long stride coming back to the walk leaves its trailing foot
   // beyond reach and the leading one still in the air), the walk settles
