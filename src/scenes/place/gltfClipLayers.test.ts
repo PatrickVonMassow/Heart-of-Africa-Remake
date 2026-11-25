@@ -866,6 +866,17 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     }
   })
 
+  // HANDOVER 25.11.2026 (remove before landing): cross-review of 0aabbc195
+  // (GPT-6.2 Sol, receipt cffecf8def9d33ac) said do-not-merge:
+  // P1 the start ends (startState 2/2, legs 1) before resumeHoldT reaches 1 and
+  //    drops the held pose and resumeP by a jump (gltfClipLayers.ts ~373);
+  // P1 a stop during the hold reuses the first stop's heldLegs/heldHips/
+  //    heldPhase and switches from resumeP to the stop's step share at once;
+  //    the cut-short handoff sets anchor 1, which blocks a second resume;
+  // P2 the test's gait exception: compare per shin, require full weight on the
+  //    frame before and a landing, sample gk before the hold slerp, and assert
+  //    the resumed start actually began on r0.
+  // polish-villagers is ladder-refused: run --section=adult-errands first.
   const RESUME_KNEE_STEP_BOUND = 0.25 // rad a frame; measured 0.224 (point 1587), main before it 0.62
   it('a walk taken up again mid-stop: over its first 30 frames the knee bends no faster than the walk clip bends it', () => {
     // resuming while the legs still left the gait bent the knee by 0.3-0.5 rad a
