@@ -4045,6 +4045,8 @@ if (section('water-jar-carried')) {
     e.intervalSeconds = 0.8
     e.dwellSeconds = 1
     e.digSeconds = 3
+    // the shipped pace, for the jar-lift capture below (point 1425)
+    window.__errandShippedPace ??= e.pace
     e.pace = 6
     e.villagerCount = 10
   })
@@ -4263,6 +4265,92 @@ if (section('water-jar-carried')) {
   }
   if (live) {
     await page.evaluate(() => window.__ui.getState().setDetailLevel('medium'))
+    await freezeLife(false)
+  }
+  // THE FULL JAR LIFTED ONTO THE HEAD (point 1425). The fill used to end with
+  // the jar swapped from the hand at his hip onto his crown in one frame, the
+  // steadying hand following within ~6 frames while he walked on (moving
+  // capture of point 1404, frames 255-261). Now it rises over
+  // waterJarLiftSeconds: one carrier, at the shipped pace, filmed from his left
+  // (jar) flank by a lens held still from the lift's start, frozen at five
+  // shares of the lift read from the drawn state (`lift`, 0 in the hand … 1 on
+  // the head): start, ~25 %, ~50 %, ~75 % and settled on the crown.
+  if (live) {
+    await page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = window.__errandShippedPace })
+    const out = await awaitPhase('walk-out', null)
+    const filler = out ? await (async () => { await freezeLife(false); return awaitPhase('fill', out.who) })() : null
+    check('jar lift: a water carrier reaches his fill (point 1425)', !!filler, filler ? `villager ${filler.who}` : 'not within 240 s')
+    if (filler) {
+      const who = filler.who
+      await freezeLife(false)
+      const STOPS = [
+        { tag: 'start', at: 0, until: 0.12 },
+        { tag: '25', at: 0.25, until: 0.4 },
+        { tag: '50', at: 0.5, until: 0.65 },
+        { tag: '75', at: 0.75, until: 0.9 },
+        { tag: 'settled', at: 1, until: 1 },
+      ]
+      // the lens: placed once, at the first stop, on his left flank 4 m out and
+      // a step ahead along his way, then held still for every later stop
+      let lens = null
+      const seen = []
+      for (const [k, stop] of STOPS.entries()) {
+        // Waits for this share of HIS lift (the full jar already on its way,
+        // or for the settled stop: on the crown once the lift has run) and
+        // freezes life in the frame it is read.
+        const got = await page.waitForFunction(([w, stop, started]) => {
+          const v = window.__placeErrands().villagers[w]
+          if (!v || v.carry !== 'fullJar') return null
+          const ok = stop.at >= 1 ? started && v.lift >= 1 : v.lift >= stop.at && v.lift < 1
+          if (!ok) return null
+          window.__placeFreezeLife(true)
+          return { lift: v.lift, x: v.x, z: v.z, yaw: v.yaw }
+        }, [who, stop, k > 0], { timeout: 60000, polling: 'raf' }).then((h) => h.jsonValue()).catch(() => null)
+        check(`jar lift: the lift's ${stop.tag} stop is reached (point 1425)`, !!got && (stop.at >= 1 || got.lift <= stop.until),
+          got ? `villager ${who}, lift ${got.lift.toFixed(3)} (wanted ${stop.at}…${stop.until})` : 'not within 60 s')
+        if (!got) break
+        if (!lens) {
+          const side = got.yaw + Math.PI / 2
+          lens = {
+            x: got.x + Math.sin(side) * 4 + Math.sin(got.yaw) * 0.6,
+            z: got.z + Math.cos(side) * 4 + Math.cos(got.yaw) * 0.6,
+            yaw: side,
+          }
+        }
+        await page.evaluate((l) => {
+          const p = window.__placePlayer
+          p.x = l.x
+          p.z = l.z
+          p.yaw = l.yaw
+          p.pitch = -0.08
+        }, lens)
+        await nextFrames(3)
+        // the jar drawn this instant: the full one, wherever the lift has it
+        const probe = await page.evaluate(probeCarriedJar, { who, name: 'carried-jar-full' })
+        const inView = !!probe.rect && !probe.behind
+        check(`jar lift (${stop.tag}): his full jar is drawn inside the frame (point 1425)`, probe.found && probe.shown && inView,
+          probe.found ? `centre (${probe.center.x.toFixed(2)}, ${probe.center.y.toFixed(2)}, ${probe.center.z.toFixed(2)}), rect ${JSON.stringify(probe.rect)}` : probe.why)
+        if (probe.found && probe.shown && inView) {
+          seen.push({ tag: stop.tag, lift: got.lift, y: probe.center.y, feet: probe.feet?.y ?? null,
+            sx: probe.rect.x + probe.rect.width / 2, sy: probe.rect.y + probe.rect.height / 2 })
+          await frame(shotName(`1425-jar-lift-${k + 1}-${stop.tag}`), {
+            local: probe.center,
+            label: `jar lift ${k + 1}/5 (${stop.tag}): water carrier #${who} (frame centre, lens held still on his left flank) lifting the FULL jar from his hand at the hip onto his head — lift ${(got.lift * 100).toFixed(0)} %`,
+          })
+        }
+        await freezeLife(false)
+      }
+      // CONTINUOUS: across the five stops the jar's projected centre climbs the
+      // frame every time, and no single step between two stops carries more
+      // than half of the whole rise (a pop puts nearly all of it in one).
+      const rise = seen.length === 5 ? seen[0].sy - seen[4].sy : 0
+      const steps = seen.slice(1).map((s, k) => ({ up: seen[k].sy - s.sy, across: Math.abs(s.sx - seen[k].sx) }))
+      check('jar lift: the jar\'s projected position rises continuously across the five stops, no step a pop (point 1425)',
+        seen.length === 5 && rise > 0 && steps.every((d) => d.up > 0 && d.up <= 0.5 * rise && d.across <= 0.5 * rise),
+        `${seen.length}/5 stops; ` + seen.map((s) => `${s.tag}: lift ${s.lift.toFixed(2)}, screen (${s.sx.toFixed(0)}, ${s.sy.toFixed(0)}), jar ${s.y.toFixed(2)} m`).join('; ') +
+          `; rise ${rise.toFixed(0)} px, steps ${steps.map((d) => `${d.up.toFixed(0)}↑ ${d.across.toFixed(0)}↔`).join(', ')}`)
+    }
+    await page.evaluate(() => { window.__balance.villageLife.adultErrands.pace = 6 })
     await freezeLife(false)
   }
 }

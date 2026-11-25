@@ -4146,6 +4146,8 @@ function ErrandVillagers({
           yaw: yaws.current[i] ?? 0,
           drawn: { squatY: g ? g.scale.y : null, handY, headAspect, mouthY, feetY: g ? g.position.y : null, groundY: groundHeight(p.x, p.z), gait, speed },
           carry: carryOf(work, i),
+          // how far a full jar has come up from his hand onto his head (jarLift.ts)
+          lift: liftShares.current[i]?.current ?? 1,
           work: task
             ? { situation: task.situation, phase: task.phase, siteIndex: task.siteIndex, x: task.x, z: task.z, arrived: task.arrived,
                 partner: task.partner, owes: !!task.owes, hushed: !!task.hushed, withheld: !!task.withheld,
