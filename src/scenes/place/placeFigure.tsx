@@ -140,6 +140,8 @@ function PrimitiveFigure({
   headProp?: ReactNode
   /** Accepted for the skinned body's sake; the primitive balances its load. */
   headSteady?: HeadLoadShape | null
+  /** Accepted for the skinned body's sake: its steadying hand lifts the load. */
+  headLift?: RefObject<number>
   /** Kneels while true: down and up again as a short transition. */
   kneeling?: RefObject<boolean>
   /** Carries a standing label of its own: the Ctrl layer does not name it twice. */

@@ -85,6 +85,7 @@ import { insidePlace, type ObservedGround } from './boundary'
 import { playRockFlank } from './playRockSurface'
 import { BANK_WATER_DROP, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import { JAR_HEIGHT, fillJarPlacement, fillRings } from './fillJar'
+import { jarLiftShare, placeLiftedJar, stepJarLift, type JarRest } from './jarLift'
 import {
   SPARE_JAR_LOCAL, aimFromShoulder, standJarLocal, toFigureFrame, standToWorld, standYaw, takeJarTravel, takePose,
 } from './waterStand'
@@ -161,6 +162,7 @@ import {
   stepAdultWork,
   taskOf,
   waterErrandSpots,
+  type AdultCarry,
   type AdultSituationId,
   type AdultWorkGeography,
   type AdultWorkView,
@@ -3305,8 +3307,12 @@ function ErrandVillagers({
   const works = useRef<Array<RefObject<FigureWork>>>([])
   /** The glTF body draws (and holds) its own shovel; the hand prop is for the
    *  primitive and the code-built bodies. */
-  const villagerAsset = useContext(FigureLookContext)?.villager ?? null
+  const figureLook = useContext(FigureLookContext)
+  const villagerAsset = figureLook?.villager ?? null
   const gltfBody = !!villagerAsset
+  /** The skinned body (glTF or code-built) steadies a head load with a hand,
+   *  so it lifts the full jar with it (jarLift.ts); the primitive does not. */
+  const steadyingBody = !!figureLook
   /** The stroke the dig progress counts strikes on: the drawn body's own —
    *  the glTF dig clip's period and blade contact, the primitive's otherwise —
    *  so each counted strike (the earth thrown) is a strike the player sees. */
@@ -3328,6 +3334,11 @@ function ErrandVillagers({
   /** Each villager's live y-squash, so his own Figure can keep his head round
    *  through it. Written by the frame loop below, read by the Figure. */
   const squats = useRef<Array<{ current: number }>>([])
+  /** Each carrier's lift of the filled jar onto his head (jarLift.ts): its
+   *  clock and the carry it saw last frame, and the share his Figure's
+   *  steadying hand rises by. */
+  const jarLifts = useRef<Array<{ seconds: number | null; carry: AdultCarry }>>([])
+  const liftShares = useRef<Array<{ current: number }>>([])
   const rim = Math.max(1, radius - NPC_RADIUS * 2)
 
   /** Every place a villager may stroll to of its own accord: the head of the
@@ -3755,6 +3766,15 @@ function ErrandVillagers({
       // established positions; the digging tool lives in the hand pivot so the
       // shaft rides the stroke instead of swinging beside an empty-handed man.
       const carry = carryOf(work, i)
+      // THE FULL JAR IS LIFTED, not swapped (jarLift.ts): from the hand at the
+      // hip onto the head, the steadying hand rising with it. The primitive
+      // body has no steadying hand, so its jar goes straight onto the head.
+      // OPEN: the low preset's primitive balances the jar hands-free; whether it should lift it too is a design call.
+      const lift = (jarLifts.current[i] ??= { seconds: null, carry })
+      lift.seconds = steadyingBody ? stepJarLift(lift.seconds, carry, lift.carry, dt) : null
+      lift.carry = carry
+      const liftShare = (liftShares.current[i] ??= { current: 1 })
+      liftShare.current = jarLiftShare(lift.seconds)
       const headJar = headJars.current[i]
       const handJar = handJars.current[i]
       const digTool = digTools.current[i]
@@ -3873,6 +3893,8 @@ function ErrandVillagers({
         }
       }
       if (pose) applyFigurePose(limbs.current[i]?.current ?? null, pose)
+      // the full jar where the hand, posed just now, has brought it
+      if (headJar && handJar) placeLiftedJar(headJar, handJar, liftShare.current, HEAD_JAR_REST)
 
       const g = refs.current[i]
       if (g) {
@@ -4202,6 +4224,7 @@ function ErrandVillagers({
             work={(works.current[i] ??= { current: { dig: false, tool: false } })}
             squat={(squats.current[i] ??= { current: 1 })}
             headSteady={steadiedLoad('jar', { bottom: JAR_WAIST_R, top: JAR_RIM_R, height: JAR_HEIGHT })}
+            headLift={(liftShares.current[i] ??= { current: 1 })}
             headProp={
               <group
                 ref={(el) => {
@@ -4210,11 +4233,8 @@ function ErrandVillagers({
                 name="carried-jar-full"
                 userData={{ villager: i }}
                 visible={false}
-                position={[0, JAR_HEIGHT / 2, 0]}
-                // A carried jar is not a plumb cylinder: a small lean turns the
-                // mouth off the vertical, which is what lets any of the water in it
-                // be seen from a standing eye rather than only its rim edge-on.
-                rotation={[0.16, 0, 0.1]}
+                position={HEAD_JAR_REST.position}
+                quaternion={HEAD_JAR_REST.quaternion}
               >
                 <Jar full />
               </group>
@@ -4298,6 +4318,14 @@ function ErrandVillagers({
 // mouth is seen at a shallow angle; a wider mouth is a wider ellipse, which is
 // what makes the reading survive the distance the player watches from.
 const JAR_RIM_R = 0.155
+/** The full jar's rest on the carrier's crown. A carried jar is not a plumb
+ *  cylinder: a small lean turns the mouth off the vertical, which is what lets
+ *  any of the water in it be seen from a standing eye rather than only its rim
+ *  edge-on. */
+const HEAD_JAR_REST: JarRest = {
+  position: new THREE.Vector3(0, JAR_HEIGHT / 2, 0),
+  quaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.16, 0, 0.1)),
+}
 const JAR_WAIST_R = 0.16
 const JAR_BASE_R = 0.13
 /** The fill ring's band width as a fraction of its radius, its lift over the

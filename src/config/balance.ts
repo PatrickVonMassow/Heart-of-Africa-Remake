@@ -103,6 +103,10 @@ interface BalanceConfig {
   /** Seconds the carrier takes to reach for the empty jar on the stand, lift
    *  it into his hand and straighten up again. */
   waterJarTakeSeconds: number
+  /** Seconds the carrier takes to lift the filled jar from his hand at the
+   *  hip onto his head, the steadying hand rising with it (never a pop
+   *  between the two carry poses). */
+  waterJarLiftSeconds: number
   /** Arrival tolerance at the fill spot in the river (work-order 1117), so the
    *  carrier dips ankle-deep rather than from the dry edge. */
   bankFillArrivalRadius: number
@@ -1940,6 +1944,9 @@ export const balance: BalanceConfig = {
   waterStandTableArrivalRadius: 0.1,
   // Calibratable: long enough to read as reaching, lifting and straightening.
   waterJarTakeSeconds: 1.6,
+  // Calibratable: a lift from the hip to the head reads as one deliberate
+  // movement at about a second; 0.35 s (the clips' arm hand-over) read as a pop.
+  waterJarLiftSeconds: 1.1,
   // Calibratable (work-order 1117): the fill spot lies only ~0.5 m past the
   // waterline, so the generic 1.1 m let the carrier dip from dry ground.
   bankFillArrivalRadius: 0.2,
@@ -4594,6 +4601,10 @@ export const VILLAGER_POSE = {
    *  below … `pitchUp` above. `seconds`: the damping's time constant.
    *  `headLoad`: the limits' share kept under a head load. */
   gaze: { chestYaw: 0.25, neck: 0.4, yawMax: 1.22, pitchUp: 0.52, pitchDown: 0.7, seconds: 0.18, headLoad: 0.5 },
+  /** How far out from the flank (m, figure frame) the steadying hand swings
+   *  a head load it lifts from the hip, at mid-lift — calibratable: enough to
+   *  clear the shoulder, little enough to read as a lift, not a heave. */
+  headLiftOut: 0.12,
   /** The corrective leg solve (step 10): it runs only where the leg's target
    *  misses the clip's own ankle by more than this (person units per unit of
    *  leg). The concept's ~2 mm would leave a held foot up to 2 mm off its hold

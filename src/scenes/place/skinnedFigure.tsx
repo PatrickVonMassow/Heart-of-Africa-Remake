@@ -320,6 +320,38 @@ const _w = new THREE.Vector3()
 const _pivot = new THREE.Vector3()
 const _fwd = new THREE.Vector3()
 const _q = new THREE.Quaternion()
+/** `from` turned `t` of the way to `to`, along whichever way round lands
+ *  nearer `last` (the turn drawn last frame; none: the shorter way) — the
+ *  shorter way alone flips sides where the two are half a turn apart. */
+function turnWithoutFlip(from: THREE.Quaternion, to: THREE.Quaternion, t: number, last: THREE.Quaternion | null): THREE.Quaternion {
+  const short = _turnA.copy(from).slerp(to, t)
+  if (!last) return from.copy(short)
+  // the long way: three's slerp always takes the short one, so it is built
+  // from the short way's complement
+  const long = _turnB.copy(from)
+  slerpLong(long, to, t)
+  return from.copy(Math.abs(short.dot(last)) >= Math.abs(long.dot(last)) ? short : long)
+}
+
+/** Unclamped slerp the long way round, written into `a`. */
+function slerpLong(a: THREE.Quaternion, b: THREE.Quaternion, t: number): void {
+  const d = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w
+  // toward `b` in the hemisphere the short way does not take
+  const s = d >= 0 ? -1 : 1
+  const theta = Math.acos(Math.max(-1, -Math.abs(d)))
+  const sin = Math.sin(theta)
+  if (sin < 1e-6) return
+  const wa = Math.sin((1 - t) * theta) / sin
+  const wb = (s * Math.sin(t * theta)) / sin
+  a.set(a.x * wa + b.x * wb, a.y * wa + b.y * wb, a.z * wa + b.z * wb, a.w * wa + b.w * wb).normalize()
+}
+const _turnA = new THREE.Quaternion()
+const _turnB = new THREE.Quaternion()
+
+/** The hanging hand a head load is lifted from (headLift). */
+const _liftFrom = new THREE.Vector3()
+const _liftHand = new THREE.Quaternion()
+const _liftTo = new THREE.Vector3()
 const _pole = new THREE.Vector3()
 const _euler = new THREE.Euler()
 const _here = new THREE.Vector3()
@@ -354,6 +386,7 @@ export function SkinnedFigure({
   handProp,
   headProp,
   headSteady,
+  headLift,
   kneeling,
   sex,
   age,
@@ -383,6 +416,11 @@ export function SkinnedFigure({
   headProp?: ReactNode
   /** Set when a hand steadies that load: its radius and height for the grip. */
   headSteady?: HeadLoadShape | null
+  /** How far a head load being lifted up has come (0: in the hand, 1: on the
+   *  head; absent: on the head): the steadying hand rises from where its arm
+   *  hangs to the rim by this share, carrying the load up rather than
+   *  snapping onto it (the water carrier's jar, jarLift.ts). */
+  headLift?: RefObject<number>
   /** Kneels while true: down and up again as a short transition. */
   kneeling?: RefObject<boolean>
   sex?: Sex
@@ -445,6 +483,10 @@ export function SkinnedFigure({
   const lastReach = useRef<[number | null, number | null]>([null, null])
   // the pose's arm angles on the reach's last frame: a later change is a new gesture
   const releasedAt = useRef<[ArmAngles | null, ArmAngles | null]>([null, null])
+  /** The lifting hand's turn last frame (headLift), so its turn from hang to
+   *  grip keeps to one way round instead of flipping where the two are
+   *  half a turn apart; null when no lift runs. */
+  const liftTurn = useRef<THREE.Quaternion | null>(null)
   const armRef = useMemo(() => restingArmRefs(arms.current, REST_POSE_ARMS), [])
   const owned = !!(pose && limbs)
   const dims = useMemo(() => legDims(rig.p), [rig])
@@ -833,10 +875,13 @@ export function SkinnedFigure({
         const fore = b[`forearm.${s}`]
         const vh = virtualHands.current[i]
         const chestQ = () => qIn(b.chest, new THREE.Quaternion())
-        const solveTo = (target: THREE.Vector3, pole: THREE.Vector3) => {
+        // `wrist`: the target is the wrist's (the hand bone's), not the palm's
+        const solveTo = (target: THREE.Vector3, pole: THREE.Vector3, wrist = false) => {
           const a = loc(fore, _e).distanceTo(loc(up, _s))
-          const reach = reachOf(s)
+          const reach = wrist ? a + loc(b[`hand.${s}`], _w).distanceTo(_e) : reachOf(s)
           loc(up, _s)
+          // a wrist target is brought within the arm's reach
+          if (wrist && target.distanceTo(_s) > reach * 0.999) target.sub(_s).setLength(reach * 0.999).add(_s)
           const sol = solveTwoBone(_s, target, a, reach - a, pole)
           if (!sol.reached) return false
           // the arm's own parent (the clavicle on the glTF body, else the chest)
@@ -848,6 +893,9 @@ export function SkinnedFigure({
           return true
         }
         let done = false
+        // a load still on its way up (headLift): the hand carries it from where
+        // the arm hangs to the rim along a path of its own, at the lift's pace
+        const lift = i === steadyArm ? Math.min(1, Math.max(0, headLift?.current ?? 1)) : 1
         if (i === steadyArm && headSteady) {
           // A hand on the rim: the grip found in the crown's own frame (the
           // load tilts with the head), brought into the body's.
@@ -856,18 +904,43 @@ export function SkinnedFigure({
           const g = headLoadGrip({ x: sh.x, y: sh.y, z: sh.z }, i === 0 ? 1 : -1, headSteady, reachOf(s))
           body.worldToLocal(rig.crown.localToWorld(_grip.set(g.x, g.y, g.z)))
           _pole.set(i === 0 ? 1 : -1, -0.3, 0.2).applyQuaternion(chestQ())
+          // a lift starts from the hand as it hangs: its wrist and its turn
+          if (lift < 1) {
+            loc(b[`hand.${s}`], _liftFrom)
+            qIn(b[`hand.${s}`], _liftHand)
+          }
           done = solveTo(_grip, _pole)
           // the palm on the load, not the back of the hand: the wrist rolled
           // toward the load's axis at the grip's height
+          let roll = 0
           if (done) {
             body.worldToLocal(rig.crown.localToWorld(_toward.set(0, g.y, 0))).sub(_grip)
             const side = i === 0 ? 1 : -1
             // taken near the roll this pose needs, so the split never crosses its cut
-            const roll = palmRollAngle(qIn(fore, _q), palmNormal(rig.gltf ? 'gltf' : 'code', side, _palm), _toward, palmRollCenter(side))
+            roll = palmRollAngle(qIn(fore, _q), palmNormal(rig.gltf ? 'gltf' : 'code', side, _palm), _toward, palmRollCenter(side))
             // the forearm rolls about its own axis (the hand stays put), the wrist the rest
             fore.quaternion.multiply(_q.setFromAxisAngle(_up, roll * FOREARM_ROLL_SHARE))
             b[`hand.${s}`].quaternion.setFromAxisAngle(_up, roll * (1 - FOREARM_ROLL_SHARE))
           }
+          if (done && lift < 1) {
+            // LIFTING: the wrist on its way from where it hung to where the grip
+            // has it, out from the flank mid-way so the load clears the body,
+            // and the hand turning from its hang to its grip with it — so what
+            // it carries rises with the lift and never swings round
+            const turned = qIn(b[`hand.${s}`], new THREE.Quaternion())
+            loc(b[`hand.${s}`], _liftTo)
+            _liftTo.lerpVectors(_liftFrom, _liftTo, lift)
+            _liftTo.x += (i === 0 ? 1 : -1) * VILLAGER_POSE.headLiftOut * Math.sin(Math.PI * lift)
+            done = solveTo(_liftTo, _pole, true)
+            if (done) {
+              fore.quaternion.multiply(_q.setFromAxisAngle(_up, lift * roll * FOREARM_ROLL_SHARE))
+              const was = liftTurn.current
+              turnWithoutFlip(_liftHand, turned, lift, was)
+              liftTurn.current = (was ?? new THREE.Quaternion()).copy(_liftHand)
+              b[`hand.${s}`].quaternion.copy(qIn(fore, _q).invert().multiply(_liftHand))
+            }
+          }
+          if (lift >= 1) liftTurn.current = null
         } else if (contactArm[i] && vh) {
           // (reachOf uses _t as scratch: measured before the target is)
           const r = reachOf(s) * 0.999
@@ -887,14 +960,16 @@ export function SkinnedFigure({
         }
         // while the clips still own part of the arm (taken or given back), the
         // solve blends with what they left, never a snap
-        const share = gltf && clips ? Math.max(clips.dig, clips.arms[i]) : 0
+        // (a load on its way up is the lift's alone: the arm runs from where it
+        // hung to the rim at the lift's own pace, not the clips' hand-over)
+        const share = gltf && clips && lift >= 1 ? Math.max(clips.dig, clips.arms[i]) : 0
         if (done) clipShown[i] = share
         if (done && share > 0) {
           up.quaternion.slerp(armBase[i][0], share)
           fore.quaternion.slerp(armBase[i][1], share)
           b[`hand.${s}`].quaternion.slerp(armBase[i][2], share)
         }
-        if (i === steadyArm) steadyShown = done ? 1 - share : 0
+        if (i === steadyArm) steadyShown = done ? (1 - share) * lift : 0
       })
       // Dev: the steadying hand as drawn (which arm, how much of its solve
       // shows past the clips), for the verification's head-load frames.
