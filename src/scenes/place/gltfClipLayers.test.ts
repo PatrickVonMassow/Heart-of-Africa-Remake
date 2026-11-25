@@ -539,6 +539,12 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     for (let t = 0; k < frames.length; t += dt, k++) if (t > from && t < to) out.push(k)
     return out
   }
+  /** The first frame whose clock (settle's, accumulated) has reached `at` seconds. */
+  const frameAt = (at: number, dt = 1 / 60) => {
+    let k = 0
+    for (let t = 0; t < at; t += dt) k++
+    return k
+  }
   const moved = (frames: Sole[], k: number) => frames[k].feet.map((pts, i) => Math.max(...pts.map((p, j) => Math.hypot(p.x - frames[k - 1].feet[i][j].x, p.z - frames[k - 1].feet[i][j].z))))
 
   it('each foot steps between the gait and the stand in turn, the other standing: never a foot slid along the ground', () => {
@@ -869,6 +875,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   })
 
   const RESUME_LANDING_BOUND = 0.22 // rad a frame; measured 0.215 (point 1587), owned by point 1589
+  const RESUME_LANDING_FRAMES = 2 // frames before the landing the excess may fall on; measured +28 for a landing at +30 (point 1587)
   const RESUME_KNEE_STEP_BOUND = 0.25 // rad a frame; measured 0.224 (point 1587), main before it 0.62
   it('a walk taken up again mid-stop: over its first 30 frames the knee bends no faster than the walk clip bends it', () => {
     // resuming while the legs still left the gait bent the knee by 0.3-0.5 rad a
@@ -886,7 +893,11 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const began = frames.findIndex((f, k) => k >= r0 - 1 && f.resumed)
         expect(began, `resumed after ${pause.toFixed(2)} s: a resumed start begins`).toBeGreaterThanOrEqual(r0 - 1)
         expect(began - r0, `resumed after ${pause.toFixed(2)} s: the resumed start begins within its first frames`).toBeLessThan(15)
-        for (let k = r0; k < r0 + 30; k++) {
+        // the first foot's landing, located rather than assumed inside the 30 frames
+        const landing = frames.findIndex((f, k) => k > began && f.start.includes(2))
+        expect(landing, `resumed after ${pause.toFixed(2)} s: the first foot lands`).toBeGreaterThan(began)
+        const landed = frames[landing].start.indexOf(2)
+        for (let k = r0; k <= Math.max(r0 + 29, landing); k++) {
           frames[k].knee.forEach((q, i) => {
             const where = `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s, +${k - r0}, shin ${i} (clip ${clip.toFixed(3)})`
             const step = q.angleTo(frames[k - 1].knee[i])
@@ -895,8 +906,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
             // released steps past the clip's range (measured once: turning 0,
             // resumed after 0.40 s, +28, 0.215 drawn, the hold still 0.167;
             // hold or heel strike (point 1423) is 1589's to measure)
+            expect(i === landed && k >= landing - RESUME_LANDING_FRAMES && k <= landing, `${where}: past the clip only on the first foot's landing step (lands +${landing - r0})`).toBe(true)
             expect(frames[k - 1].w, `${where}: past the clip only at full weight`).toBeGreaterThanOrEqual(1)
-            expect(frames[k].start[i], `${where}: only on the first foot's swing to its landing`).toBe(1)
             expect(frames[k].hold, `${where}: only while the hold is still released`).toBeGreaterThan(0)
             expect(step, `${where}: within the measured landing excess`).toBeLessThanOrEqual(RESUME_LANDING_BOUND)
           })
@@ -946,8 +957,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
           const at = `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s, stopped again after ${again.toFixed(2)} s`
           // stopped before the resumed start began, a run checks only the bound
           const began = frames.findIndex((f) => f.resumed)
-          const s2 = Math.round((cut + pause + again) * 60)
-          if (began > 0 && frames.slice(began, s2 + 1).some((f) => f.hold > 0)) duringHold++
+          // the frame the second stop acts on, on settle's own clock
+          const s2 = frameAt(cut + pause + again)
+          if (began > 0 && began < s2 && frames[s2 - 1].hold > 0) duringHold++
           expect(worstKnee(frames), at).toBeLessThanOrEqual(0.4)
         }
       }
