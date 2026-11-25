@@ -434,7 +434,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   /** Per frame: the legs' share of the gait, each foot's world points, the
    *  shins' turns, and the start's state per foot (`ClipLayers.startState`,
    *  -1 when no start runs) with whether the walk clip swings that foot. */
-  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; swing: boolean[]; step: number }
+  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number }
   /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
   function soleOf(bones: Record<string, THREE.Bone>) {
     const f = person.frame
@@ -519,7 +519,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const [land, lift] = gaitStance(i)
         return lift - land > 1e-6 && ((((c.gait.phase - land) % 1) + 1) % 1) >= lift - land
       })
-      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], swing, step })
+      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step })
     }
     return frames
   }
@@ -907,6 +907,14 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const where = `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s (clip ${clip.toFixed(3)})`
         expect(first, `${where}: the first foot lands`).toBeGreaterThan(r0)
         const waiting = 1 - foot
+        // the waiting stand foot took its step in the clip's stance and handed
+        // it over as the clip lifted it (cross-vendor review of point 1586)
+        const lifted = frames.findIndex((f, k) => k > r0 && f.start[waiting] === 1 && f.stance[waiting])
+        expect(lifted, `${where}: the waiting foot steps in the clip's stance`).toBeGreaterThan(r0)
+        const done = frames.findIndex((f, k) => k > lifted && f.start[waiting] !== 1)
+        expect(done, `${where}: the waiting foot's step ends`).toBeGreaterThan(lifted)
+        expect(frames[done].start[waiting], `${where}: ended by its own landing`).toBe(2)
+        expect(frames[done].swing[waiting], `${where}: handed over on the clip's lift`).toBe(true)
         let worst = 0
         for (let k = first + 1; k < frames.length; k++) worst = Math.max(worst, frames[k].knee[waiting].angleTo(frames[k - 1].knee[waiting]))
         expect(worst, where).toBeLessThanOrEqual(clip)

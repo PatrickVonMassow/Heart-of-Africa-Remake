@@ -151,8 +151,12 @@ export interface ClipLayers {
   resumeY: [number, number]
   resumeEase: number
   /** Per foot, the soft reach (share of G.settleSoftReach) a resumed start
-   *  holds from its stop until that foot's own step ends (point 1586). */
+   *  holds from its stop until that foot's own step ends; stopping, the
+   *  stop frame's own, so a resume takes it over unbroken (point 1586). */
   resumeSoft: [number, number]
+  /** Per foot, whether its start step lifted it in the clip's stance (a
+   *  resumed start's waiting stand foot): its step ends on the clip's lift. */
+  startStance: [boolean, boolean]
 }
 
 export function clipLayers(asset: VillagerAsset): ClipLayers {
@@ -209,6 +213,7 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     resumeY: [0, 0],
     resumeEase: 0,
     resumeSoft: [0, 0],
+    startStance: [false, false],
   }
 }
 
@@ -582,7 +587,6 @@ const _startQ = [new THREE.Quaternion(), new THREE.Quaternion()]
  * a straight leg in a tenth of a second and snapped the knee). The foot that
  * is mid-swing as the start sets the gait (`startPhase`) swings at once.
  */
-const _startStance = [false, false]
 function startFeet(c: ClipLayers, body: GroundBody | null): void {
   const yaw = body?.yaw ?? 0
   const cyc = (x: number) => ((x % 1) + 1) % 1
@@ -643,7 +647,7 @@ function startFeet(c: ClipLayers, body: GroundBody | null): void {
       }
     }
     _startP[i] = c.startState[i] === 0 ? 1 : k
-    _startStance[i] = c.startState[i] === 1 && cyc(c.startPhase[i] - land) < span
+    c.startStance[i] = c.startState[i] === 1 && cyc(c.startPhase[i] - land) < span
     if (c.startState[i] === 0) {
       _startT[i].copy(_stand[i])
       _startQ[i].copy(_standQ[i])
@@ -774,7 +778,6 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
         c.settleStand[i].z = c.lastAt[i].z
         c.settleTurn[i].copy(c.lastTurn[i])
         c.resumeY[i] = Math.max(0, c.lastAt[i].y - _stand[i].y)
-        c.resumeSoft[i] = 0
         return
       }
       if (c.startState[i] > 0) return
@@ -873,7 +876,7 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
       // a foot lifted in the clip's stance lets the hips up later (the root of
       // its step's share): faded with the share, the first foot's knee stepped
       // past the clip's range as the waiting foot rose (point 1586)
-      drop = Math.max(drop, need * (_startStance[i] ? Math.sqrt(_startP[i]) : _startP[i]))
+      drop = Math.max(drop, need * (c.startStance[i] ? Math.sqrt(_startP[i]) : _startP[i]))
     }
   })
   hips.position.y -= Math.min(drop, G.pelvisDropMax * legScale) * share * (c.starting || c.holding ? 1 : c.stop)
@@ -903,7 +906,10 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
     // until its own step has ended: let go as the walk weight came back, the
     // waiting stand foot's leg ran straight and its knee snapped at the step
     // (point 1586)
-    if (c.resumed) {
+    // (seeded by the last stop frame's own: reset on the resume frame, the
+    // take-over kept ~60% of it, cross-vendor review of point 1586)
+    if (!c.resumed) c.resumeSoft[i] = ease
+    else {
       if (c.startState[i] <= 1) c.resumeSoft[i] = Math.max(c.resumeSoft[i], ease)
       ease = Math.max(ease, c.resumeSoft[i] * Math.max(c.startState[i] <= 1 ? _startP[i] : 0, Math.min(1, (1 - w) * G.resumeSoftRelease)))
     }
