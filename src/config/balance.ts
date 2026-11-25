@@ -4472,6 +4472,10 @@ export const VILLAGER_GLTF = {
    *  walk weight is short of this share's inverse (released over the last
    *  1/20 of it, point 1586). Calibratable. */
   resumeSoftRelease: 20,
+  /** A walk resumed mid-stop releases the stop's held legs over these seconds
+   *  (smoothstep; released with the legs' weight, the hold ended by a jump at
+   *  full weight: point 1587). Calibratable. */
+  resumeHoldSeconds: 0.45,
   /** Starting, the seconds over which a foot still on the stand takes up the
    *  walk clip's roll off its heel once the legs are on the walk (held flat
    *  through the blend, it then left the stand by a jump). Calibratable. */

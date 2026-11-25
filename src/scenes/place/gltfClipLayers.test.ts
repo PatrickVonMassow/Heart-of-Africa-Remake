@@ -434,7 +434,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   /** Per frame: the legs' share of the gait, each foot's world points, the
    *  shins' turns, and the start's state per foot (`ClipLayers.startState`,
    *  -1 when no start runs) with whether the walk clip swings that foot. */
-  type Sole = { w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number }
+  type Sole = { hy?: number; gk?: THREE.Quaternion[]; sp?: number; w: number; feet: THREE.Vector3[][]; knee: THREE.Quaternion[]; start: number[]; stance: boolean[]; swing: boolean[]; step: number }
   /** The world points of each foot (ankle, heel, ball), rigid on the foot bone. */
   function soleOf(bones: Record<string, THREE.Bone>) {
     const f = person.frame
@@ -519,7 +519,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const [land, lift] = gaitStance(i)
         return lift - land > 1e-6 && ((((c.gait.phase - land) % 1) + 1) % 1) >= lift - land
       })
-      frames.push({ w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step })
+      frames.push({ hy: bones.hips.getWorldPosition(new THREE.Vector3()).y, sp: speed, gk: (['L', 'R'] as const).map((sd) => c.local[asset.bones.indexOf(`shin.${sd}`)].clone()), w: c.legs * (1 - kneel), feet: sole(), knee: (['L', 'R'] as const).map((s) => bones[`shin.${s}`].quaternion.clone()), start: c.starting ? [...c.startState] : [-1, -1], stance: [...c.startStance], swing, step })
     }
     return frames
   }
@@ -885,6 +885,21 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         expect(Math.min(...frames.map((f) => f.w)), `the stop has begun, resumed after ${pause.toFixed(2)} s`).toBeLessThan(1)
         const worst = worstKnee(frames)
         expect(worst, `turning ${turn} rad/s, resumed after ${pause.toFixed(2)} s (clip ${clip.toFixed(3)})`).toBeLessThanOrEqual(RESUME_KNEE_STEP_BOUND)
+      }
+    }
+  })
+
+  // WIP probe for point 1587 (remove before landing)
+  it.skip('PROBE1587', () => {
+    for (const turn of [0, 2.8, -2.8]) {
+      const clip = clipKneeStep(turn)
+      for (let pause = 0.35; pause < 0.8; pause += 0.05) {
+        const cut = 1.2
+        const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
+        const r0 = Math.round((cut + pause) * 60)
+        const rows: string[] = []
+        for (let k = r0 - 2; k < r0 + 45; k++) { const s = kneeStep(frames, k); if (s > clip || (k - r0 >= 5 && k - r0 <= 13 && (pause < 0.37 || (turn > 0 && pause > 0.44 && pause < 0.46)))) rows.push(`+${k - r0}:${s.toFixed(3)} w${frames[k].w.toFixed(2)} st${frames[k].start.join('/')} sw${frames[k].swing.map(Number).join('')} R${frames[k].knee[1].angleTo(frames[k-1].knee[1]).toFixed(3)} gR${frames[k].gk![1].angleTo(frames[k-1].gk![1]).toFixed(3)} v${frames[k].sp!.toFixed(2)} dH${(1000*(frames[k].hy!-frames[k-1].hy!)).toFixed(1)} dA${(1000*frames[k].feet[1][0].distanceTo(frames[k-1].feet[1][0])).toFixed(1)}`) }
+        console.log(`turn ${turn} pause ${pause.toFixed(2)} clip ${clip.toFixed(3)} :: ${rows.join(' | ')}`)
       }
     }
   })

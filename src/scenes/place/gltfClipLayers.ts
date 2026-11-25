@@ -157,6 +157,9 @@ export interface ClipLayers {
   /** Per foot, whether its start step lifted it in the clip's stance (a
    *  resumed start's waiting stand foot): its step ends on the clip's lift. */
   startStance: [boolean, boolean]
+  resumeHold: number
+  resumeHoldT: number
+  resumeP: [number, number]
 }
 
 export function clipLayers(asset: VillagerAsset): ClipLayers {
@@ -214,6 +217,9 @@ export function clipLayers(asset: VillagerAsset): ClipLayers {
     resumeEase: 0,
     resumeSoft: [0, 0],
     startStance: [false, false],
+    resumeHold: 0,
+    resumeHoldT: 0,
+    resumeP: [0, 0],
   }
 }
 
@@ -350,6 +356,8 @@ export function applyClipLayers(
     c.startRoll = 0
     c.resumed = true
     c.resumeNew = true
+    c.resumeHold = c.stop
+    c.resumeHoldT = 0
     c.gait.phase = c.heldPhase
   } else if (c.starting && (c.legs < before || m.kneel > 0)) {
     // cut short: the stop takes the feet on from where the start drew them
@@ -402,7 +410,11 @@ export function applyClipLayers(
     }
     // stopping, the legs and hips stay as the gait last drew them walking
     if (settle > 0 && c.settleFirst < 0) c.stop = c.legs < before ? 1 : 0
-    else if (c.stop > 0 && c.legs > before) c.stop *= before < 1 ? (1 - c.legs) / (1 - before) : 0
+    else if (c.resumed && c.resumeHold > 0) {
+      c.resumeHoldT = Math.min(1, c.resumeHoldT + dt / Math.max(1e-6, G.resumeHoldSeconds))
+      const u = c.resumeHoldT
+      c.stop = c.resumeHold * (1 - u * u * (3 - 2 * u))
+    } else if (c.stop > 0 && c.legs > before) c.stop *= before < 1 ? (1 - c.legs) / (1 - before) : 0
     if (c.anchor > 0 && c.legs > before) c.anchor *= before < 1 ? (1 - c.legs) / (1 - before) : 0
     // a stop reversing a start mid-blend takes the hold in as the legs fall,
     // full at the stand, from the gait as it was drawn the frame before
@@ -835,7 +847,8 @@ function settleFeet(asset: VillagerAsset, bones: Record<string, THREE.Bone>, c: 
   LEG_SIDES.forEach((s, i) => {
     const step = c.starting ? 0 : shares[i]
     // starting, the leg drawn as the clip draws it (its knee bent where the clip bends it)
-    const p = c.starting ? 0 : handPlace(c, i, stepPlace(step, c.stop))
+    const p = c.starting ? (c.resumed && c.resumeHold > 0 ? c.resumeP[i] * (c.stop / c.resumeHold) : 0) : handPlace(c, i, stepPlace(step, c.stop))
+    if (!c.starting) c.resumeP[i] = p
     legChain(bones, s).forEach((b, k) => b.quaternion.copy(_codeLeg[i][k]).slerp(gaitLocal(asset, c, s, k), 1 - p))
     const T = _target[i]
     if (c.starting) T.copy(_startT[i])
