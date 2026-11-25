@@ -4387,14 +4387,17 @@ export const VILLAGER_GLTF = {
   plantFirm: 1,
   /** The walk's heel strike (villagerClipPose.ts `heelBrake`): the clip
    *  still swings its heel forward ~2 m/s as it touches down and the hold
-   *  stopped it within a frame. Over `heelBrakeCycle` of the cycle before
-   *  it lands, the heel plays its own path re-timed to arrive with no
-   *  speed `heelBrakeLead` of the cycle before the stance's landing (the hold
-   *  takes it at ~0.01 before, measured 25.11.2026), at the spot the clip
-   *  reaches `heelLandAt` past that landing. Not taken by then, the re-timing
-   *  fades out over `heelBrakeHold`. Calibratable. */
+   *  stopped it within a frame. Over `heelBrakeCycle` of the cycle (at most
+   *  from the swing's middle), the heel plays its own path re-timed to arrive
+   *  with no speed `heelBrakeLead` of the cycle before it touches down on
+   *  this body (`heelTouch`), at the spot the clip reaches `heelLandAt` past
+   *  that touch. Not taken by then, the re-timing fades out over
+   *  `heelBrakeHold`. At 0.12 / 0.015 the heel comes into its catch at under
+   *  5 % of its swing's pace (the dead stop 74 %); 0.15 and up, or a lead
+   *  of 0.01, break the stop/resume knee cases of gltfClipLayers.test.ts or
+   *  leave 10 % (measured 25.11.2026). Calibratable. */
   heelBrakeCycle: 0.12,
-  heelBrakeLead: 0.01,
+  heelBrakeLead: 0.015,
   heelLandAt: 0,
   heelBrakeHold: 0.06,
   /** The stance foot on the ground (villagerClipPose.ts `gaitFootGround`):
