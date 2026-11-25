@@ -10,7 +10,7 @@ import { balance, VILLAGER_ASSET, VILLAGER_GLTF, VILLAGER_POSE } from '../config
 import { CHILD_FIGURE_SCALE } from './figures'
 import { AGE_GROUPS, SEXES } from '../systems/appearance'
 import { isColumnBone, parseVillager, type VillagerAsset, type VillagerClip } from './villagerAsset'
-import { clipGaitPose, clipPoseAt, gaitFootGround, heelOff, kneeTurn, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
+import { clipGaitPose, clipPoseAt, gaitFootGround, heelOff, kneeTurn, nearPitch, newClipGait, PLANT_TOUCH, samplePhase, type ClipGait, shovelOnHungHand, stanceOf, stepClipGait, toHung } from './villagerClipPose'
 import { gltfPerson, type GltfPerson } from './villagerFigureBody'
 import { contactPoints, forwardKinematics, gaitAt, gaitWeights, newPose, newWorld, sprintWeight, toolInHand, type GaitClips } from './villagerRig'
 
@@ -1182,5 +1182,29 @@ describe('the corrective leg solve (natural-villager-motion step 10)', () => {
       expect(runs, `stride ${k}`).toBeGreaterThan(4)
       expect(drift, `stride ${k}`).toBeLessThan(0.001)
     }
+  })
+})
+
+describe('a rolled foot\'s further pitch', () => {
+  it('stays continuous where its two solutions change sides', () => {
+    // cross-vendor review 25.11.2026: with ka < 0, kb crossing 0 and
+    // K / r0 = -cos(0.3), the nearer root switched between about -0.3 and
+    // +0.3 rad at full weight, a 0.6 rad jump of the applied pitch
+    const K = -Math.cos(0.3)
+    let last: number | null = null
+    let maxStep = 0
+    for (let k = -200; k <= 200; k++) {
+      const kb = k * 1e-4
+      const ka = -Math.sqrt(1 - kb * kb)
+      const { alpha, weight } = nearPitch(ka, kb, K, 1)
+      const applied = alpha * weight
+      if (last !== null) maxStep = Math.max(maxStep, Math.abs(applied - last))
+      last = applied
+    }
+    expect(maxStep).toBeLessThan(0.01)
+    // away from the tie the nearer root carries its full weight
+    const away = nearPitch(Math.cos(0.5), Math.sin(0.5), Math.cos(0.3), 1)
+    expect(away.alpha).toBeCloseTo(0.2, 6)
+    expect(away.weight).toBe(1)
   })
 })

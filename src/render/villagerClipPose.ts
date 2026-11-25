@@ -376,18 +376,26 @@ export function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shi
       // faded out as the miss grows (G.rollKeepMissFade of r0); and faded out
       // toward G.rollKeepPitchMax (a foot lifted off its pivot, near
       // upright), never cut off at it
-      const phi = Math.atan2(kb, ka)
-      const c = Math.acos(Math.max(-1, Math.min(1, K / r0)))
-      const a1 = wrapAngle(phi + c)
-      const a2 = wrapAngle(phi - c)
-      const alpha = Math.abs(a1) < Math.abs(a2) ? a1 : a2
+      const { alpha, weight: tie } = nearPitch(ka, kb, K, r0)
       const miss = smoothstep(Math.min(1, Math.max(0, 1 - (Math.abs(K) / r0 - 1) / Math.max(1e-6, G.rollKeepMissFade))))
-      const fade = miss * smoothstep(Math.min(1, Math.max(0, (G.rollKeepPitchMax - Math.abs(alpha)) / Math.max(1e-6, G.rollKeepPitchFade))))
+      const fade = tie * miss * smoothstep(Math.min(1, Math.max(0, (G.rollKeepPitchMax - Math.abs(alpha)) / Math.max(1e-6, G.rollKeepPitchFade))))
       if (fade > 0) _hoQ.premultiply(_hoR.setFromAxisAngle(n, alpha * fade))
     }
   }
   footQ.premultiply(_hoQ)
   return 'rolled'
+}
+/** The pitch α of `ka cos α + kb sin α = K` nearest to 0 (r0 = |(ka, kb)|),
+ * and its weight: faded out where both pitches lie equally near, since there
+ * the nearer one changes sides and the pitch jumped across by both. */
+export function nearPitch(ka: number, kb: number, K: number, r0: number): { alpha: number; weight: number } {
+  const phi = Math.atan2(kb, ka)
+  const c = Math.acos(Math.max(-1, Math.min(1, K / r0)))
+  const a1 = wrapAngle(phi + c)
+  const a2 = wrapAngle(phi - c)
+  const alpha = Math.abs(a1) < Math.abs(a2) ? a1 : a2
+  const weight = smoothstep(Math.min(1, Math.abs(Math.abs(a1) - Math.abs(a2)) / Math.max(1e-6, G.rollKeepPitchFade)))
+  return { alpha, weight }
 }
 const _hoN = new THREE.Vector3()
 const _hoV0 = new THREE.Vector3()
