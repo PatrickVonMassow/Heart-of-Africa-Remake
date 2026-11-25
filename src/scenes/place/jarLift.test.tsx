@@ -60,13 +60,15 @@ interface Trace {
   /** The jar hand's mount and (glTF) its wrist bone, in the body's frame. */
   mount: THREE.Vector3[]
   wrist: THREE.Vector3[]
+  /** The jar hand's wrist bone's turn, in the body's frame (glTF). */
+  wristTurn: THREE.Quaternion[]
   /** The steadying hand as the skinned body reports it (dev userData). */
   steady: Array<{ arm: string | null; weight: number } | null>
   crown: THREE.Vector3
 }
 
-async function trace(opts: { body: 'gltf' | 'primitive'; leftBusy?: boolean; lift?: boolean }): Promise<Trace> {
-  const { body, leftBusy = false, lift = true } = opts
+async function trace(opts: { body: 'gltf' | 'primitive'; leftBusy?: boolean; busyFrom?: number; lift?: boolean }): Promise<Trace> {
+  const { body, leftBusy = false, busyFrom = FULL_AT - 20, lift = true } = opts
   const look: FigureLook | null =
     body === 'gltf' ? { peopleId: 'bambara', drivers: { coldness: 0, harmattan: 0, karif: 0 }, year: 1890, palette: PALETTE, radial: 16, villager: asset } : null
   const group = new THREE.Group()
@@ -88,7 +90,7 @@ async function trace(opts: { body: 'gltf' | 'primitive'; leftBusy?: boolean; lif
       if (jars.head) jars.head.visible = carry === 'fullJar'
       if (jars.hand) jars.hand.visible = carry === 'emptyJar'
       const p = pose.current!
-      p.left = leftBusy && frame >= FULL_AT - 20 ? { ...BUSY_LEFT } : { ...REST_POSE.left }
+      p.left = leftBusy && frame >= busyFrom ? { ...BUSY_LEFT } : { ...REST_POSE.left }
       applyFigurePose(limbs.current, p)
       if (jars.head && jars.hand) placeLiftedJar(jars.head, jars.hand, share.current, REST, body === 'gltf' ? LIFT_SETTLE : 0)
     })
@@ -109,7 +111,7 @@ async function trace(opts: { body: 'gltf' | 'primitive'; leftBusy?: boolean; lif
   const gl = { render() {}, setSize() {}, setPixelRatio() {}, domElement: {} }
   await root.configure({ gl: gl as never, frameloop: 'never', size: { width: 1, height: 1, top: 0, left: 0 } })
   await act(async () => root.render(<Stage />))
-  const out: Trace = { jar: [], jarTurn: [], mount: [], wrist: [], steady: [], crown: new THREE.Vector3() }
+  const out: Trace = { jar: [], jarTurn: [], mount: [], wrist: [], wristTurn: [], steady: [], crown: new THREE.Vector3() }
   const bodyTurn = new THREE.Quaternion()
   const local = (o: THREE.Object3D) => group.worldToLocal(o.getWorldPosition(new THREE.Vector3()))
   for (frame = 0; frame < FRAMES; frame++) {
@@ -121,7 +123,11 @@ async function trace(opts: { body: 'gltf' | 'primitive'; leftBusy?: boolean; lif
     out.jarTurn.push(shown.getWorldQuaternion(new THREE.Quaternion()).premultiply(bodyTurn))
     out.mount.push(local(jars.hand!.parent!))
     const mesh = group.getObjectByName('figure-body') as THREE.SkinnedMesh | undefined
-    if (mesh?.skeleton) out.wrist.push(local(mesh.skeleton.bones[asset.bones.indexOf('hand.L')]))
+    if (mesh?.skeleton) {
+      const bone = mesh.skeleton.bones[asset.bones.indexOf('hand.L')]
+      out.wrist.push(local(bone))
+      out.wristTurn.push(bone.getWorldQuaternion(new THREE.Quaternion()).premultiply(bodyTurn))
+    }
     const st = group.getObjectByName('inhabitant')?.userData.steady as { arm: string | null; weight: number } | undefined
     out.steady.push(st ? { arm: st.arm, weight: st.weight } : null)
   }
@@ -169,20 +175,33 @@ describe('the lift clock', () => {
   })
 })
 
-describe('the lifting wrist is always within the arm\'s reach (review finding 2)', () => {
-  it('brings a target past the arm and one inside its fold onto a reachable point', () => {
+describe('the lifting wrist is always within the arm\'s reach (review findings 2 and r2-3)', () => {
+  it('brings every target onto a point the two-bone solve takes, the shoulder itself included, so the lift needs no fallback', () => {
     const s = new THREE.Vector3(0.2, 1.3, 0)
     const pole = new THREE.Vector3(1, -0.3, 0.2)
-    const [a, b] = [0.28, 0.24]
-    for (const t of [
-      new THREE.Vector3(0.2, 0.2, 0), // beyond the straight arm
-      new THREE.Vector3(0.22, 1.31, 0.01), // inside the folded arm's limit
-      new THREE.Vector3(0.4, 1.0, 0.2), // plainly reachable: left alone
-    ]) {
-      const before = t.clone()
-      liftReachable(t, s, a, b)
-      expect(solveTwoBone(s, t, a, b, pole).reached).toBe(true)
-      if (before.distanceTo(s) < a + b && before.distanceTo(s) > Math.abs(a - b)) expect(t.distanceTo(before)).toBe(0)
+    for (const [a, b] of [[0.28, 0.24], [0.26, 0.26], [0.2, 0.3]]) {
+      const targets = [
+        new THREE.Vector3(0.2, 0.2, 0), // beyond the straight arm
+        new THREE.Vector3(0.22, 1.31, 0.01), // inside the folded arm's limit
+        new THREE.Vector3(0.4, 1.0, 0.2), // plainly reachable: left alone
+        s.clone(), // on the shoulder itself: no direction of its own
+        s.clone().add(new THREE.Vector3(1e-8, 0, 0)),
+      ]
+      // and a sweep from the shoulder out past the arm in every direction
+      for (let k = 0; k < 200; k++) {
+        const dir = new THREE.Vector3(Math.sin(k * 1.7), Math.cos(k * 0.9), Math.sin(k * 2.3)).normalize()
+        targets.push(s.clone().addScaledVector(dir, (k / 200) * (a + b) * 1.5))
+      }
+      for (const t of targets) {
+        const before = t.clone()
+        liftReachable(t, s, a, b, pole)
+        expect(solveTwoBone(s, t, a, b, pole).reached).toBe(true)
+        const d = before.distanceTo(s)
+        if (d > 1e-6 && d < (a + b) * 0.999 && d > Math.abs(a - b) * 1.001) expect(t.distanceTo(before)).toBe(0)
+      }
+      // the shoulder's own target is set out toward the elbow's side, not anywhere
+      const onShoulder = liftReachable(s.clone(), s, a, b, pole)
+      if (a !== b) expect(onShoulder.clone().sub(s).normalize().dot(pole.clone().normalize())).toBeCloseTo(1, 6)
     }
   })
 })
@@ -194,6 +213,9 @@ describe('the carried jar through the change of carry, owned as PlaceLife owns i
     expect(Math.max(...steps(t.wrist))).toBeLessThan(STEP_BAR)
     expect(Math.max(...steps(t.mount))).toBeLessThan(STEP_BAR)
     expect(Math.max(...turns(t.jarTurn))).toBeLessThan(TURN_BAR)
+    // the wrist's own turn, not only the jar's: past its first 30 % the jar
+    // stands upright whatever the wrist does, so a flipping wrist would hide
+    expect(Math.max(...turns(t.wristTurn))).toBeLessThan(TURN_BAR)
     // it was at the hip, and it ends on the head
     expect(t.jar[FULL_AT - 1].y).toBeLessThan(1)
     expect(t.jar[t.jar.length - 1].y).toBeGreaterThan(t.crown.y)

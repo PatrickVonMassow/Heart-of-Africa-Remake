@@ -352,9 +352,6 @@ const _turnB = new THREE.Quaternion()
 const _liftFrom = new THREE.Vector3()
 const _liftHand = new THREE.Quaternion()
 const _liftTo = new THREE.Vector3()
-/** The lifting arm as it hung and as the finished grip has it (headLift). */
-const _liftHung = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion()] as const
-const _liftRim = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion()] as const
 const _pole = new THREE.Vector3()
 const _euler = new THREE.Euler()
 const _here = new THREE.Vector3()
@@ -889,8 +886,10 @@ export function SkinnedFigure({
           const a = loc(fore, _e).distanceTo(loc(up, _s))
           const reach = wrist ? a + loc(b[`hand.${s}`], _w).distanceTo(_e) : reachOf(s)
           loc(up, _s)
-          // a wrist target is brought within the arm's reach, both limits
-          if (wrist) liftReachable(target, _s, a, reach - a)
+          // a wrist target is brought within the arm's reach, both limits (one
+          // on the shoulder itself set out toward the elbow's side), so it is
+          // always solved
+          if (wrist) liftReachable(target, _s, a, reach - a, pole)
           const sol = solveTwoBone(_s, target, a, reach - a, pole)
           if (!sol.reached) return false
           // the arm's own parent (the clavicle on the glTF body, else the chest)
@@ -917,9 +916,6 @@ export function SkinnedFigure({
           if (lift < 1) {
             loc(b[`hand.${s}`], _liftFrom)
             qIn(b[`hand.${s}`], _liftHand)
-            _liftHung[0].copy(up.quaternion)
-            _liftHung[1].copy(fore.quaternion)
-            _liftHung[2].copy(b[`hand.${s}`].quaternion)
           }
           done = solveTo(_grip, _pole)
           // the palm on the load, not the back of the hand: the wrist rolled
@@ -943,20 +939,9 @@ export function SkinnedFigure({
             loc(b[`hand.${s}`], _liftTo)
             _liftTo.lerpVectors(_liftFrom, _liftTo, lift)
             _liftTo.x += (i === 0 ? 1 : -1) * VILLAGER_POSE.headLiftOut * Math.sin(Math.PI * lift)
-            _liftRim[0].copy(up.quaternion)
-            _liftRim[1].copy(fore.quaternion)
-            _liftRim[2].copy(b[`hand.${s}`].quaternion)
+            // (always solved: solveTo brings a wrist target within the arm's reach)
             done = solveTo(_liftTo, _pole, true)
-            if (!done) {
-              // (a wrist target the arm cannot take — solveTo brings it within
-              // both reach limits, so only a target on the shoulder itself):
-              // the arm as it hung turned toward the grip by the lift, never
-              // the finished grip ahead of its time
-              up.quaternion.copy(_liftHung[0]).slerp(_liftRim[0], lift)
-              fore.quaternion.copy(_liftHung[1]).slerp(_liftRim[1], lift)
-              b[`hand.${s}`].quaternion.copy(_liftHung[2]).slerp(_liftRim[2], lift)
-              done = true
-            } else {
+            if (done) {
               fore.quaternion.multiply(_q.setFromAxisAngle(_up, lift * roll * FOREARM_ROLL_SHARE))
               const was = liftTurn.current
               turnWithoutFlip(_liftHand, turned, lift, was)
