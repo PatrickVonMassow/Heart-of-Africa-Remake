@@ -5203,3 +5203,10 @@ put it is the mistake this line exists to stop.
   Verifiable: the resume case of gltfClipLayers.test.ts without its RESUME_LANDING_BOUND exception, bounded by the clip's 240 Hz range.
   Criticality: low - a one-degree knee excess in one frame of the first stride after a hesitation.
   Bundle: Dorfleben.
+
+- [ ] 1590. Errand water carrier sets off standing on the river surface
+  Source: finding 25.11.2026 from the picture check of point 1587 (feat/1587-resume-knee-steps 5aae342d1/ebf527500), captures verification/1582-set-off-1..4{,-webgl2}.png, both backends identical: the adult filmed setting off from her errand stop at the Bambara village bank stands and walks on the open river surface a few metres out from the brown bank, feet on the water plane. design.md §19.5: water is for crossing, not for lingering. Not caused by 1587 (knee-only change).
+  Final state: the errand stop and the walk from it lie on land (or the villager visibly wades with the water plane covering the feet, if the stop is a designed wading stand); no villager stands on top of the water surface.
+  Verifiable: Vitest that no errand stop of the village layout lies on a water cell; the set-off captures of polish-villagers --section=adult-errands on both backends show the feet on the bank.
+  Criticality: medium - a villager visibly walking on the river in a filmed village view.
+  Bundle: Dorfleben.
