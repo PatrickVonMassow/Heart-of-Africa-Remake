@@ -175,6 +175,48 @@ describe('the lift clock', () => {
   })
 })
 
+describe('the full jar takes over where the empty one hangs, on a squashed carrier too (review r2-2)', () => {
+  it('places the full jar at the empty jar\'s drawn centre at the swap, the squash and the head\'s correction included', () => {
+    for (const squash of [1, 0.78]) {
+      // the carrier squashed by its caller (the pounding squat), the arm under
+      // that squash, the crown under the head's correction of it
+      const body = new THREE.Group()
+      body.scale.set(1, squash, 1)
+      body.rotation.y = 0.7
+      const arm = new THREE.Group()
+      arm.position.set(0.2, 1.0, 0.05)
+      arm.rotation.set(0.4, 0.3, -0.5)
+      const mount = new THREE.Group()
+      mount.position.set(0, -0.55, 0)
+      mount.rotation.set(-0.2, 0, 0.3)
+      const hand = new THREE.Group()
+      hand.position.set(0, -0.12, 0.04)
+      hand.rotation.set(0, 0, 0.12)
+      const head = new THREE.Group()
+      head.position.set(0, 1.6, 0)
+      head.rotation.x = 0.25
+      head.scale.set(1, 1 / squash, 1)
+      const crown = new THREE.Group()
+      crown.position.set(0, 0.12, 0)
+      const jar = new THREE.Group()
+      body.add(arm, head)
+      arm.add(mount)
+      mount.add(hand)
+      head.add(crown)
+      crown.add(jar)
+      body.updateMatrixWorld(true)
+      placeLiftedJar(jar, hand, 0, REST)
+      jar.updateMatrixWorld(true)
+      const at = jar.getWorldPosition(new THREE.Vector3())
+      expect(at.distanceTo(hand.getWorldPosition(new THREE.Vector3()))).toBeLessThan(1e-6)
+      // and it moves on from there continuously
+      placeLiftedJar(jar, hand, 0.01, REST)
+      jar.updateMatrixWorld(true)
+      expect(jar.getWorldPosition(new THREE.Vector3()).distanceTo(at)).toBeLessThan(0.01)
+    }
+  })
+})
+
 describe('the lifting wrist is always within the arm\'s reach (review findings 2 and r2-3)', () => {
   it('brings every target onto a point the two-bone solve takes, the shoulder itself included, so the lift needs no fallback', () => {
     const s = new THREE.Vector3(0.2, 1.3, 0)

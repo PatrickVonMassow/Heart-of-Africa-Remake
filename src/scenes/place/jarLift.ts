@@ -43,6 +43,7 @@ const _q = new THREE.Quaternion()
 const _parentQ = new THREE.Quaternion()
 const _hang = new THREE.Vector3()
 const _localQ = new THREE.Quaternion()
+const _inv = new THREE.Quaternion()
 const ease = (v: number) => smooth(v)
 
 /**
@@ -64,15 +65,17 @@ export function placeLiftedJar(jar: THREE.Object3D, hand: THREE.Object3D, share:
     return
   }
   parent.updateWorldMatrix(true, false)
-  mount.updateWorldMatrix(true, false)
   parent.getWorldQuaternion(_parentQ).invert()
   // the hand's grip on the jar, into the crown's frame
   mount.getWorldPosition(_anchor)
   parent.worldToLocal(_anchor)
-  mount.getWorldQuaternion(_q).premultiply(_parentQ)
-  // the jar as it hangs in the hand, and that grip in the jar's own frame
+  mount.getWorldQuaternion(_q).premultiply(_parentQ).normalize()
+  // the jar as it hangs in the hand, and its centre from the grip as it is
+  // drawn (into the crown's frame through the full matrices: a squashed
+  // carrier's scale and shear included, which the turns alone drop)
   _localQ.copy(_q).multiply(hand.quaternion)
-  _hang.copy(hand.position).applyQuaternion(_localQ.clone().invert().multiply(_q))
+  hand.getWorldPosition(_hang)
+  parent.worldToLocal(_hang).sub(_anchor).applyQuaternion(_inv.copy(_localQ).invert())
   // upright early, before the wrist turns with the rising arm
   jar.quaternion.slerpQuaternions(_localQ, rest.quaternion, ease(share / LIFT_UPRIGHT))
   jar.position.copy(_hang).applyQuaternion(jar.quaternion).add(_anchor)
