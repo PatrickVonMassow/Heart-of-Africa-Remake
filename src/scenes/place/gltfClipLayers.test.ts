@@ -875,7 +875,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   })
 
   const RESUME_LANDING_BOUND = 0.22 // rad a frame; measured 0.215 (point 1587), owned by point 1589
-  const RESUME_LANDING_FRAMES = 2 // frames before the landing the excess may fall on; measured +28 for a landing at +30 (point 1587)
+  const RESUME_LANDING_FRAMES = 2 // frames before the landing the excess may fall on; measured 2 (point 1587)
   const RESUME_KNEE_STEP_BOUND = 0.25 // rad a frame; measured 0.224 (point 1587), main before it 0.62
   it('a walk taken up again mid-stop: over its first 30 frames the knee bends no faster than the walk clip bends it', () => {
     // resuming while the legs still left the gait bent the knee by 0.3-0.5 rad a
@@ -889,7 +889,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const cut = 1.2
         const frames = settle({ cut, resumeAt: cut + pause, turn: (t) => (t > cut - 0.3 ? turn : 0) })
         expect(Math.min(...frames.map((f) => f.w)), `the stop has begun, resumed after ${pause.toFixed(2)} s`).toBeLessThan(1)
-        const r0 = Math.round((cut + pause) * 60)
+        const r0 = frameAt(cut + pause) // the frame the resume acts on, on settle's own clock
         const began = frames.findIndex((f, k) => k >= r0 - 1 && f.resumed)
         expect(began, `resumed after ${pause.toFixed(2)} s: a resumed start begins`).toBeGreaterThanOrEqual(r0 - 1)
         expect(began - r0, `resumed after ${pause.toFixed(2)} s: the resumed start begins within its first frames`).toBeLessThan(15)
