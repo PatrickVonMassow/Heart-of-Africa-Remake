@@ -542,7 +542,7 @@ describe('the clip gait on the ground', () => {
                 // of its swing's pace, a dead stop 0.62 and more; set down up
                 // to 0.0234 per unit of leg past the clip's own step at 144 Hz;
                 // measured 25.11.2026)
-                // OPEN: at 30 Hz a pace crossing into the band
+                // OPEN (point 1595): at 30 Hz a pace crossing into the band
                 // within the four-frame brake still loses up to 0.74 of its
                 // swing's pace in the touchdown frame, as a dead stop does
                 // (re-planned each frame, the pace's change extrapolated, a
