@@ -244,6 +244,8 @@ describe('the carried jar through the change of carry, owned as PlaceLife owns i
   it('glTF body without the lift input: the steadying hand comes in over the clips\' hand-over as before', async () => {
     const t = await trace({ body: 'gltf', lift: false })
     const k = t.steady.findIndex((s, i) => i > FULL_AT && (s?.weight ?? 0) >= 1)
+    // the steadying hand does arrive (findIndex's -1 would pass the bound below)
+    expect(k).toBeGreaterThan(FULL_AT)
     expect(k - FULL_AT).toBeLessThanOrEqual(Math.ceil(VILLAGER_GLTF.transitionSeconds * FPS) + 2)
   }, 120_000)
 
