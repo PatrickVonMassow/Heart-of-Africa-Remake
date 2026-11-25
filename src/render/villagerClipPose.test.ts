@@ -241,7 +241,7 @@ describe('the clip gait on the ground', () => {
    *  pace the gait is drawn at, and the body's turn that frame (rad). */
   type HeelStep = { walked: number; speed: number; dyaw: number }
   /** One heel strike of `heelStrikeRun`. */
-  type HeelStrike = { i: number; k: number; into: number; drop: number; stop: number; land: number; slide: number; walk: number; braked: boolean; leap: number }
+  type HeelStrike = { i: number; k: number; into: number; drop: number; stop: number; land: number; slide: number; walk: number; braked: boolean; leap: number; crossed: boolean; fell: number; stance: number }
   /**
    * The walk's heel strikes over a run of `frames` frames at `hz`, the
    * planted walk beside the clip's own (nothing held). Every landing of a
@@ -274,6 +274,14 @@ describe('the clip gait on the ground', () => {
     // per foot and frame (the planted run): its heel's world spot (its
     // height the person's), and which contacts are held
     const spots: THREE.Vector3[][] = [[], []]
+    const balls: THREE.Vector3[][] = [[], []]
+    const tips: THREE.Vector3[][] = [[], []]
+    // per frame the gait's phase, the cycle walked since the run began, and
+    // per foot the phase its brake ends at (null: no walk in the blend),
+    // read off the pace alone, never off the holds
+    const phases: number[] = []
+    const cum: number[] = []
+    const ends: (number | null)[][] = [[], []]
     const held: Record<(typeof KEYS)[number], boolean>[][] = [[], []]
     const braked: boolean[][] = [[], []]
     const walkAt: number[] = []
@@ -298,6 +306,10 @@ describe('the clip gait on the ground', () => {
       }
       for (const r of runs) {
         stepClipGait(r.g, asset, f, s.walked, s.speed)
+        if (r.hold) {
+          cum.push(k > 0 ? cum[k - 1] + ((((r.g.phase - phases[k - 1]) % 1) + 1) % 1) : 0)
+          phases.push(r.g.phase)
+        }
         clipGaitPose(r.g, asset, f, s.speed, r.hold ? { x, z, yaw, unit: 1 } : null, r.pose)
         forwardKinematics(asset, f.rest0, r.pose, r.world)
         const c = contactPoints(asset, r.world, f.legScale)
@@ -308,6 +320,9 @@ describe('the clip gait on the ground', () => {
           r.heels[i].push(heel)
           if (!r.hold) return
           spots[i].push(toWorld(c[side].heel))
+          balls[i].push(toWorld(c[side].ball))
+          tips[i].push(toWorld(c[side].tip))
+          ends[i].push(heelBrakeEnd(asset, f, s.speed, i))
           held[i].push({ heel: !!r.g.held[i].heel, ball: !!r.g.held[i].ball, tip: !!r.g.held[i].tip })
           braked[i].push(r.g.brake[i] !== null)
         })
@@ -316,6 +331,7 @@ describe('the clip gait on the ground', () => {
     const [drawn, clip] = [runs[0].heels, runs[1].heels]
     const out: HeelStrike[] = []
     let unheeled = 0
+    let wrongFirst = 0
     const any = (i: number, k: number) => KEYS.some((p) => held[i][k][p])
     for (const i of [0, 1]) {
       const pace = (j: number, of = drawn) => of[i][j].distanceTo(of[i][j - 1]) / frameDt[j]
@@ -339,8 +355,15 @@ describe('the clip gait on the ground', () => {
           // (measured: such a catch holds the tip alone, its heel moved at
           // most 0.3 per unit of leg since it rose; every landing 0.44 and
           // more, its heel caught first, 25.11.2026)
+          // (the tip alone, or the ball and tip on the frame right after
+          // they let go: a ball caught first after a swing, or a tip caught
+          // away from where it rose, is a landing on the wrong contact:
+          // cross-vendor review of point 1591; measured, a 30 Hz pace step
+          // down catches the ball and tip again the next frame, 0.12 per
+          // unit of leg on, 26.11.2026)
           const moved = drawn[i][k].distanceTo(drawn[i][off]) / per
-          if (!held[i][k].heel && moved < 0.4) heeled = true
+          if (!held[i][k].heel && moved < 0.4 && ((held[i][k].tip && !held[i][k].ball) || k - off <= 1)) heeled = true
+          else if (!held[i][k].heel) wrongFirst++
         }
         if (off < 0 || heeled || held[i][k - 1].heel || !held[i][k].heel) continue
         heeled = true
@@ -356,20 +379,50 @@ describe('the clip gait on the ground', () => {
         for (let j = began > 0 ? began : off + 2; j <= last; j++) drop = Math.max(drop, (pace(j - 1) - pace(j) - Math.max(0, pace(j - 1, clip) - pace(j, clip))) / peak)
         let stop = 0
         for (let j = k; j <= last; j++) stop = Math.max(stop, (pace(j - 1) - pace(j)) / peak)
-        // the heel (the strike's contact, and the stance's pivot until it
-        // rolls onto its ball) from the frame it is held on the ground,
-        // against that spot every frame it stays held there, through the
-        // stance (its ball and tip are handed the drawn foot's place while
-        // the heel pivots: they drift up to 3.6 cm per unit of leg in a turn,
-        // the same with the brake off, measured 25.11.2026)
+        // the stance's pivot through the whole stance: the heel (the
+        // strike's contact) against its touchdown spot every frame it is
+        // held on the ground (`slide`), then, once it lets go, the least
+        // moved of the ball and tip held against their spots as it let go,
+        // while one of them is on the ground (the foot pivots on one rolling
+        // off, the other swung round it in a curve or rising), to its
+        // toe-off (`stance`, the heel's slide included; the ball and tip are
+        // handed the drawn foot's place while the heel pivots). No heel frame
+        // read, or fewer than two of the stance, count as unmeasured, never
+        // as no slide (cross-vendor review of point 1591)
         let slide = 0
-        let down: THREE.Vector3 | null = null
-        for (let j = k; j < frames && held[i][j].heel; j++) {
-          const at = spots[i][j]
-          if (at.y > 0.01) continue
-          down ??= at
-          slide = Math.max(slide, Math.hypot(at.x - down.x, at.z - down.z) / per)
+        let stance = 0
+        let samples = 0
+        let heels = 0
+        let heelDown: THREE.Vector3 | null = null
+        // the ball's and tip's spots as the heel let go
+        let toes: THREE.Vector3[] | null = null
+        let j = k
+        for (; j < frames && any(i, j); j++) {
+          if (held[i][j].heel && !toes) {
+            const h = spots[i][j]
+            if (h.y > 0.01) continue
+            heelDown ??= h
+            heels++
+            samples++
+            slide = Math.max(slide, Math.hypot(h.x - heelDown.x, h.z - heelDown.z) / per)
+            continue
+          }
+          if (!heelDown) break
+          const at = [balls[i][j], tips[i][j]]
+          toes ??= at
+          // the least moved of the ball and tip held, while one of them is on
+          // the ground (the foot pivots on one rolling off, the other swung
+          // round it or rising: neither down, its toe-off)
+          const toe = [0, 1].filter((m) => held[i][j][m ? 'tip' : 'ball'])
+          if (!toe.some((m) => at[m].y <= 0.01)) break
+          const moved = toe.map((m) => Math.hypot(at[m].x - toes![m].x, at[m].z - toes![m].z) / per)
+          samples++
+          stance = Math.max(stance, Math.min(...moved))
         }
+        stance = Math.max(stance, slide)
+        // (a stance the run's end cuts short counts as read so far)
+        if (heels < 1 && j < frames) slide = Infinity
+        if (samples < 2 && j < frames) stance = Infinity
         // (against the clip's step that frame, or of a 60 Hz one where frames
         // are shorter)
         const land = (drawn[i][k].distanceTo(clip[i][k]) - pace(k, clip) / Math.min(hz, 60)) / per
@@ -377,13 +430,57 @@ describe('the clip gait on the ground', () => {
         // brake's first frame: 1, the brake drawn on no frame before)
         const b0 = braked[i].findIndex((b, j) => j > off && j <= k && b)
         const leap = b0 > 0 ? 1 - drawn[i][b0].distanceTo(drawn[i][k]) / Math.max(1e-9, drawn[i][b0 - 1].distanceTo(drawn[i][k])) : 1
-        out.push({ i, k, into: pace(k) / peak, drop, stop, land, slide, walk: walkAt[k], braked: braked[i].slice(off, k).some(Boolean), leap })
+        // (whether the pace went into the walk-jog band within its brake:
+        // the walk's share fell by 0.15 and more from its start to the
+        // touchdown, into the band; measured, of 85 30 Hz strikes falling
+        // by 0.05 and more, the two past the stop bound fell by 0.18 and
+        // 0.22, 26.11.2026)
+        const during = walkAt.slice(began > 0 ? began : k, k + 1)
+        const fell = during[0] - during[during.length - 1]
+        const crossed = during[during.length - 1] < 1 && fell >= 0.15
+        out.push({ i, k, into: pace(k) / peak, drop, stop, land, slide, walk: walkAt[k], braked: braked[i].slice(off, k).some(Boolean), leap, crossed, fell, stance })
       }
     }
-    return Object.assign(out, { unheeled })
+    // the strikes owed, read off the gait's phase alone: each time it passes
+    // a foot's brake end, once at least 0.6 of the cycle has been walked (the
+    // foot's lift-off seen) and 0.1 of it is still to come; each owed a
+    // strike of that foot within 0.15 of the cycle (a strike skipped, its
+    // catch lost, fails here whatever the holds did)
+    const wrap = (d: number) => (((d % 1) + 1.5) % 1) - 0.5
+    let missed = 0
+    let owed = 0
+    for (const i of [0, 1]) {
+      for (let c = 1; c < frames; c++) {
+        const [e0, e1] = [ends[i][c - 1], ends[i][c]]
+        if (e0 === null || e1 === null || cum[c] < 0.6 || cum[frames - 1] - cum[c] < 0.1) continue
+        const [x0, x1] = [wrap(phases[c - 1] - e0), wrap(phases[c] - e1)]
+        if (!(x0 < 0 && x0 > -0.25 && x1 >= 0)) continue
+        owed++
+        if (!out.some((t) => t.i === i && Math.abs(cum[t.k] - cum[c]) <= 0.15)) missed++
+      }
+    }
+    return Object.assign(out, { unheeled, wrongFirst, missed, owed })
   }
   /** A steady run: `speed` throughout, turning `yawRate` rad/s. */
   const steady = (hz: number, speed: number, yawRate = 0) => () => ({ walked: speed / hz, speed, dyaw: yawRate / hz })
+  /** The worst whole-stance drift (`HeelStrike.stance`) of the same run with
+   *  the brake off: the brake adds none to the ball's and tip's own (`step`
+   *  made afresh for it). */
+  const unbrakedStance = (person: GltfPerson, hz: number, frames: number, step: () => (k: number, g: ClipGait) => HeelStep) => {
+    const g = VILLAGER_GLTF as { heelBrakeCycle: number }
+    const was = g.heelBrakeCycle
+    g.heelBrakeCycle = 0
+    try {
+      return Math.max(0, ...heelStrikeRun(person, hz, frames, step()).map((t) => t.stance).filter(Number.isFinite))
+    } finally {
+      g.heelBrakeCycle = was
+    }
+  }
+  /** Over that worst, at most this per unit of leg: the no-slide case's
+   *  bound (measured at most 0.0027 over it in the steady runs; the ball and
+   *  tip themselves drift up to 6 cm per unit of leg in a slow 2.8 rad/s
+   *  turn, as much with the brake off, 26.11.2026). */
+  const STANCE_OVER = 0.004
   /** The jog's own landing on this body at this rate (no walk, so no brake):
    *  the worst `into` and `drop` of a pure jog's catches. The runs land their
    *  heel moving, at 0.27-0.53 of their swing's pace at 60 Hz (measured
@@ -441,12 +538,17 @@ describe('the clip gait on the ground', () => {
           for (const yawRate of [0, 2.8, -2.8]) {
             const where = `${v.toFixed(3)} per leg, ${yawRate} rad/s at ${hz} Hz, leg ${person.frame.legScale.toFixed(2)}`
             const strikes = heelStrikeRun(person, hz, 3 * hz, steady(hz, v * per, yawRate))
+            const ref = unbrakedStance(person, hz, 3 * hz, () => steady(hz, v * per, yawRate))
             // every landing of a foot after its first is a heel strike: its
             // heel takes hold, and its brake ran
             for (const i of [0, 1]) expect(strikes.filter((s) => s.i === i).length, `${where}: foot ${i} is caught`).toBeGreaterThan(0)
             expect(strikes.unheeled, `${where}: landings whose heel never took hold`).toBe(0)
+            expect(strikes.wrongFirst, `${where}: landings on the ball or a tip away from its lift-off first`).toBe(0)
+            expect(strikes.missed, `${where}: owed strikes (of ${strikes.owed}) never read`).toBe(0)
+            expect(strikes.owed, `${where}: strikes owed`).toBeGreaterThan(1)
             for (const s of strikes) {
               expect(s.braked, `${where}, frame ${s.k}, foot ${s.i}: its brake ran`).toBe(true)
+              expect(s.stance, `${where}, frame ${s.k}, foot ${s.i}: its stance's drift (unbraked ${ref.toFixed(4)})`).toBeLessThanOrEqual(ref + STANCE_OVER)
               const o = overBound(s, jog, hz)
               for (const key of keys) {
                 if (o[key] > worst[key]) {
@@ -513,6 +615,10 @@ describe('the clip gait on the ground', () => {
     // the heel reached its hold unbraked
     const G = VILLAGER_GLTF
     const lo = G.jogThreshold - G.jogBand
+    // (30 Hz strikes whose pace went into the band within the brake, and
+    // the other 30 Hz strikes, bounded)
+    let crossings = 0
+    let bounded30 = 0
     for (const person of [adult, child]) {
       const per = person.frame.legScale * person.frame.scale
       for (const hz of [30, 60, 144]) {
@@ -523,19 +629,27 @@ describe('the clip gait on the ground', () => {
               const where = `${kind} ${a.toFixed(2)}-${b.toFixed(2)} per leg every ${period} s at ${hz} Hz, leg ${person.frame.legScale.toFixed(2)}`
               // the pace asked for, smoothed as the figure's walk smooths its
               // measured speed (figureWalk.ts, speedSmoothing)
-              let speed = a * per
-              const strikes = heelStrikeRun(person, hz, 4 * hz, (k) => {
-                const t = k / hz
-                const u = kind === 'wave' ? 0.5 - 0.5 * Math.cos((2 * Math.PI * t) / period) : Math.floor(t / (period / 2)) % 2
-                speed += ((a + (b - a) * u) * per - speed) * (1 - Math.exp(-1 / hz / VILLAGER_MOTION.speedSmoothing))
-                return { walked: speed / hz, speed, dyaw: 0 }
-              })
+              const paced = () => {
+                let speed = a * per
+                return (k: number) => {
+                  const t = k / hz
+                  const u = kind === 'wave' ? 0.5 - 0.5 * Math.cos((2 * Math.PI * t) / period) : Math.floor(t / (period / 2)) % 2
+                  speed += ((a + (b - a) * u) * per - speed) * (1 - Math.exp(-1 / hz / VILLAGER_MOTION.speedSmoothing))
+                  return { walked: speed / hz, speed, dyaw: 0 }
+                }
+              }
+              const strikes = heelStrikeRun(person, hz, 4 * hz, paced())
+              const ref = unbrakedStance(person, hz, 4 * hz, paced)
               expect(strikes.length, where).toBeGreaterThan(3)
               for (const i of [0, 1]) expect(strikes.filter((s) => s.i === i).length, `${where}: foot ${i} is caught`).toBeGreaterThan(1)
               expect(strikes.unheeled, `${where}: landings whose heel never took hold`).toBe(0)
+              expect(strikes.wrongFirst, `${where}: landings on the ball or a tip away from its lift-off first`).toBe(0)
+              expect(strikes.missed, `${where}: owed strikes (of ${strikes.owed}) never read`).toBe(0)
+            expect(strikes.owed, `${where}: strikes owed`).toBeGreaterThan(1)
               for (const s of strikes) {
                 const at = `${where}, frame ${s.k}, foot ${s.i}`
                 expect(s.braked, `${at}: its brake ran`).toBe(true)
+                expect(s.stance, `${at}: its stance's drift (unbraked ${ref.toFixed(4)})`).toBeLessThanOrEqual(ref + STANCE_OVER)
                 const o = overBound(s, jog, hz)
                 // (a pace crossing the band within the brake moves the touch it
                 // ends before, where one contact or another comes down first:
@@ -554,8 +668,12 @@ describe('the clip gait on the ground', () => {
                 // swing's pace in the touchdown frame, as a dead stop does
                 // (re-planned each frame, the pace's change extrapolated, a
                 // quartic ease and a brake of five frames' length all left it
-                // or broke the brake's start, measured 25.11.2026): unbounded here
-                if (hz >= 60) expect(o.stop, `${at}: stop ${s.stop.toFixed(3)}, walk ${s.walk.toFixed(2)}`).toBeLessThan(0.15)
+                // or broke the brake's start, measured 25.11.2026): unbounded there
+                // alone, every other 30 Hz strike bounded (cross-vendor review
+                // of point 1591)
+                if (hz < 60 && !s.crossed) bounded30++
+                if (hz >= 60 || !s.crossed) expect(o.stop, `${at}: stop ${s.stop.toFixed(3)}, walk ${s.walk.toFixed(2)}${s.crossed ? ', crossing into the band' : ''}`).toBeLessThan(0.15)
+                else crossings++
                 expect(o.land, `${at}: land ${s.land.toFixed(3)}, walk ${s.walk.toFixed(2)}`).toBeLessThan(0.005)
                 expect(o.slide, `${at}: slide ${s.slide.toFixed(4)}, walk ${s.walk.toFixed(2)}`).toBeLessThan(0)
               }
@@ -564,6 +682,8 @@ describe('the clip gait on the ground', () => {
         }
       }
     }
+    expect(crossings, '30 Hz strikes crossing into the band within the brake').toBeGreaterThan(0)
+    expect(bounded30, '30 Hz strikes bounded').toBeGreaterThan(crossings)
   }, 240_000)
 
   it('a frame hitch stepping past the brake\'s start still brakes the heel strike it walks into', () => {
@@ -582,6 +702,10 @@ describe('the clip gait on the ground', () => {
         const hz = 60
         for (let at = hz; at < 2.2 * hz; at += 1) {
           const strikes = heelStrikeRun(person, hz, 3 * hz, (k) => ({ walked: (speed * (k === at ? 0.1 : 1 / hz)), speed, dyaw: 0 }))
+          const run = `${v} per leg, hitch at frame ${at}, leg ${person.frame.legScale.toFixed(2)}`
+          expect(strikes.unheeled, `${run}: landings whose heel never took hold`).toBe(0)
+          expect(strikes.wrongFirst, `${run}: landings on the ball or a tip away from its lift-off first`).toBe(0)
+          expect(strikes.missed, `${run}: owed strikes (of ${strikes.owed}) never read`).toBe(0)
           for (const s of strikes) {
             // (the hitch frame's own catch included: a brake begun on it is
             // no brake drawn into the catch)

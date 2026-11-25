@@ -1110,8 +1110,12 @@ export function clipGaitPose(
       // outside its blended stance unheld, sliding 0.008 at the walk ↔ jog band
       // (measured 18.10.2026, natural-villager-motion step 10)
       const wasHeld = held.heel || held.ball || held.tip
-      // (a brake lagging the clip after a hitch takes no hold until its heel rests)
-      const lagging = !!g.brake[i] && g.brake[i]!.lag > 0 && g.brake[i]!.last < 1
+      // (a brake lagging the clip after a hitch takes no hold until its heel
+      // rests, then its heel first, where it rests: the clip has walked on
+      // past its heel's touch, its ball or tip down first)
+      const lag = !!g.brake[i] && g.brake[i]!.lag > 0
+      const lagging = lag && g.brake[i]!.last < 1
+      if (lag && !lagging && !held.heel) held.heel = toWorld(frame, body, _h.copy(c.heel).add(_miss))
       for (const k of CONTACTS) {
         const p = c[k]
         if (_yHold[k] < touch && !held[k] && !lagging) held[k] = toWorld(frame, body, _h.copy(p).add(_miss))
