@@ -47919,3 +47919,10 @@ Measured 25.11.2026 (checkpoint 7b20084e6, kept): the stand foot lifted once the
   Verifiable: the resume case of gltfClipLayers.test.ts over its first 30 frames bounded by the clip's 240 Hz range.
   Criticality: low - a small knee step at the first stride after a hesitation.
   Bundle: Dorfleben.
+
+- [x] 1584. Villager knee jumps when a stop cuts a start short
+  Source: split from point 1582 on 24.11.2026: a stop reversing a start mid-blend jumps 0.32-0.60 rad in the frame after the reversal as the step shares flip.
+  Final state: a start cut short by a stop (on the start mechanism of 1582) keeps the knee within the clip's own per-frame range, reversal frames included.
+  Verifiable: the reversal case of gltfClipLayers.test.ts (straight and ±2.8 rad/s) bounded by the clip's 240 Hz range; a moving capture on both backends.
+  Criticality: low - only when a villager stops within a fraction of a second of setting off.
+  Bundle: Dorfleben.

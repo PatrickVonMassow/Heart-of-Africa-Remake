@@ -107,13 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1584. Villager knee jumps when a stop cuts a start short
-  Source: split from point 1582 on 24.11.2026: a stop reversing a start mid-blend jumps 0.32-0.60 rad in the frame after the reversal as the step shares flip.
-  Final state: a start cut short by a stop (on the start mechanism of 1582) keeps the knee within the clip's own per-frame range, reversal frames included.
-  Verifiable: the reversal case of gltfClipLayers.test.ts (straight and ±2.8 rad/s) bounded by the clip's 240 Hz range; a moving capture on both backends.
-  Criticality: low - only when a villager stops within a fraction of a second of setting off.
-  Bundle: Dorfleben.
-
 - [ ] 1423. Villager heel strike stops the swinging foot dead
   Also: a flat foot drops its kept heading in sharp curves.
   Source: finding 22.10.2026 09:46 from the point-1402 joint-speed sweep: the heel is caught while the clip still swings it forward ~2 m/s (foot up to 2.8x clip max speed, shin ~4 rad/s reversal at 144 Hz); at 3.5 rad/s yaw the flat foot gives up its kept heading at the end of flat stance (foot reversal 4.1-4.6 rad/s). Pre-existing; the 3x margin in villagerClipPose.test.ts exists because of the heel strike.
