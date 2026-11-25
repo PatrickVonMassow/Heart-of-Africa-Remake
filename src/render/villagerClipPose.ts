@@ -385,16 +385,20 @@ export function heelOff(frame: PersonFrame, world: WorldPose, thigh: number, shi
   footQ.premultiply(_hoQ)
   return 'rolled'
 }
-/** The pitch α of `ka cos α + kb sin α = K` nearest to 0 (r0 = |(ka, kb)|),
- * and its weight: faded out where both pitches lie equally near, since there
- * the nearer one changes sides and the pitch jumped across by both. */
+/** The pitch α of `ka cos α + kb sin α = K` nearest to 0 (r0 = |(ka, kb)|;
+ * past the tangent, the nearest pitch to it), and its weight: faded out
+ * where two distinct pitches lie equally near, since there the nearer one
+ * changes sides and the pitch jumped across by both. */
 export function nearPitch(ka: number, kb: number, K: number, r0: number): { alpha: number; weight: number } {
   const phi = Math.atan2(kb, ka)
   const c = Math.acos(Math.max(-1, Math.min(1, K / r0)))
   const a1 = wrapAngle(phi + c)
   const a2 = wrapAngle(phi - c)
   const alpha = Math.abs(a1) < Math.abs(a2) ? a1 : a2
-  const weight = smoothstep(Math.min(1, Math.abs(Math.abs(a1) - Math.abs(a2)) / Math.max(1e-6, G.rollKeepPitchFade)))
+  // (by how far apart they are, the jump a change of sides would make: a
+  // tangent's two pitches coincide and keep their full weight)
+  const jump = Math.abs(a1 - a2)
+  const weight = jump <= 1e-9 ? 1 : smoothstep(Math.min(1, Math.abs(Math.abs(a1) - Math.abs(a2)) / Math.min(jump, Math.max(1e-6, G.rollKeepPitchFade))))
   return { alpha, weight }
 }
 const _hoN = new THREE.Vector3()

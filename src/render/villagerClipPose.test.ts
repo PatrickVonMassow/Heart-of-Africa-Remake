@@ -628,8 +628,9 @@ describe('the clip gait on the ground', () => {
                 yaw += yawRate * dt
                 x += Math.sin(yaw) * speed * dt
                 z += Math.cos(yaw) * speed * dt
-                // the heading each foot still keeps from its last plant (0: let go)
-                const keptBefore = [g.flatYaw[0] !== null ? g.headingKeep[0] : 0, g.flatYaw[1] !== null ? g.headingKeep[1] : 0]
+                // whether each foot still keeps a heading from its last plant
+                // (its keep or its toes still letting go of it)
+                const keptBefore = [g.flatYaw[0] !== null, g.flatYaw[1] !== null]
                 stepClipGait(g, asset, f, speed * dt, speed)
                 clipGaitPose(g, asset, f, speed, { x, z, yaw, unit: 1 }, pose)
                 forwardKinematics(asset, f.rest0, pose, world)
@@ -650,9 +651,9 @@ describe('the clip gait on the ground', () => {
                     if (kept !== null && g.headingKeep[i] > 0) {
                       catchChecked++
                       // (the catch keeps the heading drawn on its frame: that
-                      // is the clip's own only while the last plant's keep has
-                      // been let go before it — measured 0 at every catch)
-                      expect(keptBefore[i], `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, foot ${s} caught while still keeping`).toBe(0)
+                      // is the clip's own only where nothing of the last plant's
+                      // heading is kept before it — measured so at every catch)
+                      expect(keptBefore[i], `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, foot ${s} caught while still keeping`).toBe(false)
                       const e = kept - heading
                       expect(Math.abs(Math.atan2(Math.sin(e), Math.cos(e))), `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${yawRate} rad/s, foot ${s} caught`).toBeLessThan(1e-3)
                     }
@@ -1206,5 +1207,15 @@ describe('a rolled foot\'s further pitch', () => {
     const away = nearPitch(Math.cos(0.5), Math.sin(0.5), Math.cos(0.3), 1)
     expect(away.alpha).toBeCloseTo(0.2, 6)
     expect(away.weight).toBe(1)
+    // a tangent's (and a just missed sphere's) coinciding pitches keep their
+    // full weight (review round 4: the tie fade had zeroed them)
+    for (const K2 of [1, 1.2]) {
+      const t = nearPitch(Math.cos(0.4), Math.sin(0.4), K2, 1)
+      expect(t.alpha).toBeCloseTo(0.4, 6)
+      expect(t.weight).toBe(1)
+    }
+    // and keep it from the tangent inward while both lie on one side
+    // (the pitch itself follows the root's own slope there)
+    for (let k = 0; k <= 400; k++) expect(nearPitch(Math.cos(0.4), Math.sin(0.4), 1 - k * 1e-4, 1).weight).toBe(1)
   })
 })
