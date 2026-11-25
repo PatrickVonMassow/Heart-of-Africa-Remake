@@ -107,14 +107,6 @@ put it is the mistake this line exists to stop.
   Bundle: Steuerung & Performance.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
-- [ ] 1587. Villager knee steps at a resumed start's take-over and first landing
-  Source: split from point 1583 on 25.11.2026: unmoved by every resume variant measured that day, the take-over at +11 frames and the first foot's own landing at +26-28 frames step the knee 0.24-0.38 rad against the clip's 0.20-0.23 (resume case of gltfClipLayers.test.ts, 7b20084e6); the landing part may share the heel strike of point 1423.
-  Final state: the take-over and the first landing of a resumed start step the knee no faster than the clip's range, or the landing excess is charged to 1423 with a measurement that shows it is the heel strike.
-  Split 25.11.2026: the one remaining landing excess (turning 0, resumed after 0.40 s, +28: 0.215 drawn, hold 0.167) falls while the hold is still released; it moves to point 1589, bounded here at 0.22.
-  Verifiable: the resume case of gltfClipLayers.test.ts over its first 30 frames bounded by the clip's 240 Hz range.
-  Criticality: low - a small knee step at the first stride after a hesitation.
-  Bundle: Dorfleben.
-
 - [ ] 1584. Villager knee jumps when a stop cuts a start short
   Source: split from point 1582 on 24.11.2026: a stop reversing a start mid-blend jumps 0.32-0.60 rad in the frame after the reversal as the step shares flip.
   Final state: a start cut short by a stop (on the start mechanism of 1582) keeps the knee within the clip's own per-frame range, reversal frames included.
