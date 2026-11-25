@@ -890,6 +890,17 @@ export const RED_CHARGES = [
       'though the same measured failure then reads as unowned.',
   },
   {
+    point: 1585,
+    suite: 'polish-villagers',
+    backend: 'webgpu',
+    kind: 'check',
+    match: /an errand adult is caught about to set off from its stop/i,
+    why:
+      'Intermittent in the adult-errands section run too, not only the full pass: the same HEAD ' +
+      'cf2d83c13 (1586 branch) read red at 02:58 and green at 03:09 on 25.11.2026, and red again at ' +
+      'ba4b100f1 (1587 branch, a knee-only change) at 06:46; 1585 owns the catch.',
+  },
+  {
     point: 1476,
     suite: 'polish-villagers',
     backend: 'webgpu',
