@@ -1010,7 +1010,7 @@ export function SkinnedFigure({
       // THE COLUMNS last: after every writer of the hips and the legs
       if (rig.driver) rig.driver.stepFrame(rig.skeleton.bones, columnFrame.current.dt, columnFrame.current.n)
     }
-  }, [rig, dims, pose, squat, poseLegs, headSteady, kneel, kneeling, clips])
+  }, [rig, dims, pose, squat, poseLegs, headSteady, headLift, kneel, kneeling, clips])
 
   // Publish the virtual pivots to the caller that owns the pose.
   const selfLimbs = useRef<FigureLimbs>({ arms: arms.current, trunk: null, retarget, skinned: true })
