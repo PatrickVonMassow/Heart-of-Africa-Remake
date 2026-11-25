@@ -114,6 +114,13 @@ put it is the mistake this line exists to stop.
   Criticality: medium - visible foot jerk in village walks.
   Bundle: Dorfleben.
 
+- [ ] 1591. Villager heel strike stops the swinging foot dead
+  Source: split from point 1423 on 25.11.2026: the clip still swings the heel forward ~2 m/s at contact (on the ground until phase ~0.555), and the plant stops it within one frame. A ground brake breaks the no-slide case (4 mm/frame); an airborne landing brake lands up to 5 cm short and breaks three stop/resume knee cases of gltfClipLayers.test.ts narrowly (0.415 vs 0.4, 0.2546 vs 0.25). Likely needs a predicted heel rest point for the landing. The OPEN in gltfClipLayers.test.ts charging the +2.8 rad/s knee bound to point 1423 moves here.
+  Final state: heel strike decelerates the foot without a dead stop, with no foot slide and the stop/resume knee bounds unchanged.
+  Verifiable: villagerClipPose.test.ts heel-contact deceleration case; gltfClipLayers.test.ts stop/resume knee cases green at their current bounds; a moving capture on both backends.
+  Criticality: medium - visible foot jerk in village walks.
+  Bundle: Dorfleben.
+
 - [ ] 1425. Carried water jar jumps from hip to shoulder within a few frames
   Source: finding 22.10.2026 19:24 from the point-1404 moving capture (WebGL 2, seed 42, Bambara village, errand villager 1, frames 255-261 at 60 Hz, branch e962c7841): the carried jar swings from hanging low at the hip to raised beside the shoulder within ~6 frames (~0.1 s) while the carrier walks on.
   Final state: the jar moves from hip to shoulder as a visible lift over a natural duration, never as a pop between two carry poses.
@@ -5201,11 +5208,4 @@ put it is the mistake this line exists to stop.
   Final state: the errand stop and the walk from it lie on land (or the villager visibly wades with the water plane covering the feet, if the stop is a designed wading stand); no villager stands on top of the water surface.
   Verifiable: Vitest that no errand stop of the village layout lies on a water cell; the set-off captures of polish-villagers --section=adult-errands on both backends show the feet on the bank.
   Criticality: medium - a villager visibly walking on the river in a filmed village view.
-  Bundle: Dorfleben.
-
-- [ ] 1591. Villager heel strike stops the swinging foot dead
-  Source: split from point 1423 on 25.11.2026: the clip still swings the heel forward ~2 m/s at contact (on the ground until phase ~0.555), and the plant stops it within one frame. A ground brake breaks the no-slide case (4 mm/frame); an airborne landing brake lands up to 5 cm short and breaks three stop/resume knee cases of gltfClipLayers.test.ts narrowly (0.415 vs 0.4, 0.2546 vs 0.25). Likely needs a predicted heel rest point for the landing. The OPEN in gltfClipLayers.test.ts charging the +2.8 rad/s knee bound to point 1423 moves here.
-  Final state: heel strike decelerates the foot without a dead stop, with no foot slide and the stop/resume knee bounds unchanged.
-  Verifiable: villagerClipPose.test.ts heel-contact deceleration case; gltfClipLayers.test.ts stop/resume knee cases green at their current bounds; a moving capture on both backends.
-  Criticality: medium - visible foot jerk in village walks.
   Bundle: Dorfleben.
