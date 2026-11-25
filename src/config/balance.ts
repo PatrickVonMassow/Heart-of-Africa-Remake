@@ -4403,6 +4403,36 @@ export const VILLAGER_GLTF = {
   heelBrakeLead: 0.0083,
   heelLandAt: 0.006,
   heelBrakeHold: 0.06,
+  /** A heel strike's brake whose start a pace change moved past the foot
+   *  between two frames begins where the foot stands, if at least this share
+   *  of its length is left to ease the heel to rest (less, the heel would
+   *  swing faster than the clip to reach its spot in time). Calibratable. */
+  heelBrakeLate: 0.5,
+  /** The heel strike's brake re-times the whole blended heel in the walk-jog
+   *  band down to this share of the walk, fading out below it toward the
+   *  pure jog (which has no brake: the runs land their heel moving). Re-timed
+   *  by the walk's share alone, a heel at the walk's share 0.16 still lost
+   *  0.43 of its swing's pace in its catch frame (measured 25.11.2026).
+   *  Calibratable. */
+  heelBrakeWalk: 0.1,
+  /** The turn the heel strike's brake carries its target along
+   *  (villagerClipPose.ts `heelBrake`): averaged over this share of the cycle
+   *  walked, each frame's turn counted up to `heelBrakeTurnMax` rad a cycle
+   *  (2.8 rad/s at a 0.6-per-leg stroll is ~4 rad a cycle). Calibratable. */
+  heelBrakeTurnCycle: 0.05,
+  /** From this share of the heel strike's brake on, the spot its heel comes
+   *  to rest on is kept in the world (villagerClipPose.ts `heelBrake`):
+   *  followed to the end, a pace changing then moved the resting heel by the
+   *  stride's warp (0.19 of its swing's pace into its catch); kept from the
+   *  start, a walk taken up again landed short of its quickening clip and
+   *  passed the resume knee bounds (0.26 against 0.25, measured 25.11.2026).
+   *  Calibratable. */
+  heelBrakeFreeze: 0.8,
+  /** Steps across the walk-jog band the heel strike reads its touch at
+   *  (villagerClipPose.ts `heelTouch`): the touch moves by up to 0.019 of
+   *  the cycle between two of the ground's 8 levels. Calibratable. */
+  heelTouchLevels: 32,
+  heelBrakeTurnMax: 2 * Math.PI,
   /** The stance foot on the ground (villagerClipPose.ts `gaitFootGround`):
    *  the blended gait's stance is read over `groundSamples` phases, at
    *  `groundLevels` steps across each cross-fade band (interpolated between).
