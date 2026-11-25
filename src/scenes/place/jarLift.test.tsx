@@ -224,7 +224,7 @@ describe('the full jar takes over where the empty one hangs, on a squashed carri
   })
 })
 
-describe('the lifting wrist is always within the arm\'s reach (review findings 2 and r2-3)', () => {
+describe('the lifting wrist is always within the arm\'s reach (review findings 2, r2-3 and r3-5)', () => {
   it('brings every target onto a point the two-bone solve takes, the shoulder itself included, so the lift needs no fallback', () => {
     const s = new THREE.Vector3(0.2, 1.3, 0)
     const pole = new THREE.Vector3(1, -0.3, 0.2)
@@ -244,7 +244,13 @@ describe('the lifting wrist is always within the arm\'s reach (review findings 2
       for (const t of targets) {
         const before = t.clone()
         liftReachable(t, s, a, b, pole)
-        expect(solveTwoBone(s, t, a, b, pole).reached).toBe(true)
+        // a real solve, not only a reported one: finite directions whose hand
+        // lands on the brought target, off the shoulder itself (review r3-5)
+        const sol = solveTwoBone(s, t, a, b, pole)
+        expect(sol.reached).toBe(true)
+        for (const c of [sol.upper.x, sol.upper.y, sol.upper.z, sol.fore.x, sol.fore.y, sol.fore.z]) expect(Number.isFinite(c)).toBe(true)
+        expect(s.clone().addScaledVector(sol.upper, a).addScaledVector(sol.fore, b).distanceTo(t)).toBeLessThan(1e-6)
+        expect(t.distanceTo(s)).toBeGreaterThan(0)
         const d = before.distanceTo(s)
         if (d > 1e-6 && d < (a + b) * 0.999 && d > Math.abs(a - b) * 1.001) expect(t.distanceTo(before)).toBe(0)
       }

@@ -77,12 +77,15 @@ export function gestureArmEuler(a: ArmPose, out = new THREE.Euler()): THREE.Eule
  * Brings `t` (in place) within what a two-bone arm from `s` can reach: no
  * further than `a + b` and no nearer than `|a − b|`, each with a small margin,
  * so `solveTwoBone` takes it — every target, so a caller needs no fallback for
- * a failed solve. A target on the shoulder itself has no direction of its own:
+ * a failed solve. The near limit is never zero (equal bones would fold onto
+ * the shoulder). A target on the shoulder itself has no direction of its own:
  * it is set out along `toward` (down when that is zero).
  */
 export function liftReachable(t: THREE.Vector3, s: THREE.Vector3, a: number, b: number, toward?: THREE.Vector3, margin = 1e-3): THREE.Vector3 {
   const far = (a + b) * (1 - margin)
-  const near = Math.abs(a - b) * (1 + margin)
+  // (never nearer than a sliver of the arm: equal bones fold onto the
+  // shoulder itself, where the solve has no direction to bend from)
+  const near = Math.max(Math.abs(a - b) * (1 + margin), (a + b) * margin)
   const d = t.distanceTo(s)
   if (d < 1e-6) {
     const dir = toward && toward.lengthSq() > 1e-12 ? toward : _down
