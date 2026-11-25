@@ -266,6 +266,8 @@ describe('the clip gait on the ground', () => {
             // the planted walk and the clip's own (nothing held) side by side
             const runs = [true, false].map((hold) => ({ hold, g: newClipGait(), pose: newPose(n), world: newWorld(n), heels: [[], []] as THREE.Vector3[][] }))
             const caught: number[][] = [[], []]
+            // per foot, the frames its last contact let go (its swing's start)
+            const lifted: number[][] = [[], []]
             let x = 0
             let z = 0
             let yaw = 0
@@ -287,7 +289,9 @@ describe('the clip gait on the ground', () => {
                   const lz = c[s].heel.z * f.scale
                   r.heels[i].push(new THREE.Vector3(x + lx * cy + lz * sy, 0, z - lx * sy + lz * cy))
                   const now = r.g.held[i]
-                  if (r.hold && k > hz && !was[i] && (now.heel || now.ball || now.tip)) caught[i].push(k)
+                  const holds = !!(now.heel || now.ball || now.tip)
+                  if (r.hold && k > hz && !was[i] && holds) caught[i].push(k)
+                  if (r.hold && was[i] && !holds) lifted[i].push(k)
                 })
               }
             }
@@ -297,16 +301,20 @@ describe('the clip gait on the ground', () => {
               const where = `${v.toFixed(3)} per leg, ${yawRate} rad/s at ${hz} Hz, leg ${f.legScale.toFixed(2)}, foot ${i}`
               expect(caught[i].length, `${where}: its heel is caught`).toBeGreaterThan(0)
               for (const k of caught[i]) {
-                // the heel's ground speed (m/s) over the swing's last 0.35 s into its catch
+                // the heel's ground speed (m/s) over its whole swing, from the
+                // frame its last contact let go to its catch: a stop anywhere
+                // on the way in is a loss of that pace within the swing
                 const pace = (j: number) => drawn[i][j].distanceTo(drawn[i][j - 1]) / dt
-                const back = Math.round(0.35 * hz)
-                const peak = Math.max(...Array.from({ length: back }, (_, j) => pace(k - j)))
+                const off = Math.max(...lifted[i].filter((j) => j < k))
+                expect(off, `${where}, frame ${k}: its swing began within the run`).toBeGreaterThan(0)
+                const peak = Math.max(...Array.from({ length: k - off }, (_, j) => pace(off + 1 + j)))
+                expect(peak, `${where}, frame ${k}: the swing moves the heel`).toBeGreaterThan(0)
                 const into = pace(k) / peak - 0.5 * jog
                 // per 60 Hz frame, the most it loses over all that way and the
                 // frame after the catch (where one was drawn): a dead stop
-                // anywhere near the contact loses its whole pace in one frame
+                // anywhere on the way in loses its whole pace in one frame
                 let drop = 0
-                for (let j = k - back + 1; j <= Math.min(k + 1, last); j++) drop = Math.max(drop, ((pace(j - 1) - pace(j)) / peak) * (hz / 60))
+                for (let j = off + 2; j <= Math.min(k + 1, last); j++) drop = Math.max(drop, ((pace(j - 1) - pace(j)) / peak) * (hz / 60))
                 drop -= 0.6 * jog
                 // where the clip's heel touches down: at most its own last step off
                 const land = (drawn[i][k].distanceTo(clip[i][k]) - clip[i][k].distanceTo(clip[i][k - 1])) / per
@@ -325,16 +333,16 @@ describe('the clip gait on the ground', () => {
     }
     // (each foot of every run caught at least once, most twice)
     expect(catches).toBeGreaterThanOrEqual(3 * 2 * paces.length * 3 * 2)
-    // into its catch the heel has nearly come to rest (measured 0.058, turning
-    // at 0.6 per leg; the dead stop 0.735, read straight ahead turning 0.172,
-    // the walk's touch read in the band 0.19 at its share 0.84) …
+    // into its catch the heel has nearly come to rest (measured 0.058; the
+    // dead stop 0.735, read straight ahead turning 0.172, the walk's touch
+    // read in the band 0.19 at its share 0.84) …
     expect(worst.into, at.into).toBeLessThan(0.08)
-    // … slowing over frames: per 60 Hz frame it loses at most 0.421 of its
-    // swing's pace, the brake's own end (measured 25.11.2026; the dead stop
+    // … slowing over frames: per 60 Hz frame it loses at most 0.383 of its
+    // swing's pace over the whole swing (measured 25.11.2026; the dead stop
     // 1.47, its whole pace and the clip's noise on it) …
     expect(worst.drop, at.drop).toBeLessThan(0.5)
     // … and sets down where the clip's heel touches, not short of it (at most
-    // 1.7 cm per unit of leg past the clip's own step that frame)
+    // 1.76 cm per unit of leg past the clip's own step that frame)
     expect(worst.land, at.land).toBeLessThan(0.02)
   }, 240_000)
 

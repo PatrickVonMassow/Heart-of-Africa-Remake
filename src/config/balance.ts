@@ -4392,13 +4392,16 @@ export const VILLAGER_GLTF = {
    *  with no speed `heelBrakeLead` of the cycle before it touches down on
    *  this body (`heelTouch`), at the spot the clip reaches `heelLandAt` past
    *  that touch. Not taken by then, the re-timing fades out over
-   *  `heelBrakeHold`. At 0.12 / 0.015 the heel comes into its catch at under
-   *  5 % of its swing's pace (the dead stop 74 %); 0.15 and up, or a lead
-   *  of 0.01, break the stop/resume knee cases of gltfClipLayers.test.ts or
-   *  leave 10 % (measured 25.11.2026). Calibratable. */
+   *  `heelBrakeHold`. At 0.12 / 0.0083 / 0.006 the heel comes into its catch
+   *  at under 6 % of its swing's pace, straight, turning and in the walk-jog
+   *  band (the dead stop 74 %), loses at most 0.39 of it in a 60 Hz frame and
+   *  lands within 1.8 cm per leg of the clip's touch; a landing offset of
+   *  0.0083 and up lands 2-2.4 cm past it, a lead of 0.005 leaves 8 %; 0.15
+   *  and up breaks the stop/resume knee cases of gltfClipLayers.test.ts
+   *  (measured 25.11.2026). Calibratable. */
   heelBrakeCycle: 0.12,
-  heelBrakeLead: 0.0067,
-  heelLandAt: 0.0083,
+  heelBrakeLead: 0.0083,
+  heelLandAt: 0.006,
   heelBrakeHold: 0.06,
   /** The stance foot on the ground (villagerClipPose.ts `gaitFootGround`):
    *  the blended gait's stance is read over `groundSamples` phases, at
