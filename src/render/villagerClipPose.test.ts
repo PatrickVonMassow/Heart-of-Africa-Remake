@@ -891,7 +891,10 @@ describe('the clip gait on the ground', () => {
     }
     expect(handed).toBeGreaterThan(1000)
     expect(caughtN).toBeGreaterThan(500)
-  })
+    // (8 bodies x 2 paces x 2 turns x 2 rates x 4 stops of 3.5 s each; the
+    // heel strike's brake samples the clip once more per braking frame: 18 s
+    // on a quiet host, past the 20 s default on the CI runner, 25.11.2026)
+  }, 120_000)
 
   it('two villagers drawn in turn pose their legs and toes as each drawn alone, through every toe release', () => {
     // review 22.10.2026: the toes letting go after the tip's hold ended were
