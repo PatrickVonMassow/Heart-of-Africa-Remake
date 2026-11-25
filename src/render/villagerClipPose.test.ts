@@ -536,9 +536,11 @@ describe('the clip gait on the ground', () => {
     // 144 Hz). Each joint's local turn per frame is bounded against the walk
     // clip's own fastest turn of that joint at that pace. The margin: the
     // stride warp (up to 1.35) and the hold's catch-up take the thigh to
-    // 2.1×, the shin to 1.7×, and the heel strike the foot to 2.8× at 144 Hz
-    // (measured 22.10.2026; OPEN: the heel is caught while its clip still
-    // swings it forward, a separate point).
+    // 2.1×, the shin to 1.7×, and the foot lying down flat to 2.5× (measured
+    // 25.11.2026, 15-240 Hz). The heel caught while its clip still swung it
+    // forward snapped onto its hold once held firm: the foot to 2.8× at
+    // 144 Hz and 3.9× at 240 Hz (measured 22.10. and 25.11.2026; the margin
+    // was 3×).
     const n = asset.bones.length
     const bones = ['thigh', 'shin', 'foot'].flatMap((b) => ['L', 'R'].map((s) => `${b}.${s}`))
     const index = bones.map((b) => asset.bones.indexOf(b))
@@ -562,7 +564,7 @@ describe('the clip gait on the ground', () => {
             index.forEach((bone, j) => (clipMax[j] = Math.max(clipMax[j], turn(a.rot, b.rot, bone) * steps * perSecond)))
             for (let c = 0; c < b.rot.length; c++) a.rot[c] = b.rot[c]
           }
-          for (const hz of [15, 20, 30, 60, 144]) {
+          for (const hz of [15, 20, 30, 60, 144, 240]) {
             const dt = 1 / hz
             const g = newClipGait()
             const pose = newPose(n)
@@ -575,7 +577,7 @@ describe('the clip gait on the ground', () => {
               if (k * dt > 1) {
                 index.forEach((bone, j) => {
                   const rate = turn(prev, pose.rot, bone) / dt
-                  expect(rate, `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${bones[j]} at phase ${g.phase.toFixed(3)}`).toBeLessThan(3 * clipMax[j])
+                  expect(rate, `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, ${bones[j]} at phase ${g.phase.toFixed(3)}`).toBeLessThan(2.75 * clipMax[j])
                 })
               }
               for (let c = 0; c < pose.rot.length; c++) prev[c] = pose.rot[c]
@@ -584,6 +586,66 @@ describe('the clip gait on the ground', () => {
         }
       }
     }
+  })
+
+  it('in a sharp curve a planted foot keeps its heading and never turns back against the curve', () => {
+    // finding 22.10.2026 (point-1402 joint-speed sweep): at 3.5 rad/s yaw
+    // the flat foot's heel-off roll turned it back against the curve (up to
+    // 9 rad/s on the ground) and the kept heading, let go with the flat share,
+    // swung round at up to 61 rad/s (16 rad/s with heel and ball still flat
+    // on the ground; measured 25.11.2026)
+    const n = asset.bones.length
+    const yawRate = 3.5
+    const feet = ['L', 'R'].map((s) => asset.bones.indexOf(`foot.${s}`))
+    let flatChecked = 0
+    for (const sex of SEXES) {
+      for (const age of AGE_GROUPS) {
+        const f = gltfPerson(asset, sex, age, 0).frame
+        for (const perLeg of [1.0, 1.4]) {
+          const speed = perLeg * f.legScale * f.scale
+          for (const hz of [30, 60, 144]) {
+            const dt = 1 / hz
+            const g = newClipGait()
+            const pose = newPose(n)
+            const world = newWorld(n)
+            let x = 0
+            let z = 0
+            let yaw = 0
+            const last = [0, 0]
+            for (let k = 0; k * dt < 4; k++) {
+              yaw += yawRate * dt
+              x += Math.sin(yaw) * speed * dt
+              z += Math.cos(yaw) * speed * dt
+              stepClipGait(g, asset, f, speed * dt, speed)
+              clipGaitPose(g, asset, f, speed, { x, z, yaw, unit: 1 }, pose)
+              forwardKinematics(asset, f.rest0, pose, world)
+              const c = contactPoints(asset, world, f.legScale)
+              ;(['L', 'R'] as const).forEach((s, i) => {
+                const q = world.q[feet[i]]
+                const heading = 2 * Math.atan2(q.y, q.w) + yaw
+                const d = heading - last[i]
+                last[i] = heading
+                if (k * dt < 1) return
+                // the foot's world turn this frame, rad/s (+: with the curve)
+                const rate = Math.atan2(Math.sin(d), Math.cos(d)) / dt
+                const where = `${sex} ${age} at ${perLeg} per leg, ${hz} Hz, foot ${s} at phase ${g.phase.toFixed(3)}`
+                // on the ground it never turns back against the curve
+                if (Math.min(c[s].heel.y, c[s].ball.y, c[s].tip.y) <= 0.01) expect(rate, where).toBeGreaterThan(-0.1)
+                // lying on heel and ball it keeps its heading (measured to 2.1 rad/s
+                // where the heel begins to lift)
+                if (c[s].heel.y <= 0.003 && c[s].ball.y <= 0.003) {
+                  flatChecked++
+                  expect(Math.abs(rate), where).toBeLessThan(3)
+                }
+                // and it lets go of it without a snap (measured to 23.5 rad/s)
+                expect(rate, where).toBeLessThan(30)
+              })
+            }
+          }
+        }
+      }
+    }
+    expect(flatChecked).toBeGreaterThan(1000)
   })
 
   it('two villagers drawn in turn pose their legs and toes as each drawn alone, through every toe release', () => {
