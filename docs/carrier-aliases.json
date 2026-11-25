@@ -13,6 +13,10 @@
       "status": "absorbed",
       "why": "Garment clipping fold request; replaced by the single covered-body mask point in 30eb4514f."
     },
+    "1423": {
+      "status": "absorbed",
+      "why": "Split in cdc742324 (owner decision under the standing split rule, 25.11.2026): 1423 retitled to the flat-foot heading and landing snap-back; the heel-strike dead stop moved to point 1591. The carrier tick anchors the pre-split title."
+    },
     "1463": {
       "status": "absorbed",
       "why": "Parked verbatim in docs/backlog.md by point 1501 on user order 11.11.2026 (b2efed52d); resumes only on explicit user request, its five carried orders travel with it."
