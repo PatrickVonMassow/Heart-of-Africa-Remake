@@ -397,7 +397,13 @@ describe('the clip gait on the ground', () => {
         // the lift-off moves the hold's release, which is not the strike)
         const began = braked[i].findIndex((b, j) => j > off && j < k && b)
         let drop = 0
-        for (let j = began > 0 ? began : off + 2; j <= last; j++) drop = Math.max(drop, (pace(j - 1) - pace(j) - Math.max(0, pace(j - 1, clip) - pace(j, clip))) / peak)
+        // (from the swing's middle or its brake's start, whichever is first,
+        // the clip's own loss taken off: a snap to rest before the brake
+        // began is a dead stop too, cross-vendor review of point 1591; the
+        // lift-off's half stays out, a pace stepping there moves the hold's
+        // release)
+        const mid = Math.max(off + 2, Math.ceil((off + k) / 2))
+        for (let j = began > 0 ? Math.min(began, mid) : off + 2; j <= last; j++) drop = Math.max(drop, (pace(j - 1) - pace(j) - Math.max(0, pace(j - 1, clip) - pace(j, clip))) / peak)
         let stop = 0
         for (let j = k; j <= last; j++) stop = Math.max(stop, (pace(j - 1) - pace(j)) / peak)
         // the stance's pivot through the whole stance: the heel (the
@@ -419,17 +425,24 @@ describe('the clip gait on the ground', () => {
         let rolled = false
         let j = k
         for (; j < frames && any(i, j); j++) {
-          if (held[i][j].heel && !rolled) {
+          // (the heel held but risen: a ball or tip held on the ground then
+          // is read against its spot as well, cross-vendor review of point
+          // 1591: skipping those frames hid its slide)
+          const heelHeld = held[i][j].heel && !rolled
+          if (heelHeld) {
             const h = spots[i][j]
-            if (h.y > 0.01) continue
-            heelDown ??= h
-            heels++
-            samples++
-            slide = Math.max(slide, Math.hypot(h.x - heelDown.x, h.z - heelDown.z) / per)
-            continue
+            if (h.y <= 0.01) {
+              heelDown ??= h
+              heels++
+              samples++
+              slide = Math.max(slide, Math.hypot(h.x - heelDown.x, h.z - heelDown.z) / per)
+              continue
+            }
+            if (!heelDown) continue
+          } else {
+            if (!heelDown) break
+            rolled = true
           }
-          if (!heelDown) break
-          rolled = true
           // each of the ball and tip held and on the ground this frame
           // against its spot, to the first frame neither is down (its
           // toe-off; cross-vendor review of point 1591: the least moved of
@@ -445,7 +458,10 @@ describe('the clip gait on the ground', () => {
           // holds alone cannot tell it from one
           const at = [balls[i][j], tips[i][j]]
           const down = [0, 1].filter((m) => held[i][j][m ? 'tip' : 'ball'] && at[m].y <= 0.01)
-          if (down.length < 1) break
+          if (down.length < 1) {
+            if (heelHeld) continue
+            break
+          }
           for (const m of down) toes[m] ??= at[m]
           samples++
           stance = Math.max(stance, ...down.map((m) => Math.hypot(at[m].x - toes[m]!.x, at[m].z - toes[m]!.z) / per))
@@ -541,10 +557,13 @@ describe('the clip gait on the ground', () => {
    *  heel's own loss (a dead stop from 0.75 of its pace passed `drop` where
    *  the clip lost 0.3 in the same frame: cross-vendor review of point
    *  1591); braked at most 0.52 at 30 Hz, 0.23 at 60 Hz and 0.06 at 144 Hz,
-   *  unbraked 0.62 and more walking (measured 25.11.2026). `slide`: the
+   *  unbraked 0.62 and more walking (measured 25.11.2026). `drop` from 60 Hz
+   *  on: read over the whole swing at most 0.31 (measured 26.11.2026), so a
+   *  snap to rest from 0.75 before the touchdown where the clip loses 0.3
+   *  fails it (cross-vendor review of point 1591). `slide`: the
    *  heel held on the ground moves at most that much per unit of leg from
    *  where it touched down through the stance (measured at most 0.001). */
-  const heelBounds = (hz: number) => ({ ...(hz < 60 ? { into: 0.25, drop: 0.65, stop: 0.55 } : { into: 0.08, drop: 0.5, stop: (0.25 * 60) / hz }), land: 0.02, slide: 0.004 })
+  const heelBounds = (hz: number) => ({ ...(hz < 60 ? { into: 0.25, drop: 0.65, stop: 0.55 } : { into: 0.08, drop: 0.4, stop: (0.25 * 60) / hz }), land: 0.02, slide: 0.004 })
   const overBound = (s: { into: number; drop: number; stop: number; land: number; slide: number; walk: number }, jog: { into: number; drop: number; stop: number }, hz: number) => {
     // (the brake fades out below VILLAGER_GLTF.heelBrakeWalk of the walk)
     const j = 1 - Math.min(1, s.walk / VILLAGER_GLTF.heelBrakeWalk)
@@ -628,6 +647,11 @@ describe('the clip gait on the ground', () => {
           // 0.3 of it the same frame: into 0, drop 0.45 (cross-vendor review
           // of point 1591), rejected by its own loss at the touchdown
           expect(overBound({ into: 0, drop: 0.45, stop: 0.75, land: 0, slide: 0, walk: 1 }, jog, hz).stop, `a one-frame dead stop at ${hz} Hz`).toBeGreaterThan(0)
+          // the same snap two frames before the touchdown, the heel then still
+          // (into, stop and slide 0), from 60 Hz on rejected by its loss alone
+          // (OPEN: point 1597: at 30 Hz the brake's own easing loses up to
+          // 0.52 of its pace in a frame, and the bound cannot tell it)
+          if (hz >= 60) expect(overBound({ into: 0, drop: 0.45, stop: 0, land: 0, slide: 0, walk: 1 }, jog, hz).drop, `a dead stop before the touchdown at ${hz} Hz`).toBeGreaterThan(0)
           for (const v of [1.0]) {
             const strikes = heelStrikeRun(person, hz, 3 * hz, steady(hz, v * per))
             expect(strikes.length).toBeGreaterThan(1)
@@ -695,7 +719,12 @@ describe('the clip gait on the ground', () => {
                 // a 30 Hz brake of three or four frames at 0.297; measured
                 // 25.11.2026)
                 expect(o.into, `${at}: into ${s.into.toFixed(3)}, walk ${s.walk.toFixed(2)}`).toBeLessThan(hz < 60 ? 0.05 : 0.02)
-                expect(o.drop, `${at}: drop ${s.drop.toFixed(3)}, walk ${s.walk.toFixed(2)}`).toBeLessThan(0)
+                // OPEN (point 1597): from 60 Hz a pace step within the brake
+                // swings the drawn heel past the clip's (1.00 against 0.72 of
+                // its swing's pace) and stops it within two frames, losing up
+                // to 0.50 in one (the steady runs' 0.31): the bound before the
+                // steady runs' tightening stands here (measured 26.11.2026)
+                expect(o.drop, `${at}: drop ${s.drop.toFixed(3)}, walk ${s.walk.toFixed(2)}`).toBeLessThan(hz < 60 ? 0 : 0.1)
                 // (its touchdown frame's own loss likewise: at 60 Hz up to 0.38
                 // of its swing's pace, a dead stop 0.62 and more; set down up
                 // to 0.0234 per unit of leg past the clip's own step at 144 Hz;
