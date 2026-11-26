@@ -108,7 +108,7 @@ put it is the mistake this line exists to stop.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
 - [ ] 1591. Villager heel strike stops the swinging foot dead
-  Source: split from point 1423 on 25.11.2026: the clip still swings the heel forward ~2 m/s at contact (on the ground until phase ~0.555), and the plant stops it within one frame. A ground brake breaks the no-slide case (4 mm/frame); an airborne landing brake lands up to 5 cm short and breaks three stop/resume knee cases of gltfClipLayers.test.ts narrowly (0.415 vs 0.4, 0.2546 vs 0.25). Likely needs a predicted heel rest point for the landing. The OPEN in gltfClipLayers.test.ts charging the +2.8 rad/s knee bound to point 1423 moves here. Split 25.11.2026 after four unsuccessful review rounds: the first landing of each foot after a start or resume moved to point 1594; this point keeps every later strike. Split again 25.11.2026 after the fifth round: the 30 Hz pace crossing into the walk-jog band during the brake moved to point 1595.
+  Source: split from point 1423 on 25.11.2026: the clip still swings the heel forward ~2 m/s at contact (on the ground until phase ~0.555), and the plant stops it within one frame. A ground brake breaks the no-slide case (4 mm/frame); an airborne landing brake lands up to 5 cm short and breaks three stop/resume knee cases of gltfClipLayers.test.ts narrowly (0.415 vs 0.4, 0.2546 vs 0.25). Likely needs a predicted heel rest point for the landing. The OPEN in gltfClipLayers.test.ts charging the +2.8 rad/s knee bound to point 1423 moves here. Split 25.11.2026 after four unsuccessful review rounds: the first landing of each foot after a start or resume moved to point 1594; this point keeps every later strike. Split again 25.11.2026 after the fifth round: the 30 Hz pace crossing into the walk-jog band during the brake moved to point 1595. Split a third time 26.11.2026 after the sixth round: a heel strike across a frame hitch (one long frame stepping past the brake's start or touchdown) moved to point 1596; this point keeps every strike at a steady frame rate.
   Final state: heel strike decelerates the foot without a dead stop, with no foot slide and the stop/resume knee bounds unchanged.
   Verifiable: villagerClipPose.test.ts heel-contact deceleration case; gltfClipLayers.test.ts stop/resume knee cases green at their current bounds; a moving capture on both backends.
   Criticality: medium - visible foot jerk in village walks.
@@ -140,6 +140,13 @@ put it is the mistake this line exists to stop.
   Final state: at 30 Hz a heel strike during a pace crossing into the walk-jog band loses no more of its swing's pace in the touchdown frame than the 30 Hz stop bound allows, with no foot slide.
   Verifiable: villagerClipPose.test.ts pace-change case checks `stop` at 30 Hz too; a moving capture on both backends.
   Criticality: low - one-frame foot jerk only at low frame rates during pace changes.
+  Bundle: Dorfleben.
+
+- [ ] 1596. Villager heel strike across a frame hitch skips the brake or plants on the ball
+  Source: split from point 1591 on 26.11.2026 after six review rounds (round-6 author at 60ca565, findings in the 1591 review ledger): a single long frame that lands past the fade end returns before the hitch lag is applied, so the height catch takes the unbraked foot; a zero-share brake still accumulates lag, suppresses ordinary catches and forces a heel hold, so it is no unbraked control; a hitch catch can acquire the ball hold in the same frame and pivot on the ball once the clip is past the pivot switch; the hitch test measures only the first brake frame and never asserts the raw touchdown speed loss. The hitch tunables heelBrakeHitch and heelBrakeHitchFloor in balance.ts belong here.
+  Final state: a heel strike whose brake start or touchdown falls inside one long frame is braked, lands heel first and loses no more pace in its touchdown frame than at a steady frame rate, with no foot slide.
+  Verifiable: villagerClipPose.test.ts hitch sweep asserts the touchdown speed loss on every brake frame and a heel-first landing; a zero-share control leaves the catch unchanged.
+  Criticality: low - one-frame foot jerk only after a frame hitch.
   Bundle: Dorfleben.
 
 - [ ] 1425. Carried water jar jumps from hip to shoulder within a few frames
