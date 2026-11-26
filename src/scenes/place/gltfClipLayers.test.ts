@@ -991,13 +991,18 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         if (frames[k].legs > frames[k - 1].legs && !rising) first = true
         if (frames[k].legs !== frames[k - 1].legs) rising = frames[k].legs > frames[k - 1].legs
         if (frames[k].swing[i] && !frames[k - 1].swing[i]) s0 = k
-        if (!(frames[k - 1].swing[i] && !frames[k].swing[i]) || s0 < 1) continue
+        if (!(frames[k - 1].swing[i] && !frames[k].swing[i])) continue
         const stand = frames[k].starting && frames[k].start[i] <= 0
         if (stand) continue
+        // (a swing under way as the run opens ends in the foot's first
+        // landing: it spends the exemption, never the next whole swing's,
+        // as `touchdowns` reads its touchdown; cross-vendor review of point
+        // 1591)
         if (first) {
           first = false
           continue
         }
+        if (s0 < 1) continue
         if (k + 4 >= frames.length || !walking(s0, k + 1)) continue
         owed++
         // (each touchdown matched to one owed at most: villagerClipPose.test.ts)
@@ -1052,6 +1057,31 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     }
     return { add, check }
   }
+
+  it('a run read from partway through a swing owes the next whole swing\'s heel strike: the swing under way spends the first landing', () => {
+    // cross-vendor review of point 1591: the inventory spent the first
+    // landing's exemption on the first swing seen whole, so a run opening
+    // mid-swing let that swing's catch go missing unflagged
+    const walk = settle({ cut: 4 })
+    for (const i of [0, 1]) {
+      // from the middle of a swing of foot i, well into the walk
+      const from = walk.findIndex((f, k) => k > 60 && f.swing[i] && walk[k - 3].swing[i])
+      const frames = walk.slice(from)
+      expect(frames[0].legs).toBeGreaterThan(0)
+      expect(frames[0].held[i], 'the foot in the air as the run opens').toBe(false)
+      const s = heelStrikes(frames)
+      expect(s.missed, `foot ${i}: owed strikes (of ${s.owed}) never read`).toBe(0)
+      // the next whole swing is owed and struck, braked
+      const lands = touchdowns(frames)[i]
+      expect(lands[0].off, `foot ${i}: the swing under way lands first`).toBeLessThan(0)
+      const next = s.find((t) => t.i === i && t.k === lands[1].k)
+      expect(next?.braked, `foot ${i}: the next whole swing's strike, braked`).toBe(true)
+      // that swing's catch lost: flagged
+      const lost = frames.map((f) => ({ ...f, held: [...f.held], heel: [...f.heel], ball: [...f.ball], tip: [...f.tip] }))
+      for (let j = lands[1].k; j < lost.length && frames[j].held[i]; j++) lost[j].held[i] = lost[j].heel[i] = lost[j].ball[i] = lost[j].tip[i] = false
+      expect(heelStrikes(lost).missed, `foot ${i}: the next whole swing's catch lost`).toBeGreaterThan(0)
+    }
+  })
 
   it('a start or resumed walk brakes the heel strike per foot: a foot landed is braked while the other still steps off the stand, each brake keeps the share it began with', () => {
     // the brake was off for both feet until both had landed and a resumed
