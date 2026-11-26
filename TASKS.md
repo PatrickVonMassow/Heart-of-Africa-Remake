@@ -108,7 +108,7 @@ put it is the mistake this line exists to stop.
   Source: user request of 19.11.2026 19:00 UTC via the findings carrier (session unknown).
 
 - [ ] 1591. Villager heel strike stops the swinging foot dead
-  Source: split from point 1423 on 25.11.2026: the clip still swings the heel forward ~2 m/s at contact (on the ground until phase ~0.555), and the plant stops it within one frame. A ground brake breaks the no-slide case (4 mm/frame); an airborne landing brake lands up to 5 cm short and breaks three stop/resume knee cases of gltfClipLayers.test.ts narrowly (0.415 vs 0.4, 0.2546 vs 0.25). Likely needs a predicted heel rest point for the landing. The OPEN in gltfClipLayers.test.ts charging the +2.8 rad/s knee bound to point 1423 moves here. Split 25.11.2026 after four unsuccessful review rounds: the first landing of each foot after a start or resume moved to point 1594; this point keeps every later strike. Split again 25.11.2026 after the fifth round: the 30 Hz pace crossing into the walk-jog band during the brake moved to point 1595. Split a third time 26.11.2026 after the sixth round: a heel strike across a frame hitch (one long frame stepping past the brake's start or touchdown) moved to point 1596; this point keeps every strike at a steady frame rate.
+  Source: split from point 1423 on 25.11.2026: the clip still swings the heel forward ~2 m/s at contact (on the ground until phase ~0.555), and the plant stops it within one frame. A ground brake breaks the no-slide case (4 mm/frame); an airborne landing brake lands up to 5 cm short and breaks three stop/resume knee cases of gltfClipLayers.test.ts narrowly (0.415 vs 0.4, 0.2546 vs 0.25). Likely needs a predicted heel rest point for the landing. The OPEN in gltfClipLayers.test.ts charging the +2.8 rad/s knee bound to point 1423 moves here. Split 25.11.2026 after four unsuccessful review rounds: the first landing of each foot after a start or resume moved to point 1594; this point keeps every later strike. Split again 25.11.2026 after the fifth round: the 30 Hz pace crossing into the walk-jog band during the brake moved to point 1595. Split a third time 26.11.2026 after the sixth round: a heel strike across a frame hitch (one long frame stepping past the brake's start or touchdown) moved to point 1596; this point keeps every strike at a steady frame rate. Split a fourth time 26.11.2026 after the seventh round: a pace step within the brake overshooting the clip moved to point 1597. Split a fifth time 26.11.2026 after the tenth round: the five open gaps of the checks' own reach moved to point 1598.
   Final state: heel strike decelerates the foot without a dead stop, with no foot slide and the stop/resume knee bounds unchanged.
   Verifiable: villagerClipPose.test.ts heel-contact deceleration case; gltfClipLayers.test.ts stop/resume knee cases green at their current bounds; a moving capture on both backends.
   Criticality: medium - visible foot jerk in village walks.
@@ -147,6 +147,21 @@ put it is the mistake this line exists to stop.
   Final state: a heel strike whose brake start or touchdown falls inside one long frame is braked, lands heel first and loses no more pace in its touchdown frame than at a steady frame rate, with no foot slide.
   Verifiable: villagerClipPose.test.ts hitch sweep asserts the touchdown speed loss on every brake frame and a heel-first landing; a zero-share control leaves the catch unchanged.
   Criticality: low - one-frame foot jerk only after a frame hitch.
+  Bundle: Dorfleben.
+
+- [ ] 1597. Villager heel strike overshoots the clip and snaps to rest after a pace step in the brake
+  Source: split from point 1591 on 26.11.2026 after the seventh review round (branch 42273c1d9): from 60 Hz, a pace step within the heel-strike brake swings the drawn heel past the clip's (1.00 against 0.72 of its swing's pace) and stops it within two frames, losing up to 0.50 of its swing's pace in one frame where the steady runs lose at most 0.31. The pace-step case of villagerClipPose.test.ts keeps the per-frame loss bound at 0.5 under an OPEN note; at 30 Hz the brake's own easing loses up to 0.52 in a frame, so a snap to rest before the touchdown cannot be told from it.
+  Final state: a pace step within the brake decelerates the heel without overshooting the clip, losing no more pace per frame than the steady runs.
+  Verifiable: villagerClipPose.test.ts pace-step case green at the steady runs' 0.4 per-frame loss bound from 60 Hz; a 30 Hz snap-to-rest case rejected.
+  Criticality: low - two-frame heel jerk only when the pace changes during the brake.
+  Bundle: Dorfleben.
+
+
+- [ ] 1598. Heel-strike deceleration checks leave five swing and stance gaps unread
+  Source: split from point 1591 on 26.11.2026 after ten review rounds (cross review round 10 at 865ba7a, GPT-6.2 Sol; product code unchanged since round 6, the open findings are the checks' own reach): (1) villagerClipPose.test.ts varying-pace runs keep the 0.1 drop slack of point 1597 on every strike, not only on one a pace step touched; (2) its pace-step skip measures the 2 % against the speed after the change, and a snap within the skipped frames before touchdown falls outside `stop`; (3) its stance read stops measuring the heel after its hold first releases, so a heel held again and sliding while the ball stays held is unread; (4) gltfClipLayers.test.ts skips the drop from the lift-off frame to the next; (5) its stance cut short by the run's end on the penultimate frame keeps a finite slide score instead of NaN.
+  Final state: each of the five reads covers its gap: a dead stop outside a pace step, inside the skipped frames, after lift-off, a heel slide after a re-hold and a run-end-cut stance each fail their case.
+  Verifiable: villagerClipPose.test.ts and gltfClipLayers.test.ts reject a mutation per gap; both files green at their current bounds.
+  Criticality: low - test reach only, no player-visible change.
   Bundle: Dorfleben.
 
 - [ ] 1425. Carried water jar jumps from hip to shoulder within a few frames
