@@ -758,6 +758,9 @@ describe('the clip gait on the ground', () => {
             // brake lagging the clip after the hitch, and into its catch at
             // most 0.18 of its swing's pace over the frame's own length
             // (25.11.2026)
+            // OPEN: point 1596: the hitch path's own bounds (`leap`, `into`
+            // here, found weak in review round 6) are that point's to
+            // tighten; kept as they stand
             expect(s.leap, `${where}: its way to its touchdown spot covered in its brake's first frame`).toBeLessThan(0.9)
             expect(s.into, `${where}: into its catch, of its swing's pace`).toBeLessThan(0.25)
           }
