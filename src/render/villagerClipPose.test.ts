@@ -314,6 +314,7 @@ describe('the clip gait on the ground', () => {
     const braked: boolean[][] = [[], []]
     const walkAt: number[] = []
     const frameDt: number[] = []
+    const speeds: number[] = []
     let x = 0
     let z = 0
     let yaw = 0
@@ -323,6 +324,7 @@ describe('the clip gait on the ground', () => {
       x += Math.sin(yaw) * s.walked
       z += Math.cos(yaw) * s.walked
       walkAt.push(gaitWeights(s.speed / f.scale, f.legScale).walk)
+      speeds.push(s.speed)
       // (each frame's own length: a hitch walks a longer one)
       frameDt.push(s.speed > 0 ? s.walked / s.speed : dt)
       const cy = Math.cos(yaw)
@@ -392,62 +394,52 @@ describe('the clip gait on the ground', () => {
         const last = Math.min(k + 1, frames - 1)
         // (over what the clip's own heel loses that frame: its lift-off and
         // a pace changing under it are the clip's, its heel strike is not —
-        // the clip swings on through it; from the frame before its brake
-        // began, or over the whole swing where none ran: a pace stepping at
-        // the lift-off moves the hold's release, which is not the strike)
+        // the clip swings on through it)
         const began = braked[i].findIndex((b, j) => j > off && j < k && b)
         let drop = 0
-        // (from the swing's middle or its brake's start, whichever is first,
-        // the clip's own loss taken off: a snap to rest before the brake
-        // began is a dead stop too, cross-vendor review of point 1591; the
-        // lift-off's half stays out, a pace stepping there moves the hold's
-        // release)
+        // (over the whole swing from the frame after its lift-off, the clip's
+        // own loss taken off: a snap to rest anywhere before the brake began
+        // is a dead stop too, cross-vendor reviews of point 1591; a pace
+        // stepping by 2 % and more within the swing moves the hold's release,
+        // which is not the strike, so there from the swing's middle or the
+        // brake's start, whichever is first)
+        let stepped = false
+        for (let j = Math.max(1, off - 1); j <= k; j++) stepped ||= Math.abs(speeds[j] - speeds[j - 1]) > 0.02 * speeds[j]
         const mid = Math.max(off + 2, Math.ceil((off + k) / 2))
-        for (let j = began > 0 ? Math.min(began, mid) : off + 2; j <= last; j++) drop = Math.max(drop, (pace(j - 1) - pace(j) - Math.max(0, pace(j - 1, clip) - pace(j, clip))) / peak)
+        for (let j = stepped && began > 0 ? Math.min(began, mid) : stepped ? mid : off + 2; j <= last; j++) drop = Math.max(drop, (pace(j - 1) - pace(j) - Math.max(0, pace(j - 1, clip) - pace(j, clip))) / peak)
         let stop = 0
         for (let j = k; j <= last; j++) stop = Math.max(stop, (pace(j - 1) - pace(j)) / peak)
         // the stance's pivot through the whole stance: the heel (the
         // strike's contact) against its touchdown spot every frame it is
-        // held on the ground (`slide`), then, once it lets go, each of the
-        // ball and tip held on the ground against its spot, to its toe-off
-        // (`stance`, the heel's slide included; the ball and tip are handed
-        // the drawn foot's place while the heel pivots). No heel frame
-        // read, or fewer than two of the stance, count as unmeasured, never
-        // as no slide (cross-vendor review of point 1591)
+        // held on the ground (`slide`), and each of the ball and tip against
+        // its own spot every frame it is held on the ground, the heel down or
+        // not, to its toe-off (`stance`, the heel's slide included). No heel
+        // frame read, or no contact read on two frames, count as unmeasured,
+        // never as no slide (cross-vendor reviews of point 1591: a toe read
+        // only once the heel let go, or one sample per contact, hid a slide)
         let slide = 0
         let stance = 0
-        let samples = 0
-        let heels = 0
         let heelDown: THREE.Vector3 | null = null
-        // the ball's and tip's spots (from the heel's letting go, each from
-        // its first frame held on the ground), and whether the heel let go
+        // (frames read per contact: heel, ball, tip; the ball's and tip's
+        // spots, each from its first frame held on the ground)
+        const reads = [0, 0, 0]
         const toes: (THREE.Vector3 | null)[] = [null, null]
         let rolled = false
         let j = k
         for (; j < frames && any(i, j); j++) {
-          // (the heel held but risen: a ball or tip held on the ground then
-          // is read against its spot as well, cross-vendor review of point
-          // 1591: skipping those frames hid its slide)
           const heelHeld = held[i][j].heel && !rolled
-          if (heelHeld) {
-            const h = spots[i][j]
-            if (h.y <= 0.01) {
-              heelDown ??= h
-              heels++
-              samples++
-              slide = Math.max(slide, Math.hypot(h.x - heelDown.x, h.z - heelDown.z) / per)
-              continue
-            }
-            if (!heelDown) continue
-          } else {
+          if (!heelHeld) {
             if (!heelDown) break
             rolled = true
           }
-          // each of the ball and tip held and on the ground this frame
-          // against its spot, to the first frame neither is down (its
-          // toe-off; cross-vendor review of point 1591: the least moved of
-          // every held point let a held contact in the air hide a sliding one
-          // on the ground)
+          let read = false
+          const h = spots[i][j]
+          if (heelHeld && h.y <= 0.01) {
+            heelDown ??= h
+            reads[0]++
+            read = true
+            slide = Math.max(slide, Math.hypot(h.x - heelDown.x, h.z - heelDown.z) / per)
+          }
           // OPEN: point 1591 review: read past a frame with neither down
           // while the hold lasts, the hold's release (fading its contacts out
           // up to 0.04 per unit of leg over the ground) and a pace falling
@@ -458,18 +450,18 @@ describe('the clip gait on the ground', () => {
           // holds alone cannot tell it from one
           const at = [balls[i][j], tips[i][j]]
           const down = [0, 1].filter((m) => held[i][j][m ? 'tip' : 'ball'] && at[m].y <= 0.01)
-          if (down.length < 1) {
-            if (heelHeld) continue
-            break
+          for (const m of down) {
+            toes[m] ??= at[m]
+            reads[1 + m]++
+            read = true
+            stance = Math.max(stance, Math.hypot(at[m].x - toes[m]!.x, at[m].z - toes[m]!.z) / per)
           }
-          for (const m of down) toes[m] ??= at[m]
-          samples++
-          stance = Math.max(stance, ...down.map((m) => Math.hypot(at[m].x - toes[m]!.x, at[m].z - toes[m]!.z) / per))
+          if (!read && !heelHeld) break
         }
         stance = Math.max(stance, slide)
         // (a stance the run's end cuts short counts as read so far)
-        if (heels < 1 && j < frames) slide = Infinity
-        if (samples < 2 && j < frames) stance = Infinity
+        if (reads[0] < 1 && j < frames) slide = Infinity
+        if (Math.max(...reads) < 2 && j < frames) stance = Infinity
         // (against the clip's step that frame, or of a 60 Hz one where frames
         // are shorter)
         const land = (drawn[i][k].distanceTo(clip[i][k]) - pace(k, clip) / Math.min(hz, 60)) / per

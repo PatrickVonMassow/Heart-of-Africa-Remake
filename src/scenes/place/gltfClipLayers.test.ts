@@ -927,57 +927,59 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         const began = frames.findIndex((f, j) => j > off && j < k && f.brake[i] === 1)
         const peak = Math.max(...Array.from({ length: k - off }, (_, j) => pace(off + 1 + j, i)))
         let drop = 0
-        // (from the swing's middle or its brake's start, whichever is first:
-        // a snap to rest just before the brake began is a dead stop too,
-        // cross-vendor review of point 1591; the lift-off's half stays out)
+        // (over the whole swing from the frame after its lift-off: a snap to
+        // rest anywhere before the brake began is a dead stop too,
+        // cross-vendor reviews of point 1591; a step stepping by 2 % and more
+        // within the swing moves the hold's release, which is not the strike,
+        // so there from the swing's middle or the brake's start, whichever is
+        // first)
+        let stepped = false
+        for (let j = Math.max(1, off - 1); j <= k; j++) stepped ||= Math.abs(frames[j].step - frames[j - 1].step) > 0.02 * frames[j].step
         const mid = Math.max(off + 2, Math.ceil((off + k) / 2))
-        for (let j = began > 0 ? Math.min(began, mid) : off + 2; j <= k + 1; j++) drop = Math.max(drop, (pace(j - 1, i) - pace(j, i)) / peak)
+        for (let j = stepped && began > 0 ? Math.min(began, mid) : stepped ? mid : off + 2; j <= k + 1; j++) drop = Math.max(drop, (pace(j - 1, i) - pace(j, i)) / peak)
         // the stance through to its toe-off, with the legs on the gait (full
         // weight, no stop drawing them; the other foot's start still running
         // included): the heel against its touchdown spot while held on the
         // ground (`slide`; rolling onto its ball, the heel rises while held),
-        // then each of the ball and tip held on the ground against its spot,
-        // to its toe-off (`stance`, the heel's slide included). Fewer than
-        // two frames read count as
-        // unmeasured (NaN) where the stop takes the legs off the gait, as a
-        // slide everywhere else (cross-vendor review of point 1591)
+        // and each of the ball and tip against its own spot every frame it
+        // is held on the ground, the heel down or not, to its toe-off
+        // (`stance`, the heel's slide included). No contact read on two
+        // frames counts as unmeasured (NaN) where the stop takes the legs off
+        // the gait, as a slide everywhere else (cross-vendor reviews of point
+        // 1591: a toe read only once the heel let go hid a pivot's slide)
         const at = frames[k].feet[i][1]
         let slide = 0
         let stance = 0
-        let samples = 0
-        // (the ball's and tip's spots, each from its first frame held on the
-        // ground once the heel let go)
+        // (frames read per contact: heel, ball, tip; the ball's and tip's
+        // spots, each from its first frame held on the ground)
+        const reads = [0, 0, 0]
         const toes: (THREE.Vector3 | null)[] = [null, null]
         let rolled = false
         let j = k
         for (; j < frames.length && frames[j].held[i] && frames[j].w >= 1 && frames[j].hold <= 0; j++) {
           const f = frames[j].feet[i]
-          // (the heel held but risen: a ball or tip held on the ground then
-          // is read against its spot as well, cross-vendor review of point
-          // 1591: skipping those frames hid its slide)
           const heelHeld = frames[j].heel[i] && !rolled
-          if (heelHeld) {
-            if (f[1].y - at.y <= 0.005) {
-              samples++
-              slide = Math.max(slide, Math.hypot(f[1].x - at.x, f[1].z - at.z))
-              continue
-            }
-          } else rolled = true
-          // each of the ball and tip held and on the ground this frame, to
-          // the first frame neither is (as villagerClipPose.test.ts reads it,
-          // its OPEN there: the least moved of every held point let one in the
-          // air hide a sliding one on the ground)
-          const down = [0, 1].filter((m) => (m ? frames[j].tip[i] : frames[j].ball[i]) && f[2 + m].y - at.y <= 0.005)
-          if (down.length < 1) {
-            if (heelHeld) continue
-            break
+          if (!heelHeld) rolled = true
+          let read = false
+          if (heelHeld && f[1].y - at.y <= 0.005) {
+            reads[0]++
+            read = true
+            slide = Math.max(slide, Math.hypot(f[1].x - at.x, f[1].z - at.z))
           }
-          for (const m of down) toes[m] ??= f[2 + m]
-          samples++
-          stance = Math.max(stance, ...down.map((m) => Math.hypot(f[2 + m].x - toes[m]!.x, f[2 + m].z - toes[m]!.z)))
+          // (as villagerClipPose.test.ts reads it, its OPEN there: the least
+          // moved of every held point let one in the air hide a sliding one
+          // on the ground)
+          const down = [0, 1].filter((m) => (m ? frames[j].tip[i] : frames[j].ball[i]) && f[2 + m].y - at.y <= 0.005)
+          for (const m of down) {
+            toes[m] ??= f[2 + m]
+            reads[1 + m]++
+            read = true
+            stance = Math.max(stance, Math.hypot(f[2 + m].x - toes[m]!.x, f[2 + m].z - toes[m]!.z))
+          }
+          if (!read && !heelHeld) break
         }
         stance = Math.max(stance, slide)
-        if (samples < 2) {
+        if (Math.max(...reads) < 2) {
           // (cut short only by the legs leaving the gait while the foot is
           // still held, never by a stance with no contact down: that is no
           // reading, cross-vendor review of point 1591)
