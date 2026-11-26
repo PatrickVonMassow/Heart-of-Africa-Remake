@@ -476,10 +476,13 @@ describe('the clip gait on the ground', () => {
     // a foot's brake end, once at least 0.6 of the cycle has been walked (the
     // foot's lift-off seen) and 0.1 of it is still to come; each owed a
     // strike of that foot within 0.15 of the cycle (a strike skipped, its
-    // catch lost, fails here whatever the holds did)
+    // catch lost, fails here whatever the holds did), each strike matched to
+    // one owed at most (cross-vendor review of point 1591: one catch read
+    // for two owed hid the second's loss)
     const wrap = (d: number) => (((d % 1) + 1.5) % 1) - 0.5
     let missed = 0
     let owed = 0
+    const matched = new Set<HeelStrike>()
     for (const i of [0, 1]) {
       for (let c = 1; c < frames; c++) {
         const [e0, e1] = [ends[i][c - 1], ends[i][c]]
@@ -487,7 +490,10 @@ describe('the clip gait on the ground', () => {
         const [x0, x1] = [wrap(phases[c - 1] - e0), wrap(phases[c] - e1)]
         if (!(x0 < 0 && x0 > -0.25 && x1 >= 0)) continue
         owed++
-        if (!out.some((t) => t.i === i && Math.abs(cum[t.k] - cum[c]) <= 0.15)) missed++
+        // (the nearest strike not yet matched)
+        const near = out.filter((t) => t.i === i && !matched.has(t) && Math.abs(cum[t.k] - cum[c]) <= 0.15).sort((a, b) => Math.abs(cum[a.k] - cum[c]) - Math.abs(cum[b.k] - cum[c]))[0]
+        if (near) matched.add(near)
+        else missed++
       }
     }
     return Object.assign(out, { unheeled, wrongFirst, missed, owed })

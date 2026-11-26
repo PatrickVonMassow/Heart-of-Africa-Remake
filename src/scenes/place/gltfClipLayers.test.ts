@@ -982,6 +982,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
     // point 1591)
     let missed = 0
     let owed = 0
+    const matched = new Set<(typeof lands)[number][number]>()
     for (const i of [0, 1]) {
       let rising = frames[0].legs > 0
       let first = rising
@@ -999,7 +1000,10 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         }
         if (k + 4 >= frames.length || !walking(s0, k + 1)) continue
         owed++
-        if (!lands[i].some((t) => t.k >= (s0 + k) / 2 && t.k <= k + 3)) missed++
+        // (each touchdown matched to one owed at most: villagerClipPose.test.ts)
+        const land = lands[i].find((t) => !matched.has(t) && t.k >= (s0 + k) / 2 && t.k <= k + 3)
+        if (land) matched.add(land)
+        else missed++
       }
     }
     return Object.assign(out, { missed, owed, wrong: lands[0].wrong + lands[1].wrong })
