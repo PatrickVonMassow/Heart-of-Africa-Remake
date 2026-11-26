@@ -462,7 +462,13 @@ export function etaMinutes(meta) {
   const start = /(\d{1,2}):(\d{2})/.exec(text.slice(0, end.index))
   let eta = Number(end[1]) * 60 + Number(end[2])
   const from = start ? Number(start[1]) * 60 + Number(start[2]) : null
-  if (from !== null && eta < from) eta += 1440
+  // A card spanning days dates both ends ('25.11. 15:49 – 26.11. ~17:38'):
+  // the end lies that many days past the start's day.
+  const day = (d) => (d ? Date.UTC(2001, Number(d[2]) - 1, Number(d[1])) / 864e5 : null)
+  const startDay = start ? day(/(\d{1,2})\.(\d{1,2})\.\s*$/.exec(text.slice(0, start.index))) : null
+  const endDay = day(/(\d{1,2})\.(\d{1,2})\.\s*$/.exec(text.slice(0, end.index)))
+  if (startDay !== null && endDay !== null && endDay !== startDay) eta += 1440 * ((endDay - startDay + 365) % 365)
+  else if (from !== null && eta < from) eta += 1440
   return { eta, start: from }
 }
 

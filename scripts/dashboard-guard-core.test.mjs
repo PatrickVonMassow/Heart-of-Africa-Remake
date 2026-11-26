@@ -1129,6 +1129,11 @@ describe('a current-work estimate stays ahead of the clock (user 28.07.2026)', (
     expect(codes('10:44 · ~13:00', 13 * 60 + ETA_GRACE_MIN + 1)).toContain('now-eta-past')
   })
 
+  it('reads a card dated over two days by its end date, not as overdue', () => {
+    expect(codes('25.11. 15:49 – 26.11. ~17:38', 3 * 60 + 21)).not.toContain('now-eta-past')
+    expect(codes('25.11. 15:49 – 26.11. ~02:38', 3 * 60 + 21)).toContain('now-eta-past')
+  })
+
   it('reads an estimate earlier than its own start as the next day, not as overdue', () => {
     expect(codes('23:40 · ~00:30', 23 * 60 + 50)).not.toContain('now-eta-past')
   })
