@@ -929,14 +929,10 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         let drop = 0
         // (over the whole swing from the frame after its lift-off: a snap to
         // rest anywhere before the brake began is a dead stop too,
-        // cross-vendor reviews of point 1591; a step stepping by 2 % and more
-        // within the swing moves the hold's release, which is not the strike,
-        // so there from the swing's middle or the brake's start, whichever is
-        // first)
-        let stepped = false
-        for (let j = Math.max(1, off - 1); j <= k; j++) stepped ||= Math.abs(frames[j].step - frames[j - 1].step) > 0.02 * frames[j].step
-        const mid = Math.max(off + 2, Math.ceil((off + k) / 2))
-        for (let j = stepped && began > 0 ? Math.min(began, mid) : stepped ? mid : off + 2; j <= k + 1; j++) drop = Math.max(drop, (pace(j - 1, i) - pace(j, i)) / peak)
+        // cross-vendor reviews of point 1591; only the frames a step change
+        // of 2 % and more touches are skipped: it moves the hold's release)
+        const steps = (j: number) => [j, j - 1, j - 2].some((m) => m >= 1 && Math.abs(frames[m].step - frames[m - 1].step) >= 0.02 * frames[m].step)
+        for (let j = off + 2; j <= k + 1; j++) if (!steps(j)) drop = Math.max(drop, (pace(j - 1, i) - pace(j, i)) / peak)
         // the stance through to its toe-off, with the legs on the gait (full
         // weight, no stop drawing them; the other foot's start still running
         // included): the heel against its touchdown spot while held on the
@@ -976,6 +972,8 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
             read = true
             stance = Math.max(stance, Math.hypot(f[2 + m].x - toes[m]!.x, f[2 + m].z - toes[m]!.z))
           }
+          // (OPEN in villagerClipPose.test.ts: a frame with nothing down ends
+          // the read, a held tip lifted off skims on)
           if (!read && !heelHeld) break
         }
         stance = Math.max(stance, slide)
@@ -986,7 +984,9 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
           const cut = j < frames.length && frames[j].held[i] && (frames[j].w < 1 || frames[j].hold > 0)
           slide = stance = cut ? NaN : Infinity
         }
-        out.push({ k, i, braked: began > 0, into: pace(k, i) / peak, drop, slide, stance })
+        // (a swing with no pace at all is no reading: cross-vendor review of
+        // point 1591)
+        out.push({ k, i, braked: began > 0, into: peak > 0 ? pace(k, i) / peak : Infinity, drop: peak > 0 ? drop : Infinity, slide, stance })
       }
     })
     // the strikes owed, read off the walk clip's own swing (`Sole.swing`),

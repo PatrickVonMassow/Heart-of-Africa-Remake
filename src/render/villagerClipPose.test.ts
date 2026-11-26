@@ -399,14 +399,11 @@ describe('the clip gait on the ground', () => {
         let drop = 0
         // (over the whole swing from the frame after its lift-off, the clip's
         // own loss taken off: a snap to rest anywhere before the brake began
-        // is a dead stop too, cross-vendor reviews of point 1591; a pace
-        // stepping by 2 % and more within the swing moves the hold's release,
-        // which is not the strike, so there from the swing's middle or the
-        // brake's start, whichever is first)
-        let stepped = false
-        for (let j = Math.max(1, off - 1); j <= k; j++) stepped ||= Math.abs(speeds[j] - speeds[j - 1]) > 0.02 * speeds[j]
-        const mid = Math.max(off + 2, Math.ceil((off + k) / 2))
-        for (let j = stepped && began > 0 ? Math.min(began, mid) : stepped ? mid : off + 2; j <= last; j++) drop = Math.max(drop, (pace(j - 1) - pace(j) - Math.max(0, pace(j - 1, clip) - pace(j, clip))) / peak)
+        // is a dead stop too, cross-vendor reviews of point 1591; only the
+        // frames a pace step of 2 % and more touches, the step's and the two
+        // after, are skipped: it moves the hold's release, not the strike)
+        const steps = (j: number) => [j, j - 1, j - 2].some((m) => m >= 1 && Math.abs(speeds[m] - speeds[m - 1]) >= 0.02 * speeds[m])
+        for (let j = off + 2; j <= last; j++) if (!steps(j)) drop = Math.max(drop, (pace(j - 1) - pace(j) - Math.max(0, pace(j - 1, clip) - pace(j, clip))) / peak)
         let stop = 0
         for (let j = k; j <= last; j++) stop = Math.max(stop, (pace(j - 1) - pace(j)) / peak)
         // the stance's pivot through the whole stance: the heel (the
@@ -456,12 +453,15 @@ describe('the clip gait on the ground', () => {
             read = true
             stance = Math.max(stance, Math.hypot(at[m].x - toes[m]!.x, at[m].z - toes[m]!.z) / per)
           }
+          // (OPEN above: why a frame with nothing down ends the read)
           if (!read && !heelHeld) break
         }
         stance = Math.max(stance, slide)
         // (a stance the run's end cuts short counts as read so far)
         if (reads[0] < 1 && j < frames) slide = Infinity
-        if (Math.max(...reads) < 2 && j < frames) stance = Infinity
+        // (a stance the run's end cuts short before a second read is unread,
+        // NaN, and left out of the stance checks; any other is a failure)
+        if (Math.max(...reads) < 2) stance = j < frames ? Infinity : NaN
         // (against the clip's step that frame, or of a 60 Hz one where frames
         // are shorter)
         const land = (drawn[i][k].distanceTo(clip[i][k]) - pace(k, clip) / Math.min(hz, 60)) / per
@@ -477,7 +477,7 @@ describe('the clip gait on the ground', () => {
         const during = walkAt.slice(began > 0 ? began : k, k + 1)
         const fell = during[0] - during[during.length - 1]
         const crossed = during[during.length - 1] < 1 && fell >= 0.15
-        out.push({ i, k, into: pace(k) / peak, drop, stop, land, slide, walk: walkAt[k], braked: braked[i].slice(off, k).some(Boolean), leap, crossed, fell, stance })
+        out.push({ i, k, into: peak > 0 ? pace(k) / peak : Infinity, drop: peak > 0 ? drop : Infinity, stop, land, slide, walk: walkAt[k], braked: braked[i].slice(off, k).some(Boolean), leap, crossed, fell, stance })
       }
     }
     // the strikes owed, read off the gait's phase alone: each time it passes
@@ -596,7 +596,7 @@ describe('the clip gait on the ground', () => {
             expect(strikes.owed, `${where}: strikes owed`).toBeGreaterThan(1)
             for (const s of strikes) {
               expect(s.braked, `${where}, frame ${s.k}, foot ${s.i}: its brake ran`).toBe(true)
-              expect(s.stance, `${where}, frame ${s.k}, foot ${s.i}: its stance's drift (unbraked ${ref.toFixed(4)})`).toBeLessThanOrEqual(ref + STANCE_OVER)
+              if (!Number.isNaN(s.stance)) expect(s.stance, `${where}, frame ${s.k}, foot ${s.i}: its stance's drift (unbraked ${ref.toFixed(4)})`).toBeLessThanOrEqual(ref + STANCE_OVER)
               const o = overBound(s, jog, hz)
               for (const key of keys) {
                 if (o[key] > worst[key]) {
@@ -702,7 +702,7 @@ describe('the clip gait on the ground', () => {
               for (const s of strikes) {
                 const at = `${where}, frame ${s.k}, foot ${s.i}`
                 expect(s.braked, `${at}: its brake ran`).toBe(true)
-                expect(s.stance, `${at}: its stance's drift (unbraked ${ref.toFixed(4)})`).toBeLessThanOrEqual(ref + STANCE_OVER)
+                if (!Number.isNaN(s.stance)) expect(s.stance, `${at}: its stance's drift (unbraked ${ref.toFixed(4)})`).toBeLessThanOrEqual(ref + STANCE_OVER)
                 const o = overBound(s, jog, hz)
                 // (a pace crossing the band within the brake moves the touch it
                 // ends before, where one contact or another comes down first:
