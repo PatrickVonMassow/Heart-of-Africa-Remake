@@ -932,30 +932,38 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         // weight, no stop drawing them; the other foot's start still running
         // included): the heel against its touchdown spot while held on the
         // ground (`slide`; rolling onto its ball, the heel rises while held),
-        // then the least moved of the ball and tip held against their spots
-        // as the heel let go, while one of them is on the ground (`stance`,
-        // the heel's slide included). Fewer than two frames read count as
+        // then each of the ball and tip held on the ground against its spot,
+        // to its toe-off (`stance`, the heel's slide included). Fewer than
+        // two frames read count as
         // unmeasured (NaN) where the stop takes the legs off the gait, as a
         // slide everywhere else (cross-vendor review of point 1591)
         const at = frames[k].feet[i][1]
         let slide = 0
         let stance = 0
         let samples = 0
-        let toes: THREE.Vector3[] | null = null
+        // (the ball's and tip's spots, each from its first frame held on the
+        // ground once the heel let go)
+        const toes: (THREE.Vector3 | null)[] = [null, null]
+        let rolled = false
         let j = k
         for (; j < frames.length && frames[j].held[i] && frames[j].w >= 1 && frames[j].hold <= 0; j++) {
           const f = frames[j].feet[i]
-          if (frames[j].heel[i] && !toes) {
+          if (frames[j].heel[i] && !rolled) {
             if (f[1].y - at.y > 0.005) continue
             samples++
             slide = Math.max(slide, Math.hypot(f[1].x - at.x, f[1].z - at.z))
             continue
           }
-          toes ??= [f[2], f[3]]
-          const toe = [0, 1].filter((m) => (m ? frames[j].tip[i] : frames[j].ball[i]))
-          if (!toe.some((m) => f[2 + m].y - at.y <= 0.005)) break
+          rolled = true
+          // each of the ball and tip held and on the ground this frame, to
+          // the first frame neither is (as villagerClipPose.test.ts reads it,
+          // its OPEN there: the least moved of every held point let one in the
+          // air hide a sliding one on the ground)
+          const down = [0, 1].filter((m) => (m ? frames[j].tip[i] : frames[j].ball[i]) && f[2 + m].y - at.y <= 0.005)
+          if (down.length < 1) break
+          for (const m of down) toes[m] ??= f[2 + m]
           samples++
-          stance = Math.max(stance, Math.min(...toe.map((m) => Math.hypot(f[2 + m].x - toes![m].x, f[2 + m].z - toes![m].z))))
+          stance = Math.max(stance, ...down.map((m) => Math.hypot(f[2 + m].x - toes[m]!.x, f[2 + m].z - toes[m]!.z)))
         }
         stance = Math.max(stance, slide)
         if (samples < 2) {

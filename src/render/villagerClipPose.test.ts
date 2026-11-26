@@ -402,12 +402,10 @@ describe('the clip gait on the ground', () => {
         for (let j = k; j <= last; j++) stop = Math.max(stop, (pace(j - 1) - pace(j)) / peak)
         // the stance's pivot through the whole stance: the heel (the
         // strike's contact) against its touchdown spot every frame it is
-        // held on the ground (`slide`), then, once it lets go, the least
-        // moved of the ball and tip held against their spots as it let go,
-        // while one of them is on the ground (the foot pivots on one rolling
-        // off, the other swung round it in a curve or rising), to its
-        // toe-off (`stance`, the heel's slide included; the ball and tip are
-        // handed the drawn foot's place while the heel pivots). No heel frame
+        // held on the ground (`slide`), then, once it lets go, each of the
+        // ball and tip held on the ground against its spot, to its toe-off
+        // (`stance`, the heel's slide included; the ball and tip are handed
+        // the drawn foot's place while the heel pivots). No heel frame
         // read, or fewer than two of the stance, count as unmeasured, never
         // as no slide (cross-vendor review of point 1591)
         let slide = 0
@@ -415,11 +413,13 @@ describe('the clip gait on the ground', () => {
         let samples = 0
         let heels = 0
         let heelDown: THREE.Vector3 | null = null
-        // the ball's and tip's spots as the heel let go
-        let toes: THREE.Vector3[] | null = null
+        // the ball's and tip's spots (from the heel's letting go, each from
+        // its first frame held on the ground), and whether the heel let go
+        const toes: (THREE.Vector3 | null)[] = [null, null]
+        let rolled = false
         let j = k
         for (; j < frames && any(i, j); j++) {
-          if (held[i][j].heel && !toes) {
+          if (held[i][j].heel && !rolled) {
             const h = spots[i][j]
             if (h.y > 0.01) continue
             heelDown ??= h
@@ -429,16 +429,26 @@ describe('the clip gait on the ground', () => {
             continue
           }
           if (!heelDown) break
+          rolled = true
+          // each of the ball and tip held and on the ground this frame
+          // against its spot, to the first frame neither is down (its
+          // toe-off; cross-vendor review of point 1591: the least moved of
+          // every held point let a held contact in the air hide a sliding one
+          // on the ground)
+          // OPEN: point 1591 review: read past a frame with neither down
+          // while the hold lasts, the hold's release (fading its contacts out
+          // up to 0.04 per unit of leg over the ground) and a pace falling
+          // fast (lengthening the blended stance back over a foot lifted off)
+          // keep a lifted tip held, skimming 9 mm over the ground 0.2 per
+          // unit of leg on from its spot (144 Hz pace wave, braked and
+          // unbraked alike, measured 26.11.2026): no stance's slide, and the
+          // holds alone cannot tell it from one
           const at = [balls[i][j], tips[i][j]]
-          toes ??= at
-          // the least moved of the ball and tip held, while one of them is on
-          // the ground (the foot pivots on one rolling off, the other swung
-          // round it or rising: neither down, its toe-off)
-          const toe = [0, 1].filter((m) => held[i][j][m ? 'tip' : 'ball'])
-          if (!toe.some((m) => at[m].y <= 0.01)) break
-          const moved = toe.map((m) => Math.hypot(at[m].x - toes![m].x, at[m].z - toes![m].z) / per)
+          const down = [0, 1].filter((m) => held[i][j][m ? 'tip' : 'ball'] && at[m].y <= 0.01)
+          if (down.length < 1) break
+          for (const m of down) toes[m] ??= at[m]
           samples++
-          stance = Math.max(stance, Math.min(...moved))
+          stance = Math.max(stance, ...down.map((m) => Math.hypot(at[m].x - toes[m]!.x, at[m].z - toes[m]!.z) / per))
         }
         stance = Math.max(stance, slide)
         // (a stance the run's end cuts short counts as read so far)
