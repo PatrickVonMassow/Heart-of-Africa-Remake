@@ -2545,7 +2545,8 @@ describe('card times', () => {
     it('puts the estimate tilde before the clock, where the eta audit reads it', () => {
       const line = cardTimeLine({ start: '2026-10-03T07:12:00Z', end: '2026-10-05T12:30:00Z', projected: true, sessions: 2 })
       expect(line).toBe('03.10. 09:12 – 05.10. ~14:30 · 2 Sitzungen')
-      expect(etaMinutes(line)).toEqual({ eta: 14 * 60 + 30, start: 9 * 60 + 12 })
+      // (a card dated over two days ends that many days past its start's day)
+      expect(etaMinutes(line)).toEqual({ eta: 2 * 1440 + 14 * 60 + 30, start: 9 * 60 + 12 })
     })
 
     it('dates a running card without an end by its distance to now', () => {
