@@ -838,6 +838,23 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
       return (clip * hz) / 60
     })
 
+  /** Whether a catch without the heel, `frames` frames and `seconds` after
+   *  the foot's last contact let go, its heel `moved` per unit of leg since,
+   *  is a toe caught again where it rose (no landing): its tip alone within
+   *  0.2 s of the lift-off, or its ball and tip on the frame right after (as
+   *  villagerClipPose.test.ts tells it; these runs measured none, 26.11.2026). */
+  const toeRecatch = (h: { heel: boolean; ball: boolean; tip: boolean }, frames: number, seconds: number, moved: number) =>
+    !h.heel && h.tip && moved < 0.4 && ((!h.ball && seconds <= 0.2) || (h.ball && frames <= 1))
+  it('a toe caught again where it rose is no landing only on its tip alone right after the lift-off, or its ball and tip the frame after', () => {
+    const tip = { heel: false, ball: false, tip: true }
+    const both = { heel: false, ball: true, tip: true }
+    expect(toeRecatch(tip, 3, 3 / 60, 0.1)).toBe(true)
+    expect(toeRecatch(both, 1, 1 / 60, 0.1)).toBe(true)
+    expect(toeRecatch({ heel: false, ball: true, tip: false }, 1, 1 / 60, 0.05)).toBe(false)
+    expect(toeRecatch(both, 2, 2 / 60, 0.1)).toBe(false)
+    expect(toeRecatch(tip, 18, 0.3, 0.3)).toBe(false)
+    expect(toeRecatch(tip, 1, 1 / 60, 0.45)).toBe(false)
+  })
   /** Per foot, each landing over a run: the frame the gait takes hold of
    *  its HEEL (`ClipGait.held[i].heel`: a ball or tip caught first is not
    *  the heel's touchdown, and a toe caught again where it rose is no
@@ -846,7 +863,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
    *  rising (a start, a resume, a figure set walking: read from the legs'
    *  weight and the foot leaving the stand, never from the brake), and whether the foot still stood on the stand (`stand`:
    *  the gait's landing, not drawn). */
-  const touchdowns = (frames: Sole[]) =>
+  const touchdowns = (frames: Sole[], hz = 60) =>
     [0, 1].map((i) => {
       const out: { k: number; off: number; first: boolean; stand: boolean }[] = []
       // landings whose ball or tip took hold before the heel
@@ -869,14 +886,13 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
         }
         if (any && !landed && off >= 0) {
           landed = true
-          // (a toe caught again where it rose holds its tip alone, or its
-          // ball and tip the frame after they let go, its heel moved at most
-          // 0.3 per unit of leg since it rose: no landing; any other catch
-          // without the heel is a landing on the wrong contact, cross-vendor
-          // review of point 1591)
+          // (a toe caught again where it rose is no landing, `toeRecatch`;
+          // any other catch without the heel is a landing on the wrong
+          // contact, cross-vendor review of point 1591)
           const moved = Math.hypot(frames[k].feet[i][1].x - frames[off].feet[i][1].x, frames[k].feet[i][1].z - frames[off].feet[i][1].z) / (person.frame.legScale * person.frame.scale)
-          if (!frames[k].heel[i] && moved < 0.4 && ((frames[k].tip[i] && !frames[k].ball[i]) || k - off <= 1)) heeled = true
-          else if (!frames[k].heel[i]) wrong++
+          const h = { heel: frames[k].heel[i], ball: frames[k].ball[i], tip: frames[k].tip[i] }
+          if (toeRecatch(h, k - off, (k - off) / hz, moved)) heeled = true
+          else if (!h.heel) wrong++
         }
         if (heeled || frames[k - 1].heel[i] || !frames[k].heel[i]) continue
         heeled = true
@@ -901,7 +917,7 @@ describe('starting and stopping on the glTF figure (point 1330)', () => {
   const heelStrikes = (frames: Sole[], hz = 60) => {
     const pace = (k: number, i: number) => Math.hypot(frames[k].feet[i][1].x - frames[k - 1].feet[i][1].x, frames[k].feet[i][1].z - frames[k - 1].feet[i][1].z) * hz
     const out: { k: number; i: number; braked: boolean; into: number; drop: number; slide: number; stance: number }[] = []
-    const lands = touchdowns(frames)
+    const lands = touchdowns(frames, hz)
     // the body walking the whole way in (a stop's first frame takes the
     // body's pace, and the gait's with it: that frame is the stop's)
     const walking = (from: number, to: number) => frames.slice(from, to + 1).every((f) => f.step > 0)

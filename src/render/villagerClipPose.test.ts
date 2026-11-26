@@ -237,6 +237,34 @@ describe('the clip gait on the ground', () => {
     }
   }, 240_000)
 
+  /** Whether a catch without the heel, `frames` frames and `seconds` after
+   *  the foot's last contact let go, its heel `moved` per unit of leg since,
+   *  is a toe caught again where it rose (no landing): its tip alone within
+   *  0.2 s of the lift-off, or its ball and tip on the frame right after.
+   *  A ball caught alone, or later, or away from the lift-off, is a landing
+   *  on the wrong contact (cross-vendor review of point 1591; measured, the
+   *  tip alone at most 0.167 s on at 60 Hz, 0.146 s at 144 Hz and 0.067 s at
+   *  30 Hz, the ball and tip only on the next 30 Hz frame, 0.12 per unit of
+   *  leg on, every landing 0.44 and more, 26.11.2026). */
+  const toeRecatch = (h: { heel: boolean; ball: boolean; tip: boolean }, frames: number, seconds: number, moved: number) =>
+    !h.heel && h.tip && moved < 0.4 && ((!h.ball && seconds <= 0.2) || (h.ball && frames <= 1))
+
+  it('a toe caught again where it rose is told from a landing on the wrong contact by its contacts and its time since the lift-off', () => {
+    const tip = { heel: false, ball: false, tip: true }
+    const both = { heel: false, ball: true, tip: true }
+    const ball = { heel: false, ball: true, tip: false }
+    expect(toeRecatch(tip, 1, 1 / 30, 0.1)).toBe(true)
+    expect(toeRecatch(tip, 10, 0.167, 0.33)).toBe(true)
+    expect(toeRecatch(both, 1, 1 / 30, 0.12)).toBe(true)
+    // a ball alone on the next frame, the ball and tip later, the tip alone
+    // past the lift-off's frames, and any catch away from the lift-off
+    expect(toeRecatch(ball, 1, 1 / 60, 0.05)).toBe(false)
+    expect(toeRecatch(both, 2, 2 / 60, 0.1)).toBe(false)
+    expect(toeRecatch(tip, 18, 0.3, 0.3)).toBe(false)
+    expect(toeRecatch(tip, 1, 1 / 60, 0.45)).toBe(false)
+    expect(toeRecatch({ heel: true, ball: false, tip: true }, 1, 1 / 60, 0.1)).toBe(false)
+  })
+
   /** One frame of a heel-strike run: the ground walked (figure units), the
    *  pace the gait is drawn at, and the body's turn that frame (rad). */
   type HeelStep = { walked: number; speed: number; dyaw: number }
@@ -351,18 +379,11 @@ describe('the clip gait on the ground', () => {
           landed = true
           // a toe caught again where it rose (a pace falling fast lengthens
           // the blended stance back over a foot just lifted off its toes) is
-          // no landing: the foot has not swung
-          // (measured: such a catch holds the tip alone, its heel moved at
-          // most 0.3 per unit of leg since it rose; every landing 0.44 and
-          // more, its heel caught first, 25.11.2026)
-          // (the tip alone, or the ball and tip on the frame right after
-          // they let go: a ball caught first after a swing, or a tip caught
-          // away from where it rose, is a landing on the wrong contact:
-          // cross-vendor review of point 1591; measured, a 30 Hz pace step
-          // down catches the ball and tip again the next frame, 0.12 per
-          // unit of leg on, 26.11.2026)
+          // no landing: the foot has not swung (`toeRecatch`); any other
+          // catch without the heel is a landing on the wrong contact
           const moved = drawn[i][k].distanceTo(drawn[i][off]) / per
-          if (!held[i][k].heel && moved < 0.4 && ((held[i][k].tip && !held[i][k].ball) || k - off <= 1)) heeled = true
+          const since = frameDt.slice(off + 1, k + 1).reduce((a, b) => a + b, 0)
+          if (toeRecatch(held[i][k], k - off, since, moved)) heeled = true
           else if (!held[i][k].heel) wrongFirst++
         }
         if (off < 0 || heeled || held[i][k - 1].heel || !held[i][k].heel) continue
